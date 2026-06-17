@@ -32,13 +32,14 @@ export function VideoCard({ video, onPlay, onEdit, onDelete }: VideoCardProps) {
     }
   };
 
-  // Truncado de descripción
-  const shouldTruncate = video.descripcion && video.descripcion.length > 180;
+  // Truncado de descripción de forma segura
+  const desc = video.descripcion || '';
+  const shouldTruncate = desc.length > 180;
   const displayDescription = isExpanded
-    ? video.descripcion
+    ? desc
     : shouldTruncate
-    ? `${video.descripcion.slice(0, 175)}...`
-    : video.descripcion;
+    ? `${desc.slice(0, 175)}...`
+    : desc;
 
   // Renderizar miniatura o un placeholder premium según el tipo
   const renderThumbnail = () => {

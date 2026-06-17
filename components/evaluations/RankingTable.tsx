@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { Player, Evaluation } from '@/types';
+import { Player, DetailedEvaluation } from '@/types';
 import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
 import { ArrowUpDown } from 'lucide-react';
 
 interface RankingTableProps {
   players: Player[];
-  evaluations: Evaluation[];
+  evaluations: DetailedEvaluation[];
   onSelectPlayer: (id: string) => void;
 }
 
@@ -15,15 +15,16 @@ interface PlayerStats {
   tecnica: number;
   tactica: number;
   condicional: number;
+  defensiva: number;
   media: number;
   evalCount: number;
 }
 
 export function RankingTable({ players, evaluations, onSelectPlayer }: RankingTableProps) {
-  const [sortField, setSortField] = useState<'nombre' | 'demarcacion' | 'tecnica' | 'tactica' | 'condicional' | 'media' | 'evalCount'>('media');
+  const [sortField, setSortField] = useState<'nombre' | 'demarcacion' | 'tecnica' | 'tactica' | 'condicional' | 'defensiva' | 'media' | 'evalCount'>('media');
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
 
-  // Calcular estadísticas por jugador
+  // Compute stats per player
   const playerStatsList: PlayerStats[] = players.map((p) => {
     const playerEvals = evaluations.filter((e) => e.player_id === p.id);
     const count = playerEvals.length;
@@ -34,31 +35,47 @@ export function RankingTable({ players, evaluations, onSelectPlayer }: RankingTa
         tecnica: 0,
         tactica: 0,
         condicional: 0,
+        defensiva: 0,
         media: 0,
         evalCount: 0,
       };
     }
 
-    const tSum = playerEvals.reduce((s, e) => s + e.tecnica, 0);
-    const taSum = playerEvals.reduce((s, e) => s + e.tactica, 0);
-    const cSum = playerEvals.reduce((s, e) => s + e.condicional, 0);
+    // Averages from 20 metrics
+    const tSum = playerEvals.reduce((s, e) => s + (
+      e.pase_corto + e.pase_largo + e.control_orientado + e.regate + 
+      e.centros + e.finalizacion + e.disparo_lejano + e.trabajo_ofensivo
+    ) / 8, 0);
+
+    const taSum = playerEvals.reduce((s, e) => s + (
+      e.vision_juego + e.inteligencia_tactica + e.liderazgo
+    ) / 3, 0);
+
+    const cSum = playerEvals.reduce((s, e) => s + (
+      e.velocidad + e.aceleracion + e.fuerza + e.resistencia + e.juego_aereo
+    ) / 5, 0);
+
+    const dSum = playerEvals.reduce((s, e) => s + (
+      e.marcaje + e.entrada_defensiva + e.posicionamiento_defensivo + e.trabajo_defensivo
+    ) / 4, 0);
 
     const tAvg = tSum / count;
     const taAvg = taSum / count;
     const cAvg = cSum / count;
-    const mediaGlobal = (tAvg + taAvg + cAvg) / 3;
+    const dAvg = dSum / count;
+    const mediaGlobal = (tAvg + taAvg + cAvg + dAvg) / 4;
 
     return {
       player: p,
       tecnica: tAvg,
       tactica: taAvg,
       condicional: cAvg,
+      defensiva: dAvg,
       media: mediaGlobal,
       evalCount: count,
     };
   });
 
-  // Lógica de ordenamiento
   const handleSort = (field: typeof sortField) => {
     if (sortField === field) {
       setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
@@ -73,8 +90,8 @@ export function RankingTable({ players, evaluations, onSelectPlayer }: RankingTa
     let bValue: string | number;
 
     if (sortField === 'nombre') {
-      aValue = a.player.nombre.toLowerCase();
-      bValue = b.player.nombre.toLowerCase();
+      aValue = `${a.player.nombre} ${a.player.apellidos || ''}`.toLowerCase();
+      bValue = `${b.player.nombre} ${b.player.apellidos || ''}`.toLowerCase();
     } else if (sortField === 'demarcacion') {
       aValue = a.player.demarcacion;
       bValue = b.player.demarcacion;
@@ -111,21 +128,27 @@ export function RankingTable({ players, evaluations, onSelectPlayer }: RankingTa
                 <ArrowUpDown className="h-3.5 w-3.5" />
               </div>
             </th>
-            <th className="py-4 px-6 cursor-pointer hover:bg-slate-800/40 select-none text-center" onClick={() => handleSort('tecnica')}>
+            <th className="py-4 px-4 cursor-pointer hover:bg-slate-800/40 select-none text-center" onClick={() => handleSort('tecnica')}>
               <div className="flex items-center justify-center gap-1.5">
                 Téc
                 <ArrowUpDown className="h-3.5 w-3.5" />
               </div>
             </th>
-            <th className="py-4 px-6 cursor-pointer hover:bg-slate-800/40 select-none text-center" onClick={() => handleSort('tactica')}>
+            <th className="py-4 px-4 cursor-pointer hover:bg-slate-800/40 select-none text-center" onClick={() => handleSort('tactica')}>
               <div className="flex items-center justify-center gap-1.5">
                 Tac
                 <ArrowUpDown className="h-3.5 w-3.5" />
               </div>
             </th>
-            <th className="py-4 px-6 cursor-pointer hover:bg-slate-800/40 select-none text-center" onClick={() => handleSort('condicional')}>
+            <th className="py-4 px-4 cursor-pointer hover:bg-slate-800/40 select-none text-center" onClick={() => handleSort('condicional')}>
               <div className="flex items-center justify-center gap-1.5">
                 Fís
+                <ArrowUpDown className="h-3.5 w-3.5" />
+              </div>
+            </th>
+            <th className="py-4 px-4 cursor-pointer hover:bg-slate-800/40 select-none text-center" onClick={() => handleSort('defensiva')}>
+              <div className="flex items-center justify-center gap-1.5">
+                Def
                 <ArrowUpDown className="h-3.5 w-3.5" />
               </div>
             </th>
@@ -154,7 +177,7 @@ export function RankingTable({ players, evaluations, onSelectPlayer }: RankingTa
                 <Avatar src={row.player.foto_url} name={row.player.nombre} size="sm" />
                 <div>
                   <span className="font-bold text-slate-100 hover:text-green-400 block transition-colors duration-150">
-                    {row.player.nombre}
+                    {row.player.nombre} <span className="text-slate-400 font-medium">{row.player.apellidos}</span>
                   </span>
                   <span className="text-xs text-slate-500 font-medium">Dorsal #{row.player.dorsal}</span>
                 </div>
@@ -162,14 +185,17 @@ export function RankingTable({ players, evaluations, onSelectPlayer }: RankingTa
               <td className="py-4 px-6">
                 <Badge variant={row.player.demarcacion}>{row.player.demarcacion}</Badge>
               </td>
-              <td className="py-4 px-6 text-center font-semibold text-slate-200">
+              <td className="py-4 px-4 text-center font-semibold text-slate-200">
                 {row.evalCount > 0 ? row.tecnica.toFixed(1) : '-'}
               </td>
-              <td className="py-4 px-6 text-center font-semibold text-slate-200">
+              <td className="py-4 px-4 text-center font-semibold text-slate-200">
                 {row.evalCount > 0 ? row.tactica.toFixed(1) : '-'}
               </td>
-              <td className="py-4 px-6 text-center font-semibold text-slate-200">
+              <td className="py-4 px-4 text-center font-semibold text-slate-200">
                 {row.evalCount > 0 ? row.condicional.toFixed(1) : '-'}
+              </td>
+              <td className="py-4 px-4 text-center font-semibold text-slate-200">
+                {row.evalCount > 0 ? row.defensiva.toFixed(1) : '-'}
               </td>
               <td className={`py-4 px-6 text-center font-bold ${getMediaColor(row.media)}`}>
                 {row.evalCount > 0 ? row.media.toFixed(1) : 'Sin datos'}

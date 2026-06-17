@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Evaluation } from '@/types';
+import { DetailedEvaluation } from '@/types';
 
 export function useEvaluations(playerId: string | null) {
-  const [evaluations, setEvaluations] = useState<Evaluation[]>([]);
+  const [evaluations, setEvaluations] = useState<DetailedEvaluation[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -13,7 +13,7 @@ export function useEvaluations(playerId: string | null) {
     setError(null);
     try {
       const { data, error: supabaseError } = await supabase
-        .from('evaluations')
+        .from('detailed_evaluations')
         .select('*')
         .eq('player_id', playerId)
         .order('fecha_evaluacion', { ascending: false });

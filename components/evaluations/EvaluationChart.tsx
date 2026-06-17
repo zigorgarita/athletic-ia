@@ -1,14 +1,13 @@
 import React from 'react';
-import { Evaluation } from '@/types';
+import { DetailedEvaluation } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { TrendingUp } from 'lucide-react';
 
 interface EvaluationChartProps {
-  evaluations: Evaluation[];
+  evaluations: DetailedEvaluation[];
 }
 
 export function EvaluationChart({ evaluations }: EvaluationChartProps) {
-  // Ordenar de más antigua a más reciente para mostrar evolución
   const sortedData = [...evaluations].sort(
     (a, b) => new Date(a.fecha_evaluacion).getTime() - new Date(b.fecha_evaluacion).getTime()
   );
@@ -37,21 +36,38 @@ export function EvaluationChart({ evaluations }: EvaluationChartProps) {
 
   // Escalar Y (1 a 5)
   const getY = (val: number) => {
-    // 5 es arriba, 1 es abajo
     const ratio = (val - 1) / 4;
     return padding.top + chartHeight - ratio * chartHeight;
   };
 
-  // Escalar X (distribución uniforme de los índices)
+  // Escalar X
   const getX = (index: number) => {
     return padding.left + (index / (pointsCount - 1)) * chartWidth;
   };
 
+  const calculateGroupAverage = (item: DetailedEvaluation, group: 'tecnica' | 'tactica' | 'condicional' | 'defensiva') => {
+    if (group === 'tecnica') {
+      return (
+        item.pase_corto + item.pase_largo + item.control_orientado + 
+        item.regate + item.centros + item.finalizacion + 
+        item.disparo_lejano + item.trabajo_ofensivo
+      ) / 8;
+    }
+    if (group === 'tactica') {
+      return (item.vision_juego + item.inteligencia_tactica + item.liderazgo) / 3;
+    }
+    if (group === 'condicional') {
+      return (item.velocidad + item.aceleracion + item.fuerza + item.resistencia + item.juego_aereo) / 5;
+    }
+    return (item.marcaje + item.entrada_defensiva + item.posicionamiento_defensivo + item.trabajo_defensivo) / 4;
+  };
+
   // Generar strings de ruta (d) para SVG
-  const getPathData = (metric: 'tecnica' | 'tactica' | 'condicional') => {
+  const getPathData = (metric: 'tecnica' | 'tactica' | 'condicional' | 'defensiva') => {
     return sortedData.reduce((path, item, idx) => {
       const x = getX(idx);
-      const y = getY(item[metric]);
+      const val = calculateGroupAverage(item, metric);
+      const y = getY(val);
       return path + `${idx === 0 ? 'M' : 'L'} ${x} ${y}`;
     }, '');
   };
@@ -65,7 +81,7 @@ export function EvaluationChart({ evaluations }: EvaluationChartProps) {
   };
 
   return (
-    <Card className="overflow-hidden">
+    <Card className="overflow-hidden bg-slate-900/35 border-slate-800/80">
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
           <TrendingUp className="h-4 w-4 text-green-500" />
@@ -75,7 +91,7 @@ export function EvaluationChart({ evaluations }: EvaluationChartProps) {
       <CardContent className="p-5">
         <div className="relative w-full aspect-[5/2] min-h-[200px]">
           <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-full overflow-visible">
-            {/* Grid Lines Horizontales (Líneas guía de puntuación 1-5) */}
+            {/* Grid Lines Horizontales */}
             {[1, 2, 3, 4, 5].map((level) => {
               const y = getY(level);
               return (
@@ -114,7 +130,7 @@ export function EvaluationChart({ evaluations }: EvaluationChartProps) {
               strokeLinejoin="round"
               className="drop-shadow-[0_2px_4px_rgba(34,197,94,0.15)]"
             />
-            {/* Táctica -> Azul/Cian */}
+            {/* Táctica -> Azul */}
             <path
               d={getPathData('tactica')}
               fill="none"
@@ -134,20 +150,31 @@ export function EvaluationChart({ evaluations }: EvaluationChartProps) {
               strokeLinejoin="round"
               className="drop-shadow-[0_2px_4px_rgba(245,158,11,0.15)]"
             />
+            {/* Defensiva -> Púrpura */}
+            <path
+              d={getPathData('defensiva')}
+              fill="none"
+              stroke="#a855f7"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="drop-shadow-[0_2px_4px_rgba(168,85,247,0.15)]"
+            />
 
             {/* Puntos y etiquetas en el eje X */}
             {sortedData.map((item, idx) => {
               const x = getX(idx);
-              const yT = getY(item.tecnica);
-              const yTa = getY(item.tactica);
-              const yC = getY(item.condicional);
+              const yT = getY(calculateGroupAverage(item, 'tecnica'));
+              const yTa = getY(calculateGroupAverage(item, 'tactica'));
+              const yC = getY(calculateGroupAverage(item, 'condicional'));
+              const yD = getY(calculateGroupAverage(item, 'defensiva'));
 
               return (
                 <g key={item.id}>
-                  {/* Círculos guía */}
                   <circle cx={x} cy={yT} r="3" fill="#22c55e" />
                   <circle cx={x} cy={yTa} r="3" fill="#3b82f6" />
                   <circle cx={x} cy={yC} r="3" fill="#f59e0b" />
+                  <circle cx={x} cy={yD} r="3" fill="#a855f7" />
 
                   {/* Etiquetas de fechas en eje X */}
                   <text
@@ -167,7 +194,7 @@ export function EvaluationChart({ evaluations }: EvaluationChartProps) {
         </div>
 
         {/* Leyenda explicativa en la base */}
-        <div className="flex justify-center items-center gap-6 pt-3 mt-2 text-xs font-semibold">
+        <div className="flex flex-wrap justify-center items-center gap-6 pt-3 mt-2 text-xs font-semibold">
           <div className="flex items-center gap-1.5">
             <span className="h-2.5 w-2.5 rounded-full bg-green-500" />
             <span className="text-slate-400">Técnica</span>
@@ -179,6 +206,10 @@ export function EvaluationChart({ evaluations }: EvaluationChartProps) {
           <div className="flex items-center gap-1.5">
             <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
             <span className="text-slate-400">Físico</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-full bg-purple-500" />
+            <span className="text-slate-400">Defensiva</span>
           </div>
         </div>
       </CardContent>

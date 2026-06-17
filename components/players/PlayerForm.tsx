@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useForm, Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as zod from 'zod';
-import { Player, Demarcacion } from '@/types';
+import { Player, Demarcacion, Pierna, EstadoJugador } from '@/types';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Button } from '@/components/ui/Button';
@@ -15,24 +15,45 @@ const playerSchema = zod.object({
     .string()
     .min(2, 'El nombre debe tener al menos 2 caracteres')
     .max(50, 'El nombre no puede superar los 50 caracteres'),
+  apellidos: zod
+    .string()
+    .min(2, 'Los apellidos deben tener al menos 2 caracteres')
+    .max(80, 'Los apellidos no pueden superar los 80 caracteres'),
   dorsal: zod.coerce
     .number()
     .int('Debe ser un número entero')
     .min(1, 'El dorsal debe ser entre 1 y 99')
     .max(99, 'El dorsal debe ser entre 1 y 99'),
   demarcacion: zod.enum(['Portero', 'Defensa', 'Centrocampista', 'Delantero', '']).refine((val) => val !== '', {
-    message: 'Seleccione una posición válida',
+    message: 'Seleccione una posición principal válida',
   }),
+  posicion_secundaria: zod.string().nullable().optional(),
   fecha_nacimiento: zod
     .string()
     .min(1, 'La fecha de nacimiento es requerida')
     .refine((val) => {
       const selectedDate = new Date(val);
       const today = new Date();
-      // Reset hours to compare only dates
       today.setHours(0, 0, 0, 0);
       return selectedDate <= today;
     }, 'La fecha de nacimiento no puede ser futura'),
+  altura: zod.coerce
+    .number()
+    .min(1.0, 'La altura debe ser mayor a 1.0m')
+    .max(2.5, 'La altura debe ser menor a 2.5m')
+    .nullable()
+    .optional()
+    .or(zod.literal('')),
+  peso: zod.coerce
+    .number()
+    .min(30, 'El peso debe ser mayor a 30kg')
+    .max(150, 'El peso debe ser menor a 150kg')
+    .nullable()
+    .optional()
+    .or(zod.literal('')),
+  pierna_dominante: zod.enum(['Diestro', 'Zurdo', 'Ambidiestro']),
+  estado: zod.enum(['Disponible', 'Lesionado', 'Duda', 'Sancionado']),
+  rol_abp: zod.string().nullable().optional(),
   foto_url: zod.string().nullable().optional(),
 });
 
@@ -40,9 +61,16 @@ type PlayerFormData = zod.infer<typeof playerSchema>;
 
 interface FormValues {
   nombre: string;
+  apellidos: string;
   dorsal: number | string;
   demarcacion: Demarcacion | '';
+  posicion_secundaria: string;
   fecha_nacimiento: string;
+  altura: number | string;
+  peso: number | string;
+  pierna_dominante: Pierna;
+  estado: EstadoJugador;
+  rol_abp: string;
   foto_url?: string | null;
 }
 
@@ -70,9 +98,16 @@ export function PlayerForm({ player, onSubmit, onCancel, onDelete, isSubmitting 
     resolver: zodResolver(playerSchema) as unknown as Resolver<FormValues>,
     defaultValues: {
       nombre: '',
+      apellidos: '',
       dorsal: '',
       demarcacion: '',
+      posicion_secundaria: '',
       fecha_nacimiento: '',
+      altura: '',
+      peso: '',
+      pierna_dominante: 'Diestro',
+      estado: 'Disponible',
+      rol_abp: '',
       foto_url: null,
     },
   });
@@ -81,18 +116,32 @@ export function PlayerForm({ player, onSubmit, onCancel, onDelete, isSubmitting 
     if (player) {
       reset({
         nombre: player.nombre,
+        apellidos: player.apellidos || '',
         dorsal: player.dorsal,
         demarcacion: player.demarcacion,
+        posicion_secundaria: player.posicion_secundaria || '',
         fecha_nacimiento: player.fecha_nacimiento,
+        altura: player.altura || '',
+        peso: player.peso || '',
+        pierna_dominante: player.pierna_dominante || 'Diestro',
+        estado: player.estado || 'Disponible',
+        rol_abp: player.rol_abp || '',
         foto_url: player.foto_url,
       });
       setPhotoPreview(player.foto_url);
     } else {
       reset({
         nombre: '',
+        apellidos: '',
         dorsal: '',
         demarcacion: '',
+        posicion_secundaria: '',
         fecha_nacimiento: '',
+        altura: '',
+        peso: '',
+        pierna_dominante: 'Diestro',
+        estado: 'Disponible',
+        rol_abp: '',
         foto_url: null,
       });
       setPhotoPreview(null);
@@ -116,7 +165,6 @@ export function PlayerForm({ player, onSubmit, onCancel, onDelete, isSubmitting 
     }
   };
 
-  // Drag & Drop handlers
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragOver(true);
@@ -147,7 +195,6 @@ export function PlayerForm({ player, onSubmit, onCancel, onDelete, isSubmitting 
     let finalFotoUrl = isPhotoRemoved ? null : (player?.foto_url || null);
     
     if (photoFile) {
-      // Comprimir imagen antes de subir (canvas nativo en lib/image)
       const compressed = await compressImage(photoFile);
       const uploadedUrl = await uploadPhoto(compressed, values.nombre);
       if (uploadedUrl) {
@@ -155,8 +202,19 @@ export function PlayerForm({ player, onSubmit, onCancel, onDelete, isSubmitting 
       }
     }
     
-    const data = values as unknown as PlayerFormData;
-    await onSubmit({ ...data, foto_url: finalFotoUrl });
+    // Parse empty strings to null for optional numeric/text fields
+    const formattedValues: PlayerFormData & { foto_url?: string | null } = {
+      ...values,
+      dorsal: Number(values.dorsal),
+      demarcacion: values.demarcacion as Demarcacion,
+      altura: values.altura === '' ? null : Number(values.altura),
+      peso: values.peso === '' ? null : Number(values.peso),
+      posicion_secundaria: values.posicion_secundaria === '' ? null : values.posicion_secundaria,
+      rol_abp: values.rol_abp === '' ? null : values.rol_abp,
+      foto_url: finalFotoUrl
+    };
+
+    await onSubmit(formattedValues);
   };
 
   const positionOptions = [
@@ -166,15 +224,28 @@ export function PlayerForm({ player, onSubmit, onCancel, onDelete, isSubmitting 
     { value: 'Delantero', label: 'Delantero' },
   ];
 
+  const piernaOptions = [
+    { value: 'Diestro', label: 'Diestro' },
+    { value: 'Zurdo', label: 'Zurdo' },
+    { value: 'Ambidiestro', label: 'Ambidiestro' },
+  ];
+
+  const estadoOptions = [
+    { value: 'Disponible', label: 'Disponible' },
+    { value: 'Lesionado', label: 'Lesionado' },
+    { value: 'Duda', label: 'Duda Semanal' },
+    { value: 'Sancionado', label: 'Sancionado' },
+  ];
+
   return (
-    <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-5">
+    <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
       {/* Subida de foto con Drag & Drop */}
-      <div className="flex flex-col items-center justify-center mb-6">
+      <div className="flex flex-col items-center justify-center mb-4">
         <div
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
-          className={`relative group cursor-pointer h-28 w-28 rounded-full border-2 border-dashed overflow-hidden bg-slate-950 flex items-center justify-center transition-all duration-300 ${
+          className={`relative group cursor-pointer h-24 w-24 rounded-full border-2 border-dashed overflow-hidden bg-slate-950 flex items-center justify-center transition-all duration-300 ${
             isDragOver ? 'border-green-500 bg-green-500/5 scale-105' : 'border-slate-700 hover:border-green-500/70'
           }`}
         >
@@ -193,8 +264,8 @@ export function PlayerForm({ player, onSubmit, onCancel, onDelete, isSubmitting 
             </div>
           ) : (
             <div className="text-center p-2 flex flex-col items-center justify-center">
-              <Camera className="h-6 w-6 text-slate-500 group-hover:text-green-400 transition-colors mb-1" />
-              <span className="text-[10px] text-slate-500 leading-none">Arrastra o haz clic</span>
+              <Camera className="h-5 w-5 text-slate-500 group-hover:text-green-400 transition-colors mb-1" />
+              <span className="text-[9px] text-slate-500 leading-none">Arrastra o clic</span>
             </div>
           )}
           <input
@@ -204,16 +275,23 @@ export function PlayerForm({ player, onSubmit, onCancel, onDelete, isSubmitting 
             className="absolute inset-0 opacity-0 cursor-pointer z-20"
           />
         </div>
-        <span className="text-[11px] text-slate-500 mt-2">Formatos: JPG, PNG. Máx 500KB (autocomprimido).</span>
+        <span className="text-[10px] text-slate-500 mt-1">Formatos: JPG, PNG. Autocomprimido.</span>
       </div>
 
-      <Input
-        label="Nombre Completo"
-        error={errors.nombre?.message?.toString()}
-        {...register('nombre')}
-      />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Input
+          label="Nombre"
+          error={errors.nombre?.message?.toString()}
+          {...register('nombre')}
+        />
+        <Input
+          label="Apellidos"
+          error={errors.apellidos?.message?.toString()}
+          {...register('apellidos')}
+        />
+      </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-3 gap-4">
         <Input
           label="Dorsal (1-99)"
           type="number"
@@ -221,22 +299,67 @@ export function PlayerForm({ player, onSubmit, onCancel, onDelete, isSubmitting 
           {...register('dorsal')}
         />
         <Select
-          label="Demarcación"
+          label="P. Principal"
           options={positionOptions}
           error={errors.demarcacion?.message?.toString()}
           {...register('demarcacion')}
         />
+        <Input
+          label="P. Secundaria"
+          error={errors.posicion_secundaria?.message?.toString()}
+          {...register('posicion_secundaria')}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Input
+          label="Fecha Nacimiento"
+          type="date"
+          error={errors.fecha_nacimiento?.message?.toString()}
+          {...register('fecha_nacimiento')}
+        />
+        <Input
+          label="Altura (m)"
+          type="number"
+          step="0.01"
+          placeholder="Ej: 1.80"
+          error={errors.altura?.message?.toString()}
+          {...register('altura')}
+        />
+        <Input
+          label="Peso (kg)"
+          type="number"
+          step="0.1"
+          placeholder="Ej: 72.5"
+          error={errors.peso?.message?.toString()}
+          {...register('peso')}
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <Select
+          label="Pierna Dominante"
+          options={piernaOptions}
+          error={errors.pierna_dominante?.message?.toString()}
+          {...register('pierna_dominante')}
+        />
+        <Select
+          label="Estado Semanal"
+          options={estadoOptions}
+          error={errors.estado?.message?.toString()}
+          {...register('estado')}
+        />
       </div>
 
       <Input
-        label="Fecha de Nacimiento"
-        type="date"
-        error={errors.fecha_nacimiento?.message?.toString()}
-        {...register('fecha_nacimiento')}
+        label="Rol ABP"
+        placeholder="Ej: Servidor, Rematador en segundo palo"
+        error={errors.rol_abp?.message?.toString()}
+        {...register('rol_abp')}
       />
 
       {/* Botonera dinámica */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-5 border-t border-slate-800 mt-6">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-slate-800 mt-4">
         <div className="w-full sm:w-auto">
           {player && onDelete && (
             <Button
@@ -246,7 +369,7 @@ export function PlayerForm({ player, onSubmit, onCancel, onDelete, isSubmitting 
               className="w-full sm:w-auto text-red-400 hover:text-red-300 hover:bg-red-950/20 px-4 py-2 border border-transparent rounded-xl"
             >
               <Trash2 className="h-4 w-4 mr-1.5" />
-              Eliminar Jugador
+              Eliminar
             </Button>
           )}
         </div>

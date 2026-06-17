@@ -6,7 +6,7 @@ import dynamic from 'next/dynamic';
 import { supabase } from '@/lib/supabase';
 import { usePlayers } from '@/hooks/usePlayers';
 import { useCreateEvaluation } from '@/hooks/useCreateEvaluation';
-import { Evaluation } from '@/types';
+import { DetailedEvaluation } from '@/types';
 import { EvaluationCard } from '@/components/evaluations/EvaluationCard';
 import { RankingTable } from '@/components/evaluations/RankingTable';
 import { Button } from '@/components/ui/Button';
@@ -16,7 +16,6 @@ import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
 import { Select } from '@/components/ui/Select';
 
-// Carga perezosa (lazy loading) de componentes pesados
 const EvaluationChart = dynamic(
   () => import('@/components/evaluations/EvaluationChart').then((mod) => mod.EvaluationChart),
   {
@@ -39,7 +38,7 @@ export function EvaluacionesClient() {
 
   const [activeTab, setActiveTab] = useState<'ranking' | 'detail'>('ranking');
   const [selectedPlayerId, setSelectedPlayerId] = useState<string>('');
-  const [allEvaluations, setAllEvaluations] = useState<Evaluation[]>([]);
+  const [allEvaluations, setAllEvaluations] = useState<DetailedEvaluation[]>([]);
   const [loadingEvals, setLoadingEvals] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -48,7 +47,7 @@ export function EvaluacionesClient() {
     setLoadingEvals(true);
     try {
       const { data, error } = await supabase
-        .from('evaluations')
+        .from('detailed_evaluations')
         .select('*')
         .order('fecha_evaluacion', { ascending: false });
       if (error) throw error;
@@ -69,7 +68,7 @@ export function EvaluacionesClient() {
     setActiveTab('detail');
   };
 
-  const handleCreateEvaluation = async (data: Omit<Evaluation, 'id' | 'created_at'>) => {
+  const handleCreateEvaluation = async (data: Omit<DetailedEvaluation, 'id' | 'created_at'>) => {
     setActionError(null);
     const created = await createEvaluation(data);
     if (created) {
@@ -83,9 +82,17 @@ export function EvaluacionesClient() {
   const selectedPlayer = players.find((p) => p.id === selectedPlayerId);
   const selectedPlayerEvals = allEvaluations.filter((e) => e.player_id === selectedPlayerId);
 
-  const getOverallMedia = (evals: Evaluation[]) => {
+  const getOverallMedia = (evals: DetailedEvaluation[]) => {
     if (evals.length === 0) return 0;
-    const total = evals.reduce((sum, e) => sum + (e.tecnica + e.tactica + e.condicional) / 3, 0);
+    const total = evals.reduce((sum, e) => {
+      const sumMetrics = 
+        e.velocidad + e.aceleracion + e.fuerza + e.resistencia + e.juego_aereo +
+        e.marcaje + e.entrada_defensiva + e.posicionamiento_defensivo + e.trabajo_defensivo +
+        e.pase_corto + e.pase_largo + e.control_orientado + e.regate + e.centros +
+        e.finalizacion + e.disparo_lejano + e.trabajo_ofensivo + e.vision_juego +
+        e.inteligencia_tactica + e.liderazgo;
+      return sum + (sumMetrics / 20);
+    }, 0);
     return total / evals.length;
   };
 
@@ -137,7 +144,7 @@ export function EvaluacionesClient() {
       {/* Contenido Dinámico */}
       {loadingPlayers || loadingEvals ? (
         <div className="space-y-4">
-          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full animate-pulse" />
           <Skeleton className="h-44 w-full animate-pulse" />
         </div>
       ) : players.length === 0 ? (
@@ -166,7 +173,7 @@ export function EvaluacionesClient() {
               onChange={(e) => setSelectedPlayerId(e.target.value)}
               options={players.map((p) => ({
                 value: p.id,
-                label: `${p.nombre} (#${p.dorsal})`,
+                label: `${p.nombre} ${p.apellidos || ''} (#${p.dorsal})`,
               }))}
             />
           </div>
@@ -178,7 +185,7 @@ export function EvaluacionesClient() {
                 {/* Perfil Mini */}
                 <div className="p-6 rounded-2xl bg-slate-900/40 border border-slate-800/80 flex flex-col items-center text-center">
                   <Avatar src={selectedPlayer.foto_url} name={selectedPlayer.nombre} size="xl" className="mb-4" />
-                  <h3 className="text-lg font-bold text-slate-100 mb-1">{selectedPlayer.nombre}</h3>
+                  <h3 className="text-lg font-bold text-slate-100 mb-1">{selectedPlayer.nombre} {selectedPlayer.apellidos}</h3>
                   <div className="flex items-center gap-2 mb-4">
                     <Badge variant={selectedPlayer.demarcacion}>{selectedPlayer.demarcacion}</Badge>
                     <span className="text-xs text-slate-500 font-bold">#{selectedPlayer.dorsal}</span>
