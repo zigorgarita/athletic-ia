@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Users, Search, SlidersHorizontal, Eye, ShieldAlert, Star } from 'lucide-react';
+import { Plus, Users, Search, SlidersHorizontal, Eye, Star, Edit2, Trash2 } from 'lucide-react';
 import { usePlayers } from '@/hooks/usePlayers';
 import { useCreatePlayer } from '@/hooks/useCreatePlayer';
 import { useUpdatePlayer } from '@/hooks/useUpdatePlayer';
@@ -20,7 +20,7 @@ export function PlantillaClient() {
   const { players, loading, error, refetch } = usePlayers();
   const { createPlayer, loading: creating, error: createError } = useCreatePlayer();
   const { updatePlayer, loading: updating, error: updateError } = useUpdatePlayer();
-  const { deletePlayer } = useDeletePlayer();
+  const { deletePlayer, error: deleteError } = useDeletePlayer();
 
   // Navigation state (list vs details)
   const [activePlayerForDetail, setActivePlayerForDetail] = useState<Player | null>(null);
@@ -149,6 +149,8 @@ export function PlantillaClient() {
       const success = await deletePlayer(id);
       if (success) {
         refetch();
+      } else {
+        alert(deleteError || 'Error al eliminar el jugador de la base de datos.');
       }
     }
   };
@@ -426,18 +428,18 @@ export function PlantillaClient() {
                         <Button 
                           variant="ghost" 
                           onClick={(e) => handleOpenEditModal(e, player)} 
-                          className="h-8 w-8 p-0 rounded-lg text-slate-400 hover:text-green-400"
+                          className="h-8 w-8 p-0 rounded-lg text-slate-400 hover:text-green-400 hover:bg-slate-800/50"
                           title="Editar"
                         >
-                          <Plus className="h-4 w-4 rotate-45" />
+                          <Edit2 className="h-4 w-4" />
                         </Button>
                         <Button 
                           variant="ghost" 
                           onClick={(e) => handleDelete(e, player.id)} 
-                          className="h-8 w-8 p-0 rounded-lg text-slate-400 hover:text-red-400"
+                          className="h-8 w-8 p-0 rounded-lg text-red-500 hover:text-red-400 hover:bg-red-950/20 border border-transparent hover:border-red-900/30"
                           title="Eliminar"
                         >
-                          <ShieldAlert className="h-4 w-4" />
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     </td>
