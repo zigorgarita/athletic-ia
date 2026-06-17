@@ -24,7 +24,7 @@ const playerSchema = zod.object({
     .int('Debe ser un número entero')
     .min(1, 'El dorsal debe ser entre 1 y 99')
     .max(99, 'El dorsal debe ser entre 1 y 99'),
-  demarcacion: zod.enum(['Portero', 'Defensa', 'Centrocampista', 'Delantero', '']).refine((val) => val !== '', {
+  demarcacion: zod.enum(['Portero', 'Defensa', 'Centrocampista', 'Delantero', 'Lateral', 'Central', 'Pivote', 'Interior', 'Extremo', '']).refine((val) => val !== '', {
     message: 'Seleccione una posición principal válida',
   }),
   posicion_secundaria: zod.string().nullable().optional(),
@@ -219,8 +219,13 @@ export function PlayerForm({ player, onSubmit, onCancel, onDelete, isSubmitting 
 
   const positionOptions = [
     { value: 'Portero', label: 'Portero' },
+    { value: 'Lateral', label: 'Lateral' },
+    { value: 'Central', label: 'Central' },
     { value: 'Defensa', label: 'Defensa' },
+    { value: 'Pivote', label: 'Pivote' },
+    { value: 'Interior', label: 'Interior' },
     { value: 'Centrocampista', label: 'Centrocampista' },
+    { value: 'Extremo', label: 'Extremo' },
     { value: 'Delantero', label: 'Delantero' },
   ];
 

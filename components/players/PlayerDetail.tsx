@@ -256,8 +256,13 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
                 style={{ backgroundImage: `url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%2322c55e' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E")`, backgroundPosition: 'right 0.5rem center', backgroundSize: '1.25rem', backgroundRepeat: 'no-repeat' }}
               >
                 <option value="Portero" className="bg-slate-950 text-slate-200">Portero</option>
+                <option value="Lateral" className="bg-slate-950 text-slate-200">Lateral</option>
+                <option value="Central" className="bg-slate-950 text-slate-200">Central</option>
                 <option value="Defensa" className="bg-slate-950 text-slate-200">Defensa</option>
+                <option value="Pivote" className="bg-slate-950 text-slate-200">Pivote</option>
+                <option value="Interior" className="bg-slate-950 text-slate-200">Interior</option>
                 <option value="Centrocampista" className="bg-slate-950 text-slate-200">Centrocampista</option>
+                <option value="Extremo" className="bg-slate-950 text-slate-200">Extremo</option>
                 <option value="Delantero" className="bg-slate-950 text-slate-200">Delantero</option>
               </select>
             </div>
@@ -306,8 +311,13 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
                 >
                   <option value="" className="bg-slate-950 text-slate-350">Ninguna</option>
                   <option value="Portero" className="bg-slate-950 text-slate-200">Portero</option>
+                  <option value="Lateral" className="bg-slate-950 text-slate-200">Lateral</option>
+                  <option value="Central" className="bg-slate-950 text-slate-200">Central</option>
                   <option value="Defensa" className="bg-slate-950 text-slate-200">Defensa</option>
+                  <option value="Pivote" className="bg-slate-950 text-slate-200">Pivote</option>
+                  <option value="Interior" className="bg-slate-950 text-slate-200">Interior</option>
                   <option value="Centrocampista" className="bg-slate-950 text-slate-200">Centrocampista</option>
+                  <option value="Extremo" className="bg-slate-950 text-slate-200">Extremo</option>
                   <option value="Delantero" className="bg-slate-950 text-slate-200">Delantero</option>
                 </select>
               </div>

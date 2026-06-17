@@ -6,7 +6,7 @@ import { usePlayers } from '@/hooks/usePlayers';
 import { useCreatePlayer } from '@/hooks/useCreatePlayer';
 import { useUpdatePlayer } from '@/hooks/useUpdatePlayer';
 import { useDeletePlayer } from '@/hooks/useDeletePlayer';
-import { Player } from '@/types';
+import { Player, Demarcacion } from '@/types';
 import { PlayerForm } from '@/components/players/PlayerForm';
 import { PlayerDetail } from '@/components/players/PlayerDetail';
 import { Button } from '@/components/ui/Button';
@@ -98,7 +98,7 @@ export function PlantillaClient() {
     nombre: string;
     apellidos: string;
     dorsal: number;
-    demarcacion: 'Portero' | 'Defensa' | 'Centrocampista' | 'Delantero';
+    demarcacion: Demarcacion;
     posicion_secundaria?: string | null;
     fecha_nacimiento: string;
     altura?: number | '' | null;
@@ -276,8 +276,13 @@ export function PlantillaClient() {
             >
               <option value="all">Todas las posiciones</option>
               <option value="Portero">Portero</option>
+              <option value="Lateral">Lateral</option>
+              <option value="Central">Central</option>
               <option value="Defensa">Defensa</option>
+              <option value="Pivote">Pivote</option>
+              <option value="Interior">Interior</option>
               <option value="Centrocampista">Centrocampista</option>
+              <option value="Extremo">Extremo</option>
               <option value="Delantero">Delantero</option>
             </select>
           </div>

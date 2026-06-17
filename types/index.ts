@@ -1,4 +1,4 @@
-export type Demarcacion = 'Portero' | 'Defensa' | 'Centrocampista' | 'Delantero';
+export type Demarcacion = 'Portero' | 'Defensa' | 'Centrocampista' | 'Delantero' | 'Lateral' | 'Central' | 'Pivote' | 'Interior' | 'Extremo';
 export type EstadoJugador = 'Disponible' | 'Lesionado' | 'Duda' | 'Sancionado';
 export type Pierna = 'Diestro' | 'Zurdo' | 'Ambidiestro';
 export type ABPType = 'Córner Ofensivo' | 'Córner Defensivo' | 'Falta Ofensiva' | 'Falta Defensiva' | 'Penalti' | 'Saque de Banda' | 'Jugada Ensayada';
