@@ -9,6 +9,9 @@ import { useEvaluations } from '@/hooks/useEvaluations';
 import { useCreateEvaluation } from '@/hooks/useCreateEvaluation';
 import { useObservaciones } from '@/hooks/useObservaciones';
 import { usePlayerStats } from '@/hooks/usePlayerStats';
+import { useUpdatePlayer } from '@/hooks/useUpdatePlayer';
+import { useUploadPlayerPhoto } from '@/hooks/useUploadPlayerPhoto';
+import { compressImage } from '@/lib/image';
 import { 
   Award, ClipboardList, BarChart3, PlusCircle, 
   Calendar, Check, ShieldAlert, Heart, Star, Sparkles 
@@ -20,17 +23,20 @@ interface PlayerDetailProps {
 }
 
 export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
+  const [currentPlayer, setCurrentPlayer] = useState<Player>(player);
   const [activeTab, setActiveTab] = useState<'profile' | 'stats' | 'observations'>('profile');
   
   // Custom hooks
-  const { evaluations, loading: loadingEvals, refetch: refetchEvals } = useEvaluations(player.id);
+  const { evaluations, loading: loadingEvals, refetch: refetchEvals } = useEvaluations(currentPlayer.id);
   const { createEvaluation } = useCreateEvaluation();
-  const { observaciones, loading: loadingObs, createObservacion } = useObservaciones(player.id);
-  const { summary: statsSummary, loading: loadingStats } = usePlayerStats(player.id);
+  const { observaciones, loading: loadingObs, createObservacion } = useObservaciones(currentPlayer.id);
+  const { summary: statsSummary, loading: loadingStats } = usePlayerStats(currentPlayer.id);
+  const { updatePlayer } = useUpdatePlayer();
+  const { uploadPhoto, loading: uploadingPhoto } = useUploadPlayerPhoto();
 
   // Local state for detailed evaluation values
   const [currentEval, setCurrentEval] = useState<Omit<DetailedEvaluation, 'id' | 'created_at'>>({
-    player_id: player.id,
+    player_id: currentPlayer.id,
     fecha_evaluacion: new Date().toISOString().split('T')[0],
     velocidad: 3,
     aceleracion: 3,
@@ -61,7 +67,7 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
     if (evaluations && evaluations.length > 0) {
       const latest = evaluations[0];
       setCurrentEval({
-        player_id: player.id,
+        player_id: currentPlayer.id,
         fecha_evaluacion: new Date().toISOString().split('T')[0],
         velocidad: latest.velocidad,
         aceleracion: latest.aceleracion,
@@ -85,7 +91,7 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
         liderazgo: latest.liderazgo,
       });
     }
-  }, [evaluations, player.id]);
+  }, [evaluations, currentPlayer.id]);
 
   // Handle rating metric change
   const handleMetricChange = (metric: keyof Omit<DetailedEvaluation, 'id' | 'created_at' | 'player_id' | 'fecha_evaluacion'>, val: number) => {
@@ -128,7 +134,7 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
       return;
     }
     const payload = {
-      player_id: player.id,
+      player_id: currentPlayer.id,
       fecha: new Date().toISOString().split('T')[0],
       ...newObs,
     };
@@ -189,10 +195,44 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
         <div className="absolute top-0 right-0 w-64 h-64 rounded-full bg-green-500/5 blur-[80px] pointer-events-none" />
         
         {/* Foto de Perfil Grande */}
-        <div className="relative">
-          <Avatar src={player.foto_url} name={player.nombre} size="xl" className="h-32 w-32 border-4 border-slate-800/80 shadow-2xl" />
-          <div className="absolute -bottom-2 -right-2 bg-green-500 border-2 border-slate-950 text-slate-950 font-black h-9 w-9 rounded-xl flex items-center justify-center text-sm shadow-lg">
-            #{player.dorsal}
+        <div className="relative group cursor-pointer h-32 w-32 rounded-full overflow-hidden border-4 border-slate-800/80 shadow-2xl transition-all duration-300 hover:border-green-500/50">
+          <input
+            type="file"
+            accept="image/*"
+            disabled={uploadingPhoto}
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              if (file) {
+                const compressed = await compressImage(file);
+                const url = await uploadPhoto(compressed, currentPlayer.nombre);
+                if (url) {
+                  const updated = await updatePlayer(currentPlayer.id, { foto_url: url });
+                  if (updated) {
+                    setCurrentPlayer(updated);
+                  }
+                }
+              }
+            }}
+            className="absolute inset-0 opacity-0 cursor-pointer z-30"
+            title="Cambiar foto"
+          />
+          <Avatar src={currentPlayer.foto_url} name={currentPlayer.nombre} size="xl" className="h-full w-full object-cover" />
+          {!currentPlayer.foto_url && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/20 group-hover:bg-slate-950/40 transition-colors duration-200">
+              <span className="absolute bottom-2 text-[8px] text-green-400 font-extrabold uppercase tracking-wider bg-slate-950/90 px-2 py-0.5 rounded-full border border-green-500/30">
+                {uploadingPhoto ? 'Subiendo...' : 'Añadir foto'}
+              </span>
+            </div>
+          )}
+          {currentPlayer.foto_url && (
+            <div className="absolute inset-0 flex items-center justify-center bg-slate-950/60 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+              <span className="text-[8px] text-white font-extrabold uppercase tracking-wider bg-slate-900/80 px-2 py-0.5 rounded-full border border-slate-700/50">
+                {uploadingPhoto ? 'Subiendo...' : 'Cambiar foto'}
+              </span>
+            </div>
+          )}
+          <div className="absolute bottom-1 right-1 bg-green-500 text-slate-950 font-black h-6 w-6 rounded-lg flex items-center justify-center text-[10px] shadow-lg z-20">
+            #{currentPlayer.dorsal}
           </div>
         </div>
 
@@ -200,19 +240,35 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
         <div className="flex-1 space-y-3 text-center md:text-left">
           <div className="flex flex-col md:flex-row md:items-center gap-2.5 justify-center md:justify-start">
             <h1 className="text-3xl font-extrabold tracking-tight text-white">
-              {player.nombre} {player.apellidos}
+              {currentPlayer.nombre} {currentPlayer.apellidos}
             </h1>
-            <Badge variant={player.demarcacion} className="self-center md:self-auto px-3 py-1 text-xs">
-              {player.demarcacion}
-            </Badge>
-            {player.estado && (
+            <div className="relative self-center md:self-auto">
+              <select
+                value={currentPlayer.demarcacion}
+                onChange={async (e) => {
+                  const newPos = e.target.value as Player['demarcacion'];
+                  const updated = await updatePlayer(currentPlayer.id, { demarcacion: newPos });
+                  if (updated) {
+                    setCurrentPlayer(updated);
+                  }
+                }}
+                className="bg-slate-900/80 hover:bg-slate-800 text-green-400 border border-green-500/20 rounded-xl px-3 py-1 text-xs outline-none focus:border-green-500 cursor-pointer font-bold transition-all duration-200 shadow-md shadow-green-500/5 appearance-none pr-8"
+                style={{ backgroundImage: `url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%2322c55e' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E")`, backgroundPosition: 'right 0.5rem center', backgroundSize: '1.25rem', backgroundRepeat: 'no-repeat' }}
+              >
+                <option value="Portero" className="bg-slate-950 text-slate-200">Portero</option>
+                <option value="Defensa" className="bg-slate-950 text-slate-200">Defensa</option>
+                <option value="Centrocampista" className="bg-slate-950 text-slate-200">Centrocampista</option>
+                <option value="Delantero" className="bg-slate-950 text-slate-200">Delantero</option>
+              </select>
+            </div>
+            {currentPlayer.estado && (
               <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border self-center md:self-auto ${
-                player.estado === 'Disponible' ? 'bg-green-950/20 text-green-400 border-green-900/30' :
-                player.estado === 'Lesionado' ? 'bg-red-950/20 text-red-400 border-red-900/30' :
-                player.estado === 'Duda' ? 'bg-amber-950/20 text-amber-400 border-amber-900/30' :
+                currentPlayer.estado === 'Disponible' ? 'bg-green-950/20 text-green-400 border-green-900/30' :
+                currentPlayer.estado === 'Lesionado' ? 'bg-red-950/20 text-red-400 border-red-900/30' :
+                currentPlayer.estado === 'Duda' ? 'bg-amber-950/20 text-amber-400 border-amber-900/30' :
                 'bg-slate-950/20 text-slate-400 border-slate-900/30'
               }`}>
-                {player.estado === 'Duda' ? 'Duda Semanal' : player.estado}
+                {currentPlayer.estado === 'Duda' ? 'Duda Semanal' : currentPlayer.estado}
               </span>
             )}
           </div>
@@ -221,27 +277,46 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-left max-w-2xl bg-slate-950/40 p-4 rounded-2xl border border-slate-800/50">
             <div>
               <span className="text-[10px] uppercase text-slate-500 font-bold block">Edad</span>
-              <span className="text-sm font-semibold text-slate-200">{getAge(player.fecha_nacimiento)} años</span>
+              <span className="text-sm font-semibold text-slate-200">{getAge(currentPlayer.fecha_nacimiento)} años</span>
             </div>
             <div>
               <span className="text-[10px] uppercase text-slate-500 font-bold block">Estatura / Peso</span>
               <span className="text-sm font-semibold text-slate-200">
-                {player.altura ? `${player.altura}m` : '-'} / {player.peso ? `${player.peso}kg` : '-'}
+                {currentPlayer.altura ? `${currentPlayer.altura}m` : '-'} / {currentPlayer.peso ? `${currentPlayer.peso}kg` : '-'}
               </span>
             </div>
             <div>
               <span className="text-[10px] uppercase text-slate-500 font-bold block">Pierna Dominante</span>
-              <span className="text-sm font-semibold text-slate-200">{player.pierna_dominante}</span>
+              <span className="text-sm font-semibold text-slate-200">{currentPlayer.pierna_dominante}</span>
             </div>
             <div>
-              <span className="text-[10px] uppercase text-slate-500 font-bold block">Posición Sec.</span>
-              <span className="text-sm font-semibold text-slate-200">{player.posicion_secundaria || 'Ninguna'}</span>
+              <span className="text-[10px] uppercase text-slate-500 font-bold block mb-1">Posición Sec.</span>
+              <div className="relative">
+                <select
+                  value={currentPlayer.posicion_secundaria || ''}
+                  onChange={async (e) => {
+                    const newPos = e.target.value || null;
+                    const updated = await updatePlayer(currentPlayer.id, { posicion_secundaria: newPos });
+                    if (updated) {
+                      setCurrentPlayer(updated);
+                    }
+                  }}
+                  className="bg-slate-900/40 hover:bg-slate-800/60 text-slate-200 border border-slate-700/30 rounded-lg px-2 py-0.5 text-xs outline-none focus:border-green-500 cursor-pointer font-semibold appearance-none pr-6 w-full"
+                  style={{ backgroundImage: `url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%2394a3b8' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E")`, backgroundPosition: 'right 0.35rem center', backgroundSize: '1rem', backgroundRepeat: 'no-repeat' }}
+                >
+                  <option value="" className="bg-slate-950 text-slate-350">Ninguna</option>
+                  <option value="Portero" className="bg-slate-950 text-slate-200">Portero</option>
+                  <option value="Defensa" className="bg-slate-950 text-slate-200">Defensa</option>
+                  <option value="Centrocampista" className="bg-slate-950 text-slate-200">Centrocampista</option>
+                  <option value="Delantero" className="bg-slate-950 text-slate-200">Delantero</option>
+                </select>
+              </div>
             </div>
           </div>
 
           <div className="flex flex-wrap gap-4 text-xs text-slate-400 pt-1 justify-center md:justify-start">
-            {player.rol_abp && (
-              <span><strong className="text-slate-300">Rol ABP:</strong> {player.rol_abp}</span>
+            {currentPlayer.rol_abp && (
+              <span><strong className="text-slate-300">Rol ABP:</strong> {currentPlayer.rol_abp}</span>
             )}
             <span>
               <strong className="text-slate-300">Valoración Global:</strong> 
