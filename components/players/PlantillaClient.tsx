@@ -417,30 +417,27 @@ export function PlantillaClient() {
                     </td>
                     <td className="px-6 py-3.5 text-right" onClick={e => e.stopPropagation()}>
                       <div className="flex justify-end gap-1.5">
-                        <Button 
-                          variant="ghost" 
+                        <button 
                           onClick={() => setActivePlayerForDetail(player)} 
-                          className="h-8 w-8 p-0 rounded-lg text-slate-400 hover:text-white"
+                          className="h-8 w-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-colors duration-150"
                           title="Ver ficha"
                         >
                           <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button 
-                          variant="ghost" 
+                        </button>
+                        <button 
                           onClick={(e) => handleOpenEditModal(e, player)} 
-                          className="h-8 w-8 p-0 rounded-lg text-slate-400 hover:text-green-400 hover:bg-slate-800/50"
+                          className="h-8 w-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-green-400 hover:bg-slate-800/50 transition-colors duration-150"
                           title="Editar"
                         >
                           <Edit2 className="h-4 w-4" />
-                        </Button>
-                        <Button 
-                          variant="ghost" 
+                        </button>
+                        <button 
                           onClick={(e) => handleDelete(e, player.id)} 
-                          className="h-8 w-8 p-0 rounded-lg text-red-500 hover:text-red-400 hover:bg-red-950/20 border border-transparent hover:border-red-900/30"
+                          className="h-8 w-8 flex items-center justify-center rounded-lg text-red-500 hover:text-red-400 hover:bg-red-950/20 border border-transparent hover:border-red-900/30 transition-colors duration-150"
                           title="Eliminar"
                         >
                           <Trash2 className="h-4 w-4" />
-                        </Button>
+                        </button>
                       </div>
                     </td>
                   </tr>
