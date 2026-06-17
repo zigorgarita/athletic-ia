@@ -35,7 +35,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
             <Shield className="h-5 w-5" />
           </div>
           <div>
-            <span className="text-base font-bold tracking-tight text-white block">Mi Equipo</span>
+            <span className="text-base font-bold tracking-tight text-white block">indautxu_26_27</span>
             <span className="text-xs text-slate-400 block -mt-1">Gestión de Fútbol</span>
           </div>
         </div>

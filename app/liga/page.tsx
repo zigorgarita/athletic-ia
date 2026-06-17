@@ -3,7 +3,7 @@ import { Metadata } from 'next';
 import { LigaClient } from '@/components/liga/LigaClient';
 
 export const metadata: Metadata = {
-  title: 'Liga y Jornadas - Mi Equipo',
+  title: 'Liga y Jornadas - indautxu_26_27',
   description: 'Gestión de convocatorias, marcadores y estadísticas de partidos del Indautxu Juvenil A.',
 };
 

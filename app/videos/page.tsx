@@ -3,7 +3,7 @@ import { Metadata } from 'next';
 import { VideosClient } from '@/components/videos/VideosClient';
 
 export const metadata: Metadata = {
-  title: 'Videos de Partidos y Análisis Táctico - Mi Equipo',
+  title: 'Videos de Partidos y Análisis Táctico - indautxu_26_27',
   description: 'Visualice, organice y reproduzca videos de partidos de fútbol con su respectivo análisis y anotaciones tácticas.',
 };
 

@@ -15,13 +15,13 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Mi Equipo - Gestión Deportiva",
+  title: "indautxu_26_27 - Gestión Deportiva",
   description: "Web App de Gestión de Plantilla de Fútbol y Evaluaciones de Rendimiento",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Mi Equipo",
+    title: "indautxu_26_27",
   },
 };
 

@@ -2,8 +2,8 @@ import { MetadataRoute } from 'next';
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Mi Equipo - Gestión Deportiva',
-    short_name: 'Mi Equipo',
+    name: 'indautxu_26_27 - Gestión Deportiva',
+    short_name: 'indautxu_26_27',
     description: 'Aplicación premium de gestión de plantilla de fútbol, evaluaciones y videoanálisis táctico',
     start_url: '/',
     display: 'standalone',

@@ -3,7 +3,7 @@ import { Metadata } from 'next';
 import { PlantillaClient } from '@/components/players/PlantillaClient';
 
 export const metadata: Metadata = {
-  title: 'Plantilla de Jugadores - Mi Equipo',
+  title: 'Plantilla de Jugadores - indautxu_26_27',
   description: 'Gestione la plantilla de jugadores de fútbol, dorsales y demarcaciones del club.',
 };
 

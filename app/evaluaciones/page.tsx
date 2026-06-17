@@ -3,7 +3,7 @@ import { Metadata } from 'next';
 import { EvaluacionesClient } from '@/components/evaluations/EvaluacionesClient';
 
 export const metadata: Metadata = {
-  title: 'Evaluaciones de Rendimiento - Mi Equipo',
+  title: 'Evaluaciones de Rendimiento - indautxu_26_27',
   description: 'Historial de evaluaciones de rendimiento deportivo, gráficas de evolución y rankings de jugadores.',
 };
 
