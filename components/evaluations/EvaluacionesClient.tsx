@@ -85,13 +85,20 @@ export function EvaluacionesClient() {
   const getOverallMedia = (evals: DetailedEvaluation[]) => {
     if (evals.length === 0) return 0;
     const total = evals.reduce((sum, e) => {
-      const sumMetrics = 
-        e.velocidad + e.aceleracion + e.fuerza + e.resistencia + e.juego_aereo +
-        e.marcaje + e.entrada_defensiva + e.posicionamiento_defensivo + e.trabajo_defensivo +
-        e.pase_corto + e.pase_largo + e.control_orientado + e.regate + e.centros +
-        e.finalizacion + e.disparo_lejano + e.trabajo_ofensivo + e.vision_juego +
-        e.inteligencia_tactica + e.liderazgo;
-      return sum + (sumMetrics / 20);
+      let avg = 0;
+      if (e.metricas && Object.keys(e.metricas).length > 0) {
+        const vals = Object.values(e.metricas) as number[];
+        avg = vals.reduce((a, b) => a + b, 0) / vals.length;
+      } else {
+        const sumMetrics = 
+          (e.velocidad || 0) + (e.aceleracion || 0) + (e.fuerza || 0) + (e.resistencia || 0) + (e.juego_aereo || 0) +
+          (e.marcaje || 0) + (e.entrada_defensiva || 0) + (e.posicionamiento_defensivo || 0) + (e.trabajo_defensivo || 0) +
+          (e.pase_corto || 0) + (e.pase_largo || 0) + (e.control_orientado || 0) + (e.regate || 0) + (e.centros || 0) +
+          (e.finalizacion || 0) + (e.disparo_lejano || 0) + (e.trabajo_ofensivo || 0) + (e.vision_juego || 0) +
+          (e.inteligencia_tactica || 0) + (e.liderazgo || 0);
+        avg = sumMetrics / 20;
+      }
+      return sum + avg;
     }, 0);
     return total / evals.length;
   };

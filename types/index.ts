@@ -27,35 +27,130 @@ export interface DetailedEvaluation {
   fecha_evaluacion: string;
   
   // Físicas
-  velocidad: number;
-  aceleracion: number;
-  fuerza: number;
-  resistencia: number;
-  juego_aereo: number;
+  velocidad?: number;
+  aceleracion?: number;
+  fuerza?: number;
+  resistencia?: number;
+  juego_aereo?: number;
   
   // Defensivas
-  marcaje: number;
-  entrada_defensiva: number;
-  posicionamiento_defensivo: number;
-  trabajo_defensivo: number;
+  marcaje?: number;
+  entrada_defensiva?: number;
+  posicionamiento_defensivo?: number;
+  trabajo_defensivo?: number;
   
   // Técnicas / Ofensivas
-  pase_corto: number;
-  pase_largo: number;
-  control_orientado: number;
-  regate: number;
-  centros: number;
-  finalizacion: number;
-  disparo_lejano: number;
-  trabajo_ofensivo: number;
+  pase_corto?: number;
+  pase_largo?: number;
+  control_orientado?: number;
+  regate?: number;
+  centros?: number;
+  finalizacion?: number;
+  disparo_lejano?: number;
+  trabajo_ofensivo?: number;
   
   // Tácticas / Cognitivas
-  vision_juego: number;
-  inteligencia_tactica: number;
-  liderazgo: number;
+  vision_juego?: number;
+  inteligencia_tactica?: number;
+  liderazgo?: number;
+  
+  // Métricas dinámicas por posición
+  metricas?: Record<string, number> | null;
   
   created_at: string;
 }
+
+export const METRICAS_POR_POSICION: Record<string, string[]> = {
+  Portero: [
+    'Reflejos',
+    'Juego aéreo',
+    '1x1',
+    'Blocaje',
+    'Saque con mano',
+    'Saque con pie',
+    'Comunicación',
+    'Colocación'
+  ],
+  Central: [
+    'Marcaje',
+    'Anticipación',
+    'Juego aéreo',
+    'Duelo defensivo',
+    'Salida de balón',
+    'Posicionamiento',
+    'Velocidad',
+    'Liderazgo'
+  ],
+  Defensa: [
+    'Marcaje',
+    'Anticipación',
+    'Juego aéreo',
+    'Duelo defensivo',
+    'Salida de balón',
+    'Posicionamiento',
+    'Velocidad',
+    'Liderazgo'
+  ],
+  Lateral: [
+    'Velocidad',
+    'Aceleración',
+    'Centros',
+    'Duelo defensivo',
+    'Resistencia',
+    'Pase',
+    'Inteligencia táctica'
+  ],
+  Pivote: [
+    'Pase corto',
+    'Pase largo',
+    'Visión de juego',
+    'Posicionamiento',
+    'Recuperación',
+    'Inteligencia táctica',
+    'Liderazgo'
+  ],
+  Mediapunta: [
+    'Control orientado',
+    'Visión de juego',
+    'Último pase',
+    'Regate',
+    'Creatividad',
+    'Finalización'
+  ],
+  Interior: [
+    'Control orientado',
+    'Visión de juego',
+    'Último pase',
+    'Regate',
+    'Creatividad',
+    'Finalización'
+  ],
+  Centrocampista: [
+    'Control orientado',
+    'Visión de juego',
+    'Último pase',
+    'Regate',
+    'Creatividad',
+    'Finalización'
+  ],
+  Extremo: [
+    'Velocidad',
+    'Aceleración',
+    'Regate',
+    'Centros',
+    '1 contra 1',
+    'Finalización'
+  ],
+  Delantero: [
+    'Finalización',
+    'Desmarque',
+    'Juego aéreo',
+    'Remate',
+    'Fuerza',
+    'Movilidad',
+    'Trabajo ofensivo'
+  ]
+};
 
 export interface Observacion {
   id: string;

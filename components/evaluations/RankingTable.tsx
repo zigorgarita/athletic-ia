@@ -41,23 +41,42 @@ export function RankingTable({ players, evaluations, onSelectPlayer }: RankingTa
       };
     }
 
-    // Averages from 20 metrics
-    const tSum = playerEvals.reduce((s, e) => s + (
-      e.pase_corto + e.pase_largo + e.control_orientado + e.regate + 
-      e.centros + e.finalizacion + e.disparo_lejano + e.trabajo_ofensivo
-    ) / 8, 0);
+    const calculatedEvals = playerEvals.map(e => {
+      let tecnica = 3;
+      let tactica = 3;
+      let condicional = 3;
+      let defensiva = 3;
 
-    const taSum = playerEvals.reduce((s, e) => s + (
-      e.vision_juego + e.inteligencia_tactica + e.liderazgo
-    ) / 3, 0);
+      if (e.metricas && Object.keys(e.metricas).length > 0) {
+        const metrics = e.metricas;
+        const mapCategory = (keys: string[]) => {
+          const vals = keys.map(k => metrics[k]).filter(v => v !== undefined);
+          return vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : 3;
+        };
 
-    const cSum = playerEvals.reduce((s, e) => s + (
-      e.velocidad + e.aceleracion + e.fuerza + e.resistencia + e.juego_aereo
-    ) / 5, 0);
+        condicional = mapCategory(['Reflejos', 'Velocidad', 'Aceleración', 'Fuerza', 'Resistencia', 'Juego aéreo', 'Movilidad']);
+        defensiva = mapCategory(['Marcaje', 'Anticipación', 'Duelo defensivo', 'Posicionamiento', 'Blocaje', 'Recuperación']);
+        tecnica = mapCategory(['Blocaje', 'Saque con mano', 'Saque con pie', 'Pase', 'Pase corto', 'Pase largo', 'Control orientado', 'Último pase', 'Regate', 'Centros', '1 contra 1', '1x1', 'Finalización', 'Remate']);
+        tactica = mapCategory(['Comunicación', 'Colocación', 'Liderazgo', 'Inteligencia táctica', 'Visión de juego', 'Creatividad', 'Trabajo ofensivo']);
+      } else {
+        tecnica = (
+          (e.pase_corto ?? 3) + (e.pase_largo ?? 3) + (e.control_orientado ?? 3) + 
+          (e.regate ?? 3) + (e.centros ?? 3) + (e.finalizacion ?? 3) + 
+          (e.disparo_lejano ?? 3) + (e.trabajo_ofensivo ?? 3)
+        ) / 8;
 
-    const dSum = playerEvals.reduce((s, e) => s + (
-      e.marcaje + e.entrada_defensiva + e.posicionamiento_defensivo + e.trabajo_defensivo
-    ) / 4, 0);
+        tactica = ((e.vision_juego ?? 3) + (e.inteligencia_tactica ?? 3) + (e.liderazgo ?? 3)) / 3;
+        condicional = ((e.velocidad ?? 3) + (e.aceleracion ?? 3) + (e.fuerza ?? 3) + (e.resistencia ?? 3) + (e.juego_aereo ?? 3)) / 5;
+        defensiva = ((e.marcaje ?? 3) + (e.entrada_defensiva ?? 3) + (e.posicionamiento_defensivo ?? 3) + (e.trabajo_defensivo ?? 3)) / 4;
+      }
+
+      return { tecnica, tactica, condicional, defensiva };
+    });
+
+    const tSum = calculatedEvals.reduce((s, e) => s + e.tecnica, 0);
+    const taSum = calculatedEvals.reduce((s, e) => s + e.tactica, 0);
+    const cSum = calculatedEvals.reduce((s, e) => s + e.condicional, 0);
+    const dSum = calculatedEvals.reduce((s, e) => s + e.defensiva, 0);
 
     const tAvg = tSum / count;
     const taAvg = taSum / count;

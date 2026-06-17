@@ -46,20 +46,39 @@ export function EvaluationChart({ evaluations }: EvaluationChartProps) {
   };
 
   const calculateGroupAverage = (item: DetailedEvaluation, group: 'tecnica' | 'tactica' | 'condicional' | 'defensiva') => {
+    if (item.metricas && Object.keys(item.metricas).length > 0) {
+      const metrics = item.metricas;
+      const mapCategory = (keys: string[]) => {
+        const vals = keys.map(k => metrics[k]).filter(v => v !== undefined);
+        return vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : 3;
+      };
+
+      if (group === 'condicional') {
+        return mapCategory(['Reflejos', 'Velocidad', 'Aceleración', 'Fuerza', 'Resistencia', 'Juego aéreo', 'Movilidad']);
+      }
+      if (group === 'defensiva') {
+        return mapCategory(['Marcaje', 'Anticipación', 'Duelo defensivo', 'Posicionamiento', 'Blocaje', 'Recuperación']);
+      }
+      if (group === 'tecnica') {
+        return mapCategory(['Blocaje', 'Saque con mano', 'Saque con pie', 'Pase', 'Pase corto', 'Pase largo', 'Control orientado', 'Último pase', 'Regate', 'Centros', '1 contra 1', '1x1', 'Finalización', 'Remate']);
+      }
+      return mapCategory(['Comunicación', 'Colocación', 'Liderazgo', 'Inteligencia táctica', 'Visión de juego', 'Creatividad', 'Trabajo ofensivo']);
+    }
+
     if (group === 'tecnica') {
       return (
-        item.pase_corto + item.pase_largo + item.control_orientado + 
-        item.regate + item.centros + item.finalizacion + 
-        item.disparo_lejano + item.trabajo_ofensivo
+        (item.pase_corto ?? 3) + (item.pase_largo ?? 3) + (item.control_orientado ?? 3) + 
+        (item.regate ?? 3) + (item.centros ?? 3) + (item.finalizacion ?? 3) + 
+        (item.disparo_lejano ?? 3) + (item.trabajo_ofensivo ?? 3)
       ) / 8;
     }
     if (group === 'tactica') {
-      return (item.vision_juego + item.inteligencia_tactica + item.liderazgo) / 3;
+      return ((item.vision_juego ?? 3) + (item.inteligencia_tactica ?? 3) + (item.liderazgo ?? 3)) / 3;
     }
     if (group === 'condicional') {
-      return (item.velocidad + item.aceleracion + item.fuerza + item.resistencia + item.juego_aereo) / 5;
+      return ((item.velocidad ?? 3) + (item.aceleracion ?? 3) + (item.fuerza ?? 3) + (item.resistencia ?? 3) + (item.juego_aereo ?? 3)) / 5;
     }
-    return (item.marcaje + item.entrada_defensiva + item.posicionamiento_defensivo + item.trabajo_defensivo) / 4;
+    return ((item.marcaje ?? 3) + (item.entrada_defensiva ?? 3) + (item.posicionamiento_defensivo ?? 3) + (item.trabajo_defensivo ?? 3)) / 4;
   };
 
   // Generar strings de ruta (d) para SVG

@@ -11,27 +11,49 @@ export function EvaluationCard({ evaluation }: EvaluationCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   // Group metrics calculations
-  const tecnica = (
-    evaluation.pase_corto + evaluation.pase_largo + evaluation.control_orientado + 
-    evaluation.regate + evaluation.centros + evaluation.finalizacion + 
-    evaluation.disparo_lejano + evaluation.trabajo_ofensivo
-  ) / 8;
+  let tecnica = 3;
+  let tactica = 3;
+  let condicional = 3;
+  let defensiva = 3;
+  let media = 3;
 
-  const tactica = (
-    evaluation.vision_juego + evaluation.inteligencia_tactica + evaluation.liderazgo
-  ) / 3;
+  if (evaluation.metricas && Object.keys(evaluation.metricas).length > 0) {
+    const metrics = evaluation.metricas;
+    const mapCategory = (keys: string[]) => {
+      const vals = keys.map(k => metrics[k]).filter(v => v !== undefined);
+      return vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : 3;
+    };
 
-  const condicional = (
-    evaluation.velocidad + evaluation.aceleracion + evaluation.fuerza + 
-    evaluation.resistencia + evaluation.juego_aereo
-  ) / 5;
+    condicional = mapCategory(['Reflejos', 'Velocidad', 'Aceleración', 'Fuerza', 'Resistencia', 'Juego aéreo', 'Movilidad']);
+    defensiva = mapCategory(['Marcaje', 'Anticipación', 'Duelo defensivo', 'Posicionamiento', 'Blocaje', 'Recuperación']);
+    tecnica = mapCategory(['Blocaje', 'Saque con mano', 'Saque con pie', 'Pase', 'Pase corto', 'Pase largo', 'Control orientado', 'Último pase', 'Regate', 'Centros', '1 contra 1', '1x1', 'Finalización', 'Remate']);
+    tactica = mapCategory(['Comunicación', 'Colocación', 'Liderazgo', 'Inteligencia táctica', 'Visión de juego', 'Creatividad', 'Trabajo ofensivo']);
+    
+    const allVals = Object.values(metrics);
+    media = allVals.reduce((a, b) => a + b, 0) / allVals.length;
+  } else {
+    tecnica = (
+      (evaluation.pase_corto ?? 3) + (evaluation.pase_largo ?? 3) + (evaluation.control_orientado ?? 3) + 
+      (evaluation.regate ?? 3) + (evaluation.centros ?? 3) + (evaluation.finalizacion ?? 3) + 
+      (evaluation.disparo_lejano ?? 3) + (evaluation.trabajo_ofensivo ?? 3)
+    ) / 8;
 
-  const defensiva = (
-    evaluation.marcaje + evaluation.entrada_defensiva + 
-    evaluation.posicionamiento_defensivo + evaluation.trabajo_defensivo
-  ) / 4;
+    tactica = (
+      (evaluation.vision_juego ?? 3) + (evaluation.inteligencia_tactica ?? 3) + (evaluation.liderazgo ?? 3)
+    ) / 3;
 
-  const media = (tecnica + tactica + condicional + defensiva) / 4;
+    condicional = (
+      (evaluation.velocidad ?? 3) + (evaluation.aceleracion ?? 3) + (evaluation.fuerza ?? 3) + 
+      (evaluation.resistencia ?? 3) + (evaluation.juego_aereo ?? 3)
+    ) / 5;
+
+    defensiva = (
+      (evaluation.marcaje ?? 3) + (evaluation.entrada_defensiva ?? 3) + 
+      (evaluation.posicionamiento_defensivo ?? 3) + (evaluation.trabajo_defensivo ?? 3)
+    ) / 4;
+
+    media = (tecnica + tactica + condicional + defensiva) / 4;
+  }
 
   const getMediaColorClass = (val: number) => {
     if (val >= 4.0) return 'bg-green-500/10 text-green-400 border border-green-500/20';
@@ -130,32 +152,47 @@ export function EvaluationCard({ evaluation }: EvaluationCardProps) {
             className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-200 focus:outline-none transition-colors duration-200"
           >
             <FileText className="h-3.5 w-3.5" />
-            <span>{isExpanded ? 'Ocultar desglose de 20 métricas' : 'Ver desglose de 20 métricas'}</span>
+            <span>
+              {evaluation.metricas && Object.keys(evaluation.metricas).length > 0 
+                ? (isExpanded ? 'Ocultar desglose de métricas de posición' : 'Ver desglose de métricas de posición')
+                : (isExpanded ? 'Ocultar desglose de 20 métricas' : 'Ver desglose de 20 métricas')
+              }
+            </span>
             {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
           </button>
           
           {isExpanded && (
             <div className="mt-3 text-[11px] text-slate-300 bg-slate-950/50 p-4 rounded-xl border border-slate-850 grid grid-cols-2 gap-x-4 gap-y-2">
-              <div><strong className="text-slate-400">Velocidad:</strong> {evaluation.velocidad}</div>
-              <div><strong className="text-slate-400">Aceleración:</strong> {evaluation.aceleracion}</div>
-              <div><strong className="text-slate-400">Fuerza:</strong> {evaluation.fuerza}</div>
-              <div><strong className="text-slate-400">Resistencia:</strong> {evaluation.resistencia}</div>
-              <div><strong className="text-slate-400">Juego Aéreo:</strong> {evaluation.juego_aereo}</div>
-              <div><strong className="text-slate-400">Marcaje:</strong> {evaluation.marcaje}</div>
-              <div><strong className="text-slate-400">Entrada Def.:</strong> {evaluation.entrada_defensiva}</div>
-              <div><strong className="text-slate-400">Pos. Defensivo:</strong> {evaluation.posicionamiento_defensivo}</div>
-              <div><strong className="text-slate-400">Trabajo Def.:</strong> {evaluation.trabajo_defensivo}</div>
-              <div><strong className="text-slate-400">Pase Corto:</strong> {evaluation.pase_corto}</div>
-              <div><strong className="text-slate-400">Pase Largo:</strong> {evaluation.pase_largo}</div>
-              <div><strong className="text-slate-400">Control Orien.:</strong> {evaluation.control_orientado}</div>
-              <div><strong className="text-slate-400">Regate:</strong> {evaluation.regate}</div>
-              <div><strong className="text-slate-400">Centros:</strong> {evaluation.centros}</div>
-              <div><strong className="text-slate-400">Finalización:</strong> {evaluation.finalizacion}</div>
-              <div><strong className="text-slate-400">Disparo Lej.:</strong> {evaluation.disparo_lejano}</div>
-              <div><strong className="text-slate-400">Trabajo Ofen.:</strong> {evaluation.trabajo_ofensivo}</div>
-              <div><strong className="text-slate-400">Visión Juego:</strong> {evaluation.vision_juego}</div>
-              <div><strong className="text-slate-400">Intel. Táctica:</strong> {evaluation.inteligencia_tactica}</div>
-              <div><strong className="text-slate-400">Liderazgo:</strong> {evaluation.liderazgo}</div>
+              {evaluation.metricas && Object.keys(evaluation.metricas).length > 0 ? (
+                Object.entries(evaluation.metricas).map(([key, val]) => (
+                  <div key={key}>
+                    <strong className="text-slate-400">{key}:</strong> {val} ★
+                  </div>
+                ))
+              ) : (
+                <>
+                  <div><strong className="text-slate-400">Velocidad:</strong> {evaluation.velocidad}</div>
+                  <div><strong className="text-slate-400">Aceleración:</strong> {evaluation.aceleracion}</div>
+                  <div><strong className="text-slate-400">Fuerza:</strong> {evaluation.fuerza}</div>
+                  <div><strong className="text-slate-400">Resistencia:</strong> {evaluation.resistencia}</div>
+                  <div><strong className="text-slate-400">Juego Aéreo:</strong> {evaluation.juego_aereo}</div>
+                  <div><strong className="text-slate-400">Marcaje:</strong> {evaluation.marcaje}</div>
+                  <div><strong className="text-slate-400">Entrada Def.:</strong> {evaluation.entrada_defensiva}</div>
+                  <div><strong className="text-slate-400">Pos. Defensivo:</strong> {evaluation.posicionamiento_defensivo}</div>
+                  <div><strong className="text-slate-400">Trabajo Def.:</strong> {evaluation.trabajo_defensivo}</div>
+                  <div><strong className="text-slate-400">Pase Corto:</strong> {evaluation.pase_corto}</div>
+                  <div><strong className="text-slate-400">Pase Largo:</strong> {evaluation.pase_largo}</div>
+                  <div><strong className="text-slate-400">Control Orien.:</strong> {evaluation.control_orientado}</div>
+                  <div><strong className="text-slate-400">Regate:</strong> {evaluation.regate}</div>
+                  <div><strong className="text-slate-400">Centros:</strong> {evaluation.centros}</div>
+                  <div><strong className="text-slate-400">Finalización:</strong> {evaluation.finalizacion}</div>
+                  <div><strong className="text-slate-400">Disparo Lej.:</strong> {evaluation.disparo_lejano}</div>
+                  <div><strong className="text-slate-400">Trabajo Ofen.:</strong> {evaluation.trabajo_ofensivo}</div>
+                  <div><strong className="text-slate-400">Visión Juego:</strong> {evaluation.vision_juego}</div>
+                  <div><strong className="text-slate-400">Intel. Táctica:</strong> {evaluation.inteligencia_tactica}</div>
+                  <div><strong className="text-slate-400">Liderazgo:</strong> {evaluation.liderazgo}</div>
+                </>
+              )}
             </div>
           )}
         </div>

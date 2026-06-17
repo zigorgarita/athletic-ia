@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Player, DetailedEvaluation } from '@/types';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Player, DetailedEvaluation, METRICAS_POR_POSICION } from '@/types';
 import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -14,7 +14,7 @@ import { useUploadPlayerPhoto } from '@/hooks/useUploadPlayerPhoto';
 import { compressImage } from '@/lib/image';
 import { 
   Award, ClipboardList, BarChart3, PlusCircle, 
-  Calendar, Check, ShieldAlert, Heart, Star, Sparkles 
+  Calendar, Check, Star, Sparkles 
 } from 'lucide-react';
 
 interface PlayerDetailProps {
@@ -34,76 +34,80 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
   const { updatePlayer } = useUpdatePlayer();
   const { uploadPhoto, loading: uploadingPhoto } = useUploadPlayerPhoto();
 
-  // Local state for detailed evaluation values
-  const [currentEval, setCurrentEval] = useState<Omit<DetailedEvaluation, 'id' | 'created_at'>>({
-    player_id: currentPlayer.id,
-    fecha_evaluacion: new Date().toISOString().split('T')[0],
-    velocidad: 3,
-    aceleracion: 3,
-    fuerza: 3,
-    resistencia: 3,
-    juego_aereo: 3,
-    marcaje: 3,
-    entrada_defensiva: 3,
-    posicionamiento_defensivo: 3,
-    trabajo_defensivo: 3,
-    pase_corto: 3,
-    pase_largo: 3,
-    control_orientado: 3,
-    regate: 3,
-    centros: 3,
-    finalizacion: 3,
-    disparo_lejano: 3,
-    trabajo_ofensivo: 3,
-    vision_juego: 3,
-    inteligencia_tactica: 3,
-    liderazgo: 3,
-  });
-
+  // State for position-specific metrics
+  const [dynamicMetrics, setDynamicMetrics] = useState<Record<string, number>>({});
   const [saveSuccess, setSaveSuccess] = useState(false);
+
+  const playerPosition = currentPlayer.demarcacion;
+  const metricsList = useMemo(() => METRICAS_POR_POSICION[playerPosition] || [], [playerPosition]);
 
   // Sync state with latest evaluation from DB if available
   useEffect(() => {
+    const initialMetrics: Record<string, number> = {};
+    metricsList.forEach(m => {
+      initialMetrics[m] = 3;
+    });
+
     if (evaluations && evaluations.length > 0) {
       const latest = evaluations[0];
-      setCurrentEval({
-        player_id: currentPlayer.id,
-        fecha_evaluacion: new Date().toISOString().split('T')[0],
-        velocidad: latest.velocidad,
-        aceleracion: latest.aceleracion,
-        fuerza: latest.fuerza,
-        resistencia: latest.resistencia,
-        juego_aereo: latest.juego_aereo,
-        marcaje: latest.marcaje,
-        entrada_defensiva: latest.entrada_defensiva,
-        posicionamiento_defensivo: latest.posicionamiento_defensivo,
-        trabajo_defensivo: latest.trabajo_defensivo,
-        pase_corto: latest.pase_corto,
-        pase_largo: latest.pase_largo,
-        control_orientado: latest.control_orientado,
-        regate: latest.regate,
-        centros: latest.centros,
-        finalizacion: latest.finalizacion,
-        disparo_lejano: latest.disparo_lejano,
-        trabajo_ofensivo: latest.trabajo_ofensivo,
-        vision_juego: latest.vision_juego,
-        inteligencia_tactica: latest.inteligencia_tactica,
-        liderazgo: latest.liderazgo,
-      });
+      if (latest.metricas) {
+        metricsList.forEach(m => {
+          initialMetrics[m] = latest.metricas?.[m] ?? 3;
+        });
+      } else {
+        // Fallback/map from old columns if JSONB is empty
+        const oldFieldMap: Record<string, keyof DetailedEvaluation> = {
+          'Velocidad': 'velocidad',
+          'Aceleración': 'aceleracion',
+          'Fuerza': 'fuerza',
+          'Resistencia': 'resistencia',
+          'Juego aéreo': 'juego_aereo',
+          'Marcaje': 'marcaje',
+          'Entrada Defensiva': 'entrada_defensiva',
+          'Duelo defensivo': 'entrada_defensiva',
+          'Posicionamiento': 'posicionamiento_defensivo',
+          'Trabajo Defensivo': 'trabajo_defensivo',
+          'Pase': 'pase_corto',
+          'Pase corto': 'pase_corto',
+          'Pase largo': 'pase_largo',
+          'Control orientado': 'control_orientado',
+          'Regate': 'regate',
+          'Centros': 'centros',
+          'Finalización': 'finalizacion',
+          'Disparo lejano': 'disparo_lejano',
+          'Trabajo Ofensivo': 'trabajo_ofensivo',
+          'Visión de juego': 'vision_juego',
+          'Inteligencia táctica': 'inteligencia_tactica',
+          'Liderazgo': 'liderazgo',
+        };
+
+        metricsList.forEach(m => {
+          const oldField = oldFieldMap[m];
+          if (oldField && latest[oldField] !== undefined) {
+            initialMetrics[m] = latest[oldField] as number;
+          }
+        });
+      }
     }
-  }, [evaluations, currentPlayer.id]);
+    setDynamicMetrics(initialMetrics);
+  }, [evaluations, playerPosition, metricsList]);
 
   // Handle rating metric change
-  const handleMetricChange = (metric: keyof Omit<DetailedEvaluation, 'id' | 'created_at' | 'player_id' | 'fecha_evaluacion'>, val: number) => {
-    setCurrentEval(prev => ({
+  const handleDynamicMetricChange = (metricName: string, val: number) => {
+    setDynamicMetrics(prev => ({
       ...prev,
-      [metric]: val
+      [metricName]: val
     }));
   };
 
   // Save detailed evaluations
   const handleSaveEvaluation = async () => {
-    const saved = await createEvaluation(currentEval);
+    const payload: Omit<DetailedEvaluation, 'id' | 'created_at'> = {
+      player_id: currentPlayer.id,
+      fecha_evaluacion: new Date().toISOString().split('T')[0],
+      metricas: dynamicMetrics
+    };
+    const saved = await createEvaluation(payload);
     if (saved) {
       setSaveSuccess(true);
       refetchEvals();
@@ -167,17 +171,10 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
     return age;
   };
 
-  // Calculate global rating average
-  const globalRatingAvg = evaluations && evaluations.length > 0 
-    ? (evaluations.reduce((acc, curr) => {
-        const sumMetrics = 
-          curr.velocidad + curr.aceleracion + curr.fuerza + curr.resistencia + curr.juego_aereo +
-          curr.marcaje + curr.entrada_defensiva + curr.posicionamiento_defensivo + curr.trabajo_defensivo +
-          curr.pase_corto + curr.pase_largo + curr.control_orientado + curr.regate + curr.centros +
-          curr.finalizacion + curr.disparo_lejano + curr.trabajo_ofensivo + curr.vision_juego +
-          curr.inteligencia_tactica + curr.liderazgo;
-        return acc + (sumMetrics / 20);
-      }, 0) / evaluations.length).toFixed(1)
+  // Calculate global rating average based on active position-specific metrics
+  const activeMetrics = Object.values(dynamicMetrics);
+  const globalRatingAvg = activeMetrics.length > 0 
+    ? (activeMetrics.reduce((acc, curr) => acc + curr, 0) / activeMetrics.length).toFixed(1)
     : '-';
 
   return (
@@ -380,14 +377,15 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
         {activeTab === 'profile' && (
           <div className="space-y-6">
             {/* Cabecera Guardar Valoraciones */}
+            {/* Cabecera Guardar Valoraciones */}
             <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 bg-slate-900/60 p-5 rounded-2xl border border-slate-800/80">
               <div>
                 <h3 className="text-base font-bold text-slate-100 flex items-center gap-1.5">
                   <Sparkles className="h-4 w-4 text-amber-400" />
-                  Sistema de Rendimiento (20 Métricas)
+                  Sistema de Rendimiento ({playerPosition.toUpperCase()})
                 </h3>
                 <p className="text-xs text-slate-400 mt-1">
-                  Establece la valoración técnica, táctica, física y cognitiva. Cada cambio requiere guardarse en Supabase.
+                  Métricas personalizadas para la posición de {playerPosition.toLowerCase()}. La valoración global se calcula promediando estas métricas.
                 </p>
               </div>
               <div className="flex items-center gap-3">
@@ -402,72 +400,27 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
               </div>
             </div>
 
-            {/* Grid de 20 Métricas por Categorías */}
+            {/* Grid de Métricas específicas */}
             {loadingEvals ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {[1, 2, 3, 4].map(i => (
-                  <div key={i} className="p-6 rounded-2xl border border-slate-800 space-y-4">
-                    <div className="h-6 w-32 bg-slate-800 rounded animate-pulse" />
-                    <div className="h-24 w-full bg-slate-900 rounded animate-pulse" />
-                  </div>
-                ))}
+              <div className="p-6 rounded-2xl border border-slate-800 space-y-4">
+                <div className="h-6 w-32 bg-slate-800 rounded animate-pulse" />
+                <div className="h-24 w-full bg-slate-900 rounded animate-pulse" />
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* 1. MÉTRIQUES FÍSICAS */}
-                <div className="p-6 rounded-2xl bg-slate-900/20 border border-slate-800/70 space-y-4">
-                  <h3 className="text-sm font-bold text-green-400 uppercase tracking-wider border-b border-slate-800/60 pb-2 flex items-center gap-2">
-                    <Heart className="h-4 w-4 text-green-500" /> Físicas
-                  </h3>
-                  <div className="space-y-1">
-                    <StarRating label="Velocidad" value={currentEval.velocidad} onChange={(v) => handleMetricChange('velocidad', v)} size={18} />
-                    <StarRating label="Aceleración" value={currentEval.aceleracion} onChange={(v) => handleMetricChange('aceleracion', v)} size={18} />
-                    <StarRating label="Fuerza" value={currentEval.fuerza} onChange={(v) => handleMetricChange('fuerza', v)} size={18} />
-                    <StarRating label="Resistencia" value={currentEval.resistencia} onChange={(v) => handleMetricChange('resistencia', v)} size={18} />
-                    <StarRating label="Juego Aéreo" value={currentEval.juego_aereo} onChange={(v) => handleMetricChange('juego_aereo', v)} size={18} />
-                  </div>
-                </div>
-
-                {/* 2. MÉTRIQUES DEFENSIVAS */}
-                <div className="p-6 rounded-2xl bg-slate-900/20 border border-slate-800/70 space-y-4">
-                  <h3 className="text-sm font-bold text-blue-400 uppercase tracking-wider border-b border-slate-800/60 pb-2 flex items-center gap-2">
-                    <ShieldAlert className="h-4 w-4 text-blue-500" /> Defensivas
-                  </h3>
-                  <div className="space-y-1">
-                    <StarRating label="Marcaje" value={currentEval.marcaje} onChange={(v) => handleMetricChange('marcaje', v)} size={18} />
-                    <StarRating label="Entrada Defensiva" value={currentEval.entrada_defensiva} onChange={(v) => handleMetricChange('entrada_defensiva', v)} size={18} />
-                    <StarRating label="Posicionamiento" value={currentEval.posicionamiento_defensivo} onChange={(v) => handleMetricChange('posicionamiento_defensivo', v)} size={18} />
-                    <StarRating label="Trabajo Defensivo" value={currentEval.trabajo_defensivo} onChange={(v) => handleMetricChange('trabajo_defensivo', v)} size={18} />
-                  </div>
-                </div>
-
-                {/* 3. MÉTRIQUES TÉCNICAS / OFENSIVAS */}
-                <div className="p-6 rounded-2xl bg-slate-900/20 border border-slate-800/70 space-y-4 md:col-span-2">
-                  <h3 className="text-sm font-bold text-rose-400 uppercase tracking-wider border-b border-slate-800/60 pb-2 flex items-center gap-2">
-                    <Award className="h-4 w-4 text-rose-500" /> Técnicas y Ofensivas
-                  </h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-1">
-                    <StarRating label="Pase Corto" value={currentEval.pase_corto} onChange={(v) => handleMetricChange('pase_corto', v)} size={18} />
-                    <StarRating label="Pase Largo" value={currentEval.pase_largo} onChange={(v) => handleMetricChange('pase_largo', v)} size={18} />
-                    <StarRating label="Control Orientado" value={currentEval.control_orientado} onChange={(v) => handleMetricChange('control_orientado', v)} size={18} />
-                    <StarRating label="Regate" value={currentEval.regate} onChange={(v) => handleMetricChange('regate', v)} size={18} />
-                    <StarRating label="Centros" value={currentEval.centros} onChange={(v) => handleMetricChange('centros', v)} size={18} />
-                    <StarRating label="Finalización" value={currentEval.finalizacion} onChange={(v) => handleMetricChange('finalizacion', v)} size={18} />
-                    <StarRating label="Disparo Lejano" value={currentEval.disparo_lejano} onChange={(v) => handleMetricChange('disparo_lejano', v)} size={18} />
-                    <StarRating label="Trabajo Ofensivo" value={currentEval.trabajo_ofensivo} onChange={(v) => handleMetricChange('trabajo_ofensivo', v)} size={18} />
-                  </div>
-                </div>
-
-                {/* 4. MÉTRIQUES TÁCTICAS / COGNITIVAS */}
-                <div className="p-6 rounded-2xl bg-slate-900/20 border border-slate-800/70 space-y-4 md:col-span-2">
-                  <h3 className="text-sm font-bold text-amber-400 uppercase tracking-wider border-b border-slate-800/60 pb-2 flex items-center gap-2">
-                    <Star className="h-4 w-4 text-amber-500" /> Tácticas y Cognitivas
-                  </h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-8 gap-y-1">
-                    <StarRating label="Visión de Juego" value={currentEval.vision_juego} onChange={(v) => handleMetricChange('vision_juego', v)} size={18} />
-                    <StarRating label="Inteligencia Táctica" value={currentEval.inteligencia_tactica} onChange={(v) => handleMetricChange('inteligencia_tactica', v)} size={18} />
-                    <StarRating label="Liderazgo" value={currentEval.liderazgo} onChange={(v) => handleMetricChange('liderazgo', v)} size={18} />
-                  </div>
+              <div className="p-6 rounded-2xl bg-slate-900/20 border border-slate-800/70 space-y-6">
+                <h3 className="text-sm font-bold text-green-400 uppercase tracking-wider border-b border-slate-800/60 pb-2 flex items-center gap-2">
+                  <Award className="h-4 w-4 text-green-500" /> Atributos de Posición
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3">
+                  {metricsList.map((metric) => (
+                    <StarRating
+                      key={metric}
+                      label={metric}
+                      value={dynamicMetrics[metric] ?? 3}
+                      onChange={(val) => handleDynamicMetricChange(metric, val)}
+                      size={20}
+                    />
+                  ))}
                 </div>
               </div>
             )}

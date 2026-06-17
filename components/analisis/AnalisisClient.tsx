@@ -88,16 +88,39 @@ export function AnalisisClient() {
     // Most recent evaluation
     const latest = pEvals[0];
 
-    const tecnica = (
-      latest.pase_corto + latest.pase_largo + latest.control_orientado + 
-      latest.regate + latest.centros + latest.finalizacion + 
-      latest.disparo_lejano + latest.trabajo_ofensivo
-    ) / 8;
+    let tecnica = 3;
+    let tactica = 3;
+    let condicional = 3;
+    let defensiva = 3;
+    let global = 3;
 
-    const tactica = (latest.vision_juego + latest.inteligencia_tactica + latest.liderazgo) / 3;
-    const condicional = (latest.velocidad + latest.aceleracion + latest.fuerza + latest.resistencia + latest.juego_aereo) / 5;
-    const defensiva = (latest.marcaje + latest.entrada_defensiva + latest.posicionamiento_defensivo + latest.trabajo_defensivo) / 4;
-    const global = (tecnica + tactica + condicional + defensiva) / 4;
+    if (latest.metricas && Object.keys(latest.metricas).length > 0) {
+      const metrics = latest.metricas;
+      
+      const mapCategory = (keys: string[]) => {
+        const vals = keys.map(k => metrics[k]).filter(v => v !== undefined);
+        return vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : 3;
+      };
+
+      condicional = mapCategory(['Reflejos', 'Velocidad', 'Aceleración', 'Fuerza', 'Resistencia', 'Juego aéreo', 'Movilidad']);
+      defensiva = mapCategory(['Marcaje', 'Anticipación', 'Duelo defensivo', 'Posicionamiento', 'Blocaje', 'Recuperación']);
+      tecnica = mapCategory(['Blocaje', 'Saque con mano', 'Saque con pie', 'Pase', 'Pase corto', 'Pase largo', 'Control orientado', 'Último pase', 'Regate', 'Centros', '1 contra 1', '1x1', 'Finalización', 'Remate']);
+      tactica = mapCategory(['Comunicación', 'Colocación', 'Liderazgo', 'Inteligencia táctica', 'Visión de juego', 'Creatividad', 'Trabajo ofensivo']);
+      
+      const allVals = Object.values(metrics);
+      global = allVals.reduce((a, b) => a + b, 0) / allVals.length;
+    } else {
+      tecnica = (
+        (latest.pase_corto ?? 3) + (latest.pase_largo ?? 3) + (latest.control_orientado ?? 3) + 
+        (latest.regate ?? 3) + (latest.centros ?? 3) + (latest.finalizacion ?? 3) + 
+        (latest.disparo_lejano ?? 3) + (latest.trabajo_ofensivo ?? 3)
+      ) / 8;
+
+      tactica = ((latest.vision_juego ?? 3) + (latest.inteligencia_tactica ?? 3) + (latest.liderazgo ?? 3)) / 3;
+      condicional = ((latest.velocidad ?? 3) + (latest.aceleracion ?? 3) + (latest.fuerza ?? 3) + (latest.resistencia ?? 3) + (latest.juego_aereo ?? 3)) / 5;
+      defensiva = ((latest.marcaje ?? 3) + (latest.entrada_defensiva ?? 3) + (latest.posicionamiento_defensivo ?? 3) + (latest.trabajo_defensivo ?? 3)) / 4;
+      global = (tecnica + tactica + condicional + defensiva) / 4;
+    }
 
     return { tecnica, tactica, condicional, defensiva, global, raw: latest };
   };

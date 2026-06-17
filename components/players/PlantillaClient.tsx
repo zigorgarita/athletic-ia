@@ -6,7 +6,7 @@ import { usePlayers } from '@/hooks/usePlayers';
 import { useCreatePlayer } from '@/hooks/useCreatePlayer';
 import { useUpdatePlayer } from '@/hooks/useUpdatePlayer';
 import { useDeletePlayer } from '@/hooks/useDeletePlayer';
-import { Player, Demarcacion } from '@/types';
+import { Player, Demarcacion, DetailedEvaluation } from '@/types';
 import { PlayerForm } from '@/components/players/PlayerForm';
 import { PlayerDetail } from '@/components/players/PlayerDetail';
 import { Button } from '@/components/ui/Button';
@@ -46,19 +46,25 @@ export function PlantillaClient() {
       try {
         const { data, error: err } = await supabase
           .from('detailed_evaluations')
-          .select('player_id, velocidad, aceleracion, fuerza, resistencia, juego_aereo, marcaje, entrada_defensiva, posicionamiento_defensivo, trabajo_defensivo, pase_corto, pase_largo, control_orientado, regate, centros, finalizacion, disparo_lejano, trabajo_ofensivo, vision_juego, inteligencia_tactica, liderazgo');
+          .select('player_id, metricas, velocidad, aceleracion, fuerza, resistencia, juego_aereo, marcaje, entrada_defensiva, posicionamiento_defensivo, trabajo_defensivo, pase_corto, pase_largo, control_orientado, regate, centros, finalizacion, disparo_lejano, trabajo_ofensivo, vision_juego, inteligencia_tactica, liderazgo');
         
         if (err) throw err;
 
         const sumMap: Record<string, { sum: number; count: number }> = {};
-        data?.forEach((row) => {
-          const sumMetrics = 
-            row.velocidad + row.aceleracion + row.fuerza + row.resistencia + row.juego_aereo +
-            row.marcaje + row.entrada_defensiva + row.posicionamiento_defensivo + row.trabajo_defensivo +
-            row.pase_corto + row.pase_largo + row.control_orientado + row.regate + row.centros +
-            row.finalizacion + row.disparo_lejano + row.trabajo_ofensivo + row.vision_juego +
-            row.inteligencia_tactica + row.liderazgo;
-          const avg = sumMetrics / 20;
+        data?.forEach((row: Partial<DetailedEvaluation> & { player_id: string }) => {
+          let avg = 0;
+          if (row.metricas && Object.keys(row.metricas).length > 0) {
+            const vals = Object.values(row.metricas) as number[];
+            avg = vals.reduce((a, b) => a + b, 0) / vals.length;
+          } else {
+            const sumMetrics = 
+              (row.velocidad || 0) + (row.aceleracion || 0) + (row.fuerza || 0) + (row.resistencia || 0) + (row.juego_aereo || 0) +
+              (row.marcaje || 0) + (row.entrada_defensiva || 0) + (row.posicionamiento_defensivo || 0) + (row.trabajo_defensivo || 0) +
+              (row.pase_corto || 0) + (row.pase_largo || 0) + (row.control_orientado || 0) + (row.regate || 0) + (row.centros || 0) +
+              (row.finalizacion || 0) + (row.disparo_lejano || 0) + (row.trabajo_ofensivo || 0) + (row.vision_juego || 0) +
+              (row.inteligencia_tactica || 0) + (row.liderazgo || 0);
+            avg = sumMetrics / 20;
+          }
 
           if (!sumMap[row.player_id]) {
             sumMap[row.player_id] = { sum: 0, count: 0 };
