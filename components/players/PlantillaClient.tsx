@@ -352,21 +352,21 @@ export function PlantillaClient() {
           <table className="w-full text-left border-collapse select-none">
             <thead>
               <tr className="border-b border-slate-800 bg-slate-900/60 text-slate-400 text-[10px] font-black uppercase tracking-wider">
-                <th className="px-6 py-4">Foto</th>
-                <th className="px-4 py-4 cursor-pointer hover:text-white" onClick={() => requestSort('dorsal')}>
+                <th className="px-4 py-4 w-12 text-center">Foto</th>
+                <th className="px-3 py-4 cursor-pointer hover:text-white w-20" onClick={() => requestSort('dorsal')}>
                   Dorsal {sortBy === 'dorsal' && (sortOrder === 'asc' ? '▲' : '▼')}
                 </th>
-                <th className="px-6 py-4 cursor-pointer hover:text-white" onClick={() => requestSort('nombre')}>
+                <th className="px-4 py-4 cursor-pointer hover:text-white" onClick={() => requestSort('nombre')}>
                   Nombre Completo {sortBy === 'nombre' && (sortOrder === 'asc' ? '▲' : '▼')}
                 </th>
-                <th className="px-6 py-4">Posición</th>
-                <th className="px-4 py-4 text-center">Edad</th>
-                <th className="px-6 py-4">Pierna</th>
-                <th className="px-6 py-4">Estado</th>
-                <th className="px-6 py-4 cursor-pointer hover:text-white" onClick={() => requestSort('valoracion')}>
-                  Valoración Global {sortBy === 'valoracion' && (sortOrder === 'asc' ? '▲' : '▼')}
+                <th className="px-4 py-4 w-32">Posición</th>
+                <th className="px-3 py-4 text-center w-16">Edad</th>
+                <th className="px-4 py-4 w-24">Pierna</th>
+                <th className="px-4 py-4 w-28">Estado</th>
+                <th className="px-4 py-4 cursor-pointer hover:text-white w-36" onClick={() => requestSort('valoracion')}>
+                  Val. Global {sortBy === 'valoracion' && (sortOrder === 'asc' ? '▲' : '▼')}
                 </th>
-                <th className="px-6 py-4 text-right">Acciones</th>
+                <th className="px-6 py-4 text-center w-[120px] min-w-[120px]">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60 text-xs">
@@ -378,25 +378,25 @@ export function PlantillaClient() {
                     onClick={() => setActivePlayerForDetail(player)}
                     className="hover:bg-slate-800/30 transition-colors duration-150 cursor-pointer group"
                   >
-                    <td className="px-6 py-3.5">
-                      <Avatar src={player.foto_url} name={player.nombre} size="sm" className="border border-slate-700/60" />
+                    <td className="px-4 py-3.5 text-center">
+                      <Avatar src={player.foto_url} name={player.nombre} size="sm" className="border border-slate-700/60 mx-auto" />
                     </td>
-                    <td className="px-4 py-3.5 font-black text-sm text-slate-300">
+                    <td className="px-3 py-3.5 font-black text-sm text-slate-300">
                       #{player.dorsal}
                     </td>
-                    <td className="px-6 py-3.5 font-bold text-slate-100 group-hover:text-green-400 transition-colors">
+                    <td className="px-4 py-3.5 font-bold text-slate-100 group-hover:text-green-400 transition-colors">
                       {player.nombre} <span className="text-slate-400 font-medium">{player.apellidos}</span>
                     </td>
-                    <td className="px-6 py-3.5">
+                    <td className="px-4 py-3.5">
                       <Badge variant={player.demarcacion}>{player.demarcacion}</Badge>
                     </td>
-                    <td className="px-4 py-3.5 text-center text-slate-300">
+                    <td className="px-3 py-3.5 text-center text-slate-300">
                       {getAge(player.fecha_nacimiento)}
                     </td>
-                    <td className="px-6 py-3.5 text-slate-450">
+                    <td className="px-4 py-3.5 text-slate-450">
                       {player.pierna_dominante || 'Diestro'}
                     </td>
-                    <td className="px-6 py-3.5">
+                    <td className="px-4 py-3.5">
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
                         player.estado === 'Disponible' ? 'bg-green-950/20 text-green-400 border-green-900/30' :
                         player.estado === 'Lesionado' ? 'bg-red-950/20 text-red-400 border-red-900/30' :
@@ -406,7 +406,7 @@ export function PlantillaClient() {
                         {player.estado === 'Duda' ? 'Duda' : player.estado}
                       </span>
                     </td>
-                    <td className="px-6 py-3.5 font-bold">
+                    <td className="px-4 py-3.5 font-bold">
                       {avgValuation ? (
                         <span className="text-amber-400 flex items-center gap-1">
                           <Star className="h-3.5 w-3.5 fill-amber-450 text-amber-450" /> {avgValuation}
@@ -415,8 +415,8 @@ export function PlantillaClient() {
                         <span className="text-slate-500">-</span>
                       )}
                     </td>
-                    <td className="px-6 py-3.5 text-right" onClick={e => e.stopPropagation()}>
-                      <div className="flex justify-end gap-1.5">
+                    <td className="px-6 py-3.5" onClick={e => e.stopPropagation()}>
+                      <div className="flex justify-center gap-2">
                         <button 
                           onClick={() => setActivePlayerForDetail(player)} 
                           className="h-8 w-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-colors duration-150"
