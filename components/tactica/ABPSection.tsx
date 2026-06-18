@@ -276,6 +276,113 @@ const getRolesForPlayType = (type: ABPType): string[] => {
   return ['Lanzador', 'Sacador', 'Rematador', 'Bloqueador', 'Arrastrador', 'Rechace', 'Cierre', 'Primer palo', 'Segundo palo', 'Vigilancia', 'Libre'];
 };
 
+const getPositionsForPlay = (type: ABPType, zona?: string | null): { role: string; x: number; y: number }[] => {
+  if (type === 'Saque de banda ofensivo') {
+    if (zona === 'Inicio') {
+      return [
+        { role: 'Sacador', x: 5, y: 70 },
+        { role: 'Apoyo', x: 20, y: 65 },
+        { role: 'Libre', x: 30, y: 55 },
+        { role: 'Rechace', x: 40, y: 75 },
+        { role: 'Vigilancia', x: 35, y: 35 },
+        { role: 'Libre', x: 50, y: 45 },
+        { role: 'Cambio de orientación', x: 60, y: 25 },
+        { role: 'Profundidad', x: 70, y: 55 },
+        { role: 'Libre', x: 80, y: 35 },
+        { role: 'Libre', x: 90, y: 50 }
+      ];
+    } else if (zona === 'Medio') {
+      return [
+        { role: 'Sacador', x: 5, y: 50 },
+        { role: 'Apoyo', x: 25, y: 40 },
+        { role: 'Libre', x: 30, y: 60 },
+        { role: 'Rechace', x: 45, y: 50 },
+        { role: 'Vigilancia', x: 40, y: 20 },
+        { role: 'Libre', x: 55, y: 35 },
+        { role: 'Cambio de orientación', x: 65, y: 15 },
+        { role: 'Profundidad', x: 75, y: 50 },
+        { role: 'Libre', x: 80, y: 30 },
+        { role: 'Libre', x: 85, y: 45 }
+      ];
+    } else {
+      return DEFAULT_POSITIONS_BY_TYPE[type] || [];
+    }
+  }
+
+  if (type === 'Saque de banda defensivo') {
+    if (zona === 'Inicio') {
+      return [
+        { role: 'Cierre', x: 50, y: 15 },
+        { role: 'Vigilancia', x: 20, y: 45 },
+        { role: 'Vigilancia', x: 30, y: 40 },
+        { role: 'Libre', x: 18, y: 35 },
+        { role: 'Libre', x: 28, y: 35 },
+        { role: 'Rechace', x: 50, y: 50 },
+        { role: 'Vigilancia', x: 35, y: 70 },
+        { role: 'Vigilancia', x: 65, y: 70 },
+        { role: 'Libre', x: 40, y: 30 },
+        { role: 'Libre', x: 45, y: 30 },
+        { role: 'Libre', x: 50, y: 30 }
+      ];
+    } else if (zona === 'Medio') {
+      return [
+        { role: 'Cierre', x: 50, y: 15 },
+        { role: 'Libre', x: 30, y: 45 },
+        { role: 'Libre', x: 40, y: 45 },
+        { role: 'Libre', x: 50, y: 45 },
+        { role: 'Libre', x: 60, y: 45 },
+        { role: 'Rechace', x: 50, y: 55 },
+        { role: 'Vigilancia', x: 35, y: 65 },
+        { role: 'Vigilancia', x: 65, y: 65 },
+        { role: 'Vigilancia', x: 50, y: 75 },
+        { role: 'Libre', x: 45, y: 35 },
+        { role: 'Libre', x: 55, y: 35 }
+      ];
+    } else {
+      return [
+        { role: 'Cierre', x: 50, y: 15 },
+        { role: 'Vigilancia', x: 42, y: 28 },
+        { role: 'Vigilancia', x: 48, y: 28 },
+        { role: 'Vigilancia', x: 58, y: 28 },
+        { role: 'Primer palo', x: 40, y: 22 },
+        { role: 'Rechace', x: 50, y: 48 },
+        { role: 'Vigilancia', x: 20, y: 60 },
+        { role: 'Vigilancia', x: 80, y: 60 },
+        { role: 'Libre', x: 42, y: 35 },
+        { role: 'Libre', x: 48, y: 35 },
+        { role: 'Libre', x: 58, y: 35 }
+      ];
+    }
+  }
+
+  return DEFAULT_POSITIONS_BY_TYPE[type] || [];
+};
+
+const getFieldView = (type: ABPType, zona?: string | null): 'full' | 'attack' | 'defense' | 'midfield' => {
+  if (type === 'Saque inicial') {
+    return 'full';
+  }
+  
+  if (type === 'Saque de banda ofensivo') {
+    if (zona === 'Inicio') return 'defense';
+    if (zona === 'Medio') return 'midfield';
+    return 'attack';
+  }
+  
+  if (type === 'Saque de banda defensivo') {
+    if (zona === 'Inicio') return 'attack';
+    if (zona === 'Medio') return 'midfield';
+    return 'defense';
+  }
+  
+  const lower = type.toLowerCase();
+  if (lower.includes('defensivo') || lower.includes('defensiva')) {
+    return 'defense';
+  }
+  
+  return 'attack';
+};
+
 export function ABPSection({ players }: ABPSectionProps) {
   const [plays, setPlays] = useState<ABPPlay[]>([]);
   const [selectedPlay, setSelectedPlay] = useState<ABPPlay | null>(null);
@@ -294,6 +401,7 @@ export function ABPSection({ players }: ABPSectionProps) {
   const [playDesc, setPlayDesc] = useState('');
   const [playType, setPlayType] = useState<ABPType>('Córner ofensivo');
   const [playVideoUrl, setPlayVideoUrl] = useState('');
+  const [playZone, setPlayZone] = useState<'Inicio' | 'Medio' | 'Finalización' | ''>('Finalización');
   const [videoFile, setVideoFile] = useState<File | null>(null);
   
   // Filters & Search
@@ -407,13 +515,15 @@ export function ABPSection({ players }: ABPSectionProps) {
       }
 
       // Insert Play record
+      const isThrowIn = playType === 'Saque de banda ofensivo' || playType === 'Saque de banda defensivo';
       const { data: playRes, error: insertError } = await supabase
         .from('abp_plays')
         .insert({
           tipo: playType,
           titulo: playTitle,
           descripcion: playDesc || null,
-          video_url: videoUrl
+          video_url: videoUrl,
+          zona: isThrowIn ? playZone : null
         })
         .select()
         .single();
@@ -421,7 +531,7 @@ export function ABPSection({ players }: ABPSectionProps) {
       if (insertError) throw insertError;
 
       // Insert default roles & positions for the chosen ABPType
-      const defaultRoles = DEFAULT_POSITIONS_BY_TYPE[playType] || [];
+      const defaultRoles = getPositionsForPlay(playType, isThrowIn ? playZone : null);
       if (defaultRoles.length > 0 && playRes) {
         const rolesPayload = defaultRoles.map((dr, index) => ({
           abp_play_id: playRes.id,
@@ -491,13 +601,15 @@ export function ABPSection({ players }: ABPSectionProps) {
         videoUrl = data.publicUrl;
       }
 
+      const isThrowIn = playType === 'Saque de banda ofensivo' || playType === 'Saque de banda defensivo';
       const { error: updateError } = await supabase
         .from('abp_plays')
         .update({
           titulo: playTitle,
           tipo: playType,
           descripcion: playDesc || null,
-          video_url: videoUrl
+          video_url: videoUrl,
+          zona: isThrowIn ? playZone : null
         })
         .eq('id', selectedPlay.id);
 
@@ -512,7 +624,8 @@ export function ABPSection({ players }: ABPSectionProps) {
         titulo: playTitle,
         tipo: playType,
         descripcion: playDesc || null,
-        video_url: videoUrl
+        video_url: videoUrl,
+        zona: isThrowIn ? playZone : null
       };
       setSelectedPlay(updatedPlay);
       await loadPlays();
@@ -533,6 +646,7 @@ export function ABPSection({ players }: ABPSectionProps) {
     setPlayType(selectedPlay.tipo);
     setPlayDesc(selectedPlay.descripcion || '');
     setPlayVideoUrl(selectedPlay.video_url || '');
+    setPlayZone((selectedPlay.zona as 'Inicio' | 'Medio' | 'Finalización') || 'Finalización');
     setIsEditModalOpen(true);
   };
 
@@ -709,8 +823,8 @@ export function ABPSection({ players }: ABPSectionProps) {
         
       if (deleteError) throw deleteError;
 
-      // 2. Insert new default roles based on play type
-      const defaults = DEFAULT_POSITIONS_BY_TYPE[selectedPlay.tipo] || [];
+      // 2. Insert new default roles based on play type and zone
+      const defaults = getPositionsForPlay(selectedPlay.tipo, selectedPlay.zona);
       if (defaults.length > 0) {
         const rolesPayload = defaults.map((dr, index) => ({
           abp_play_id: selectedPlay.id,
@@ -1175,59 +1289,101 @@ export function ABPSection({ players }: ABPSectionProps) {
                       ref={containerRef}
                       className="relative w-full aspect-[4/3] bg-emerald-950/80 rounded-2xl border-2 border-emerald-500/25 overflow-hidden select-none"
                     >
-                      {/* SVG del Campo (Detalle de Córner / Falta / Área) */}
-                      {selectedPlay.tipo === 'Saque inicial' ? (
-                        <svg viewBox="0 0 400 300" className="absolute inset-0 w-full h-full pointer-events-none opacity-30">
-                          {/* Contorno del campo */}
-                          <rect x="15" y="15" width="370" height="270" fill="none" stroke="#fff" strokeWidth="1.5" />
-                          {/* Línea central */}
-                          <line x1="200" y1="15" x2="200" y2="285" stroke="#fff" strokeWidth="1.5" />
-                          {/* Círculo central */}
-                          <circle cx="200" cy="150" r="45" fill="none" stroke="#fff" strokeWidth="1.5" />
-                          <circle cx="200" cy="150" r="2.5" fill="#fff" />
-                          
-                          {/* Área Grande Izquierda */}
-                          <rect x="15" y="65" width="60" height="170" fill="none" stroke="#fff" strokeWidth="1.5" />
-                          {/* Área Pequeña Izquierda */}
-                          <rect x="15" y="105" width="22" height="90" fill="none" stroke="#fff" strokeWidth="1.5" />
-                          {/* Punto de Penalti Izquierdo */}
-                          <circle cx="55" cy="150" r="2" fill="#fff" />
-                          {/* Semicírculo Área Izquierda */}
-                          <path d="M 75 115 A 40 40 0 0 1 75 185" fill="none" stroke="#fff" strokeWidth="1.5" />
-                          {/* Portería Izquierda */}
-                          <rect x="7" y="115" width="8" height="70" fill="none" stroke="#fff" strokeWidth="1.8" />
-                          
-                          {/* Área Grande Derecha */}
-                          <rect x="325" y="65" width="60" height="170" fill="none" stroke="#fff" strokeWidth="1.5" />
-                          {/* Área Pequeña Derecha */}
-                          <rect x="363" y="105" width="22" height="90" fill="none" stroke="#fff" strokeWidth="1.5" />
-                          {/* Punto de Penalti Derecho */}
-                          <circle cx="345" cy="150" r="2" fill="#fff" />
-                          {/* Semicírculo Área Derecha */}
-                          <path d="M 325 115 A 40 40 0 0 0 325 185" fill="none" stroke="#fff" strokeWidth="1.5" />
-                          {/* Portería Derecha */}
-                          <rect x="385" y="115" width="8" height="70" fill="none" stroke="#fff" strokeWidth="1.8" />
-                        </svg>
-                      ) : (
-                        <svg viewBox="0 0 400 300" className="absolute inset-0 w-full h-full pointer-events-none opacity-30">
-                          {/* Líneas principales del área */}
-                          <rect x="0" y="0" width="400" height="300" fill="none" stroke="#fff" strokeWidth="1.5" />
-                          {/* Línea de fondo y córner flag arcs */}
-                          <path d="M 0 10 A 10 10 0 0 1 10 0" fill="none" stroke="#fff" strokeWidth="2" />
-                          <path d="M 400 10 A 10 10 0 0 0 390 0" fill="none" stroke="#fff" strokeWidth="2" />
-                          
-                          {/* Área Grande */}
-                          <rect x="75" y="0" width="250" height="110" fill="none" stroke="#fff" strokeWidth="1.5" />
-                          {/* Área Pequeña */}
-                          <rect x="140" y="0" width="120" height="40" fill="none" stroke="#fff" strokeWidth="1.5" />
-                          {/* Punto de Penalti */}
-                          <circle cx="200" cy="80" r="2.5" fill="#fff" />
-                          {/* Semi-circunferencia del área grande */}
-                          <path d="M 150 110 A 60 60 0 0 0 250 110" fill="none" stroke="#fff" strokeWidth="1.5" />
-                          {/* Portería */}
-                          <rect x="165" y="-6" width="70" height="6" fill="none" stroke="#fff" strokeWidth="2" />
-                        </svg>
-                      )}
+                      {(() => {
+                        const view = getFieldView(selectedPlay.tipo, selectedPlay.zona);
+                        if (view === 'full') {
+                          return (
+                            <svg viewBox="0 0 400 300" className="absolute inset-0 w-full h-full pointer-events-none opacity-30">
+                              {/* Contorno del campo */}
+                              <rect x="15" y="15" width="370" height="270" fill="none" stroke="#fff" strokeWidth="1.5" />
+                              {/* Línea central */}
+                              <line x1="200" y1="15" x2="200" y2="285" stroke="#fff" strokeWidth="1.5" />
+                              {/* Círculo central */}
+                              <circle cx="200" cy="150" r="45" fill="none" stroke="#fff" strokeWidth="1.5" />
+                              <circle cx="200" cy="150" r="2.5" fill="#fff" />
+                              
+                              {/* Área Grande Izquierda */}
+                              <rect x="15" y="65" width="60" height="170" fill="none" stroke="#fff" strokeWidth="1.5" />
+                              {/* Área Pequeña Izquierda */}
+                              <rect x="15" y="105" width="22" height="90" fill="none" stroke="#fff" strokeWidth="1.5" />
+                              {/* Punto de Penalti Izquierdo */}
+                              <circle cx="55" cy="150" r="2" fill="#fff" />
+                              {/* Semicírculo Área Izquierda */}
+                              <path d="M 75 115 A 40 40 0 0 1 75 185" fill="none" stroke="#fff" strokeWidth="1.5" />
+                              {/* Portería Izquierda */}
+                              <rect x="7" y="115" width="8" height="70" fill="none" stroke="#fff" strokeWidth="1.8" />
+                              
+                              {/* Área Grande Derecha */}
+                              <rect x="325" y="65" width="60" height="170" fill="none" stroke="#fff" strokeWidth="1.5" />
+                              {/* Área Pequeña Derecha */}
+                              <rect x="363" y="105" width="22" height="90" fill="none" stroke="#fff" strokeWidth="1.5" />
+                              {/* Punto de Penalti Derecho */}
+                              <circle cx="345" cy="150" r="2" fill="#fff" />
+                              {/* Semicírculo Área Derecha */}
+                              <path d="M 325 115 A 40 40 0 0 0 325 185" fill="none" stroke="#fff" strokeWidth="1.5" />
+                              {/* Portería Derecha */}
+                              <rect x="385" y="115" width="8" height="70" fill="none" stroke="#fff" strokeWidth="1.8" />
+                            </svg>
+                          );
+                        } else if (view === 'midfield') {
+                          return (
+                            <svg viewBox="0 0 400 300" className="absolute inset-0 w-full h-full pointer-events-none opacity-30">
+                              {/* Contorno del campo */}
+                              <rect x="15" y="15" width="370" height="270" fill="none" stroke="#fff" strokeWidth="1.5" />
+                              {/* Línea central */}
+                              <line x1="200" y1="15" x2="200" y2="285" stroke="#fff" strokeWidth="1.5" />
+                              {/* Círculo central */}
+                              <circle cx="200" cy="150" r="45" fill="none" stroke="#fff" strokeWidth="1.5" />
+                              <circle cx="200" cy="150" r="2.5" fill="#fff" />
+                              <text x="200" y="250" fill="#fff" fontSize="8" fontWeight="bold" textAnchor="middle" opacity="0.5">ZONA MEDIA (MEDIO CAMPO)</text>
+                            </svg>
+                          );
+                        } else if (view === 'defense') {
+                          return (
+                            <svg viewBox="0 0 400 300" className="absolute inset-0 w-full h-full pointer-events-none opacity-30">
+                              {/* Líneas principales del área */}
+                              <rect x="0" y="0" width="400" height="300" fill="none" stroke="#fff" strokeWidth="1.5" />
+                              {/* Línea de fondo y córner flag arcs */}
+                              <path d="M 0 10 A 10 10 0 0 1 10 0" fill="none" stroke="#fff" strokeWidth="2" />
+                              <path d="M 400 10 A 10 10 0 0 0 390 0" fill="none" stroke="#fff" strokeWidth="2" />
+                              
+                              {/* Área Grande */}
+                              <rect x="75" y="0" width="250" height="110" fill="none" stroke="#fff" strokeWidth="1.5" />
+                              {/* Área Pequeña */}
+                              <rect x="140" y="0" width="120" height="40" fill="none" stroke="#fff" strokeWidth="1.5" />
+                              {/* Punto de Penalti */}
+                              <circle cx="200" cy="80" r="2.5" fill="#fff" />
+                              {/* Semi-circunferencia del área grande */}
+                              <path d="M 150 110 A 60 60 0 0 0 250 110" fill="none" stroke="#fff" strokeWidth="1.5" />
+                              {/* Portería */}
+                              <rect x="165" y="-6" width="70" height="6" fill="none" stroke="#fff" strokeWidth="2" />
+                              <text x="200" y="125" fill="#fff" fontSize="8" fontWeight="bold" textAnchor="middle" opacity="0.5">ÁREA PROPIA (DEFENSA)</text>
+                            </svg>
+                          );
+                        } else {
+                          return (
+                            <svg viewBox="0 0 400 300" className="absolute inset-0 w-full h-full pointer-events-none opacity-30">
+                              {/* Líneas principales del área */}
+                              <rect x="0" y="0" width="400" height="300" fill="none" stroke="#fff" strokeWidth="1.5" />
+                              {/* Línea de fondo y córner flag arcs */}
+                              <path d="M 0 10 A 10 10 0 0 1 10 0" fill="none" stroke="#fff" strokeWidth="2" />
+                              <path d="M 400 10 A 10 10 0 0 0 390 0" fill="none" stroke="#fff" strokeWidth="2" />
+                              
+                              {/* Área Grande */}
+                              <rect x="75" y="0" width="250" height="110" fill="none" stroke="#fff" strokeWidth="1.5" />
+                              {/* Área Pequeña */}
+                              <rect x="140" y="0" width="120" height="40" fill="none" stroke="#fff" strokeWidth="1.5" />
+                              {/* Punto de Penalti */}
+                              <circle cx="200" cy="80" r="2.5" fill="#fff" />
+                              {/* Semi-circunferencia del área grande */}
+                              <path d="M 150 110 A 60 60 0 0 0 250 110" fill="none" stroke="#fff" strokeWidth="1.5" />
+                              {/* Portería */}
+                              <rect x="165" y="-6" width="70" height="6" fill="none" stroke="#fff" strokeWidth="2" />
+                              <text x="200" y="125" fill="#fff" fontSize="8" fontWeight="bold" textAnchor="middle" opacity="0.5">ÁREA RIVAL (ATAQUE)</text>
+                            </svg>
+                          );
+                        }
+                      })()}
 
                       {/* Renderizado de Fichas/Roles */}
                       {playRoles.map((role) => {
@@ -1584,6 +1740,19 @@ export function ABPSection({ players }: ABPSectionProps) {
             options={ABP_TYPES.map(t => ({ value: t, label: t }))}
           />
 
+          {(playType === 'Saque de banda ofensivo' || playType === 'Saque de banda defensivo') && (
+            <Select
+              label="Zona del Campo (Tercio)"
+              value={playZone}
+              onChange={(e) => setPlayZone(e.target.value as 'Inicio' | 'Medio' | 'Finalización')}
+              options={[
+                { value: 'Inicio', label: 'Inicio (tercio defensivo)' },
+                { value: 'Medio', label: 'Medio (tercio medio)' },
+                { value: 'Finalización', label: 'Finalización (último tercio)' }
+              ]}
+            />
+          )}
+
           <div className="space-y-1">
             <label className="text-[11px] font-bold text-slate-400">Instrucciones y Ejecución</label>
             <textarea
@@ -1644,6 +1813,19 @@ export function ABPSection({ players }: ABPSectionProps) {
             onChange={(e) => setPlayType(e.target.value as ABPType)}
             options={ABP_TYPES.map(t => ({ value: t, label: t }))}
           />
+
+          {(playType === 'Saque de banda ofensivo' || playType === 'Saque de banda defensivo') && (
+            <Select
+              label="Zona del Campo (Tercio)"
+              value={playZone}
+              onChange={(e) => setPlayZone(e.target.value as 'Inicio' | 'Medio' | 'Finalización')}
+              options={[
+                { value: 'Inicio', label: 'Inicio (tercio defensivo)' },
+                { value: 'Medio', label: 'Medio (tercio medio)' },
+                { value: 'Finalización', label: 'Finalización (último tercio)' }
+              ]}
+            />
+          )}
 
           <div className="space-y-1">
             <label className="text-[11px] font-bold text-slate-400">Instrucciones y Ejecución</label>

@@ -242,6 +242,7 @@ export interface ABPPlay {
   titulo: string;
   descripcion: string | null;
   video_url: string | null;
+  zona?: string | null;
   created_at: string;
 }
 
