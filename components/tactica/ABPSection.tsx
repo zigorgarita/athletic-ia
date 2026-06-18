@@ -105,7 +105,8 @@ const DEFAULT_POSITIONS_BY_TYPE: Record<ABPType, { role: string; x: number; y: n
     { role: 'Libre', x: 45, y: 32 },
     { role: 'Libre', x: 55, y: 32 },
     { role: 'Vigilancia', x: 30, y: 60 },
-    { role: 'Vigilancia', x: 70, y: 60 }
+    { role: 'Vigilancia', x: 70, y: 60 },
+    { role: 'Libre', x: 50, y: 70 }
   ],
   'Falta lateral ofensiva': [
     { role: 'Lanzador', x: 10, y: 40 },
@@ -128,7 +129,9 @@ const DEFAULT_POSITIONS_BY_TYPE: Record<ABPType, { role: string; x: number; y: n
     { role: 'Libre', x: 54, y: 30 },
     { role: 'Rechace', x: 50, y: 45 },
     { role: 'Vigilancia', x: 30, y: 70 },
-    { role: 'Vigilancia', x: 70, y: 70 }
+    { role: 'Vigilancia', x: 70, y: 70 },
+    { role: 'Libre', x: 40, y: 58 },
+    { role: 'Libre', x: 60, y: 58 }
   ],
   'Saque de banda ofensivo': [
     { role: 'Sacador', x: 5, y: 45 },
@@ -150,7 +153,10 @@ const DEFAULT_POSITIONS_BY_TYPE: Record<ABPType, { role: string; x: number; y: n
     { role: 'Libre', x: 28, y: 35 },
     { role: 'Rechace', x: 50, y: 50 },
     { role: 'Vigilancia', x: 35, y: 70 },
-    { role: 'Vigilancia', x: 65, y: 70 }
+    { role: 'Vigilancia', x: 65, y: 70 },
+    { role: 'Libre', x: 40, y: 30 },
+    { role: 'Libre', x: 45, y: 30 },
+    { role: 'Libre', x: 50, y: 30 }
   ],
   'Saque de medio ofensivo': [
     { role: 'Lanzador', x: 50, y: 52 },
@@ -171,7 +177,11 @@ const DEFAULT_POSITIONS_BY_TYPE: Record<ABPType, { role: string; x: number; y: n
     { role: 'Vigilancia', x: 65, y: 65 },
     { role: 'Libre', x: 40, y: 55 },
     { role: 'Libre', x: 60, y: 55 },
-    { role: 'Vigilancia', x: 50, y: 75 }
+    { role: 'Vigilancia', x: 50, y: 75 },
+    { role: 'Libre', x: 30, y: 45 },
+    { role: 'Libre', x: 45, y: 45 },
+    { role: 'Libre', x: 55, y: 45 },
+    { role: 'Libre', x: 70, y: 45 }
   ],
   'Penalti ofensivo': [
     { role: 'Lanzador', x: 50, y: 36 },
@@ -190,7 +200,13 @@ const DEFAULT_POSITIONS_BY_TYPE: Record<ABPType, { role: string; x: number; y: n
     { role: 'Libre', x: 38, y: 52 },
     { role: 'Libre', x: 44, y: 52 },
     { role: 'Libre', x: 56, y: 52 },
-    { role: 'Libre', x: 62, y: 52 }
+    { role: 'Libre', x: 62, y: 52 },
+    { role: 'Libre', x: 30, y: 58 },
+    { role: 'Libre', x: 70, y: 58 },
+    { role: 'Libre', x: 40, y: 65 },
+    { role: 'Libre', x: 60, y: 65 },
+    { role: 'Libre', x: 45, y: 75 },
+    { role: 'Libre', x: 55, y: 75 }
   ],
   'Jugada especial ofensiva': [
     { role: 'Lanzador', x: 50, y: 70 },
@@ -210,7 +226,12 @@ const DEFAULT_POSITIONS_BY_TYPE: Record<ABPType, { role: string; x: number; y: n
     { role: 'Vigilancia', x: 60, y: 25 },
     { role: 'Libre', x: 45, y: 35 },
     { role: 'Libre', x: 55, y: 35 },
-    { role: 'Vigilancia', x: 50, y: 70 }
+    { role: 'Vigilancia', x: 50, y: 70 },
+    { role: 'Libre', x: 30, y: 50 },
+    { role: 'Libre', x: 70, y: 50 },
+    { role: 'Libre', x: 40, y: 60 },
+    { role: 'Libre', x: 60, y: 60 },
+    { role: 'Libre', x: 50, y: 80 }
   ]
 };
 
