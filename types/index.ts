@@ -1,7 +1,21 @@
 export type Demarcacion = 'Portero' | 'Defensa' | 'Centrocampista' | 'Delantero' | 'Lateral' | 'Central' | 'Pivote' | 'Interior' | 'Extremo';
 export type EstadoJugador = 'Disponible' | 'Lesionado' | 'Duda' | 'Sancionado';
 export type Pierna = 'Diestro' | 'Zurdo' | 'Ambidiestro';
-export type ABPType = 'Córner Ofensivo' | 'Córner Defensivo' | 'Falta Ofensiva' | 'Falta Defensiva' | 'Penalti' | 'Saque de Banda' | 'Jugada Ensayada';
+export type ABPType =
+  | 'Córner ofensivo'
+  | 'Falta frontal ofensiva'
+  | 'Falta lateral ofensiva'
+  | 'Saque de banda ofensivo'
+  | 'Saque de medio ofensivo'
+  | 'Penalti ofensivo'
+  | 'Jugada especial ofensiva'
+  | 'Córner defensivo'
+  | 'Falta frontal defensiva'
+  | 'Falta lateral defensiva'
+  | 'Saque de banda defensivo'
+  | 'Saque de medio defensivo'
+  | 'Penalti defensivo'
+  | 'Jugada especial defensiva';
 
 export interface Player {
   id: string;
@@ -233,8 +247,13 @@ export interface ABPPlay {
 export interface ABPPlayerRole {
   id: string;
   abp_play_id: string;
-  player_id: string;
+  player_id: string | null;
   rol_asignado: string;
+  posicion_x: number | null;
+  posicion_y: number | null;
+  etiqueta?: string | null;
+  comentario?: string | null;
+  orden?: number | null;
   created_at: string;
 }
 

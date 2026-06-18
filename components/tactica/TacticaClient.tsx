@@ -9,9 +9,8 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Avatar } from '@/components/ui/Avatar';
-import { ABPSection } from './ABPSection';
 import { 
-  Layout, Shield, Save, FolderOpen, RefreshCw, AlertCircle, 
+  Layout, Save, FolderOpen, RefreshCw, AlertCircle, 
   CheckCircle, Users, Trash2, ChevronDown
 } from 'lucide-react';
 
@@ -92,7 +91,6 @@ const FORMATIONS: Record<string, { label: string; coords: Omit<PositionNode, 'pl
 
 export function TacticaClient() {
   const { players, loading: loadingPlayers } = usePlayers();
-  const [activeTab, setActiveTab] = useState<'pizarra' | 'abp'>('pizarra');
 
   // Board states
   const [selectedFormation, setSelectedFormation] = useState<string>('4-3-3');
@@ -299,41 +297,14 @@ export function TacticaClient() {
       <div className="flex flex-col gap-1">
         <h1 className="text-3xl font-extrabold tracking-tight text-slate-100 flex items-center gap-2">
           <Layout className="h-8 w-8 text-green-500" />
-          Pizarra Táctica y ABP
+          Pizarra Táctica
         </h1>
         <p className="text-slate-400 text-sm">
-          Planificación visual de sistemas tácticos, alineaciones y jugadas ensayadas a balón parado.
+          Planificación visual de sistemas tácticos, alineaciones y variantes de juego.
         </p>
       </div>
 
-      {/* Tabs */}
-      <div className="flex border-b border-slate-800">
-        <button
-          onClick={() => setActiveTab('pizarra')}
-          className={`flex items-center gap-2 px-6 py-3.5 border-b-2 text-sm font-semibold transition-all duration-200 ${
-            activeTab === 'pizarra'
-              ? 'border-green-500 text-green-400 bg-green-500/5'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <Shield className="h-4 w-4" />
-          Pizarra Táctica
-        </button>
-        <button
-          onClick={() => setActiveTab('abp')}
-          className={`flex items-center gap-2 px-6 py-3.5 border-b-2 text-sm font-semibold transition-all duration-200 ${
-            activeTab === 'abp'
-              ? 'border-green-500 text-green-400 bg-green-500/5'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <Users className="h-4 w-4" />
-          Estrategias ABP
-        </button>
-      </div>
-
-      {activeTab === 'pizarra' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Columna Izquierda: Configuración de la Pizarra */}
           <div className="space-y-6 lg:col-span-1">
             {/* Controles de Configuración */}
@@ -541,11 +512,6 @@ export function TacticaClient() {
             </div>
           </div>
         </div>
-      )}
-
-      {activeTab === 'abp' && (
-        <ABPSection players={players} />
-      )}
     </div>
   );
 }

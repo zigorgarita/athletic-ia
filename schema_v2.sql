@@ -171,7 +171,7 @@ CREATE TABLE gps_data (
 -- 9. Crear la tabla de jugadas ensayadas ABP (abp_plays)
 CREATE TABLE abp_plays (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tipo abp_type NOT NULL,
+    tipo TEXT NOT NULL,
     titulo TEXT NOT NULL,
     descripcion TEXT,
     video_url TEXT,

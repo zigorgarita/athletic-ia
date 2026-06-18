@@ -12,9 +12,8 @@ import {
   ArrowRightLeft, Sparkles, Scale, TrendingUp
 } from 'lucide-react';
 
-export function AnalisisClient() {
+export function AnalisisClient({ mode }: { mode: 'dashboard' | 'comparator' }) {
   const { players, loading: loadingPlayers } = usePlayers();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'comparator'>('dashboard');
 
   // Database states
   const [allEvaluations, setAllEvaluations] = useState<DetailedEvaluation[]>([]);
@@ -333,42 +332,27 @@ export function AnalisisClient() {
       {/* Cabecera */}
       <div className="flex flex-col gap-1">
         <h1 className="text-3xl font-extrabold tracking-tight text-slate-100 flex items-center gap-2">
-          <BarChart3 className="h-8 w-8 text-green-500" />
-          Panel Analítico y Comparador
+          {mode === 'dashboard' ? (
+            <>
+              <BarChart3 className="h-8 w-8 text-green-500" />
+              Dashboard
+            </>
+          ) : (
+            <>
+              <ArrowRightLeft className="h-8 w-8 text-green-500" />
+              Comparador
+            </>
+          )}
         </h1>
         <p className="text-slate-400 text-sm">
-          Análisis de rendimiento integral de la plantilla y comparativa de jugadores basada en datos reales de Supabase.
+          {mode === 'dashboard'
+            ? 'Panel general de rendimiento, estadísticas acumuladas y rankings de la plantilla.'
+            : 'Comparativa interactiva de rendimiento 1vs1 de los futbolistas.'}
         </p>
       </div>
 
-      {/* Tabs */}
-      <div className="flex border-b border-slate-800">
-        <button
-          onClick={() => setActiveTab('dashboard')}
-          className={`flex items-center gap-2 px-6 py-3.5 border-b-2 text-sm font-semibold transition-all duration-200 ${
-            activeTab === 'dashboard'
-              ? 'border-green-500 text-green-400 bg-green-500/5'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <Trophy className="h-4 w-4" />
-          Panel General (Dashboard)
-        </button>
-        <button
-          onClick={() => setActiveTab('comparator')}
-          className={`flex items-center gap-2 px-6 py-3.5 border-b-2 text-sm font-semibold transition-all duration-200 ${
-            activeTab === 'comparator'
-              ? 'border-green-500 text-green-400 bg-green-500/5'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <ArrowRightLeft className="h-4 w-4" />
-          Comparador 1vs1
-        </button>
-      </div>
-
       {/* TAB CONTENT: DASHBOARD */}
-      {activeTab === 'dashboard' && (
+      {mode === 'dashboard' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Columna Izquierda: Top 5 y Medias por Posición */}
           <div className="space-y-6 lg:col-span-1">
@@ -521,7 +505,7 @@ export function AnalisisClient() {
       )}
 
       {/* TAB CONTENT: COMPARATOR */}
-      {activeTab === 'comparator' && (
+      {mode === 'comparator' && (
         <div className="space-y-6">
           {/* Selectores de Comparación */}
           <div className="p-5 bg-slate-900/40 border border-slate-800/80 rounded-2xl grid grid-cols-1 sm:grid-cols-2 gap-6 items-center">

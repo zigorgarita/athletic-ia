@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Users, ClipboardCheck, Video, Shield, Trophy, BarChart3, Activity, Layout } from 'lucide-react';
+import { Users, Shield, Trophy, BarChart3, Activity, Layout, ArrowRightLeft } from 'lucide-react';
 import { LoginScreen } from './LoginScreen';
 
 interface NavItem {
@@ -14,12 +14,12 @@ interface NavItem {
 
 const navigation: NavItem[] = [
   { name: 'Plantilla', href: '/plantilla', icon: Users },
-  { name: 'Evaluaciones', href: '/evaluaciones', icon: ClipboardCheck },
+  { name: 'Pizarra Táctica', href: '/tactica', icon: Layout },
+  { name: 'ABP', href: '/abp', icon: Shield },
   { name: 'Liga', href: '/liga', icon: Trophy },
-  { name: 'Analítica', href: '/analisis', icon: BarChart3 },
-  { name: 'Físico (GPS)', href: '/gps', icon: Activity },
-  { name: 'Pizarra', href: '/tactica', icon: Layout },
-  { name: 'Videos', href: '/videos', icon: Video },
+  { name: 'Dashboard', href: '/dashboard', icon: BarChart3 },
+  { name: 'GPS', href: '/gps', icon: Activity },
+  { name: 'Comparador', href: '/comparador', icon: ArrowRightLeft },
 ];
 
 export function Shell({ children }: { children: React.ReactNode }) {
