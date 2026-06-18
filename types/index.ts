@@ -15,7 +15,8 @@ export type ABPType =
   | 'Saque de banda defensivo'
   | 'Saque de medio defensivo'
   | 'Penalti defensivo'
-  | 'Jugada especial defensiva';
+  | 'Jugada especial defensiva'
+  | 'Saque inicial';
 
 export interface Player {
   id: string;
