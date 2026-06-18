@@ -12,7 +12,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { 
   Film, Plus, AlertCircle, Trash2, BookOpen, Layers, X, 
   Save, RefreshCw, Copy, Edit2, Search, UserCheck, 
-  PlusCircle, Check
+  PlusCircle, Check, ChevronDown
 } from 'lucide-react';
 
 interface ABPSectionProps {
@@ -37,45 +37,29 @@ const ABP_TYPES: ABPType[] = [
 ];
 
 const ROLES_LIST = [
-  'Lanzador', 'Rematador', 'Bloqueador', 'Arrastrador', 
-  'Primer palo', 'Segundo palo', 'Rechace', 'Cierre', 
-  'Vigilancia', 'Portero', 'Defensa zona', 'Marca individual', 'Libre',
-  'Pantalla', 'Segunda jugada', 'Sacador', 'Apoyo cercano', 'Tercer hombre',
-  'Ruptura', 'Fijador', 'Jugador que inicia', 'Apoyo', 'Receptor'
+  'Lanzador', 'Sacador', 'Rematador', 'Bloqueador', 'Arrastrador',
+  'Rechace', 'Cierre', 'Primer palo', 'Segundo palo', 'Vigilancia', 'Libre'
 ];
 
 // Mapeo de abreviaturas para la ficha en la pizarra
 const ROLE_ABBRS: Record<string, string> = {
   'Lanzador': 'LAN',
+  'Sacador': 'SAC',
   'Rematador': 'REM',
   'Bloqueador': 'BLOQ',
   'Arrastrador': 'ARR',
-  'Primer palo': 'P.PALO',
-  'Segundo palo': 'S.PALO',
   'Rechace': 'RECH',
   'Cierre': 'CIER',
+  'Primer palo': 'P.PALO',
+  'Segundo palo': 'S.PALO',
   'Vigilancia': 'VIG',
-  'Portero': 'POR',
-  'Defensa zona': 'ZONA',
-  'Marca individual': 'MARCA',
-  'Libre': 'LIB',
-  'Pantalla': 'PAN',
-  'Segunda jugada': '2ªJUG',
-  'Sacador': 'SAC',
-  'Apoyo cercano': 'APOYO',
-  'Tercer hombre': '3ºHOM',
-  'Ruptura': 'RUPT',
-  'Fijador': 'FIJ',
-  'Jugador que inicia': 'INI',
-  'Apoyo': 'APO',
-  'Receptor': 'REC'
+  'Libre': 'LIB'
 };
 
 // Formación/Posición inicial por defecto según tipo de ABP
 const DEFAULT_POSITIONS_BY_TYPE: Record<ABPType, { role: string; x: number; y: number }[]> = {
   'Córner ofensivo': [
     { role: 'Lanzador', x: 5, y: 10 },
-    { role: 'Portero', x: 50, y: 15 },
     { role: 'Primer palo', x: 42, y: 22 },
     { role: 'Segundo palo', x: 58, y: 24 },
     { role: 'Rematador', x: 48, y: 32 },
@@ -87,13 +71,13 @@ const DEFAULT_POSITIONS_BY_TYPE: Record<ABPType, { role: string; x: number; y: n
     { role: 'Cierre', x: 70, y: 78 }
   ],
   'Córner defensivo': [
-    { role: 'Portero', x: 50, y: 15 },
-    { role: 'Defensa zona', x: 40, y: 20 },
-    { role: 'Defensa zona', x: 50, y: 20 },
-    { role: 'Defensa zona', x: 60, y: 20 },
-    { role: 'Marca individual', x: 42, y: 28 },
-    { role: 'Marca individual', x: 48, y: 28 },
-    { role: 'Marca individual', x: 58, y: 28 },
+    { role: 'Cierre', x: 50, y: 15 },
+    { role: 'Vigilancia', x: 40, y: 20 },
+    { role: 'Vigilancia', x: 50, y: 20 },
+    { role: 'Vigilancia', x: 60, y: 20 },
+    { role: 'Libre', x: 42, y: 28 },
+    { role: 'Libre', x: 48, y: 28 },
+    { role: 'Libre', x: 58, y: 28 },
     { role: 'Primer palo', x: 40, y: 22 },
     { role: 'Rechace', x: 50, y: 48 },
     { role: 'Vigilancia', x: 20, y: 60 },
@@ -101,32 +85,30 @@ const DEFAULT_POSITIONS_BY_TYPE: Record<ABPType, { role: string; x: number; y: n
   ],
   'Falta frontal ofensiva': [
     { role: 'Lanzador', x: 50, y: 65 },
-    { role: 'Portero', x: 50, y: 15 },
     { role: 'Rematador', x: 40, y: 32 },
     { role: 'Rematador', x: 45, y: 32 },
     { role: 'Rematador', x: 55, y: 32 },
-    { role: 'Pantalla', x: 50, y: 42 },
+    { role: 'Rematador', x: 35, y: 35 },
+    { role: 'Rematador', x: 65, y: 35 },
+    { role: 'Bloqueador', x: 50, y: 42 },
     { role: 'Rechace', x: 50, y: 52 },
     { role: 'Vigilancia', x: 25, y: 80 },
-    { role: 'Vigilancia', x: 75, y: 80 },
-    { role: 'Segunda jugada', x: 35, y: 48 },
-    { role: 'Segunda jugada', x: 65, y: 48 }
+    { role: 'Vigilancia', x: 75, y: 80 }
   ],
   'Falta frontal defensiva': [
-    { role: 'Portero', x: 50, y: 15 },
-    { role: 'Defensa zona', x: 42, y: 45 },
-    { role: 'Defensa zona', x: 46, y: 45 },
-    { role: 'Defensa zona', x: 50, y: 45 },
-    { role: 'Defensa zona', x: 54, y: 45 },
-    { role: 'Defensa zona', x: 58, y: 45 },
-    { role: 'Marca individual', x: 45, y: 32 },
-    { role: 'Marca individual', x: 55, y: 32 },
+    { role: 'Cierre', x: 50, y: 15 },
+    { role: 'Vigilancia', x: 42, y: 45 },
+    { role: 'Vigilancia', x: 46, y: 45 },
+    { role: 'Vigilancia', x: 50, y: 45 },
+    { role: 'Vigilancia', x: 54, y: 45 },
+    { role: 'Vigilancia', x: 58, y: 45 },
+    { role: 'Libre', x: 45, y: 32 },
+    { role: 'Libre', x: 55, y: 32 },
     { role: 'Vigilancia', x: 30, y: 60 },
     { role: 'Vigilancia', x: 70, y: 60 }
   ],
   'Falta lateral ofensiva': [
     { role: 'Lanzador', x: 10, y: 40 },
-    { role: 'Portero', x: 50, y: 15 },
     { role: 'Rematador', x: 42, y: 25 },
     { role: 'Rematador', x: 48, y: 28 },
     { role: 'Rematador', x: 54, y: 25 },
@@ -134,69 +116,77 @@ const DEFAULT_POSITIONS_BY_TYPE: Record<ABPType, { role: string; x: number; y: n
     { role: 'Segundo palo', x: 58, y: 26 },
     { role: 'Rechace', x: 50, y: 48 },
     { role: 'Vigilancia', x: 30, y: 75 },
-    { role: 'Vigilancia', x: 70, y: 75 }
+    { role: 'Vigilancia', x: 70, y: 75 },
+    { role: 'Libre', x: 40, y: 50 }
   ],
   'Falta lateral defensiva': [
-    { role: 'Portero', x: 50, y: 15 },
-    { role: 'Defensa zona', x: 45, y: 22 },
-    { role: 'Defensa zona', x: 55, y: 22 },
-    { role: 'Marca individual', x: 42, y: 30 },
-    { role: 'Marca individual', x: 48, y: 30 },
-    { role: 'Marca individual', x: 54, y: 30 },
+    { role: 'Cierre', x: 50, y: 15 },
+    { role: 'Vigilancia', x: 45, y: 22 },
+    { role: 'Vigilancia', x: 55, y: 22 },
+    { role: 'Libre', x: 42, y: 30 },
+    { role: 'Libre', x: 48, y: 30 },
+    { role: 'Libre', x: 54, y: 30 },
     { role: 'Rechace', x: 50, y: 45 },
     { role: 'Vigilancia', x: 30, y: 70 },
     { role: 'Vigilancia', x: 70, y: 70 }
   ],
   'Saque de banda ofensivo': [
     { role: 'Sacador', x: 5, y: 45 },
-    { role: 'Portero', x: 50, y: 15 },
-    { role: 'Apoyo cercano', x: 15, y: 45 },
-    { role: 'Tercer hombre', x: 25, y: 38 },
-    { role: 'Ruptura', x: 30, y: 28 },
-    { role: 'Fijador', x: 45, y: 25 },
+    { role: 'Rematador', x: 15, y: 45 },
+    { role: 'Rematador', x: 25, y: 38 },
+    { role: 'Rematador', x: 30, y: 28 },
+    { role: 'Rematador', x: 45, y: 25 },
     { role: 'Rechace', x: 50, y: 50 },
     { role: 'Vigilancia', x: 30, y: 75 },
-    { role: 'Vigilancia', x: 70, y: 75 }
+    { role: 'Vigilancia', x: 70, y: 75 },
+    { role: 'Libre', x: 40, y: 60 },
+    { role: 'Libre', x: 60, y: 60 }
   ],
   'Saque de banda defensivo': [
-    { role: 'Portero', x: 50, y: 15 },
-    { role: 'Defensa zona', x: 20, y: 45 },
-    { role: 'Defensa zona', x: 30, y: 40 },
-    { role: 'Marca individual', x: 18, y: 35 },
-    { role: 'Marca individual', x: 28, y: 35 },
+    { role: 'Cierre', x: 50, y: 15 },
+    { role: 'Vigilancia', x: 20, y: 45 },
+    { role: 'Vigilancia', x: 30, y: 40 },
+    { role: 'Libre', x: 18, y: 35 },
+    { role: 'Libre', x: 28, y: 35 },
     { role: 'Rechace', x: 50, y: 50 },
     { role: 'Vigilancia', x: 35, y: 70 },
     { role: 'Vigilancia', x: 65, y: 70 }
   ],
   'Saque de medio ofensivo': [
-    { role: 'Jugador que inicia', x: 50, y: 52 },
-    { role: 'Apoyo', x: 42, y: 54 },
-    { role: 'Ruptura', x: 30, y: 40 },
-    { role: 'Ruptura', x: 70, y: 40 },
-    { role: 'Receptor', x: 50, y: 45 },
-    { role: 'Fijador', x: 50, y: 30 },
+    { role: 'Lanzador', x: 50, y: 52 },
+    { role: 'Rematador', x: 42, y: 54 },
+    { role: 'Rematador', x: 30, y: 40 },
+    { role: 'Rematador', x: 70, y: 40 },
+    { role: 'Rematador', x: 50, y: 45 },
+    { role: 'Rematador', x: 50, y: 30 },
     { role: 'Vigilancia', x: 35, y: 75 },
-    { role: 'Vigilancia', x: 65, y: 75 }
+    { role: 'Vigilancia', x: 65, y: 75 },
+    { role: 'Libre', x: 45, y: 60 },
+    { role: 'Libre', x: 55, y: 60 }
   ],
   'Saque de medio defensivo': [
-    { role: 'Portero', x: 50, y: 88 },
-    { role: 'Defensa zona', x: 35, y: 65 },
-    { role: 'Defensa zona', x: 50, y: 65 },
-    { role: 'Defensa zona', x: 65, y: 65 },
-    { role: 'Marca individual', x: 40, y: 55 },
-    { role: 'Marca individual', x: 60, y: 55 },
+    { role: 'Cierre', x: 50, y: 88 },
+    { role: 'Vigilancia', x: 35, y: 65 },
+    { role: 'Vigilancia', x: 50, y: 65 },
+    { role: 'Vigilancia', x: 65, y: 65 },
+    { role: 'Libre', x: 40, y: 55 },
+    { role: 'Libre', x: 60, y: 55 },
     { role: 'Vigilancia', x: 50, y: 75 }
   ],
   'Penalti ofensivo': [
     { role: 'Lanzador', x: 50, y: 36 },
-    { role: 'Portero', x: 50, y: 15 },
-    { role: 'Libre', x: 38, y: 52 },
-    { role: 'Libre', x: 44, y: 52 },
-    { role: 'Libre', x: 56, y: 52 },
-    { role: 'Libre', x: 62, y: 52 }
+    { role: 'Rechace', x: 38, y: 52 },
+    { role: 'Rechace', x: 44, y: 52 },
+    { role: 'Rechace', x: 56, y: 52 },
+    { role: 'Rechace', x: 62, y: 52 },
+    { role: 'Libre', x: 30, y: 58 },
+    { role: 'Libre', x: 70, y: 58 },
+    { role: 'Libre', x: 40, y: 65 },
+    { role: 'Libre', x: 60, y: 65 },
+    { role: 'Libre', x: 50, y: 75 }
   ],
   'Penalti defensivo': [
-    { role: 'Portero', x: 50, y: 15 },
+    { role: 'Cierre', x: 50, y: 15 },
     { role: 'Libre', x: 38, y: 52 },
     { role: 'Libre', x: 44, y: 52 },
     { role: 'Libre', x: 56, y: 52 },
@@ -204,19 +194,22 @@ const DEFAULT_POSITIONS_BY_TYPE: Record<ABPType, { role: string; x: number; y: n
   ],
   'Jugada especial ofensiva': [
     { role: 'Lanzador', x: 50, y: 70 },
-    { role: 'Portero', x: 50, y: 15 },
     { role: 'Rematador', x: 40, y: 30 },
     { role: 'Rematador', x: 60, y: 30 },
     { role: 'Bloqueador', x: 50, y: 38 },
     { role: 'Vigilancia', x: 30, y: 80 },
-    { role: 'Vigilancia', x: 70, y: 80 }
+    { role: 'Vigilancia', x: 70, y: 80 },
+    { role: 'Libre', x: 40, y: 50 },
+    { role: 'Libre', x: 60, y: 50 },
+    { role: 'Libre', x: 45, y: 65 },
+    { role: 'Libre', x: 55, y: 65 }
   ],
   'Jugada especial defensiva': [
-    { role: 'Portero', x: 50, y: 15 },
-    { role: 'Defensa zona', x: 40, y: 25 },
-    { role: 'Defensa zona', x: 60, y: 25 },
-    { role: 'Marca individual', x: 45, y: 35 },
-    { role: 'Marca individual', x: 55, y: 35 },
+    { role: 'Cierre', x: 50, y: 15 },
+    { role: 'Vigilancia', x: 40, y: 25 },
+    { role: 'Vigilancia', x: 60, y: 25 },
+    { role: 'Libre', x: 45, y: 35 },
+    { role: 'Libre', x: 55, y: 35 },
     { role: 'Vigilancia', x: 50, y: 70 }
   ]
 };
@@ -1126,22 +1119,42 @@ export function ABPSection({ players }: ABPSectionProps) {
                           >
                             {/* Ficha Visual del Jugador / Rol */}
                             <div 
-                              className={`h-9 w-9 rounded-full border-2 flex items-center justify-center shadow-lg transition-transform duration-100 active:scale-110 ${
+                              className={`h-10 w-10 rounded-full border-2 flex items-center justify-center shadow-lg transition-transform duration-100 active:scale-110 ${
                                 player
                                   ? 'bg-slate-900 border-green-500 shadow-green-500/20'
                                   : 'bg-slate-950 border-slate-700/80 border-dashed text-slate-400'
                               }`}
                             >
                               {player ? (
-                                <Avatar src={player.foto_url} name={player.nombre} size="sm" />
+                                <div className="relative flex items-center justify-center w-full h-full">
+                                  <Avatar src={player.foto_url} name={player.nombre} size="sm" />
+                                  <span className="absolute -bottom-1 -right-1 bg-green-500 text-slate-950 font-black text-[7px] h-3.5 w-3.5 rounded-full flex items-center justify-center border border-slate-900 shadow">
+                                    #{player.dorsal}
+                                  </span>
+                                </div>
                               ) : (
                                 <span className="text-[9px] font-black tracking-tight">{label}</span>
                               )}
                             </div>
 
-                            {/* Nombre del puesto o jugador */}
-                            <div className="mt-1 bg-slate-950/90 border border-slate-800 px-1 py-0.5 rounded text-[8px] font-bold text-slate-300 max-w-[80px] truncate leading-none">
-                              {player ? player.nombre : role.rol_asignado}
+                            {/* Nombre y Rol con Selector */}
+                            <div className="mt-1 bg-slate-950/90 border border-slate-800 px-1 py-0.5 rounded text-[8px] font-bold text-slate-300 max-w-[100px] flex flex-col items-center leading-tight select-none pointer-events-auto">
+                              <span className="truncate max-w-[85px]">{player ? player.nombre : 'Puesto Vacío'}</span>
+                              <div className="flex items-center gap-0.5 mt-0.5 text-[7px] text-slate-450 border-t border-slate-800/60 pt-0.5 w-full justify-center">
+                                <span className="truncate max-w-[65px]">{role.rol_asignado}</span>
+                                <div className="relative shrink-0">
+                                  <select
+                                    value={role.rol_asignado}
+                                    onChange={(e) => handleRoleChange(role.id, e.target.value)}
+                                    className="absolute inset-0 opacity-0 w-3 h-3 cursor-pointer"
+                                  >
+                                    {ROLES_LIST.map((r) => (
+                                      <option key={r} value={r}>{r}</option>
+                                    ))}
+                                  </select>
+                                  <ChevronDown className="h-2 w-2 text-slate-500" />
+                                </div>
+                              </div>
                             </div>
                           </div>
                         );
