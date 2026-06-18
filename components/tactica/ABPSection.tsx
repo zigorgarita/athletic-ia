@@ -235,6 +235,25 @@ const DEFAULT_POSITIONS_BY_TYPE: Record<ABPType, { role: string; x: number; y: n
   ]
 };
 
+const normalizePlayType = (type: string): ABPType => {
+  const lower = type.toLowerCase().trim();
+  if (lower === 'córner ofensivo') return 'Córner ofensivo';
+  if (lower === 'córner defensivo') return 'Córner defensivo';
+  if (lower === 'falta ofensiva' || lower === 'falta frontal ofensiva') return 'Falta frontal ofensiva';
+  if (lower === 'falta defensiva' || lower === 'falta frontal defensiva') return 'Falta frontal defensiva';
+  if (lower === 'falta lateral ofensiva') return 'Falta lateral ofensiva';
+  if (lower === 'falta lateral defensiva') return 'Falta lateral defensiva';
+  if (lower === 'saque de banda' || lower === 'saque de banda ofensivo') return 'Saque de banda ofensivo';
+  if (lower === 'saque de banda defensivo') return 'Saque de banda defensivo';
+  if (lower === 'saque de medio ofensivo') return 'Saque de medio ofensivo';
+  if (lower === 'saque de medio defensivo') return 'Saque de medio defensivo';
+  if (lower === 'penalti' || lower === 'penalti ofensivo') return 'Penalti ofensivo';
+  if (lower === 'penalti defensivo') return 'Penalti defensivo';
+  if (lower === 'jugada ensayada' || lower === 'jugada especial ofensiva') return 'Jugada especial ofensiva';
+  if (lower === 'jugada especial defensiva') return 'Jugada especial defensiva';
+  return 'Córner ofensivo'; // fallback
+};
+
 export function ABPSection({ players }: ABPSectionProps) {
   const [plays, setPlays] = useState<ABPPlay[]>([]);
   const [selectedPlay, setSelectedPlay] = useState<ABPPlay | null>(null);
@@ -279,11 +298,16 @@ export function ABPSection({ players }: ABPSectionProps) {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setPlays(data || []);
+      
+      const normalized = (data || []).map(p => ({
+        ...p,
+        tipo: normalizePlayType(p.tipo)
+      }));
+      setPlays(normalized);
       
       // If we don't have a selected play, choose the first one
-      if (data && data.length > 0 && !selectedPlay) {
-        setSelectedPlay(data[0]);
+      if (normalized.length > 0 && !selectedPlay) {
+        setSelectedPlay(normalized[0]);
       }
     } catch (err) {
       console.error('Error loading ABP plays:', err);
@@ -646,21 +670,52 @@ export function ABPSection({ players }: ABPSectionProps) {
   }
 
   // --- POSITION RESET (Default Layout) ---
-  const handleResetPositions = () => {
+  const handleResetPositions = async () => {
     if (!selectedPlay) return;
-    const defaults = DEFAULT_POSITIONS_BY_TYPE[selectedPlay.tipo] || [];
+    if (!confirm('¿Seguro que deseas restablecer la jugada a su diseño por defecto? Se borrarán todos los cambios y asignaciones.')) return;
     
-    setPlayRoles(prev => {
-      return prev.map((role, idx) => {
-        const def = defaults[idx] || { x: 50 + (idx * 2), y: 50 };
-        return {
-          ...role,
-          posicion_x: def.x,
-          posicion_y: def.y
-        };
-      });
-    });
-    setSuccessMsg('Posiciones restablecidas al diseño por defecto. Recuerda pulsar GUARDAR.');
+    setLoadingRoles(true);
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    
+    try {
+      // 1. Delete all existing roles for this play
+      const { error: deleteError } = await supabase
+        .from('abp_player_roles')
+        .delete()
+        .eq('abp_play_id', selectedPlay.id);
+        
+      if (deleteError) throw deleteError;
+
+      // 2. Insert new default roles based on play type
+      const defaults = DEFAULT_POSITIONS_BY_TYPE[selectedPlay.tipo] || [];
+      if (defaults.length > 0) {
+        const rolesPayload = defaults.map((dr, index) => ({
+          abp_play_id: selectedPlay.id,
+          player_id: null,
+          rol_asignado: dr.role,
+          posicion_x: dr.x,
+          posicion_y: dr.y,
+          etiqueta: ROLE_ABBRS[dr.role] || dr.role.substring(0, 4).toUpperCase(),
+          orden: index + 1
+        }));
+
+        const { error: insertError } = await supabase
+          .from('abp_player_roles')
+          .insert(rolesPayload);
+
+        if (insertError) throw insertError;
+      }
+
+      // 3. Reload roles
+      await loadPlayRoles(selectedPlay.id);
+      setSuccessMsg('Diseño restablecido por defecto.');
+    } catch (err: any) {
+      console.error('Error resetting positions:', err);
+      setErrorMsg(err.message || 'Error al restablecer las posiciones.');
+    } finally {
+      setLoadingRoles(false);
+    }
   };
 
   // --- CLEAR ALL PLAYERS FROM ROLES ---
