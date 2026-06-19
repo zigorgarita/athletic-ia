@@ -276,3 +276,36 @@ export interface MatchVideo {
   fecha_partido: string;
   created_at: string;
 }
+
+export const POSICIONES_REALES = [
+  'Portero',
+  'Central derecho',
+  'Central izquierdo',
+  'Central central',
+  'Lateral derecho',
+  'Lateral izquierdo',
+  'Pivote',
+  'Pivote derecho',
+  'Pivote izquierdo',
+  'Interior derecho',
+  'Interior izquierdo',
+  'Media punta',
+  'Extremo derecho',
+  'Extremo izquierdo',
+  'Delantero centro'
+] as const;
+
+export type PosicionReal = typeof POSICIONES_REALES[number];
+
+export const FUNCIONES_TACTICAS = [
+  'Sacador',
+  'Apoyo',
+  'Tercer hombre',
+  'Receptor',
+  'Profundidad',
+  'Vigilancia',
+  'Cobertura'
+] as const;
+
+export type FuncionTactica = typeof FUNCIONES_TACTICAS[number];
+
