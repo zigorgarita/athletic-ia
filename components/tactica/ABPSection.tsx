@@ -12,7 +12,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { 
   Film, Plus, AlertCircle, Trash2, BookOpen, Layers, X, 
   Save, RefreshCw, Copy, Edit2, Search, UserCheck, 
-  PlusCircle, Check, ChevronDown
+  PlusCircle, Check, ChevronDown, Folder, FolderOpen
 } from 'lucide-react';
 
 interface ABPSectionProps {
@@ -1422,36 +1422,59 @@ export function ABPSection({ players }: ABPSectionProps) {
             </p>
 
             {/* Categorías de Filtro */}
-            <div className="space-y-1 pt-2 border-t border-slate-800/60 max-h-[180px] overflow-y-auto pr-1">
+            <div className="space-y-1 pt-2 border-t border-slate-800/60 max-h-[220px] overflow-y-auto pr-1">
               <button
                 onClick={() => setActiveFilter('Todos')}
-                className={`w-full text-left px-3 py-1.5 rounded-lg text-[11px] transition-all duration-150 ${
+                className={`w-full flex items-center justify-between px-3 py-1.5 rounded-xl text-[11px] transition-all duration-150 ${
                   activeFilter === 'Todos' 
                     ? 'bg-green-500/10 text-green-400 font-bold border border-green-500/20' 
                     : 'text-slate-400 hover:bg-slate-800/30'
                 }`}
               >
-                Todas las categorías
+                <div className="flex items-center gap-2">
+                  {activeFilter === 'Todos' ? <FolderOpen className="h-4 w-4 text-green-500" /> : <Folder className="h-4 w-4 text-slate-500" />}
+                  <span>Todas las jugadas</span>
+                </div>
+                <span className="bg-slate-950/60 px-2 py-0.5 rounded-full border border-slate-850/80 text-[10px]">
+                  {plays.length}
+                </span>
               </button>
-              {ABP_TYPES.map(type => (
-                <button
-                  key={type}
-                  onClick={() => setActiveFilter(type)}
-                  className={`w-full text-left px-3 py-1.5 rounded-lg text-[11px] transition-all duration-150 ${
-                    activeFilter === type 
-                      ? 'bg-green-500/10 text-green-400 font-bold border border-green-500/20' 
-                      : 'text-slate-400 hover:bg-slate-800/30'
-                  }`}
-                >
-                  {type}
-                </button>
-              ))}
+              {ABP_TYPES.map(type => {
+                const count = plays.filter(p => p.tipo === type).length;
+                const isActive = activeFilter === type;
+                return (
+                  <button
+                    key={type}
+                    onClick={() => setActiveFilter(type)}
+                    className={`w-full flex items-center justify-between px-3 py-1.5 rounded-xl text-[11px] transition-all duration-150 ${
+                      isActive 
+                        ? 'bg-green-500/10 text-green-400 font-bold border border-green-500/20' 
+                        : 'text-slate-400 hover:bg-slate-800/30'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 truncate">
+                      {isActive ? <FolderOpen className="h-4 w-4 text-green-500" /> : <Folder className="h-4 w-4 text-slate-500" />}
+                      <span className="truncate">{type}</span>
+                    </div>
+                    <span className={`px-2 py-0.5 rounded-full border text-[10px] shrink-0 ${
+                      isActive ? 'bg-green-500/20 border-green-500/30 text-green-400' : 'bg-slate-950/60 border-slate-850/80 text-slate-500'
+                    }`}>
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
           {/* Listado de Jugadas Filtradas */}
-          <div className="p-4 bg-slate-900/40 border border-slate-800/80 rounded-2xl flex flex-col max-h-[350px] overflow-y-auto">
-            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Listado ({filteredPlays.length})</h3>
+          <div className="p-4 bg-slate-900/40 border border-slate-800/80 rounded-2xl flex flex-col max-h-[380px] overflow-y-auto">
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+              <BookOpen className="h-4 w-4 text-green-500" />
+              <span>
+                {activeFilter === 'Todos' ? 'Todas las jugadas' : activeFilter} ({filteredPlays.length})
+              </span>
+            </h3>
             {loadingPlays ? (
               <div className="space-y-2">
                 <Skeleton className="h-10 w-full" />
