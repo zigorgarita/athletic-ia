@@ -55,6 +55,7 @@ const playerSchema = zod.object({
   estado: zod.enum(['Disponible', 'Lesionado', 'Duda', 'Sancionado']),
   rol_abp: zod.string().nullable().optional(),
   foto_url: zod.string().nullable().optional(),
+  equipo: zod.enum(['DH', 'B']),
 });
 
 type PlayerFormData = zod.infer<typeof playerSchema>;
@@ -72,6 +73,7 @@ interface FormValues {
   estado: EstadoJugador;
   rol_abp: string;
   foto_url?: string | null;
+  equipo: 'DH' | 'B';
 }
 
 interface PlayerFormProps {
@@ -109,6 +111,7 @@ export function PlayerForm({ player, onSubmit, onCancel, onDelete, isSubmitting 
       estado: 'Disponible',
       rol_abp: '',
       foto_url: null,
+      equipo: 'DH',
     },
   });
 
@@ -127,6 +130,7 @@ export function PlayerForm({ player, onSubmit, onCancel, onDelete, isSubmitting 
         estado: player.estado || 'Disponible',
         rol_abp: player.rol_abp || '',
         foto_url: player.foto_url,
+        equipo: player.equipo || 'DH',
       });
       setPhotoPreview(player.foto_url);
     } else {
@@ -143,6 +147,7 @@ export function PlayerForm({ player, onSubmit, onCancel, onDelete, isSubmitting 
         estado: 'Disponible',
         rol_abp: '',
         foto_url: null,
+        equipo: 'DH',
       });
       setPhotoPreview(null);
     }
@@ -240,6 +245,11 @@ export function PlayerForm({ player, onSubmit, onCancel, onDelete, isSubmitting 
     { value: 'Lesionado', label: 'Lesionado' },
     { value: 'Duda', label: 'Duda Semanal' },
     { value: 'Sancionado', label: 'Sancionado' },
+  ];
+
+  const equipoOptions = [
+    { value: 'DH', label: 'DH' },
+    { value: 'B', label: 'B' },
   ];
 
   return (
@@ -341,7 +351,7 @@ export function PlayerForm({ player, onSubmit, onCancel, onDelete, isSubmitting 
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Select
           label="Pierna Dominante"
           options={piernaOptions}
@@ -353,6 +363,12 @@ export function PlayerForm({ player, onSubmit, onCancel, onDelete, isSubmitting 
           options={estadoOptions}
           error={errors.estado?.message?.toString()}
           {...register('estado')}
+        />
+        <Select
+          label="Equipo"
+          options={equipoOptions}
+          error={errors.equipo?.message?.toString()}
+          {...register('equipo')}
         />
       </div>
 

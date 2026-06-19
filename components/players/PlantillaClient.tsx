@@ -34,6 +34,7 @@ export function PlantillaClient() {
   const [searchTerm, setSearchTerm] = useState('');
   const [posFilter, setPosFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [equipoFilter, setEquipoFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'dorsal' | 'valoracion' | 'nombre'>('dorsal');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
@@ -113,6 +114,7 @@ export function PlantillaClient() {
     estado: 'Disponible' | 'Lesionado' | 'Duda' | 'Sancionado';
     rol_abp?: string | null;
     foto_url?: string | null;
+    equipo: 'DH' | 'B';
   }) => {
     setActionError(null);
     const payload: Omit<Player, 'id' | 'created_at' | 'updated_at'> = {
@@ -128,6 +130,7 @@ export function PlantillaClient() {
       estado: formData.estado,
       rol_abp: formData.rol_abp ?? null,
       foto_url: formData.foto_url ?? null,
+      equipo: formData.equipo,
     };
 
     if (selectedPlayer) {
@@ -144,7 +147,7 @@ export function PlantillaClient() {
         setIsModalOpen(false);
         refetch();
       } else {
-        setActionError(createError || 'Error al agregar el jugador. Verifica el límite de 20 jugadores y dorsales únicos.');
+        setActionError(createError || 'Error al agregar el jugador. Verifica que el dorsal no esté duplicado.');
       }
     }
   };
@@ -180,8 +183,9 @@ export function PlantillaClient() {
     
     const matchPos = posFilter === 'all' ? true : player.demarcacion === posFilter;
     const matchStatus = statusFilter === 'all' ? true : player.estado === statusFilter;
+    const matchEquipo = equipoFilter === 'all' ? true : player.equipo === equipoFilter;
 
-    return matchSearch && matchPos && matchStatus;
+    return matchSearch && matchPos && matchStatus && matchEquipo;
   });
 
   // Sort logic
@@ -233,7 +237,7 @@ export function PlantillaClient() {
             Plantilla
           </h1>
           <p className="text-slate-400 text-sm">
-            Gestión de futbolistas registrados ({players.length} / 20)
+            Gestión de futbolistas registrados ({players.length})
           </p>
         </div>
         <Button onClick={handleOpenAddModal} className="flex items-center gap-1.5 self-start sm:self-auto">
@@ -256,7 +260,7 @@ export function PlantillaClient() {
           Filtros y Búsqueda
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           {/* Búsqueda por Nombre */}
           <div className="relative">
             <label className="text-[10px] text-slate-500 font-bold uppercase mb-1.5 block">Nombre o Apellidos</label>
@@ -290,6 +294,20 @@ export function PlantillaClient() {
               <option value="Centrocampista">Centrocampista</option>
               <option value="Extremo">Extremo</option>
               <option value="Delantero">Delantero</option>
+            </select>
+          </div>
+
+          {/* Equipo */}
+          <div>
+            <label className="text-[10px] text-slate-500 font-bold uppercase mb-1.5 block">Equipo</label>
+            <select
+              value={equipoFilter}
+              onChange={(e) => setEquipoFilter(e.target.value)}
+              className="w-full px-3 py-2.5 text-xs rounded-xl bg-slate-950/70 border border-slate-800 text-slate-200 outline-none focus:border-green-500 cursor-pointer"
+            >
+              <option value="all">Todos los equipos</option>
+              <option value="DH">DH</option>
+              <option value="B">B</option>
             </select>
           </div>
 
@@ -370,7 +388,8 @@ export function PlantillaClient() {
                 <th className="px-4 py-4 cursor-pointer hover:text-white" onClick={() => requestSort('nombre')}>
                   Nombre Completo {sortBy === 'nombre' && (sortOrder === 'asc' ? '▲' : '▼')}
                 </th>
-                <th className="px-4 py-4 w-32">Posición</th>
+                <th className="px-4 py-4 w-28">Posición</th>
+                <th className="px-4 py-4 w-20">Equipo</th>
                 <th className="px-3 py-4 text-center w-16">Edad</th>
                 <th className="px-4 py-4 w-24">Pierna</th>
                 <th className="px-4 py-4 w-28">Estado</th>
@@ -400,6 +419,15 @@ export function PlantillaClient() {
                     </td>
                     <td className="px-4 py-3.5">
                       <Badge variant={player.demarcacion}>{player.demarcacion}</Badge>
+                    </td>
+                    <td className="px-4 py-3.5">
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                        player.equipo === 'DH' 
+                          ? 'bg-green-950/20 text-green-400 border-green-900/30' 
+                          : 'bg-blue-950/20 text-blue-400 border-blue-900/30'
+                      }`}>
+                        {player.equipo}
+                      </span>
                     </td>
                     <td className="px-3 py-3.5 text-center text-slate-300">
                       {getAge(player.fecha_nacimiento)}

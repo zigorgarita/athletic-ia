@@ -32,6 +32,7 @@ export interface Player {
   estado: EstadoJugador;
   rol_abp: string | null;
   foto_url: string | null;
+  equipo: 'DH' | 'B';
   created_at: string;
   updated_at: string;
 }
