@@ -12,15 +12,16 @@ import { Avatar } from '@/components/ui/Avatar';
 import { 
   Layout, Save, FolderOpen, RefreshCw, AlertCircle, 
   CheckCircle, Users, Trash2, ChevronDown, Copy, Plus, X, ShieldAlert,
-  Zap, Award, HelpCircle, User, Star
+  Zap, Award, HelpCircle, User, Star, ArrowRight, BookOpen, Edit3
 } from 'lucide-react';
 
 interface PositionNode {
   id: number;
-  label: string; // CD, GK, DC, etc.
+  label: string; // POR, LD, LI, etc.
   x: number; // %
   y: number; // %
   player_id: string | null;
+  notas_entrenador?: string;
 }
 
 const POSITION_ROLES = ['POR', 'LD', 'LI', 'DFC', 'MCD', 'MC', 'MCO', 'ED', 'EI', 'DC'];
@@ -29,99 +30,178 @@ const FORMATIONS: Record<string, { label: string; coords: Omit<PositionNode, 'pl
   '1-4-2-3-1': {
     label: '1-4-2-3-1',
     coords: [
-      { id: 1, label: 'POR', x: 50, y: 88 },
-      { id: 2, label: 'LD', x: 15, y: 68 },
-      { id: 3, label: 'DFC', x: 38, y: 74 },
-      { id: 4, label: 'DFC', x: 62, y: 74 },
-      { id: 5, label: 'LI', x: 85, y: 68 },
-      { id: 6, label: 'MCD', x: 36, y: 58 },
-      { id: 7, label: 'MCD', x: 64, y: 58 },
-      { id: 8, label: 'MCO', x: 50, y: 40 },
-      { id: 9, label: 'ED', x: 18, y: 30 },
-      { id: 10, label: 'EI', x: 82, y: 30 },
-      { id: 11, label: 'DC', x: 50, y: 16 },
+      { id: 1, label: 'POR', x: 50, y: 88, notas_entrenador: '' },
+      { id: 2, label: 'LD', x: 15, y: 68, notas_entrenador: '' },
+      { id: 3, label: 'DFC', x: 38, y: 74, notas_entrenador: '' },
+      { id: 4, label: 'DFC', x: 62, y: 74, notas_entrenador: '' },
+      { id: 5, label: 'LI', x: 85, y: 68, notas_entrenador: '' },
+      { id: 6, label: 'MCD', x: 36, y: 58, notas_entrenador: '' },
+      { id: 7, label: 'MCD', x: 64, y: 58, notas_entrenador: '' },
+      { id: 8, label: 'MCO', x: 50, y: 40, notas_entrenador: '' },
+      { id: 9, label: 'ED', x: 18, y: 30, notas_entrenador: '' },
+      { id: 10, label: 'EI', x: 82, y: 30, notas_entrenador: '' },
+      { id: 11, label: 'DC', x: 50, y: 16, notas_entrenador: '' },
     ]
   },
   '1-4-3-3': {
     label: '1-4-3-3',
     coords: [
-      { id: 1, label: 'POR', x: 50, y: 88 },
-      { id: 2, label: 'LD', x: 15, y: 68 },
-      { id: 3, label: 'DFC', x: 38, y: 74 },
-      { id: 4, label: 'DFC', x: 62, y: 74 },
-      { id: 5, label: 'LI', x: 85, y: 68 },
-      { id: 6, label: 'MCD', x: 50, y: 55 },
-      { id: 7, label: 'MC', x: 30, y: 44 },
-      { id: 8, label: 'MC', x: 70, y: 44 },
-      { id: 9, label: 'ED', x: 18, y: 22 },
-      { id: 10, label: 'EI', x: 82, y: 22 },
-      { id: 11, label: 'DC', x: 50, y: 15 },
+      { id: 1, label: 'POR', x: 50, y: 88, notas_entrenador: '' },
+      { id: 2, label: 'LD', x: 15, y: 68, notas_entrenador: '' },
+      { id: 3, label: 'DFC', x: 38, y: 74, notas_entrenador: '' },
+      { id: 4, label: 'DFC', x: 62, y: 74, notas_entrenador: '' },
+      { id: 5, label: 'LI', x: 85, y: 68, notas_entrenador: '' },
+      { id: 6, label: 'MCD', x: 50, y: 55, notas_entrenador: '' },
+      { id: 7, label: 'MC', x: 30, y: 44, notas_entrenador: '' },
+      { id: 8, label: 'MC', x: 70, y: 44, notas_entrenador: '' },
+      { id: 9, label: 'ED', x: 18, y: 22, notas_entrenador: '' },
+      { id: 10, label: 'EI', x: 82, y: 22, notas_entrenador: '' },
+      { id: 11, label: 'DC', x: 50, y: 15, notas_entrenador: '' },
     ]
   },
   '1-4-4-2': {
     label: '1-4-4-2',
     coords: [
-      { id: 1, label: 'POR', x: 50, y: 88 },
-      { id: 2, label: 'LD', x: 15, y: 68 },
-      { id: 3, label: 'DFC', x: 38, y: 74 },
-      { id: 4, label: 'DFC', x: 62, y: 74 },
-      { id: 5, label: 'LI', x: 85, y: 68 },
-      { id: 6, label: 'MC', x: 36, y: 50 },
-      { id: 7, label: 'MC', x: 64, y: 50 },
-      { id: 8, label: 'ED', x: 15, y: 40 },
-      { id: 9, label: 'EI', x: 85, y: 40 },
-      { id: 10, label: 'DC', x: 38, y: 18 },
-      { id: 11, label: 'DC', x: 62, y: 18 },
+      { id: 1, label: 'POR', x: 50, y: 88, notas_entrenador: '' },
+      { id: 2, label: 'LD', x: 15, y: 68, notas_entrenador: '' },
+      { id: 3, label: 'DFC', x: 38, y: 74, notas_entrenador: '' },
+      { id: 4, label: 'DFC', x: 62, y: 74, notas_entrenador: '' },
+      { id: 5, label: 'LI', x: 85, y: 68, notas_entrenador: '' },
+      { id: 6, label: 'MC', x: 36, y: 50, notas_entrenador: '' },
+      { id: 7, label: 'MC', x: 64, y: 50, notas_entrenador: '' },
+      { id: 8, label: 'ED', x: 15, y: 40, notas_entrenador: '' },
+      { id: 9, label: 'EI', x: 85, y: 40, notas_entrenador: '' },
+      { id: 10, label: 'DC', x: 38, y: 18, notas_entrenador: '' },
+      { id: 11, label: 'DC', x: 62, y: 18, notas_entrenador: '' },
     ]
   },
   '1-3-5-2': {
     label: '1-3-5-2',
     coords: [
-      { id: 1, label: 'POR', x: 50, y: 88 },
-      { id: 2, label: 'DFC', x: 25, y: 74 },
-      { id: 3, label: 'DFC', x: 50, y: 77 },
-      { id: 4, label: 'DFC', x: 75, y: 74 },
-      { id: 5, label: 'MCD', x: 36, y: 58 },
-      { id: 6, label: 'MCD', x: 64, y: 58 },
-      { id: 7, label: 'LD', x: 15, y: 45 },
-      { id: 8, label: 'LI', x: 85, y: 45 },
-      { id: 9, label: 'MCO', x: 50, y: 40 },
-      { id: 10, label: 'DC', x: 38, y: 18 },
-      { id: 11, label: 'DC', x: 62, y: 18 },
+      { id: 1, label: 'POR', x: 50, y: 88, notas_entrenador: '' },
+      { id: 2, label: 'DFC', x: 25, y: 74, notas_entrenador: '' },
+      { id: 3, label: 'DFC', x: 50, y: 77, notas_entrenador: '' },
+      { id: 4, label: 'DFC', x: 75, y: 74, notas_entrenador: '' },
+      { id: 5, label: 'MCD', x: 36, y: 58, notas_entrenador: '' },
+      { id: 6, label: 'MCD', x: 64, y: 58, notas_entrenador: '' },
+      { id: 7, label: 'LD', x: 15, y: 45, notas_entrenador: '' },
+      { id: 8, label: 'LI', x: 85, y: 45, notas_entrenador: '' },
+      { id: 9, label: 'MCO', x: 50, y: 40, notas_entrenador: '' },
+      { id: 10, label: 'DC', x: 38, y: 18, notas_entrenador: '' },
+      { id: 11, label: 'DC', x: 62, y: 18, notas_entrenador: '' },
     ]
   },
   '1-5-3-2': {
     label: '1-5-3-2',
     coords: [
-      { id: 1, label: 'POR', x: 50, y: 88 },
-      { id: 2, label: 'LD', x: 12, y: 68 },
-      { id: 3, label: 'DFC', x: 30, y: 75 },
-      { id: 4, label: 'DFC', x: 50, y: 77 },
-      { id: 5, label: 'DFC', x: 70, y: 75 },
-      { id: 6, label: 'LI', x: 88, y: 68 },
-      { id: 7, label: 'MC', x: 35, y: 50 },
-      { id: 8, label: 'MC', x: 50, y: 54 },
-      { id: 9, label: 'MC', x: 65, y: 50 },
-      { id: 10, label: 'DC', x: 38, y: 22 },
-      { id: 11, label: 'DC', x: 62, y: 22 },
+      { id: 1, label: 'POR', x: 50, y: 88, notas_entrenador: '' },
+      { id: 2, label: 'LD', x: 12, y: 68, notas_entrenador: '' },
+      { id: 3, label: 'DFC', x: 30, y: 75, notas_entrenador: '' },
+      { id: 4, label: 'DFC', x: 50, y: 77, notas_entrenador: '' },
+      { id: 5, label: 'DFC', x: 70, y: 75, notas_entrenador: '' },
+      { id: 6, label: 'LI', x: 88, y: 68, notas_entrenador: '' },
+      { id: 7, label: 'MC', x: 35, y: 50, notas_entrenador: '' },
+      { id: 8, label: 'MC', x: 50, y: 54, notas_entrenador: '' },
+      { id: 9, label: 'MC', x: 65, y: 50, notas_entrenador: '' },
+      { id: 10, label: 'DC', x: 38, y: 22, notas_entrenador: '' },
+      { id: 11, label: 'DC', x: 62, y: 22, notas_entrenador: '' },
     ]
   },
   'Personalizado': {
-    label: 'Personalizado (Editar Libremente)',
+    label: 'Personalizado',
     coords: [
-      { id: 1, label: 'POR', x: 50, y: 88 },
-      { id: 2, label: 'LD', x: 15, y: 68 },
-      { id: 3, label: 'DFC', x: 38, y: 74 },
-      { id: 4, label: 'DFC', x: 62, y: 74 },
-      { id: 5, label: 'LI', x: 85, y: 68 },
-      { id: 6, label: 'MCD', x: 50, y: 55 },
-      { id: 7, label: 'MC', x: 30, y: 44 },
-      { id: 8, label: 'MC', x: 70, y: 44 },
-      { id: 9, label: 'ED', x: 18, y: 22 },
-      { id: 10, label: 'EI', x: 82, y: 22 },
-      { id: 11, label: 'DC', x: 50, y: 15 },
+      { id: 1, label: 'POR', x: 50, y: 88, notas_entrenador: '' },
+      { id: 2, label: 'LD', x: 15, y: 68, notas_entrenador: '' },
+      { id: 3, label: 'DFC', x: 38, y: 74, notas_entrenador: '' },
+      { id: 4, label: 'DFC', x: 62, y: 74, notas_entrenador: '' },
+      { id: 5, label: 'LI', x: 85, y: 68, notas_entrenador: '' },
+      { id: 6, label: 'MCD', x: 50, y: 55, notas_entrenador: '' },
+      { id: 7, label: 'MC', x: 30, y: 44, notas_entrenador: '' },
+      { id: 8, label: 'MC', x: 70, y: 44, notas_entrenador: '' },
+      { id: 9, label: 'ED', x: 18, y: 22, notas_entrenador: '' },
+      { id: 10, label: 'EI', x: 82, y: 22, notas_entrenador: '' },
+      { id: 11, label: 'DC', x: 50, y: 15, notas_entrenador: '' },
     ]
   }
+};
+
+// Tactical Database for IA recommendations according to combinations
+const TACTICAL_DATABASE: Record<string, Record<string, {
+  ventajas: string;
+  desventajas: string;
+  zonaConflicto: string;
+  dueloClave: string;
+  tareasLineas: string;
+  orientaciones: Record<string, string>;
+}>> = {
+  '1-4-2-3-1': {
+    '1-4-3-3': {
+      ventajas: 'Superioridad táctica en la mediapunta: nuestro mediapunta central (MCO) flotará libre a la espalda de sus dos interiores, forzando a su único pivote defensivo a salir de zona. Extremos que ensanchan su última línea.',
+      desventajas: 'Riesgo de emparejamiento desfavorable en bandas si sus extremos rápidos atacan el espacio exterior libre antes de las coberturas de nuestro doble pivote.',
+      zonaConflicto: 'La zona de la mediapunta interior (carril central entre línea de volantes rival y su defensa).',
+      dueloClave: 'Nuestro MCO contra el MCD organizador rival (fijación táctica).',
+      tareasLineas: 'Portería: Salida en corto y apoyo a centrales.\nDefensa: Coberturas laterales rápidas.\nMedios: Doble pivote sostiene y MCO distribuye.\nDelantera: Fijar a centrales y diagonales al espacio.',
+      orientaciones: {
+        'POR': 'Cobertura constante del espacio libre detrás del bloque de centrales.',
+        'LD': 'Atento al extremo zurdo rápido del rival; no conceder el perfil interior.',
+        'LI': 'Asegurar repliegue rápido y vigilancias del extremo diestro.',
+        'DFC': 'Ganar duelos aéreos con su Delantero Centro; achicar en bloque medio.',
+        'MCD': 'Sostén táctico, equilibrar coberturas en bandas si el lateral salta.',
+        'MC': 'Distribución fluida de primer contacto, ocupar la corona en área rival.',
+        'MCO': 'Recibir entre líneas, girar rápido y alimentar pasillos de extremos.',
+        'ED': 'Aislar al lateral izquierdo rival en 1x1 por fuera.',
+        'EI': 'Diagonales de fuera hacia dentro hacia zona de finalización.',
+        'DC': 'Fijar a centrales, provocar desmarques de ruptura y descarga de espaldas.'
+      }
+    },
+    '1-4-4-2': {
+      ventajas: 'Superioridad numérica de 3 vs 2 en zona de mediocampo gracias al triángulo invertido formado por el doble pivote y el mediapunta central.',
+      desventajas: 'Dificultad en basculación si sus dos delanteros fijan a nuestros dos centrales y sus laterales se proyectan con libertad.',
+      zonaConflicto: 'Espacio de construcción en zona media (interior central).',
+      dueloClave: 'Doble pivote propio frente a la línea de medios rival para dominar posesión.',
+      tareasLineas: 'Portería: Reiniciar juego con pivotes.\nDefensa: Anticipar juego directo a sus dos puntas.\nMedios: Controlar tiempos de juego y circular.\nDelantera: MCO explota el carril central.',
+      orientaciones: {
+        'POR': 'Apoyo activo en salida de balón.',
+        'DFC': 'Uno anticipa al delantero que desciende y otro cubre profundidad.',
+        'MCD': 'Mantener vigilancias estrechas al mediocampo rival.',
+        'MCO': 'Ocupar el espacio desierto a la espalda de su doble pivote.',
+        'DC': 'Estirar al rival buscando balones en profundidad a la espalda de centrales.'
+      }
+    }
+  },
+  '1-4-3-3': {
+    '1-4-4-2': {
+      ventajas: 'Ocupación de espacios en amplitud. Extremos que aíslan a laterales, permitiendo crear superioridades en mediocampo de 3 contra 2 volantes.',
+      desventajas: 'Sufrimiento en transiciones rápidas si el pivote propio queda superado por su doble delantero en zona de rebote.',
+      zonaConflicto: 'La franja de tres cuartos exterior y el pasillo interior de transición.',
+      dueloClave: 'Extremos propios vs Laterales rivales (desequilibrio individual).',
+      tareasLineas: 'Portería: Actuar como jugador libre en construcción.\nDefensa: Progresión combinada por bandas.\nMedios: Rotaciones dinámicas para liberar carriles.\nDelantera: Extremos con libertad ofensiva.',
+      orientaciones: {
+        'POR': 'Distribución rápida en transiciones ofensivas.',
+        'LD': 'Proyección ofensiva profunda doblando al extremo.',
+        'LI': 'Asegurar equilibrio defensivo si el LD sube.',
+        'DFC': 'Controlar el juego directo hacia sus dos delanteros centro.',
+        'MCD': 'Ancla del equipo, equilibrar coberturas.',
+        'MC': 'Ocupar espacios de interior y pisar área rival.',
+        'ED': 'Desborde en amplitud exterior.',
+        'EI': 'Diagonales para el disparo a pierna cambiada.',
+        'DC': 'Rematar centros laterales y fijar marca de centrales.'
+      }
+    }
+  }
+};
+
+const DEFAULT_RECOMMENDATIONS: Record<string, string> = {
+  'POR': 'Portero: Voz de mando activa. Cobertura del área y juego con el pie ágil.',
+  'LD': 'Lateral Derecho: Progresar en amplitud y doblar por fuera al extremo.',
+  'LI': 'Lateral Izquierdo: Mantener vigilancias rápidas y asegurar repliegue.',
+  'DFC': 'Central: Anticipar juego directo, coberturas limpias y salida aseada.',
+  'MCD': 'Mediocentro Defensivo: Sostén defensivo, ganar segundas jugadas y equilibrar basculaciones.',
+  'MC': 'Mediocentro: Conexión dinámica entre líneas, distribución y pisar área rival.',
+  'MCO': 'Mediapunta: Recibir entre líneas, giros rápidos para habilitar puntas.',
+  'ED': 'Extremo Derecho: Aislar al lateral rival en 1x1 exterior, diagonal al área en centros opuestos.',
+  'EI': 'Extremo Izquierdo: Desborde exterior, diagonales de fuera hacia dentro.',
+  'DC': 'Delantero Centro: Fijar centrales rivales, juego de espaldas y desmarques de ruptura.'
 };
 
 export function TacticaClient() {
@@ -143,10 +223,7 @@ export function TacticaClient() {
   const [desventajas, setDesventajas] = useState<string>('');
   const [zonaConflicto, setZonaConflicto] = useState<string>('');
   const [dueloClave, setDueloClave] = useState<string>('');
-  const [orientacionesIndividuales, setOrientacionesIndividuales] = useState<string>('');
-
-  // Helper State: Selected Player to assign via click
-  const [activePlayerForAssignment, setActivePlayerForAssignment] = useState<string | null>(null);
+  const [tareasLineas, setTareasLineas] = useState<string>('');
 
   // Database Load states
   const [savedLineups, setSavedLineups] = useState<TacticalLineup[]>([]);
@@ -158,7 +235,7 @@ export function TacticaClient() {
 
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Initialize nodes based on selected formation (if not loading saved lineup)
+  // Initialize nodes based on selected formation
   useEffect(() => {
     if (!currentLineupId) {
       const defaultCoords = FORMATIONS[selectedFormation]?.coords || [];
@@ -166,10 +243,31 @@ export function TacticaClient() {
         defaultCoords.map((coord) => ({
           ...coord,
           player_id: null,
+          notas_entrenador: ''
         }))
       );
     }
   }, [selectedFormation, currentLineupId]);
+
+  // Load tactical proposals when systems change
+  useEffect(() => {
+    // Generate AI recommendations based on own vs rival system
+    const databaseMatch = TACTICAL_DATABASE[selectedFormation]?.[rivalFormation];
+    if (databaseMatch) {
+      setVentajas(databaseMatch.ventajas);
+      setDesventajas(databaseMatch.desventajas);
+      setZonaConflicto(databaseMatch.zonaConflicto);
+      setDueloClave(databaseMatch.dueloClave);
+      setTareasLineas(databaseMatch.tareasLineas);
+    } else {
+      // Default proposals
+      setVentajas(`Ventajas teóricas de jugar con ${selectedFormation} contra un rival posicionado en ${rivalFormation}. Superioridad local en salida de balón y ocupación racional del carril medio.`);
+      setDesventajas(`Vulnerabilidad del dibujo ${selectedFormation} ante repliegues fallidos o transiciones rápidas por el perfil exterior si el rival ${rivalFormation} explota las bandas.`);
+      setZonaConflicto(`Carriles intermedios entre la línea de volantes rivales y la defensa del bloque bajo.`);
+      setDueloClave(`Duelo por la posesión entre la base de construcción central y los interiores rivales.`);
+      setTareasLineas(`Defensa: Línea de 4 basculando rápido.\nMedios: Asegurar circulación fluida.\nDelantera: Fijar centrales y generar pasillos exteriores.`);
+    }
+  }, [selectedFormation, rivalFormation]);
 
   useEffect(() => {
     loadSavedData();
@@ -195,9 +293,24 @@ export function TacticaClient() {
     }
   }
 
-  // --- Drag & Drop logic for nodes ---
+  // --- Change Formation and Maintain assigned players ---
+  const handleFormationChange = (formationKey: string) => {
+    setSelectedFormation(formationKey);
+    const defaultCoords = FORMATIONS[formationKey]?.coords || [];
+    setNodes(prev => {
+      return defaultCoords.map(coord => {
+        const existingNode = prev.find(n => n.id === coord.id);
+        return {
+          ...coord,
+          player_id: existingNode ? existingNode.player_id : null,
+          notas_entrenador: existingNode?.notas_entrenador || ''
+        };
+      });
+    });
+  };
+
+  // --- Drag & Drop logic for free movement of nodes ---
   const handleDragStart = (e: React.MouseEvent | React.TouchEvent, nodeId: number) => {
-    // If click on inner selectors, do not trigger drag
     const target = e.target as HTMLElement;
     if (target.tagName === 'SELECT' || target.closest('.no-drag')) return;
 
@@ -247,31 +360,54 @@ export function TacticaClient() {
     window.addEventListener('touchend', handleDragEnd);
   };
 
-  // --- Assign player directly via click helper ---
+  // --- HTML5 Drag & Drop Handlers ---
   const handlePlayerAssign = (nodeId: number, playerId: string | null) => {
     setNodes(prev => prev.map(n => {
       if (n.id === nodeId) {
         return { ...n, player_id: playerId };
       }
-      // Evitar duplicados
+      // Avoid duplicates
       if (playerId && n.player_id === playerId && n.id !== nodeId) {
         return { ...n, player_id: null };
       }
       return n;
     }));
-    setActivePlayerForAssignment(null);
   };
 
-  // Click on node: if there is an active player selected, assign them, otherwise do nothing
-  const handleNodeClick = (nodeId: number) => {
-    if (activePlayerForAssignment) {
-      handlePlayerAssign(nodeId, activePlayerForAssignment);
+  const handlePitchNodeDrop = (e: React.DragEvent, targetNodeId: number) => {
+    e.preventDefault();
+    const rawData = e.dataTransfer.getData('text/plain');
+    if (!rawData) return;
+
+    if (rawData.startsWith('node:')) {
+      const parts = rawData.split(':');
+      const sourceNodeId = parseInt(parts[1]);
+      const sourcePlayerId = parts[2];
+      
+      const targetNode = nodes.find(n => n.id === targetNodeId);
+      const targetPlayerId = targetNode ? targetNode.player_id : null;
+      
+      setNodes(prev => prev.map(n => {
+        if (n.id === targetNodeId) {
+          return { ...n, player_id: sourcePlayerId };
+        }
+        if (n.id === sourceNodeId) {
+          return { ...n, player_id: targetPlayerId };
+        }
+        return n;
+      }));
+    } else {
+      // Direct drag from roster sidebar
+      handlePlayerAssign(targetNodeId, rawData);
     }
   };
 
-  // Change individual node label/role
   const handleRoleChange = (nodeId: number, newRole: string) => {
     setNodes(prev => prev.map(n => n.id === nodeId ? { ...n, label: newRole } : n));
+  };
+
+  const handlePlayerNoteChange = (nodeId: number, notes: string) => {
+    setNodes(prev => prev.map(n => n.id === nodeId ? { ...n, notas_entrenador: notes } : n));
   };
 
   // --- Save Tactical Lineup ---
@@ -296,30 +432,29 @@ export function TacticaClient() {
           label: n.label,
           x: parseFloat(n.x.toFixed(1)),
           y: parseFloat(n.y.toFixed(1)),
-          player_id: n.player_id
+          player_id: n.player_id,
+          notas_entrenador: n.notas_entrenador || ''
         })),
         match_id: selectedMatchId || null,
         ventajas: ventajas || null,
         desventajas: desventajas || null,
         zona_conflicto: zonaConflicto || null,
         duelo_clave: dueloClave || null,
-        orientaciones_individuales: orientacionesIndividuales || null
+        orientaciones_individuales: tareasLineas || null
       };
 
       let error;
       if (currentLineupId) {
-        // Update existing
         const res = await supabase.from('tactical_lineups').update(payload).eq('id', currentLineupId);
         error = res.error;
       } else {
-        // Insert new
         const res = await supabase.from('tactical_lineups').insert(payload);
         error = res.error;
       }
 
       if (error) throw error;
 
-      setSuccessMsg('Alineación y análisis táctico guardados con éxito.');
+      setSuccessMsg('Alineación táctica y análisis de comparador guardados con éxito.');
       loadSavedData();
     } catch (err: unknown) {
       const error = err as Error;
@@ -344,7 +479,7 @@ export function TacticaClient() {
     setDesventajas(lineup.desventajas || '');
     setZonaConflicto(lineup.zona_conflicto || '');
     setDueloClave(lineup.duelo_clave || '');
-    setOrientacionesIndividuales(lineup.orientaciones_individuales || '');
+    setTareasLineas(lineup.orientaciones_individuales || '');
     
     // Load position nodes
     if (Array.isArray(lineup.posiciones)) {
@@ -353,13 +488,13 @@ export function TacticaClient() {
         label: p.label,
         x: p.x,
         y: p.y,
-        player_id: p.player_id
+        player_id: p.player_id,
+        notas_entrenador: p.notas_entrenador || ''
       })));
     }
     setSuccessMsg(`Cargada la pizarra: "${lineup.nombre_pizarra || lineup.nombre_sistema}"`);
   };
 
-  // Duplicate current state into a new board
   const handleDuplicateLineup = () => {
     if (!lineupName) {
       setErrorMsg('Primero carga o diseña una alineación para duplicar.');
@@ -367,10 +502,9 @@ export function TacticaClient() {
     }
     setCurrentLineupId(null); // Clear ID to force insert on save
     setLineupName(`Copia de ${lineupName}`);
-    setSuccessMsg('Pizarra duplicada localmente. Cambia el nombre y haz clic en Guardar para persistirla.');
+    setSuccessMsg('Pizarra duplicada localmente. Haz clic en Guardar para persistirla.');
   };
 
-  // Reset to current formation template
   const handleResetBoard = () => {
     if (confirm('¿Deseas restablecer la posición y vaciar todos los jugadores?')) {
       const defaultCoords = FORMATIONS[selectedFormation]?.coords || [];
@@ -378,13 +512,13 @@ export function TacticaClient() {
         defaultCoords.map((coord) => ({
           ...coord,
           player_id: null,
+          notas_entrenador: ''
         }))
       );
       setSuccessMsg('Se ha restablecido la pizarra.');
     }
   };
 
-  // Delete Board
   async function handleDeleteLineup(id: string, e: React.MouseEvent) {
     e.stopPropagation();
     if (!confirm('¿Seguro que deseas eliminar esta pizarra táctica?')) return;
@@ -400,7 +534,7 @@ export function TacticaClient() {
         setDesventajas('');
         setZonaConflicto('');
         setDueloClave('');
-        setOrientacionesIndividuales('');
+        setTareasLineas('');
       }
       loadSavedData();
       setSuccessMsg('Pizarra eliminada con éxito.');
@@ -409,7 +543,6 @@ export function TacticaClient() {
     }
   }
 
-  // Helper: Get assigned player IDs
   const getAssignedPlayerIds = () => nodes.map(n => n.player_id).filter(id => !!id);
 
   if (loadingPlayers) {
@@ -428,7 +561,7 @@ export function TacticaClient() {
         <div className="flex flex-col gap-1">
           <h1 className="text-3xl font-extrabold tracking-tight text-slate-100 flex items-center gap-2">
             <Layout className="h-8 w-8 text-green-500" />
-            Pizarra Táctica Profesional
+            Pizarra Táctica
           </h1>
           <p className="text-slate-400 text-sm">
             Diseña formaciones, arrastra jugadores, define roles y realiza el análisis táctico para cada partido.
@@ -456,18 +589,36 @@ export function TacticaClient() {
                 setLineupName('');
                 setLineupNotes('');
                 setSelectedMatchId('');
-                setVentajas('');
-                setDesventajas('');
-                setZonaConflicto('');
-                setDueloClave('');
-                setOrientacionesIndividuales('');
                 setSuccessMsg('Nueva pizarra vacía lista para diseñar.');
               }}
               className="flex items-center gap-1.5 text-xs bg-slate-900/60 border-slate-800 text-slate-300"
             >
-              <Plus className="h-3.5 w-3.5 text-green-400" /> Nueva Pizarra
+              <Plus className="h-3.5 w-3.5 text-green-400" /> Nueva
             </Button>
           )}
+        </div>
+      </div>
+
+      {/* Selector de sistemas visible arriba */}
+      <div className="p-4 bg-slate-900/40 border border-slate-800/80 rounded-2xl">
+        <label className="block text-slate-400 text-xs font-bold mb-3 uppercase tracking-wider">Sistema de Juego Propio</label>
+        <div className="flex items-center gap-2 flex-wrap">
+          {Object.keys(FORMATIONS).map(formationKey => {
+            const isActive = selectedFormation === formationKey;
+            return (
+              <button
+                key={formationKey}
+                onClick={() => handleFormationChange(formationKey)}
+                className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all ${
+                  isActive 
+                    ? 'bg-green-500/10 border-green-500/30 text-green-400 shadow-md shadow-green-500/5' 
+                    : 'bg-slate-950/80 border-slate-850 text-slate-400 hover:border-slate-800 hover:text-slate-200'
+                }`}
+              >
+                {formationKey}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -495,20 +646,18 @@ export function TacticaClient() {
         </div>
       )}
 
-      {/* Main Grid: Form, Pitch, and Roster */}
+      {/* Main Pitch and configuration Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
-        {/* Columna 1 (3/12): Configuraciones, Jornadas y Pizarras Guardadas */}
+        {/* Left column (3/12) */}
         <div className="lg:col-span-3 space-y-6">
-          
-          {/* Metadatos de la Pizarra */}
           <div className="p-5 bg-slate-900/40 border border-slate-800/80 rounded-2xl space-y-4">
             <h3 className="text-xs font-bold text-slate-300 uppercase tracking-widest flex items-center gap-1.5">
-              <Star className="h-3.5 w-3.5 text-green-500" /> Datos del Plan
+              <Star className="h-3.5 w-3.5 text-green-500" /> Plan del Partido
             </h3>
 
             <Input
-              label="Nombre de Pizarra / Plan"
+              label="Nombre de Alineación"
               type="text"
               placeholder="Ej. Plan A - Presión Alta"
               value={lineupName}
@@ -526,32 +675,24 @@ export function TacticaClient() {
             />
 
             <Select
-              label="Sistema Propio"
-              value={selectedFormation}
-              onChange={(e) => setSelectedFormation(e.target.value)}
+              label="Sistema Rival"
+              value={rivalFormation}
+              onChange={(e) => setRivalFormation(e.target.value)}
               options={Object.keys(FORMATIONS).map(f => ({ value: f, label: FORMATIONS[f].label }))}
             />
 
-            <Input
-              label="Sistema Rival"
-              type="text"
-              placeholder="Ej. 1-4-4-2"
-              value={rivalFormation}
-              onChange={(e) => setRivalFormation(e.target.value)}
-            />
-
             <div>
-              <label className="block text-slate-400 text-xs font-bold mb-1.5">Notas / Observaciones Generales</label>
+              <label className="block text-slate-400 text-xs font-bold mb-1.5">Notas Generales</label>
               <textarea
                 value={lineupNotes}
                 onChange={(e) => setLineupNotes(e.target.value)}
-                placeholder="Anotaciones tácticas rápidas..."
-                className="w-full min-h-[70px] bg-slate-950/80 border border-slate-850 focus:border-green-500/50 rounded-xl px-3 py-2 text-xs text-slate-200 placeholder-slate-600 focus:outline-none transition-colors"
+                placeholder="Notas rápidas..."
+                className="w-full min-h-[80px] bg-slate-950/80 border border-slate-850 focus:border-green-500/50 rounded-xl px-3 py-2 text-xs text-slate-200 placeholder-slate-600 focus:outline-none transition-colors"
               />
             </div>
           </div>
 
-          {/* Historial de Pizarras Guardadas */}
+          {/* Saved boards list */}
           <div className="p-5 bg-slate-900/40 border border-slate-800/80 rounded-2xl space-y-4">
             <h3 className="text-xs font-bold text-slate-300 uppercase tracking-widest flex items-center gap-1.5">
               <FolderOpen className="h-3.5 w-3.5 text-blue-500" /> Pizarras Guardadas
@@ -562,31 +703,31 @@ export function TacticaClient() {
             ) : savedLineups.length === 0 ? (
               <p className="text-xs text-slate-500 italic p-2 text-center">No hay alineaciones guardadas.</p>
             ) : (
-              <div className="space-y-2 max-h-[250px] overflow-y-auto pr-1">
+              <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1">
                 {savedLineups.map((lineup) => {
                   const match = matches.find(m => m.id === lineup.match_id);
                   return (
                     <div
                       key={lineup.id}
                       onClick={() => handleLoadLineup(lineup)}
-                      className={`flex items-center justify-between p-3 bg-slate-950/40 hover:bg-slate-850/50 border rounded-2xl text-xs cursor-pointer transition-all duration-200 ${
+                      className={`flex items-center justify-between p-2.5 bg-slate-950/40 hover:bg-slate-850/50 border rounded-2xl text-xs cursor-pointer transition-all duration-200 ${
                         currentLineupId === lineup.id ? 'border-green-500/40 bg-green-500/5' : 'border-slate-850'
                       }`}
                     >
                       <div className="truncate mr-2 flex-1">
                         <span className="font-bold text-slate-200 block truncate">{lineup.nombre_pizarra || lineup.nombre_sistema}</span>
-                        <span className="text-[10px] text-slate-400 font-medium block truncate">
-                          {lineup.sistema_propio || lineup.nombre_sistema} {lineup.sistema_rival ? `vs ${lineup.sistema_rival}` : ''}
+                        <span className="text-[10px] text-slate-450 block truncate">
+                          {lineup.sistema_propio || lineup.nombre_sistema} vs {lineup.sistema_rival || '1-4-3-3'}
                         </span>
                         {match && (
-                          <span className="inline-block mt-1 text-[9px] bg-slate-900 px-1.5 py-0.5 rounded text-slate-400 font-semibold border border-slate-800/60">
-                            Jor. {match.jornada} vs {match.rival}
+                          <span className="inline-block mt-0.5 text-[8px] bg-slate-900 px-1 py-0.2 rounded text-slate-400">
+                            Jor. {match.jornada}
                           </span>
                         )}
                       </div>
                       <button
                         onClick={(e) => handleDeleteLineup(lineup.id, e)}
-                        className="p-1.5 hover:bg-red-500/20 hover:text-red-400 text-slate-500 rounded-xl transition-colors duration-150"
+                        className="p-1 hover:bg-red-500/20 hover:text-red-400 text-slate-500 rounded transition-colors"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
@@ -598,20 +739,11 @@ export function TacticaClient() {
           </div>
         </div>
 
-        {/* Columna 2 (6/12): El Campo Interactivo de Fútbol */}
+        {/* Center column: Soccer field (6/12) */}
         <div className="lg:col-span-6 flex flex-col items-center">
-          {activePlayerForAssignment && (
-            <div className="w-full max-w-[480px] mb-3 p-2 bg-green-500/10 border border-green-500/20 text-green-400 rounded-xl text-center text-xs flex items-center justify-between px-3 animation-pulse">
-              <span>Haz clic en un círculo en el campo para colocar a: <b>{players.find(p => p.id === activePlayerForAssignment)?.nombre}</b></span>
-              <button onClick={() => setActivePlayerForAssignment(null)} className="bg-green-500/20 p-1 rounded-full text-green-400 hover:bg-green-500/30">
-                <X className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          )}
-
           <div
             ref={containerRef}
-            className="relative w-full aspect-[2/3] max-w-[480px] bg-emerald-950/90 rounded-[2rem] border-2 border-emerald-500/20 overflow-hidden shadow-2xl select-none"
+            className="relative w-full aspect-[2/3] max-w-[480px] bg-emerald-950/90 rounded-[2.5rem] border border-emerald-500/20 overflow-hidden shadow-2xl select-none"
           >
             {/* SVG Pitch Lines */}
             <svg viewBox="0 0 400 600" className="absolute inset-0 w-full h-full pointer-events-none opacity-20">
@@ -632,6 +764,10 @@ export function TacticaClient() {
             {/* Render Nodes / Players */}
             {nodes.map((node) => {
               const assignedPlayer = players.find(p => p.id === node.player_id);
+              const playerName = assignedPlayer 
+                ? assignedPlayer.nombre.split(' ')[0] 
+                : node.label;
+                
               return (
                 <div
                   key={node.id}
@@ -640,50 +776,66 @@ export function TacticaClient() {
                     top: `${node.y}%`,
                     transform: 'translate(-50%, -50%)',
                   }}
-                  onClick={() => handleNodeClick(node.id)}
-                  className="absolute z-10 flex flex-col items-center cursor-move group"
+                  className="absolute z-10 flex flex-col items-center cursor-move"
                   onMouseDown={(e) => handleDragStart(e, node.id)}
                   onTouchStart={(e) => handleDragStart(e, node.id)}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                  }}
+                  onDrop={(e) => handlePitchNodeDrop(e, node.id)}
+                  draggable={!!node.player_id}
+                  onDragStart={(e) => {
+                    if (node.player_id) {
+                      e.dataTransfer.setData('text/plain', `node:${node.id}:${node.player_id}`);
+                      e.dataTransfer.effectAllowed = 'move';
+                    }
+                  }}
                 >
-                  {/* Ficha Visual */}
-                  <div className={`h-11 w-11 rounded-full border-2 bg-slate-950 flex items-center justify-center shadow-xl transition-all duration-150 active:scale-110 border-slate-700 hover:border-green-500/50 ${
-                    assignedPlayer ? 'border-green-500/70 shadow-green-500/10' : 'border-slate-800 bg-slate-900/80'
+                  {/* Outer circle with glow and premium style */}
+                  <div className={`h-14 w-14 rounded-full border-2 bg-slate-950 flex items-center justify-center shadow-xl transition-transform duration-100 group-hover:scale-105 ${
+                    assignedPlayer ? 'border-green-500 shadow-green-500/20' : 'border-slate-800 bg-slate-900/60'
                   }`}>
                     {assignedPlayer ? (
                       <Avatar src={assignedPlayer.foto_url} name={assignedPlayer.nombre} size="sm" className="w-full h-full" />
                     ) : (
-                      <span className="text-[10px] font-black text-slate-400">{node.label}</span>
+                      <span className="text-[10px] font-black text-slate-500">{node.label}</span>
                     )}
                   </div>
 
-                  {/* Info / Selector */}
-                  <div className="mt-1 bg-slate-950/90 border border-slate-800/80 px-2 py-0.5 rounded-xl text-[8px] font-extrabold text-slate-200 flex items-center gap-1 select-none pointer-events-auto no-drag shadow-lg">
-                    <span className="truncate max-w-[65px]">{assignedPlayer ? assignedPlayer.nombre : node.label}</span>
+                  {/* Position overlay badge */}
+                  <div className="absolute -top-2 bg-slate-950 border border-slate-800/80 px-1 py-0.2 rounded text-[7px] font-extrabold text-green-400 no-drag">
+                    {node.label}
+                  </div>
+
+                  {/* Name overlay */}
+                  <div className="mt-1 bg-slate-950/90 border border-slate-900 px-1.5 py-0.2 rounded-lg text-[8px] font-bold text-slate-200 flex items-center gap-1 select-none pointer-events-auto no-drag shadow-md">
+                    <span className="truncate max-w-[50px]">{playerName}</span>
                     
-                    {/* Selector de Rol */}
+                    {/* Inline select to change role */}
                     <div className="relative">
                       <select
                         value={node.label}
                         onChange={(e) => handleRoleChange(node.id, e.target.value)}
-                        className="absolute inset-0 opacity-0 w-3.5 h-3.5 cursor-pointer font-bold"
+                        className="absolute inset-0 opacity-0 w-3 h-3 cursor-pointer"
                       >
                         {POSITION_ROLES.map(role => (
                           <option key={role} value={role}>{role}</option>
                         ))}
                       </select>
-                      <ChevronDown className="h-2 w-2 text-slate-450 hover:text-slate-200" />
+                      <ChevronDown className="h-2 w-2 text-slate-500 hover:text-slate-200" />
                     </div>
 
-                    {/* Remover Asignación */}
+                    {/* Clear button */}
                     {assignedPlayer && (
                       <button 
                         onClick={(e) => {
                           e.stopPropagation();
                           handlePlayerAssign(node.id, null);
                         }} 
-                        className="ml-1 text-slate-500 hover:text-red-400 transition-colors"
+                        className="ml-0.5 text-slate-500 hover:text-red-400"
                       >
-                        <X className="h-2.5 w-2.5" />
+                        <X className="h-2 w-2" />
                       </button>
                     )}
                   </div>
@@ -693,39 +845,49 @@ export function TacticaClient() {
           </div>
         </div>
 
-        {/* Columna 3 (3/12): Barra Lateral de Jugadores de la Plantilla */}
-        <div className="lg:col-span-3 space-y-4">
-          <div className="p-5 bg-slate-900/40 border border-slate-800/80 rounded-2xl flex flex-col max-h-[600px]">
-            <h3 className="text-xs font-bold text-slate-350 uppercase tracking-widest mb-3 flex items-center gap-1.5">
-              <Users className="h-3.5 w-3.5 text-green-500" /> Plantilla Activa
+        {/* Right column: Roster sidebar (3/12) */}
+        <div className="lg:col-span-3">
+          <div className="p-5 bg-slate-900/40 border border-slate-800/80 rounded-2xl flex flex-col max-h-[600px] overflow-hidden">
+            <h3 className="text-xs font-bold text-slate-300 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+              <Users className="h-3.5 w-3.5 text-green-500" /> Plantilla
             </h3>
             
-            <p className="text-[10px] text-slate-500 mb-3 leading-relaxed">
-              Selecciona un jugador del roster y pulsa sobre una posición en el campo para asignarlo.
+            <p className="text-[10px] text-slate-500 mb-3 leading-tight">
+              Arrastra un jugador al campo o haz clic en su ficha para colocarlo en cualquier posición libre.
             </p>
 
             <div className="space-y-1.5 overflow-y-auto flex-1 pr-1">
               {players.map((p) => {
                 const isAssigned = getAssignedPlayerIds().includes(p.id);
-                const isSelected = activePlayerForAssignment === p.id;
                 return (
                   <div
                     key={p.id}
+                    draggable={!isAssigned}
+                    onDragStart={(e) => {
+                      if (!isAssigned) {
+                        e.dataTransfer.setData('text/plain', p.id);
+                        e.dataTransfer.effectAllowed = 'move';
+                      }
+                    }}
                     onClick={() => {
                       if (isAssigned) {
-                        // Find node and clear
+                        // Find occupied node and clear it
                         const node = nodes.find(n => n.player_id === p.id);
                         if (node) handlePlayerAssign(node.id, null);
                       } else {
-                        setActivePlayerForAssignment(isSelected ? null : p.id);
+                        // Find first empty node
+                        const emptyNode = nodes.find(n => !n.player_id);
+                        if (emptyNode) {
+                          handlePlayerAssign(emptyNode.id, p.id);
+                        } else {
+                          alert('El campo está completo. Quita o sustituye un jugador.');
+                        }
                       }
                     }}
-                    className={`flex items-center justify-between p-2 rounded-xl text-xs border transition-all cursor-pointer select-none ${
+                    className={`flex items-center justify-between p-2 rounded-xl text-xs border transition-all cursor-grab select-none active:cursor-grabbing ${
                       isAssigned
-                        ? 'bg-slate-900/30 border-slate-850/60 text-slate-500 hover:bg-slate-900/50'
-                        : isSelected
-                        ? 'bg-green-500/10 border-green-500/30 text-green-400 ring-1 ring-green-500/30'
-                        : 'bg-slate-950/60 border-slate-850/70 text-slate-200 hover:border-slate-800 hover:bg-slate-950'
+                        ? 'bg-slate-900/20 border-slate-850/40 text-slate-500 opacity-60'
+                        : 'bg-slate-950/60 border-slate-850/60 text-slate-200 hover:border-slate-800 hover:bg-slate-950'
                     }`}
                   >
                     <div className="flex items-center gap-2 truncate">
@@ -736,13 +898,11 @@ export function TacticaClient() {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-1 text-[9px] font-bold">
-                      {isAssigned ? (
-                        <span className="bg-green-500/10 text-green-400 px-1.5 py-0.5 rounded border border-green-500/10">ON</span>
-                      ) : isSelected ? (
-                        <span className="bg-yellow-500/10 text-yellow-400 px-1.5 py-0.5 rounded border border-yellow-500/10 animation-pulse">LISTO</span>
-                      ) : null}
-                    </div>
+                    {isAssigned && (
+                      <span className="text-[8px] bg-green-500/10 text-green-400 px-1 py-0.2 rounded border border-green-500/10 shrink-0">
+                        PUESTO
+                      </span>
+                    )}
                   </div>
                 );
               })}
@@ -751,85 +911,149 @@ export function TacticaClient() {
         </div>
       </div>
 
-      {/* Secciones de Análisis Táctico */}
+      {/* Comparador Táctico Section */}
       <div className="p-6 bg-slate-900/40 border border-slate-800/80 rounded-3xl space-y-6 mt-6">
-        <div className="flex items-center gap-2 pb-3 border-b border-slate-800/60">
-          <Layout className="h-5 w-5 text-green-500" />
-          <h3 className="text-sm font-bold text-slate-200 uppercase tracking-widest">
-            Análisis Táctico de la Jornada
-          </h3>
+        <div className="flex items-center justify-between pb-3 border-b border-slate-800/60">
+          <div className="flex items-center gap-2">
+            <BookOpen className="h-5 w-5 text-green-500" />
+            <h3 className="text-sm font-bold text-slate-200 uppercase tracking-widest">
+              Comparador Táctico (Análisis Estratégico)
+            </h3>
+          </div>
+          <div className="text-[10px] text-slate-400 font-bold bg-slate-950 border border-slate-850/60 px-3 py-1 rounded-xl">
+            {selectedFormation} <ArrowRight className="inline-block h-3.5 w-3.5 mx-1 text-slate-500" /> {rivalFormation}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Ventajas y Desventajas */}
           <div className="space-y-4">
             <div className="bg-slate-950/30 border border-slate-850/60 p-4.5 rounded-2xl space-y-2">
               <label className="text-xs font-bold text-green-400 flex items-center gap-1.5">
-                <Zap className="h-3.5 w-3.5 text-green-400" /> Ventajas del Sistema vs Rival
+                <Zap className="h-3.5 w-3.5 text-green-400" /> Ventajas del Sistema
               </label>
               <textarea
                 value={ventajas}
                 onChange={(e) => setVentajas(e.target.value)}
-                placeholder="Ej. Superioridad numérica en el medio campo, pasillos laterales libres para laterales profundos..."
-                className="w-full min-h-[100px] bg-slate-950/80 border border-slate-850 focus:border-green-500/50 rounded-xl px-3 py-2 text-xs text-slate-200 placeholder-slate-600 focus:outline-none transition-colors resize-y"
+                placeholder="Añade o edita ventajas del sistema..."
+                className="w-full min-h-[100px] bg-slate-950/80 border border-slate-850 focus:border-green-500/50 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none transition-colors"
               />
             </div>
 
             <div className="bg-slate-950/30 border border-slate-850/60 p-4.5 rounded-2xl space-y-2">
               <label className="text-xs font-bold text-red-400 flex items-center gap-1.5">
-                <ShieldAlert className="h-3.5 w-3.5 text-red-400" /> Desventajas / Riesgos del Sistema
+                <ShieldAlert className="h-3.5 w-3.5 text-red-400" /> Desventajas / Riesgos
               </label>
               <textarea
                 value={desventajas}
                 onChange={(e) => setDesventajas(e.target.value)}
-                placeholder="Ej. Vulnerables en transiciones rápidas si los mediocentros no realizan vigilancias..."
-                className="w-full min-h-[100px] bg-slate-950/80 border border-slate-850 focus:border-red-500/50 rounded-xl px-3 py-2 text-xs text-slate-200 placeholder-slate-600 focus:outline-none transition-colors resize-y"
+                placeholder="Añade o edita desventajas/riesgos..."
+                className="w-full min-h-[100px] bg-slate-950/80 border border-slate-850 focus:border-red-500/50 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none transition-colors"
               />
             </div>
           </div>
 
-          {/* Zonas, Duelo Clave e Orientaciones */}
           <div className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="bg-slate-950/30 border border-slate-850/60 p-4 rounded-2xl space-y-2">
-                <label className="text-xs font-bold text-slate-350 flex items-center gap-1.5">
-                  <HelpCircle className="h-3.5 w-3.5 text-slate-500" /> Zona de Conflicto Táctico
+                <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                  <HelpCircle className="h-3.5 w-3.5 text-slate-500" /> Zona de Conflicto Clave
                 </label>
                 <input
                   type="text"
                   value={zonaConflicto}
                   onChange={(e) => setZonaConflicto(e.target.value)}
-                  placeholder="Ej. Espacio a la espalda del DFC"
-                  className="w-full bg-slate-950/80 border border-slate-850 focus:border-green-500/50 rounded-xl px-3 py-2 text-xs text-slate-200 placeholder-slate-600 focus:outline-none transition-colors"
+                  placeholder="Zona de conflicto clave..."
+                  className="w-full bg-slate-950/80 border border-slate-850 focus:border-green-500/50 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none transition-colors"
                 />
               </div>
 
               <div className="bg-slate-950/30 border border-slate-850/60 p-4 rounded-2xl space-y-2">
-                <label className="text-xs font-bold text-slate-350 flex items-center gap-1.5">
-                  <Award className="h-3.5 w-3.5 text-yellow-500" /> Duelo Táctico Clave
+                <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                  <Award className="h-3.5 w-3.5 text-yellow-500" /> Duelo Táctico Principal
                 </label>
                 <input
                   type="text"
                   value={dueloClave}
                   onChange={(e) => setDueloClave(e.target.value)}
-                  placeholder="Ej. Extremo Izquierdo vs Lateral Derecho"
-                  className="w-full bg-slate-950/80 border border-slate-850 focus:border-green-500/50 rounded-xl px-3 py-2 text-xs text-slate-200 placeholder-slate-600 focus:outline-none transition-colors"
+                  placeholder="Duelo táctico principal..."
+                  className="w-full bg-slate-950/80 border border-slate-850 focus:border-green-500/50 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none transition-colors"
                 />
               </div>
             </div>
 
             <div className="bg-slate-950/30 border border-slate-850/60 p-4.5 rounded-2xl space-y-2">
-              <label className="text-xs font-bold text-slate-350 flex items-center gap-1.5">
-                <User className="h-3.5 w-3.5 text-blue-400" /> Orientaciones / Instrucciones Individuales
+              <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                <Layout className="h-3.5 w-3.5 text-blue-400" /> Tareas por Líneas
               </label>
               <textarea
-                value={orientacionesIndividuales}
-                onChange={(e) => setOrientacionesIndividuales(e.target.value)}
-                placeholder="Ej. Aingeru: Presionar la salida del central zurdo. Unax: Mantener posición y cobertura..."
-                className="w-full min-h-[100px] bg-slate-950/80 border border-slate-850 focus:border-green-500/50 rounded-xl px-3 py-2 text-xs text-slate-200 placeholder-slate-600 focus:outline-none transition-colors resize-y"
+                value={tareasLineas}
+                onChange={(e) => setTareasLineas(e.target.value)}
+                placeholder="Añade o edita tareas por líneas..."
+                className="w-full min-h-[100px] bg-slate-950/80 border border-slate-850 focus:border-green-500/50 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none transition-colors"
               />
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Orientaciones Individuales y Notas del Entrenador */}
+      <div className="p-6 bg-slate-900/40 border border-slate-800/80 rounded-3xl space-y-6 mt-6">
+        <div className="flex items-center gap-2 pb-3 border-b border-slate-800/60">
+          <User className="h-5 w-5 text-green-500" />
+          <h3 className="text-sm font-bold text-slate-200 uppercase tracking-widest">
+            Orientaciones Individuales y Notas del Entrenador
+          </h3>
+        </div>
+
+        <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2">
+          {nodes.map(node => {
+            const assignedPlayer = players.find(p => p.id === node.player_id);
+            if (!assignedPlayer) return null;
+
+            // Extract preset instructions for this position from tactical db
+            const presetInstructions = TACTICAL_DATABASE[selectedFormation]?.[rivalFormation]?.orientaciones?.[node.label] || 
+                                       DEFAULT_RECOMMENDATIONS[node.label] || 
+                                       `Recomendación de posición para ${node.label}.`;
+
+            return (
+              <div key={node.id} className="p-4 bg-slate-950/40 border border-slate-850 rounded-2xl grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Avatar src={assignedPlayer.foto_url} name={assignedPlayer.nombre} size="sm" />
+                    <div>
+                      <span className="font-bold text-slate-100 text-xs block">{assignedPlayer.nombre}</span>
+                      <span className="text-[9px] font-bold text-green-400 bg-green-500/10 px-1.5 py-0.2 rounded">
+                        Posición: {node.label}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="p-2.5 bg-slate-900/40 border border-slate-850/60 rounded-xl text-[11px] text-slate-350 italic space-y-1">
+                    <span className="font-bold text-[9px] uppercase tracking-wide text-slate-500 block">Propuesta IA:</span>
+                    <span>{presetInstructions}</span>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
+                    <Edit3 className="h-3 w-3 text-slate-500" /> Notas del Entrenador
+                  </label>
+                  <textarea
+                    value={node.notas_entrenador || ''}
+                    onChange={(e) => handlePlayerNoteChange(node.id, e.target.value)}
+                    placeholder={`Escribe notas tácticas específicas para ${assignedPlayer.nombre.split(' ')[0]}...`}
+                    className="w-full min-h-[70px] bg-slate-950/80 border border-slate-850 focus:border-green-500/50 rounded-xl px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none transition-colors"
+                  />
+                </div>
+              </div>
+            );
+          })}
+
+          {nodes.filter(n => !!n.player_id).length === 0 && (
+            <p className="text-xs text-slate-500 italic p-4 text-center">
+              Asigna jugadores de la plantilla en el campo para configurar sus notas y orientaciones.
+            </p>
+          )}
         </div>
       </div>
     </div>
