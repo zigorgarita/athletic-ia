@@ -263,9 +263,17 @@ export interface ABPPlayerRole {
 export interface TacticalLineup {
   id: string;
   nombre_sistema: string;
+  nombre_pizarra: string | null;
+  sistema_propio: string | null;
+  sistema_rival: string | null;
   notas: string | null;
   posiciones: any; // Coordenadas y mapeo JSON
   match_id: string | null;
+  ventajas: string | null;
+  desventajas: string | null;
+  zona_conflicto: string | null;
+  duelo_clave: string | null;
+  orientaciones_individuales: string | null;
   created_at: string;
 }
 
