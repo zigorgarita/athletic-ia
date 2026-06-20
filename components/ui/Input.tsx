@@ -22,7 +22,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             type={type}
             ref={ref}
             placeholder=" "
-            className={`peer w-full px-4 py-3 rounded-xl bg-slate-900/60 border border-slate-700/60 text-slate-100 placeholder-transparent outline-none transition-all duration-200 focus:border-green-500 focus:ring-1 focus:ring-green-500 text-sm ${
+            className={`peer w-full px-4 py-3 rounded-xl bg-slate-900/60 border border-slate-700/60 text-slate-100 placeholder-transparent outline-none transition-all duration-200 focus:border-[#CC0E21] focus:ring-1 focus:ring-[#CC0E21] text-sm ${
               icon ? 'pl-10' : ''
             } ${
               error ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''
@@ -36,7 +36,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
               peer-placeholder-shown:translate-y-0 
               peer-focus:scale-75 
               peer-focus:-translate-y-7 
-              peer-focus:text-green-500
+              peer-focus:text-[#CC0E21]
               -translate-y-7 scale-75 bg-slate-950 px-1 rounded
               ${icon ? 'peer-placeholder-shown:left-10' : 'peer-placeholder-shown:left-4'}
               ${error ? 'peer-focus:text-red-500' : ''}`}

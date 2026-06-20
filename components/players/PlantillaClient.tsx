@@ -233,7 +233,7 @@ export function PlantillaClient() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex flex-col gap-1">
           <h1 className="text-3xl font-extrabold tracking-tight text-slate-100 flex items-center gap-2">
-            <Users className="h-8 w-8 text-green-500" />
+            <Users className="h-8 w-8 text-[#CC0E21]" />
             Plantilla
           </h1>
           <p className="text-slate-400 text-sm">
@@ -256,7 +256,7 @@ export function PlantillaClient() {
       {/* Panel de Filtros */}
       <div className="p-5 rounded-2xl bg-slate-900/40 border border-slate-800/80 backdrop-blur-md space-y-4">
         <div className="flex items-center gap-2 text-slate-350 text-xs font-bold uppercase tracking-wider pb-2 border-b border-slate-800/40">
-          <SlidersHorizontal className="h-4 w-4 text-green-500" />
+          <SlidersHorizontal className="h-4 w-4 text-[#CC0E21]" />
           Filtros y Búsqueda
         </div>
 
@@ -270,7 +270,7 @@ export function PlantillaClient() {
                 placeholder="Buscar jugador..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-4 py-2.5 text-xs rounded-xl bg-slate-950/70 border border-slate-800 text-slate-100 placeholder-slate-500 outline-none transition-all duration-200 focus:border-green-500"
+                className="w-full pl-9 pr-4 py-2.5 text-xs rounded-xl bg-slate-950/70 border border-slate-800 text-slate-100 placeholder-slate-500 outline-none transition-all duration-200 focus:border-[#CC0E21]"
               />
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 text-slate-500" />
             </div>
@@ -282,7 +282,7 @@ export function PlantillaClient() {
             <select
               value={posFilter}
               onChange={(e) => setPosFilter(e.target.value)}
-              className="w-full px-3 py-2.5 text-xs rounded-xl bg-slate-950/70 border border-slate-800 text-slate-200 outline-none focus:border-green-500 cursor-pointer"
+              className="w-full px-3 py-2.5 text-xs rounded-xl bg-slate-950/70 border border-slate-800 text-slate-200 outline-none focus:border-[#CC0E21] cursor-pointer"
             >
               <option value="all">Todas las posiciones</option>
               <option value="Portero">Portero</option>
@@ -303,7 +303,7 @@ export function PlantillaClient() {
             <select
               value={equipoFilter}
               onChange={(e) => setEquipoFilter(e.target.value)}
-              className="w-full px-3 py-2.5 text-xs rounded-xl bg-slate-950/70 border border-slate-800 text-slate-200 outline-none focus:border-green-500 cursor-pointer"
+              className="w-full px-3 py-2.5 text-xs rounded-xl bg-slate-950/70 border border-slate-800 text-slate-200 outline-none focus:border-[#CC0E21] cursor-pointer"
             >
               <option value="all">Todos los equipos</option>
               <option value="DH">DH</option>
@@ -317,7 +317,7 @@ export function PlantillaClient() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full px-3 py-2.5 text-xs rounded-xl bg-slate-950/70 border border-slate-800 text-slate-200 outline-none focus:border-green-500 cursor-pointer"
+              className="w-full px-3 py-2.5 text-xs rounded-xl bg-slate-950/70 border border-slate-800 text-slate-200 outline-none focus:border-[#CC0E21] cursor-pointer"
             >
               <option value="all">Todos los estados</option>
               <option value="Disponible">Disponible</option>
@@ -335,7 +335,7 @@ export function PlantillaClient() {
                 onClick={() => requestSort('dorsal')}
                 className={`flex-1 py-2 text-center text-xs font-bold rounded-xl border transition-all duration-200 ${
                   sortBy === 'dorsal'
-                    ? 'bg-green-500/10 text-green-400 border-green-500/20 shadow-md'
+                    ? 'bg-[#CC0E21]/10 text-[#CC0E21] border-[#CC0E21]/20 shadow-md'
                     : 'bg-slate-950/30 text-slate-400 border-slate-800 hover:text-slate-200'
                 }`}
               >
@@ -345,7 +345,7 @@ export function PlantillaClient() {
                 onClick={() => requestSort('valoracion')}
                 className={`flex-1 py-2 text-center text-xs font-bold rounded-xl border transition-all duration-200 ${
                   sortBy === 'valoracion'
-                    ? 'bg-green-500/10 text-green-400 border-green-500/20 shadow-md'
+                    ? 'bg-[#CC0E21]/10 text-[#CC0E21] border-[#CC0E21]/20 shadow-md'
                     : 'bg-slate-950/30 text-slate-400 border-slate-800 hover:text-slate-200'
                 }`}
               >
@@ -414,7 +414,7 @@ export function PlantillaClient() {
                     <td className="px-3 py-3.5 font-black text-sm text-slate-300">
                       #{player.dorsal}
                     </td>
-                    <td className="px-4 py-3.5 font-bold text-slate-100 group-hover:text-green-400 transition-colors">
+                    <td className="px-4 py-3.5 font-bold text-slate-100 group-hover:text-[#CC0E21] transition-colors">
                       {player.nombre} <span className="text-slate-400 font-medium">{player.apellidos}</span>
                     </td>
                     <td className="px-4 py-3.5">
@@ -423,7 +423,7 @@ export function PlantillaClient() {
                     <td className="px-4 py-3.5">
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
                         player.equipo === 'DH' 
-                          ? 'bg-green-950/20 text-green-400 border-green-900/30' 
+                          ? 'bg-red-950/10 text-[#CC0E21] border-[#CC0E21]/20' 
                           : 'bg-blue-950/20 text-blue-400 border-blue-900/30'
                       }`}>
                         {player.equipo}
@@ -465,7 +465,7 @@ export function PlantillaClient() {
                         </button>
                         <button 
                           onClick={(e) => handleOpenEditModal(e, player)} 
-                          className="h-8 w-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-green-400 hover:bg-slate-800/50 transition-colors duration-150"
+                          className="h-8 w-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-[#CC0E21] hover:bg-slate-800/50 transition-colors duration-150"
                           title="Editar"
                         >
                           <Edit2 className="h-4 w-4" />

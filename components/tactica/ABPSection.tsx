@@ -1411,7 +1411,7 @@ export function ABPSection({ players }: ABPSectionProps) {
                   setVideoFile(null);
                   setIsPlayModalOpen(true);
                 }}
-                className="py-1 px-2.5 text-[10px] h-auto flex items-center gap-1 bg-green-500 hover:bg-green-600 text-slate-950 font-bold"
+                className="py-1 px-2.5 text-[10px] h-auto flex items-center gap-1 bg-[#CC0E21] hover:bg-red-500 text-white font-bold"
               >
                 <Plus className="h-3.5 w-3.5" />
                 Nueva Jugada
@@ -1427,12 +1427,12 @@ export function ABPSection({ players }: ABPSectionProps) {
                 onClick={() => setActiveFilter('Todos')}
                 className={`w-full flex items-center justify-between px-3 py-1.5 rounded-xl text-[11px] transition-all duration-150 ${
                   activeFilter === 'Todos' 
-                    ? 'bg-green-500/10 text-green-400 font-bold border border-green-500/20' 
+                    ? 'bg-[#CC0E21]/10 text-[#CC0E21] font-bold border border-[#CC0E21]/15' 
                     : 'text-slate-400 hover:bg-slate-800/30'
                 }`}
               >
                 <div className="flex items-center gap-2">
-                  {activeFilter === 'Todos' ? <FolderOpen className="h-4 w-4 text-green-500" /> : <Folder className="h-4 w-4 text-slate-500" />}
+                  {activeFilter === 'Todos' ? <FolderOpen className="h-4 w-4 text-[#CC0E21]" /> : <Folder className="h-4 w-4 text-slate-500" />}
                   <span>Todas las jugadas</span>
                 </div>
                 <span className="bg-slate-950/60 px-2 py-0.5 rounded-full border border-slate-850/80 text-[10px]">
@@ -1448,16 +1448,16 @@ export function ABPSection({ players }: ABPSectionProps) {
                     onClick={() => setActiveFilter(type)}
                     className={`w-full flex items-center justify-between px-3 py-1.5 rounded-xl text-[11px] transition-all duration-150 ${
                       isActive 
-                        ? 'bg-green-500/10 text-green-400 font-bold border border-green-500/20' 
+                        ? 'bg-[#CC0E21]/10 text-[#CC0E21] font-bold border border-[#CC0E21]/15' 
                         : 'text-slate-400 hover:bg-slate-800/30'
                     }`}
                   >
                     <div className="flex items-center gap-2 truncate">
-                      {isActive ? <FolderOpen className="h-4 w-4 text-green-500" /> : <Folder className="h-4 w-4 text-slate-500" />}
+                      {isActive ? <FolderOpen className="h-4 w-4 text-[#CC0E21]" /> : <Folder className="h-4 w-4 text-slate-500" />}
                       <span className="truncate">{type}</span>
                     </div>
                     <span className={`px-2 py-0.5 rounded-full border text-[10px] shrink-0 ${
-                      isActive ? 'bg-green-500/20 border-green-500/30 text-green-400' : 'bg-slate-950/60 border-slate-850/80 text-slate-500'
+                      isActive ? 'bg-[#CC0E21]/20 border-[#CC0E21]/30 text-[#CC0E21]' : 'bg-slate-950/60 border-slate-850/80 text-slate-500'
                     }`}>
                       {count}
                     </span>
@@ -1470,7 +1470,7 @@ export function ABPSection({ players }: ABPSectionProps) {
           {/* Listado de Jugadas Filtradas */}
           <div className="p-4 bg-slate-900/40 border border-slate-800/80 rounded-2xl flex flex-col max-h-[380px] overflow-y-auto">
             <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
-              <BookOpen className="h-4 w-4 text-green-500" />
+              <BookOpen className="h-4 w-4 text-[#CC0E21]" />
               <span>
                 {activeFilter === 'Todos' ? 'Todas las jugadas' : activeFilter} ({filteredPlays.length})
               </span>
@@ -1490,7 +1490,7 @@ export function ABPSection({ players }: ABPSectionProps) {
                     onClick={() => setSelectedPlay(play)}
                     className={`group w-full flex items-center justify-between p-2.5 rounded-xl border text-xs cursor-pointer transition-all ${
                       selectedPlay?.id === play.id
-                        ? 'bg-green-500/10 border-green-500/30 text-green-400 font-bold'
+                        ? 'bg-[#CC0E21]/10 border-[#CC0E21]/30 text-[#CC0E21] font-bold'
                         : 'bg-slate-950/40 border-slate-850 text-slate-350 hover:bg-slate-850/50 hover:border-slate-800'
                     }`}
                   >
@@ -1526,7 +1526,7 @@ export function ABPSection({ players }: ABPSectionProps) {
               <div className="p-5 bg-slate-900/40 border border-slate-800/80 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
-                    <span className="text-[10px] text-green-400 font-bold bg-green-500/10 border border-green-500/20 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                    <span className="text-[10px] text-[#CC0E21] font-bold bg-[#CC0E21]/10 border border-[#CC0E21]/20 px-2 py-0.5 rounded-full uppercase tracking-wider">
                       {selectedPlay.tipo}
                     </span>
                   </div>
@@ -1555,7 +1555,7 @@ export function ABPSection({ players }: ABPSectionProps) {
                     variant="primary"
                     onClick={handleSavePositions}
                     loading={isSaving}
-                    className="py-1.5 px-4 text-xs flex items-center gap-1.5 bg-green-500 hover:bg-green-600 text-slate-950 font-bold"
+                    className="py-1.5 px-4 text-xs flex items-center gap-1.5 bg-[#CC0E21] hover:bg-red-500 text-white font-bold"
                   >
                     <Save className="h-3.5 w-3.5" />
                     Guardar Cambios
@@ -1579,7 +1579,7 @@ export function ABPSection({ players }: ABPSectionProps) {
                           <select
                             value={selectedTacticalSystem}
                             onChange={(e) => handleApplyTacticalSystem(e.target.value as keyof typeof SISTEMAS_TACTICOS)}
-                            className="bg-slate-950 border border-slate-800 text-[10px] font-bold text-green-400 rounded px-1.5 py-0.5 outline-none"
+                            className="bg-slate-950 border border-slate-800 text-[10px] font-bold text-[#CC0E21] rounded px-1.5 py-0.5 outline-none"
                           >
                             <option value="1-4-3-3">1-4-3-3</option>
                             <option value="1-4-2-3-1">1-4-2-3-1</option>
@@ -1735,7 +1735,7 @@ export function ABPSection({ players }: ABPSectionProps) {
                               transform: 'translate(-50%, -50%)',
                             }}
                             className={`absolute z-10 flex flex-col items-center cursor-move rounded-full transition-transform duration-100 ${
-                              activeNodeId === role.id ? 'ring-2 ring-green-400 ring-offset-2 ring-offset-emerald-950 scale-105 shadow-2xl' : ''
+                              activeNodeId === role.id ? 'ring-2 ring-[#CC0E21] ring-offset-2 ring-offset-emerald-950 scale-105 shadow-2xl' : ''
                             }`}
                             onMouseDown={(e) => {
                               setActiveNodeId(role.id);
@@ -1752,14 +1752,14 @@ export function ABPSection({ players }: ABPSectionProps) {
                             <div 
                               className={`h-10 w-10 rounded-full border-2 flex items-center justify-center shadow-lg transition-transform duration-100 active:scale-110 ${
                                 player
-                                  ? 'bg-slate-900 border-green-500 shadow-green-500/20'
+                                  ? 'bg-slate-900 border-[#CC0E21] shadow-red-500/20'
                                   : 'bg-slate-950 border-slate-700/80 border-dashed text-slate-400'
                               }`}
                             >
                               {player ? (
                                 <div className="relative flex items-center justify-center w-full h-full">
                                   <Avatar src={player.foto_url} name={player.nombre} size="sm" />
-                                  <span className="absolute -bottom-1 -right-1 bg-green-500 text-slate-950 font-black text-[7px] h-3.5 w-3.5 rounded-full flex items-center justify-center border border-slate-900 shadow">
+                                  <span className="absolute -bottom-1 -right-1 bg-[#CC0E21] text-white font-black text-[7px] h-3.5 w-3.5 rounded-full flex items-center justify-center border border-slate-900 shadow">
                                     #{player.dorsal}
                                   </span>
                                 </div>
@@ -1774,7 +1774,7 @@ export function ABPSection({ players }: ABPSectionProps) {
                               <div className="flex flex-col items-center gap-0.5 mt-0.5 text-[7px] text-slate-450 border-t border-slate-800/60 pt-0.5 w-full justify-center">
                                 <span className="truncate max-w-[85px] text-center">{role.rol_asignado}</span>
                                 {isRealPosType && funcion_tactica && (
-                                  <span className="bg-green-500/20 text-green-400 border border-green-500/30 px-1 py-0.2 rounded mt-0.5 font-black text-[6.5px]">
+                                  <span className="bg-[#CC0E21]/20 text-[#CC0E21] border border-[#CC0E21]/30 px-1 py-0.2 rounded mt-0.5 font-black text-[6.5px]">
                                     {funcion_tactica}
                                   </span>
                                 )}
@@ -1811,7 +1811,7 @@ export function ABPSection({ players }: ABPSectionProps) {
                       <Button 
                         variant="secondary"
                         onClick={handleAddRoleNode}
-                        className="py-1 px-2 text-[10px] h-auto flex items-center gap-1 border border-slate-800 text-green-400"
+                        className="py-1 px-2 text-[10px] h-auto flex items-center gap-1 border border-slate-800 text-[#CC0E21]"
                       >
                         <PlusCircle className="h-3 w-3" /> Añadir Puesto
                       </Button>
@@ -1823,7 +1823,7 @@ export function ABPSection({ players }: ABPSectionProps) {
                     {/* Instrucciones */}
                     <div className="p-4 bg-slate-900/40 border border-slate-800/80 rounded-2xl space-y-2">
                       <h4 className="text-xs font-bold text-slate-400 flex items-center gap-1.5">
-                        <BookOpen className="h-3.5 w-3.5 text-green-500" /> Instrucciones tácticas
+                        <BookOpen className="h-3.5 w-3.5 text-[#CC0E21]" /> Instrucciones tácticas
                       </h4>
                       <div className="bg-slate-950/40 border border-slate-850 p-3 rounded-xl min-h-[120px] max-h-[220px] overflow-y-auto">
                         {selectedPlay.descripcion ? (
@@ -1872,7 +1872,7 @@ export function ABPSection({ players }: ABPSectionProps) {
                   {/* PANEL: ROLES Y PUESTOS DE LA JUGADA */}
                   <div className="p-4 bg-slate-900/40 border border-slate-800/80 rounded-2xl flex flex-col">
                     <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
-                      <Layers className="h-3.5 w-3.5 text-green-500" /> Puestos de la jugada ({playRoles.length})
+                      <Layers className="h-3.5 w-3.5 text-[#CC0E21]" /> Puestos de la jugada ({playRoles.length})
                     </h3>
 
                     {loadingRoles ? (
@@ -1895,14 +1895,14 @@ export function ABPSection({ players }: ABPSectionProps) {
                             >
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2 flex-wrap">
-                                  <span className="h-6 w-8 bg-slate-900 border border-slate-800 text-[9px] text-green-400 font-bold rounded flex items-center justify-center">
+                                  <span className="h-6 w-8 bg-slate-900 border border-slate-800 text-[9px] text-[#CC0E21] font-bold rounded flex items-center justify-center">
                                     {label}
                                   </span>
                                   {isRealPosType ? (
                                     <select
                                       value={role.rol_asignado}
                                       onChange={(e) => handleRoleChange(role.id, e.target.value)}
-                                      className="bg-slate-900 border border-slate-800 text-xs font-semibold text-slate-300 rounded px-2 py-0.5 outline-none focus:border-green-500"
+                                      className="bg-slate-900 border border-slate-800 text-xs font-semibold text-slate-300 rounded px-2 py-0.5 outline-none focus:border-[#CC0E21]"
                                     >
                                       {Object.keys(POSITION_ABBRS).map((pos) => (
                                         <option key={pos} value={pos}>{pos}</option>
@@ -1912,7 +1912,7 @@ export function ABPSection({ players }: ABPSectionProps) {
                                     <select
                                       value={role.rol_asignado}
                                       onChange={(e) => handleRoleChange(role.id, e.target.value)}
-                                      className="bg-slate-900 border border-slate-800 text-xs font-semibold text-slate-300 rounded px-2 py-0.5 outline-none focus:border-green-500"
+                                      className="bg-slate-900 border border-slate-800 text-xs font-semibold text-slate-300 rounded px-2 py-0.5 outline-none focus:border-[#CC0E21]"
                                     >
                                       {getRolesForPlayType(selectedPlay.tipo).map((opt) => (
                                         <option key={opt} value={opt}>{opt}</option>
@@ -1927,7 +1927,7 @@ export function ABPSection({ players }: ABPSectionProps) {
                                         const nextCom = serializeComentario(e.target.value, comentario);
                                         handleCommentChange(role.id, nextCom);
                                       }}
-                                      className="bg-slate-900/60 border border-slate-800 text-[10px] text-green-400 rounded px-1.5 py-0.5 outline-none"
+                                      className="bg-slate-900/60 border border-slate-800 text-[10px] text-[#CC0E21] rounded px-1.5 py-0.5 outline-none"
                                     >
                                       <option value="">-- Sin función --</option>
                                       <option value="Sacador">Sacador</option>
@@ -1955,7 +1955,7 @@ export function ABPSection({ players }: ABPSectionProps) {
                                 <select
                                   value={role.player_id || ''}
                                   onChange={(e) => handleAssignPlayerDirect(role.id, e.target.value)}
-                                  className="flex-1 bg-slate-900 border border-slate-800 text-xs text-slate-350 rounded px-2.5 py-1 outline-none focus:border-green-500"
+                                  className="flex-1 bg-slate-900 border border-slate-800 text-xs text-slate-350 rounded px-2.5 py-1 outline-none focus:border-[#CC0E21]"
                                 >
                                   <option value="">-- Sin asignar (Vacío) --</option>
                                   {players.map((p) => (
@@ -2003,14 +2003,14 @@ export function ABPSection({ players }: ABPSectionProps) {
                   <div className="p-4 bg-slate-900/40 border border-slate-800/80 rounded-2xl flex flex-col space-y-3">
                     <div className="flex justify-between items-center">
                       <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-                        <UserCheck className="h-3.5 w-3.5 text-green-500" /> Plantilla de Jugadores
+                        <UserCheck className="h-3.5 w-3.5 text-[#CC0E21]" /> Plantilla de Jugadores
                       </h3>
                       <div className="flex bg-slate-950 rounded-lg p-0.5 border border-slate-850">
                         <button
                           type="button"
                           onClick={() => setPlayerStatusTab('todos')}
                           className={`px-2 py-1 text-[9px] font-bold rounded-md transition-colors ${
-                            playerStatusTab === 'todos' ? 'bg-slate-800 text-green-400' : 'text-slate-500 hover:text-slate-300'
+                            playerStatusTab === 'todos' ? 'bg-slate-800 text-[#CC0E21]' : 'text-slate-500 hover:text-slate-300'
                           }`}
                         >
                           TODOS
@@ -2019,7 +2019,7 @@ export function ABPSection({ players }: ABPSectionProps) {
                           type="button"
                           onClick={() => setPlayerStatusTab('libres')}
                           className={`px-2 py-1 text-[9px] font-bold rounded-md transition-colors ${
-                            playerStatusTab === 'libres' ? 'bg-slate-800 text-green-400' : 'text-slate-500 hover:text-slate-300'
+                            playerStatusTab === 'libres' ? 'bg-slate-800 text-[#CC0E21]' : 'text-slate-500 hover:text-slate-300'
                           }`}
                         >
                           LIBRES
@@ -2038,14 +2038,14 @@ export function ABPSection({ players }: ABPSectionProps) {
                           value={playerSearch}
                           onChange={(e) => setPlayerSearch(e.target.value)}
                           placeholder="Buscar dorsal/nombre..."
-                          className="w-full bg-slate-950 border border-slate-850 rounded-lg pl-8 pr-2.5 py-1 text-xs text-slate-300 placeholder-slate-650 outline-none focus:border-green-500"
+                          className="w-full bg-slate-950 border border-slate-850 rounded-lg pl-8 pr-2.5 py-1 text-xs text-slate-300 placeholder-slate-650 outline-none focus:border-[#CC0E21]"
                         />
                       </div>
 
                       <select
                         value={playerFilterPos}
                         onChange={(e) => setPlayerFilterPos(e.target.value)}
-                        className="bg-slate-950 border border-slate-850 rounded-lg px-2.5 py-1 text-xs text-slate-300 outline-none focus:border-green-500"
+                        className="bg-slate-950 border border-slate-850 rounded-lg px-2.5 py-1 text-xs text-slate-300 outline-none focus:border-[#CC0E21]"
                       >
                         <option value="Todas">Todas las posiciones</option>
                         <option value="Portero">Portero</option>
@@ -2110,7 +2110,7 @@ export function ABPSection({ players }: ABPSectionProps) {
               <Button 
                 variant="primary" 
                 onClick={() => setIsPlayModalOpen(true)}
-                className="mt-2 bg-green-500 hover:bg-green-600 text-slate-950 font-bold"
+                className="mt-2 bg-[#CC0E21] hover:bg-red-500 text-white font-bold"
               >
                 Crear Primera Jugada
               </Button>
@@ -2156,7 +2156,7 @@ export function ABPSection({ players }: ABPSectionProps) {
           <div className="space-y-1">
             <label className="text-[11px] font-bold text-slate-400">Instrucciones y Ejecución</label>
             <textarea
-              className="w-full bg-slate-950 border border-slate-850 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none focus:border-green-500"
+              className="w-full bg-slate-950 border border-slate-850 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none focus:border-[#CC0E21]"
               rows={4}
               placeholder="Detalla la trayectoria del balón, los desmarques y las vigilancias defensivas..."
               value={playDesc}
@@ -2187,7 +2187,7 @@ export function ABPSection({ players }: ABPSectionProps) {
 
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="ghost" type="button" onClick={() => setIsPlayModalOpen(false)}>Cancelar</Button>
-            <Button variant="primary" type="submit" loading={isSaving} className="bg-green-500 text-slate-950 font-bold">
+            <Button variant="primary" type="submit" loading={isSaving} className="bg-[#CC0E21] hover:bg-red-500 text-white font-bold">
               Guardar Jugada
             </Button>
           </div>
@@ -2230,7 +2230,7 @@ export function ABPSection({ players }: ABPSectionProps) {
           <div className="space-y-1">
             <label className="text-[11px] font-bold text-slate-400">Instrucciones y Ejecución</label>
             <textarea
-              className="w-full bg-slate-950 border border-slate-850 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none focus:border-green-500"
+              className="w-full bg-slate-950 border border-slate-850 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none focus:border-[#CC0E21]"
               rows={4}
               value={playDesc}
               onChange={(e) => setPlayDesc(e.target.value)}
@@ -2258,7 +2258,7 @@ export function ABPSection({ players }: ABPSectionProps) {
 
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="ghost" type="button" onClick={() => setIsEditModalOpen(false)}>Cancelar</Button>
-            <Button variant="primary" type="submit" loading={isSaving} className="bg-green-500 text-slate-950 font-bold">
+            <Button variant="primary" type="submit" loading={isSaving} className="bg-[#CC0E21] hover:bg-red-500 text-white font-bold">
               Guardar Cambios
             </Button>
           </div>

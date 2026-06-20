@@ -396,7 +396,7 @@ export function GPSClient() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight text-slate-100 flex items-center gap-2">
-            <Activity className="h-8 w-8 text-green-500" />
+            <Activity className="h-8 w-8 text-[#CC0E21]" />
             Rendimiento Físico (GPS)
           </h1>
           <p className="text-slate-400 text-sm">
@@ -429,17 +429,17 @@ export function GPSClient() {
               <div className="space-y-1.5 max-h-[400px] overflow-y-auto pr-1">
                 {sessions.map((session) => (
                   <button
-                    key={session.id}
-                    onClick={() => setSelectedSession(session)}
-                    className={`w-full flex items-center justify-between text-left p-3 rounded-xl border text-xs transition-all duration-200 ${
-                      selectedSession?.id === session.id
-                        ? 'bg-green-500/10 border-green-500/30 text-green-400 font-bold'
-                        : 'bg-slate-950/20 border-slate-850 text-slate-350 hover:bg-slate-850/30'
-                    }`}
+                     key={session.id}
+                     onClick={() => setSelectedSession(session)}
+                     className={`w-full flex items-center justify-between text-left p-3 rounded-xl border text-xs transition-all duration-200 ${
+                       selectedSession?.id === session.id
+                         ? 'bg-[#CC0E21]/10 border-[#CC0E21]/30 text-[#CC0E21] font-bold'
+                         : 'bg-slate-950/20 border-slate-850 text-slate-350 hover:bg-slate-850/30'
+                     }`}
                   >
-                    <div className="space-y-1 truncate mr-2">
-                      <div className="flex items-center gap-1.5 font-bold text-slate-200">
-                        <Calendar className="h-3 w-3 text-slate-450" />
+                     <div className="space-y-1 truncate mr-2">
+                       <div className="flex items-center gap-1.5 font-bold text-slate-200">
+                         <Calendar className="h-3 w-3 text-slate-450" />
                         {new Date(session.fecha).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })}
                       </div>
                       <span className="text-[10px] text-slate-450 truncate block">
@@ -670,7 +670,7 @@ export function GPSClient() {
             </div>
 
             {/* Zona de Drop de Archivo */}
-            <div className="border-2 border-dashed border-slate-700/80 rounded-2xl p-8 text-center bg-slate-950/20 hover:border-green-500/50 hover:bg-slate-950/40 transition-all cursor-pointer relative group">
+            <div className="border-2 border-dashed border-slate-700/80 rounded-2xl p-8 text-center bg-slate-950/20 hover:border-[#CC0E21]/50 hover:bg-slate-950/40 transition-all cursor-pointer relative group">
               <input
                 type="file"
                 accept=".csv"
@@ -678,7 +678,7 @@ export function GPSClient() {
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
               />
               <div className="flex flex-col items-center justify-center space-y-2 pointer-events-none">
-                <Upload className="h-10 w-10 text-slate-500 group-hover:text-green-500 transition-colors" />
+                <Upload className="h-10 w-10 text-slate-500 group-hover:text-[#CC0E21] transition-colors" />
                 <span className="text-xs font-bold text-slate-350">Arrastra tu archivo .csv aquí</span>
                 <span className="text-[10px] text-slate-500">O haz clic para explorar tus archivos</span>
               </div>

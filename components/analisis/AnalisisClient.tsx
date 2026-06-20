@@ -263,12 +263,12 @@ export function AnalisisClient({ mode }: { mode: 'dashboard' | 'comparator' }) {
             );
           })}
 
-          {/* Polygon Player A (Cyan / Green) */}
+          {/* Polygon Player A (Rojo Indautxu) */}
           {avgsA.global > 0 && (
             <polygon
               points={getPolyData(avgsA)}
-              fill="rgba(34, 197, 94, 0.25)"
-              stroke="#22c55e"
+              fill="rgba(204, 14, 33, 0.25)"
+              stroke="#CC0E21"
               strokeWidth="2.5"
             />
           )}
@@ -287,7 +287,7 @@ export function AnalisisClient({ mode }: { mode: 'dashboard' | 'comparator' }) {
           {categories.map((cat, idx) => {
             const valA = idx === 0 ? avgsA.tecnica : idx === 1 ? avgsA.tactica : idx === 2 ? avgsA.defensiva : avgsA.condicional;
             const pA = getCoords(valA || 0, cat.angle);
-            return valA > 0 ? <circle key={`dotA-${idx}`} cx={pA.x} cy={pA.y} r="3.5" fill="#22c55e" /> : null;
+            return valA > 0 ? <circle key={`dotA-${idx}`} cx={pA.x} cy={pA.y} r="3.5" fill="#CC0E21" /> : null;
           })}
 
           {avgsB && categories.map((cat, idx) => {
@@ -300,7 +300,7 @@ export function AnalisisClient({ mode }: { mode: 'dashboard' | 'comparator' }) {
         {/* Legend */}
         <div className="flex gap-4 mt-3 text-xs font-bold">
           <div className="flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-full bg-green-500" />
+            <span className="h-2.5 w-2.5 rounded-full bg-[#CC0E21]" />
             <span className="text-slate-400">
               {players.find(p => p.id === playerAId)?.nombre || 'Jugador A'}
             </span>
@@ -334,12 +334,12 @@ export function AnalisisClient({ mode }: { mode: 'dashboard' | 'comparator' }) {
         <h1 className="text-3xl font-extrabold tracking-tight text-slate-100 flex items-center gap-2">
           {mode === 'dashboard' ? (
             <>
-              <BarChart3 className="h-8 w-8 text-green-500" />
+              <BarChart3 className="h-8 w-8 text-[#CC0E21]" />
               Dashboard
             </>
           ) : (
             <>
-              <ArrowRightLeft className="h-8 w-8 text-green-500" />
+              <ArrowRightLeft className="h-8 w-8 text-[#CC0E21]" />
               Comparador
             </>
           )}
@@ -368,7 +368,7 @@ export function AnalisisClient({ mode }: { mode: 'dashboard' | 'comparator' }) {
                   {top5.map((item, idx) => (
                     <div key={item.player.id} className="flex items-center justify-between gap-3 bg-slate-950/40 p-3 rounded-xl border border-slate-850">
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-black text-green-550 w-4">#{idx + 1}</span>
+                        <span className="text-xs font-black text-[#CC0E21] w-4">#{idx + 1}</span>
                         <Avatar src={item.player.foto_url} name={item.player.nombre} size="sm" />
                         <div>
                           <span className="font-bold text-slate-100 block text-xs">{item.player.nombre}</span>
@@ -417,7 +417,7 @@ export function AnalisisClient({ mode }: { mode: 'dashboard' | 'comparator' }) {
             <div className="p-5 bg-slate-900/40 border border-slate-800/80 rounded-2xl space-y-4 flex flex-col items-center">
               <div className="w-full">
                 <h3 className="text-sm font-bold text-slate-350 uppercase tracking-wider flex items-center gap-2">
-                  <TrendingUp className="h-4 w-4 text-green-500" /> Radar de Rendimiento
+                  <TrendingUp className="h-4 w-4 text-[#CC0E21]" /> Radar de Rendimiento
                 </h3>
                 <p className="text-[11px] text-slate-550 mt-1">Selecciona un futbolista para ver su gráfico de radar.</p>
               </div>
@@ -469,7 +469,7 @@ export function AnalisisClient({ mode }: { mode: 'dashboard' | 'comparator' }) {
             {/* Minutos por Jugador */}
             <div className="p-5 bg-slate-900/40 border border-slate-800/80 rounded-2xl space-y-4 max-h-[300px] overflow-y-auto">
               <h3 className="text-sm font-bold text-slate-350 uppercase tracking-wider flex items-center gap-2">
-                <Clock className="h-4 w-4 text-green-500" /> Minutos Acumulados
+                <Clock className="h-4 w-4 text-[#CC0E21]" /> Minutos Acumulados
               </h3>
               <div className="space-y-2.5">
                 {playerMinutes.slice(0, 6).map((item) => (
@@ -484,7 +484,7 @@ export function AnalisisClient({ mode }: { mode: 'dashboard' | 'comparator' }) {
             {/* Ranking General de la Plantilla */}
             <div className="p-5 bg-slate-900/40 border border-slate-800/80 rounded-2xl space-y-4 max-h-[350px] overflow-y-auto">
               <h3 className="text-sm font-bold text-slate-350 uppercase tracking-wider flex items-center gap-2">
-                <Trophy className="h-4 w-4 text-green-500" /> Ranking General
+                <Trophy className="h-4 w-4 text-[#CC0E21]" /> Ranking General
               </h3>
               <div className="space-y-2">
                 {rankingList.map((item, idx) => (
@@ -493,7 +493,7 @@ export function AnalisisClient({ mode }: { mode: 'dashboard' | 'comparator' }) {
                       <span className="text-[10px] text-slate-500 font-black">#{idx + 1}</span>
                       <span className="font-bold text-slate-100">{item.player.nombre}</span>
                     </div>
-                    <span className="text-[11px] font-bold text-green-400">
+                    <span className="text-[11px] font-bold text-slate-300">
                       {item.averages.global > 0 ? item.averages.global.toFixed(1) : '-'}
                     </span>
                   </div>
@@ -543,7 +543,7 @@ export function AnalisisClient({ mode }: { mode: 'dashboard' | 'comparator' }) {
                   <thead>
                     <tr className="bg-slate-900/60 border-b border-slate-800 text-slate-400 font-bold uppercase">
                       <th className="px-6 py-3.5">Parámetro</th>
-                      <th className="px-6 py-3.5 text-green-400 font-black">
+                      <th className="px-6 py-3.5 text-[#CC0E21] font-black">
                         {players.find(p => p.id === compPlayerAId)?.nombre}
                       </th>
                       <th className="px-6 py-3.5 text-purple-400 font-black">
@@ -583,7 +583,7 @@ export function AnalisisClient({ mode }: { mode: 'dashboard' | 'comparator' }) {
                     {/* Valoración Global */}
                     <tr className="bg-slate-950/20 font-bold">
                       <td className="px-6 py-3.5 text-slate-350">Valoración Global Promedio</td>
-                      <td className="px-6 py-3.5 text-green-400">{getPlayerAverages(compPlayerAId).global > 0 ? getPlayerAverages(compPlayerAId).global.toFixed(1) : '-'}</td>
+                      <td className="px-6 py-3.5 text-[#CC0E21]">{getPlayerAverages(compPlayerAId).global > 0 ? getPlayerAverages(compPlayerAId).global.toFixed(1) : '-'}</td>
                       <td className="px-6 py-3.5 text-purple-400">{getPlayerAverages(compPlayerBId).global > 0 ? getPlayerAverages(compPlayerBId).global.toFixed(1) : '-'}</td>
                     </tr>
                     {/* Averages detallados */}

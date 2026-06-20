@@ -23,7 +23,7 @@ export function ABPClient() {
       {/* Cabecera */}
       <div className="flex flex-col gap-1">
         <h1 className="text-3xl font-extrabold tracking-tight text-slate-100 flex items-center gap-2">
-          <Shield className="h-8 w-8 text-green-500" />
+          <Shield className="h-8 w-8 text-[#CC0E21]" />
           Estrategia ABP
         </h1>
         <p className="text-slate-400 text-sm">

@@ -560,7 +560,7 @@ export function TacticaClient() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-800/60">
         <div className="flex flex-col gap-1">
           <h1 className="text-3xl font-extrabold tracking-tight text-slate-100 flex items-center gap-2">
-            <Layout className="h-8 w-8 text-green-500" />
+            <Layout className="h-8 w-8 text-[#CC0E21]" />
             Pizarra Táctica
           </h1>
           <p className="text-slate-400 text-sm">
@@ -593,14 +593,13 @@ export function TacticaClient() {
               }}
               className="flex items-center gap-1.5 text-xs bg-slate-900/60 border-slate-800 text-slate-300"
             >
-              <Plus className="h-3.5 w-3.5 text-green-400" /> Nueva
+              <Plus className="h-3.5 w-3.5 text-[#CC0E21]" /> Nueva
             </Button>
           )}
         </div>
       </div>
 
-      {/* Selector de sistemas visible arriba */}
-      <div className="p-4 bg-slate-900/40 border border-slate-800/80 rounded-2xl">
+        <div className="p-4 bg-slate-900/40 border border-slate-800/80 rounded-2xl">
         <label className="block text-slate-400 text-xs font-bold mb-3 uppercase tracking-wider">Sistema de Juego Propio</label>
         <div className="flex items-center gap-2 flex-wrap">
           {Object.keys(FORMATIONS).map(formationKey => {
@@ -611,7 +610,7 @@ export function TacticaClient() {
                 onClick={() => handleFormationChange(formationKey)}
                 className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all ${
                   isActive 
-                    ? 'bg-green-500/10 border-green-500/30 text-green-400 shadow-md shadow-green-500/5' 
+                    ? 'bg-[#CC0E21]/10 border-[#CC0E21]/30 text-[#CC0E21] shadow-md shadow-red-500/5' 
                     : 'bg-slate-950/80 border-slate-850 text-slate-400 hover:border-slate-800 hover:text-slate-200'
                 }`}
               >
@@ -653,7 +652,7 @@ export function TacticaClient() {
         <div className="lg:col-span-3 space-y-6">
           <div className="p-5 bg-slate-900/40 border border-slate-800/80 rounded-2xl space-y-4">
             <h3 className="text-xs font-bold text-slate-300 uppercase tracking-widest flex items-center gap-1.5">
-              <Star className="h-3.5 w-3.5 text-green-500" /> Plan del Partido
+              <Star className="h-3.5 w-3.5 text-[#CC0E21]" /> Plan del Partido
             </h3>
 
             <Input
@@ -687,7 +686,7 @@ export function TacticaClient() {
                 value={lineupNotes}
                 onChange={(e) => setLineupNotes(e.target.value)}
                 placeholder="Notas rápidas..."
-                className="w-full min-h-[80px] bg-slate-950/80 border border-slate-850 focus:border-green-500/50 rounded-xl px-3 py-2 text-xs text-slate-200 placeholder-slate-600 focus:outline-none transition-colors"
+                className="w-full min-h-[80px] bg-slate-950/80 border border-slate-850 focus:border-[#CC0E21]/50 rounded-xl px-3 py-2 text-xs text-slate-200 placeholder-slate-600 focus:outline-none transition-colors"
               />
             </div>
           </div>
@@ -711,7 +710,7 @@ export function TacticaClient() {
                       key={lineup.id}
                       onClick={() => handleLoadLineup(lineup)}
                       className={`flex items-center justify-between p-2.5 bg-slate-950/40 hover:bg-slate-850/50 border rounded-2xl text-xs cursor-pointer transition-all duration-200 ${
-                        currentLineupId === lineup.id ? 'border-green-500/40 bg-green-500/5' : 'border-slate-850'
+                        currentLineupId === lineup.id ? 'border-[#CC0E21]/40 bg-[#CC0E21]/5' : 'border-slate-850'
                       }`}
                     >
                       <div className="truncate mr-2 flex-1">
@@ -794,7 +793,7 @@ export function TacticaClient() {
                 >
                   {/* Outer circle with glow and premium style */}
                   <div className={`h-14 w-14 rounded-full border-2 bg-slate-950 flex items-center justify-center shadow-xl transition-transform duration-100 group-hover:scale-105 ${
-                    assignedPlayer ? 'border-green-500 shadow-green-500/20' : 'border-slate-800 bg-slate-900/60'
+                    assignedPlayer ? 'border-[#CC0E21] shadow-red-500/20' : 'border-slate-800 bg-slate-900/60'
                   }`}>
                     {assignedPlayer ? (
                       <Avatar src={assignedPlayer.foto_url} name={assignedPlayer.nombre} size="sm" className="w-full h-full" />
@@ -804,7 +803,7 @@ export function TacticaClient() {
                   </div>
 
                   {/* Position overlay badge */}
-                  <div className="absolute -top-2 bg-slate-950 border border-slate-800/80 px-1 py-0.2 rounded text-[7px] font-extrabold text-green-400 no-drag">
+                  <div className="absolute -top-2 bg-slate-950 border border-slate-800/80 px-1 py-0.2 rounded text-[7px] font-extrabold text-[#CC0E21] no-drag">
                     {node.label}
                   </div>
 
@@ -849,7 +848,7 @@ export function TacticaClient() {
         <div className="lg:col-span-3">
           <div className="p-5 bg-slate-900/40 border border-slate-800/80 rounded-2xl flex flex-col max-h-[600px] overflow-hidden">
             <h3 className="text-xs font-bold text-slate-300 uppercase tracking-widest mb-2 flex items-center gap-1.5">
-              <Users className="h-3.5 w-3.5 text-green-500" /> Plantilla
+              <Users className="h-3.5 w-3.5 text-[#CC0E21]" /> Plantilla
             </h3>
             
             <p className="text-[10px] text-slate-500 mb-3 leading-tight">
@@ -899,7 +898,7 @@ export function TacticaClient() {
                     </div>
 
                     {isAssigned && (
-                      <span className="text-[8px] bg-green-500/10 text-green-400 px-1 py-0.2 rounded border border-green-500/10 shrink-0">
+                      <span className="text-[8px] bg-[#CC0E21]/10 text-[#CC0E21] px-1 py-0.2 rounded border border-[#CC0E21]/15 shrink-0">
                         PUESTO
                       </span>
                     )}
@@ -915,7 +914,7 @@ export function TacticaClient() {
       <div className="p-6 bg-slate-900/40 border border-slate-800/80 rounded-3xl space-y-6 mt-6">
         <div className="flex items-center justify-between pb-3 border-b border-slate-800/60">
           <div className="flex items-center gap-2">
-            <BookOpen className="h-5 w-5 text-green-500" />
+            <BookOpen className="h-5 w-5 text-[#CC0E21]" />
             <h3 className="text-sm font-bold text-slate-200 uppercase tracking-widest">
               Comparador Táctico (Análisis Estratégico)
             </h3>
@@ -928,14 +927,14 @@ export function TacticaClient() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-4">
             <div className="bg-slate-950/30 border border-slate-850/60 p-4.5 rounded-2xl space-y-2">
-              <label className="text-xs font-bold text-green-400 flex items-center gap-1.5">
-                <Zap className="h-3.5 w-3.5 text-green-400" /> Ventajas del Sistema
+              <label className="text-xs font-bold text-[#CC0E21] flex items-center gap-1.5">
+                <Zap className="h-3.5 w-3.5 text-[#CC0E21]" /> Ventajas del Sistema
               </label>
               <textarea
                 value={ventajas}
                 onChange={(e) => setVentajas(e.target.value)}
                 placeholder="Añade o edita ventajas del sistema..."
-                className="w-full min-h-[100px] bg-slate-950/80 border border-slate-850 focus:border-green-500/50 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none transition-colors"
+                className="w-full min-h-[100px] bg-slate-950/80 border border-slate-850 focus:border-[#CC0E21]/50 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none transition-colors"
               />
             </div>
 
@@ -963,7 +962,7 @@ export function TacticaClient() {
                   value={zonaConflicto}
                   onChange={(e) => setZonaConflicto(e.target.value)}
                   placeholder="Zona de conflicto clave..."
-                  className="w-full bg-slate-950/80 border border-slate-850 focus:border-green-500/50 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none transition-colors"
+                  className="w-full bg-slate-950/80 border border-slate-850 focus:border-[#CC0E21]/50 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none transition-colors"
                 />
               </div>
 
@@ -976,7 +975,7 @@ export function TacticaClient() {
                   value={dueloClave}
                   onChange={(e) => setDueloClave(e.target.value)}
                   placeholder="Duelo táctico principal..."
-                  className="w-full bg-slate-950/80 border border-slate-850 focus:border-green-500/50 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none transition-colors"
+                  className="w-full bg-slate-950/80 border border-slate-850 focus:border-[#CC0E21]/50 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none transition-colors"
                 />
               </div>
             </div>
@@ -989,7 +988,7 @@ export function TacticaClient() {
                 value={tareasLineas}
                 onChange={(e) => setTareasLineas(e.target.value)}
                 placeholder="Añade o edita tareas por líneas..."
-                className="w-full min-h-[100px] bg-slate-950/80 border border-slate-850 focus:border-green-500/50 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none transition-colors"
+                className="w-full min-h-[100px] bg-slate-950/80 border border-slate-850 focus:border-[#CC0E21]/50 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none transition-colors"
               />
             </div>
           </div>
@@ -999,7 +998,7 @@ export function TacticaClient() {
       {/* Orientaciones Individuales y Notas del Entrenador */}
       <div className="p-6 bg-slate-900/40 border border-slate-800/80 rounded-3xl space-y-6 mt-6">
         <div className="flex items-center gap-2 pb-3 border-b border-slate-800/60">
-          <User className="h-5 w-5 text-green-500" />
+          <User className="h-5 w-5 text-[#CC0E21]" />
           <h3 className="text-sm font-bold text-slate-200 uppercase tracking-widest">
             Orientaciones Individuales y Notas del Entrenador
           </h3>
@@ -1022,7 +1021,7 @@ export function TacticaClient() {
                     <Avatar src={assignedPlayer.foto_url} name={assignedPlayer.nombre} size="sm" />
                     <div>
                       <span className="font-bold text-slate-100 text-xs block">{assignedPlayer.nombre}</span>
-                      <span className="text-[9px] font-bold text-green-400 bg-green-500/10 px-1.5 py-0.2 rounded">
+                      <span className="text-[9px] font-bold text-[#CC0E21] bg-[#CC0E21]/10 px-1.5 py-0.2 rounded">
                         Posición: {node.label}
                       </span>
                     </div>
@@ -1042,7 +1041,7 @@ export function TacticaClient() {
                     value={node.notas_entrenador || ''}
                     onChange={(e) => handlePlayerNoteChange(node.id, e.target.value)}
                     placeholder={`Escribe notas tácticas específicas para ${assignedPlayer.nombre.split(' ')[0]}...`}
-                    className="w-full min-h-[70px] bg-slate-950/80 border border-slate-850 focus:border-green-500/50 rounded-xl px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none transition-colors"
+                    className="w-full min-h-[70px] bg-slate-950/80 border border-slate-850 focus:border-[#CC0E21]/50 rounded-xl px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none transition-colors"
                   />
                 </div>
               </div>

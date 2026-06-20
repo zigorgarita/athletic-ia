@@ -26,7 +26,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
           <select
             id={selectId}
             ref={ref}
-            className={`peer w-full px-4 py-3 rounded-xl bg-slate-900/60 border border-slate-700/60 text-slate-100 outline-none transition-all duration-200 focus:border-green-500 focus:ring-1 focus:ring-green-500 text-sm appearance-none ${
+            className={`peer w-full px-4 py-3 rounded-xl bg-slate-900/60 border border-slate-700/60 text-slate-100 outline-none transition-all duration-200 focus:border-[#CC0E21] focus:ring-1 focus:ring-[#CC0E21] text-sm appearance-none ${
               icon ? 'pl-10' : ''
             } ${
               error ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''
@@ -46,7 +46,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
           <label
             htmlFor={selectId}
             className={`absolute left-4 top-3 text-slate-400 text-sm transition-all duration-200 pointer-events-none origin-[0]
-              -translate-y-7 scale-75 bg-slate-950 px-1 rounded peer-focus:text-green-500
+              -translate-y-7 scale-75 bg-slate-950 px-1 rounded peer-focus:text-[#CC0E21]
               ${error ? 'peer-focus:text-red-500' : ''}`}
           >
             {label}

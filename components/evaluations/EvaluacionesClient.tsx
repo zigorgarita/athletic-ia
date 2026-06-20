@@ -109,7 +109,7 @@ export function EvaluacionesClient() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex flex-col gap-1">
           <h1 className="text-3xl font-extrabold tracking-tight text-slate-100 flex items-center gap-2">
-            <ClipboardCheck className="h-8 w-8 text-green-500" />
+            <ClipboardCheck className="h-8 w-8 text-[#CC0E21]" />
             Evaluaciones
           </h1>
           <p className="text-slate-400 text-sm">
@@ -128,7 +128,7 @@ export function EvaluacionesClient() {
           onClick={() => setActiveTab('ranking')}
           className={`flex items-center gap-2 px-6 py-3 border-b-2 text-sm font-semibold transition-all duration-200 ${
             activeTab === 'ranking'
-              ? 'border-green-500 text-green-400'
+              ? 'border-[#CC0E21] text-[#CC0E21]'
               : 'border-transparent text-slate-400 hover:text-slate-200'
           }`}
         >
@@ -139,7 +139,7 @@ export function EvaluacionesClient() {
           onClick={() => setActiveTab('detail')}
           className={`flex items-center gap-2 px-6 py-3 border-b-2 text-sm font-semibold transition-all duration-200 ${
             activeTab === 'detail'
-              ? 'border-green-500 text-green-400'
+              ? 'border-[#CC0E21] text-[#CC0E21]'
               : 'border-transparent text-slate-400 hover:text-slate-200'
           }`}
         >
@@ -200,7 +200,7 @@ export function EvaluacionesClient() {
 
                   <div className="w-full pt-4 border-t border-slate-800/60 mt-2 flex flex-col items-center">
                     <span className="text-xs text-slate-400 uppercase tracking-wider font-semibold">Media Global</span>
-                    <span className="text-3xl font-extrabold text-green-400 mt-1">
+                    <span className="text-3xl font-extrabold text-slate-100 mt-1">
                       {selectedPlayerEvals.length > 0
                         ? getOverallMedia(selectedPlayerEvals).toFixed(1)
                         : '-'}

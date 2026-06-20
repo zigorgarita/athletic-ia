@@ -132,7 +132,7 @@ export function ConvocatoriaModal({ match, onClose, onSave, initialStats }: Conv
   if (loadingPlayers) {
     return (
       <div className="p-8 text-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-green-500 mx-auto" />
+        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-[#CC0E21] mx-auto" />
         <span className="text-slate-400 text-xs mt-2 block">Cargando plantilla...</span>
       </div>
     );
@@ -142,7 +142,7 @@ export function ConvocatoriaModal({ match, onClose, onSave, initialStats }: Conv
     <div className="space-y-5 flex flex-col max-h-[80vh]">
       <div className="pb-3 border-b border-slate-800">
         <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-          <Trophy className="h-4.5 w-4.5 text-green-500" />
+          <Trophy className="h-4.5 w-4.5 text-[#CC0E21]" />
           Convocatoria y Estadísticas - Jornada {match.jornada}
         </h3>
         <p className="text-xs text-slate-500 mt-1">
@@ -246,7 +246,7 @@ export function ConvocatoriaModal({ match, onClose, onSave, initialStats }: Conv
                       min="0"
                       max="120"
                       onChange={(e) => updateStatField(p.id, 'minutos', Number(e.target.value))}
-                      className="w-full px-2.5 py-1.5 text-xs rounded-lg bg-slate-950 border border-slate-800 text-slate-200 outline-none focus:border-green-500"
+                      className="w-full px-2.5 py-1.5 text-xs rounded-lg bg-slate-950 border border-slate-800 text-slate-200 outline-none focus:border-[#CC0E21]"
                     />
                   </div>
 
@@ -258,7 +258,7 @@ export function ConvocatoriaModal({ match, onClose, onSave, initialStats }: Conv
                       value={stats.goles ?? 0}
                       min="0"
                       onChange={(e) => updateStatField(p.id, 'goles', Number(e.target.value))}
-                      className="w-full px-2.5 py-1.5 text-xs rounded-lg bg-slate-950 border border-slate-800 text-slate-200 outline-none focus:border-green-500"
+                      className="w-full px-2.5 py-1.5 text-xs rounded-lg bg-slate-950 border border-slate-800 text-slate-200 outline-none focus:border-[#CC0E21]"
                     />
                   </div>
 
@@ -270,7 +270,7 @@ export function ConvocatoriaModal({ match, onClose, onSave, initialStats }: Conv
                       value={stats.asistencias ?? 0}
                       min="0"
                       onChange={(e) => updateStatField(p.id, 'asistencias', Number(e.target.value))}
-                      className="w-full px-2.5 py-1.5 text-xs rounded-lg bg-slate-950 border border-slate-800 text-slate-200 outline-none focus:border-green-500"
+                      className="w-full px-2.5 py-1.5 text-xs rounded-lg bg-slate-950 border border-slate-800 text-slate-200 outline-none focus:border-[#CC0E21]"
                     />
                   </div>
 
@@ -304,7 +304,7 @@ export function ConvocatoriaModal({ match, onClose, onSave, initialStats }: Conv
                       value={stats.recuperaciones ?? 0}
                       min="0"
                       onChange={(e) => updateStatField(p.id, 'recuperaciones', Number(e.target.value))}
-                      className="w-full px-2.5 py-1.5 text-xs rounded-lg bg-slate-950 border border-slate-800 text-slate-200 outline-none focus:border-green-500"
+                      className="w-full px-2.5 py-1.5 text-xs rounded-lg bg-slate-950 border border-slate-800 text-slate-200 outline-none focus:border-[#CC0E21]"
                     />
                   </div>
 
@@ -316,7 +316,7 @@ export function ConvocatoriaModal({ match, onClose, onSave, initialStats }: Conv
                       value={stats.intercepciones ?? 0}
                       min="0"
                       onChange={(e) => updateStatField(p.id, 'intercepciones', Number(e.target.value))}
-                      className="w-full px-2.5 py-1.5 text-xs rounded-lg bg-slate-950 border border-slate-800 text-slate-200 outline-none focus:border-green-500"
+                      className="w-full px-2.5 py-1.5 text-xs rounded-lg bg-slate-950 border border-slate-800 text-slate-200 outline-none focus:border-[#CC0E21]"
                     />
                   </div>
 
@@ -328,7 +328,7 @@ export function ConvocatoriaModal({ match, onClose, onSave, initialStats }: Conv
                       value={stats.pases_completados ?? 0}
                       min="0"
                       onChange={(e) => updateStatField(p.id, 'pases_completados', Number(e.target.value))}
-                      className="w-full px-2.5 py-1.5 text-xs rounded-lg bg-slate-950 border border-slate-800 text-slate-200 outline-none focus:border-green-500"
+                      className="w-full px-2.5 py-1.5 text-xs rounded-lg bg-slate-950 border border-slate-800 text-slate-200 outline-none focus:border-[#CC0E21]"
                     />
                   </div>
 
@@ -340,7 +340,7 @@ export function ConvocatoriaModal({ match, onClose, onSave, initialStats }: Conv
                       value={stats.pases_totales ?? 0}
                       min="0"
                       onChange={(e) => updateStatField(p.id, 'pases_totales', Number(e.target.value))}
-                      className="w-full px-2.5 py-1.5 text-xs rounded-lg bg-slate-950 border border-slate-800 text-slate-200 outline-none focus:border-green-500"
+                      className="w-full px-2.5 py-1.5 text-xs rounded-lg bg-slate-950 border border-slate-800 text-slate-200 outline-none focus:border-[#CC0E21]"
                     />
                   </div>
                 </div>

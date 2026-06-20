@@ -49,7 +49,7 @@ export function VideoPlayerModal({ isOpen, onClose, video }: VideoPlayerModalPro
       <div className="relative w-full max-w-4xl bg-slate-950 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden z-10 animate-in fade-in zoom-in-95 duration-200 flex flex-col">
         {/* Cabecera */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800/80 bg-slate-900/40">
-          <div className="flex items-center gap-2 text-green-400">
+          <div className="flex items-center gap-2 text-[#CC0E21]">
             <Play className="h-4.5 w-4.5 fill-current" />
             <h2 className="text-md font-bold text-slate-100 truncate max-w-[65vw] sm:max-w-md">
               {video.titulo}
@@ -57,7 +57,7 @@ export function VideoPlayerModal({ isOpen, onClose, video }: VideoPlayerModalPro
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-green-500"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-[#CC0E21]"
             aria-label="Cerrar reproductor"
           >
             <X size={20} />

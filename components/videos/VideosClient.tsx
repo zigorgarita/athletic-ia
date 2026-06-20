@@ -168,7 +168,7 @@ export function VideosClient() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex flex-col gap-1">
           <h1 className="text-3xl font-extrabold tracking-tight text-slate-100 flex items-center gap-2">
-            <Film className="h-8 w-8 text-green-500" />
+            <Film className="h-8 w-8 text-[#CC0E21]" />
             Videos de Partidos
           </h1>
           <p className="text-slate-400 text-sm">
@@ -191,7 +191,7 @@ export function VideosClient() {
             placeholder="Buscar por título o notas..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 text-sm rounded-xl bg-slate-950/60 border border-slate-800 text-slate-200 placeholder-slate-500 outline-none transition-all duration-200 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+            className="w-full pl-10 pr-4 py-2 text-sm rounded-xl bg-slate-950/60 border border-slate-800 text-slate-200 placeholder-slate-500 outline-none transition-all duration-200 focus:border-[#CC0E21] focus:ring-1 focus:ring-[#CC0E21]"
           />
         </div>
 
@@ -201,7 +201,7 @@ export function VideosClient() {
           value={selectedMonth}
           onChange={(e) => setSelectedMonth(e.target.value)}
           options={MESES}
-          className="bg-slate-950/60 border border-slate-800 focus:border-green-500 text-sm"
+          className="bg-slate-950/60 border border-slate-800 focus:border-[#CC0E21] text-sm"
         />
 
         {/* Filtro Año */}
@@ -210,7 +210,7 @@ export function VideosClient() {
           value={selectedYear}
           onChange={(e) => setSelectedYear(e.target.value)}
           options={yearOptions}
-          className="bg-slate-950/60 border border-slate-800 focus:border-green-500 text-sm"
+          className="bg-slate-950/60 border border-slate-800 focus:border-[#CC0E21] text-sm"
         />
       </div>
 
@@ -252,9 +252,9 @@ export function VideosClient() {
         <div className="relative pl-6 border-l-2 border-slate-800/80 space-y-6">
           {filteredVideos.map((video) => (
             <div key={video.id} className="relative">
-              {/* Indicador de Timeline (Punto verde) */}
-              <div className="absolute -left-[31px] top-1/2 transform -translate-y-1/2 w-4 h-4 rounded-full bg-slate-950 border-2 border-green-500 flex items-center justify-center">
-                <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
+              {/* Indicador de Timeline (Punto rojo) */}
+              <div className="absolute -left-[31px] top-1/2 transform -translate-y-1/2 w-4 h-4 rounded-full bg-slate-950 border-2 border-[#CC0E21] flex items-center justify-center">
+                <div className="w-1.5 h-1.5 rounded-full bg-[#CC0E21]" />
               </div>
 
               <VideoCard

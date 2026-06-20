@@ -57,11 +57,11 @@ export function VideoCard({ video, onPlay, onEdit, onDelete }: VideoCardProps) {
 
     // Placeholder premium
     return (
-      <div className="w-full h-full bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 flex flex-col items-center justify-center gap-2 text-slate-500 transition-colors duration-300 group-hover:text-green-400">
+      <div className="w-full h-full bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 flex flex-col items-center justify-center gap-2 text-slate-500 transition-colors duration-300 group-hover:text-[#CC0E21]">
         {type === 'vimeo' ? (
-          <Film className="h-10 w-10 text-slate-600 group-hover:text-green-500 transition-colors duration-300" />
+          <Film className="h-10 w-10 text-slate-600 group-hover:text-[#CC0E21] transition-colors duration-300" />
         ) : (
-          <Video className="h-10 w-10 text-slate-600 group-hover:text-green-500 transition-colors duration-300" />
+          <Video className="h-10 w-10 text-slate-600 group-hover:text-[#CC0E21] transition-colors duration-300" />
         )}
         <span className="text-[10px] uppercase tracking-wider font-semibold opacity-60">
           {type === 'vimeo' ? 'Vimeo Video' : 'Video Directo'}
@@ -71,7 +71,7 @@ export function VideoCard({ video, onPlay, onEdit, onDelete }: VideoCardProps) {
   };
 
   return (
-    <Card className="relative overflow-hidden group border border-slate-800/80 bg-slate-900/30 backdrop-blur-sm transition-all duration-300 hover:border-green-500/40">
+    <Card className="relative overflow-hidden group border border-slate-800/80 bg-slate-900/30 backdrop-blur-sm transition-all duration-300 hover:border-[#CC0E21]/40">
       <div className="flex flex-col md:flex-row gap-6 p-5">
         {/* Contenedor de Miniatura / Video Trigger */}
         <div 
@@ -81,7 +81,7 @@ export function VideoCard({ video, onPlay, onEdit, onDelete }: VideoCardProps) {
           {renderThumbnail()}
           {/* Overlay Oscuro y Botón Play */}
           <div className="absolute inset-0 bg-black/40 group-hover/thumb:bg-black/20 transition-colors duration-300 flex items-center justify-center">
-            <div className="h-12 w-12 rounded-full bg-green-500 text-slate-950 flex items-center justify-center shadow-lg transform scale-90 opacity-90 group-hover/thumb:scale-100 group-hover/thumb:opacity-100 transition-all duration-300">
+            <div className="h-12 w-12 rounded-full bg-[#CC0E21] text-white flex items-center justify-center shadow-lg transform scale-90 opacity-90 group-hover/thumb:scale-100 group-hover/thumb:opacity-100 transition-all duration-300">
               <Play className="h-5 w-5 fill-current ml-0.5" />
             </div>
           </div>
@@ -93,7 +93,7 @@ export function VideoCard({ video, onPlay, onEdit, onDelete }: VideoCardProps) {
             {/* Header info */}
             <div className="flex items-center gap-3 text-xs text-slate-500 mb-2 font-medium">
               <span className="flex items-center gap-1">
-                <Calendar className="h-3.5 w-3.5 text-green-500" />
+                <Calendar className="h-3.5 w-3.5 text-[#CC0E21]" />
                 {formatDate(video.fecha_partido)}
               </span>
               <span className="w-1.5 h-1.5 rounded-full bg-slate-800" />
@@ -105,7 +105,7 @@ export function VideoCard({ video, onPlay, onEdit, onDelete }: VideoCardProps) {
             {/* Título */}
             <h3 
               onClick={() => onPlay(video)}
-              className="text-lg font-bold text-slate-100 hover:text-green-400 cursor-pointer transition-colors duration-200 mb-2 leading-snug truncate"
+              className="text-lg font-bold text-slate-100 hover:text-[#CC0E21] cursor-pointer transition-colors duration-200 mb-2 leading-snug truncate"
             >
               {video.titulo}
             </h3>
@@ -117,7 +117,7 @@ export function VideoCard({ video, onPlay, onEdit, onDelete }: VideoCardProps) {
                 {shouldTruncate && (
                   <button
                     onClick={() => setIsExpanded(!isExpanded)}
-                    className="text-green-400 hover:text-green-300 font-bold ml-1.5 inline-flex items-center gap-0.5 text-xs transition-colors duration-150"
+                    className="text-[#CC0E21] hover:text-[#CC0E21]/80 font-bold ml-1.5 inline-flex items-center gap-0.5 text-xs transition-colors duration-150"
                   >
                     {isExpanded ? (
                       <>
@@ -151,7 +151,7 @@ export function VideoCard({ video, onPlay, onEdit, onDelete }: VideoCardProps) {
               <Button
                 onClick={() => onEdit(video)}
                 variant="ghost"
-                className="h-8 w-8 p-0 text-slate-400 hover:text-green-400 hover:bg-green-500/10 rounded-lg"
+                className="h-8 w-8 p-0 text-slate-400 hover:text-[#CC0E21] hover:bg-[#CC0E21]/10 rounded-lg"
                 title="Editar video"
               >
                 <Edit className="h-4 w-4" />

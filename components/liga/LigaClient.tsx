@@ -101,7 +101,7 @@ export function LigaClient() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex flex-col gap-1">
           <h1 className="text-3xl font-extrabold tracking-tight text-slate-100 flex items-center gap-2">
-            <Trophy className="h-8 w-8 text-green-500" />
+            <Trophy className="h-8 w-8 text-[#CC0E21]" />
             Liga y Jornadas
           </h1>
           <p className="text-slate-400 text-sm">
@@ -218,7 +218,7 @@ export function LigaClient() {
                   <Button
                     onClick={() => handleOpenEditMatch(match)}
                     variant="ghost"
-                    className="h-9 w-9 p-0 text-slate-400 hover:text-green-400 hover:bg-green-500/10 rounded-lg"
+                    className="h-9 w-9 p-0 text-slate-400 hover:text-[#CC0E21] hover:bg-[#CC0E21]/10 rounded-lg"
                     title="Editar partido"
                   >
                     <Edit className="h-4 w-4" />

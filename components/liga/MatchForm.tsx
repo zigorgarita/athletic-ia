@@ -96,7 +96,7 @@ export function MatchForm({ match, onSubmit, onCancel, isSubmitting = false }: M
           <label className="flex items-center gap-2 text-sm text-slate-350 font-bold cursor-pointer select-none">
             <input
               type="checkbox"
-              className="rounded bg-slate-950 border-slate-800 text-green-500 focus:ring-green-500 h-4.5 w-4.5"
+              className="rounded bg-slate-950 border-slate-800 text-[#CC0E21] focus:ring-[#CC0E21] h-4.5 w-4.5"
               {...register('es_local')}
             />
             ¿Jugamos de Local?
@@ -108,7 +108,7 @@ export function MatchForm({ match, onSubmit, onCancel, isSubmitting = false }: M
         <label className="flex items-center gap-2 text-sm font-bold text-slate-200 cursor-pointer select-none">
           <input
             type="checkbox"
-            className="rounded bg-slate-950 border-slate-855 text-green-500 focus:ring-green-500 h-4.5 w-4.5"
+            className="rounded bg-slate-950 border-slate-855 text-[#CC0E21] focus:ring-[#CC0E21] h-4.5 w-4.5"
             {...register('jugado')}
           />
           ¿El partido ya se ha jugado?

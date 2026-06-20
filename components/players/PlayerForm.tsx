@@ -261,7 +261,7 @@ export function PlayerForm({ player, onSubmit, onCancel, onDelete, isSubmitting 
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
           className={`relative group cursor-pointer h-24 w-24 rounded-full border-2 border-dashed overflow-hidden bg-slate-950 flex items-center justify-center transition-all duration-300 ${
-            isDragOver ? 'border-green-500 bg-green-500/5 scale-105' : 'border-slate-700 hover:border-green-500/70'
+            isDragOver ? 'border-[#CC0E21] bg-[#CC0E21]/5 scale-105' : 'border-slate-700 hover:border-[#CC0E21]/70'
           }`}
         >
           {photoPreview ? (
@@ -279,7 +279,7 @@ export function PlayerForm({ player, onSubmit, onCancel, onDelete, isSubmitting 
             </div>
           ) : (
             <div className="text-center p-2 flex flex-col items-center justify-center">
-              <Camera className="h-5 w-5 text-slate-500 group-hover:text-green-400 transition-colors mb-1" />
+              <Camera className="h-5 w-5 text-slate-500 group-hover:text-[#CC0E21] transition-colors mb-1" />
               <span className="text-[9px] text-slate-500 leading-none">Arrastra o clic</span>
             </div>
           )}

@@ -31,12 +31,12 @@ export function Shell({ children }: { children: React.ReactNode }) {
       {/* Header fijo superior */}
       <header className="sticky top-0 z-40 flex h-16 w-full items-center justify-between border-b border-slate-800/80 bg-slate-900/80 px-6 backdrop-blur-md">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-500/10 text-green-500 border border-green-500/20 shadow-lg shadow-green-500/5">
-            <Shield className="h-5 w-5" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl overflow-hidden bg-slate-900 border border-slate-800 shadow-lg shadow-red-500/5">
+            <img src="/escudo.jpg" alt="S.D. Indautxu" className="h-full w-full object-cover" />
           </div>
           <div>
-            <span className="text-base font-bold tracking-tight text-white block">indautxu_26_27</span>
-            <span className="text-xs text-slate-400 block -mt-1">Gestión de Fútbol</span>
+            <span className="text-base font-bold tracking-tight text-white block">S.D. INDAUTXU</span>
+            <span className="text-xs text-slate-400 block -mt-1">Juvenil A • 2026/27</span>
           </div>
         </div>
 
@@ -51,11 +51,11 @@ export function Shell({ children }: { children: React.ReactNode }) {
                 href={item.href}
                 className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
                   isActive
-                    ? 'bg-slate-800 text-green-400 border border-slate-700/50'
+                    ? 'bg-slate-800 text-[#CC0E21] border border-[#CC0E21]/20'
                     : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 border border-transparent'
                 }`}
               >
-                <Icon className={`h-4 w-4 ${isActive ? 'text-green-400' : 'text-slate-400'}`} />
+                <Icon className={`h-4 w-4 ${isActive ? 'text-[#CC0E21]' : 'text-slate-400'}`} />
                 {item.name}
               </Link>
             );
@@ -80,13 +80,13 @@ export function Shell({ children }: { children: React.ReactNode }) {
                     href={item.href}
                     className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group ${
                       isActive
-                        ? 'bg-green-500/10 text-green-400 border border-green-500/10'
+                        ? 'bg-[#CC0E21]/10 text-[#CC0E21] border border-[#CC0E21]/15'
                         : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 border border-transparent'
                     }`}
                   >
                     <Icon
                       className={`h-4 w-4 transition-colors duration-200 ${
-                        isActive ? 'text-green-400' : 'text-slate-400 group-hover:text-slate-300'
+                        isActive ? 'text-[#CC0E21]' : 'text-slate-400 group-hover:text-slate-300'
                       }`}
                     />
                     {item.name}
@@ -106,7 +106,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
       </div>
 
       {/* Barra de pestañas inferior (Bottom Tab Bar) en móviles */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 h-16 border-t border-slate-800/80 bg-slate-900/90 backdrop-blur-md px-6 flex items-center justify-around">
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 h-16 border-t border-slate-800/80 bg-slate-900/90 backdrop-blur-md px-4 flex items-center justify-between gap-1 overflow-x-auto scrollbar-none">
         {navigation.map((item) => {
           const Icon = item.icon;
           const isActive = pathname.startsWith(item.href);
@@ -114,8 +114,8 @@ export function Shell({ children }: { children: React.ReactNode }) {
             <Link
               key={item.name}
               href={item.href}
-              className={`flex flex-col items-center justify-center gap-1 py-1 px-3 rounded-lg transition-colors duration-200 ${
-                isActive ? 'text-green-400' : 'text-slate-400 hover:text-slate-200'
+              className={`flex flex-col items-center justify-center gap-1 py-1 px-2.5 rounded-lg transition-colors duration-200 shrink-0 ${
+                isActive ? 'text-[#CC0E21]' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               <Icon className="h-5 w-5" />

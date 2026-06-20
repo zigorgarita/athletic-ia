@@ -172,7 +172,7 @@ export function RankingTable({ players, evaluations, onSelectPlayer }: RankingTa
               </div>
             </th>
             <th className="py-4 px-6 cursor-pointer hover:bg-slate-800/40 select-none text-center" onClick={() => handleSort('media')}>
-              <div className="flex items-center justify-center gap-1.5 text-green-400">
+              <div className="flex items-center justify-center gap-1.5 text-[#CC0E21]">
                 Media Global
                 <ArrowUpDown className="h-3.5 w-3.5" />
               </div>
@@ -195,7 +195,7 @@ export function RankingTable({ players, evaluations, onSelectPlayer }: RankingTa
               <td className="py-4 px-6 flex items-center gap-3">
                 <Avatar src={row.player.foto_url} name={row.player.nombre} size="sm" />
                 <div>
-                  <span className="font-bold text-slate-100 hover:text-green-400 block transition-colors duration-150">
+                  <span className="font-bold text-slate-100 hover:text-[#CC0E21] block transition-colors duration-150">
                     {row.player.nombre} <span className="text-slate-400 font-medium">{row.player.apellidos}</span>
                   </span>
                   <span className="text-xs text-slate-500 font-medium">Dorsal #{row.player.dorsal}</span>

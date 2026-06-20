@@ -5,8 +5,8 @@
 :root {
   --background: #0f172a;
   --foreground: #f8fafc;
-  --accent: #22c55e;
-  --accent-foreground: #0f172a;
+  --accent: #CC0E21;
+  --accent-foreground: #ffffff;
 }
 
 body {
@@ -19,6 +19,13 @@ body {
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-none {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
   }
 }
 

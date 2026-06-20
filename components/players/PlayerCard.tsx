@@ -36,13 +36,13 @@ export function PlayerCard({ player, onEdit, onDelete, isDeleting = false }: Pla
 
       <CardContent className="pt-8 pb-6 flex flex-col items-center text-center">
         <div className="relative mb-4">
-          <Avatar src={player.foto_url} name={player.nombre} size="xl" className="border-2 border-slate-700/80 group-hover:border-green-500/50 transition-colors duration-300" />
+          <Avatar src={player.foto_url} name={player.nombre} size="xl" className="border-2 border-slate-700/80 group-hover:border-[#CC0E21]/50 transition-colors duration-300" />
           <div className="absolute -bottom-1 -right-1 bg-slate-900 border border-slate-700 text-slate-100 font-bold h-7 w-7 rounded-full flex items-center justify-center text-xs shadow-md">
             #{player.dorsal}
           </div>
         </div>
 
-        <h3 className="font-bold text-slate-100 text-lg line-clamp-1 mb-1 group-hover:text-green-400 transition-colors duration-200">
+        <h3 className="font-bold text-slate-100 text-lg line-clamp-1 mb-1 group-hover:text-[#CC0E21] transition-colors duration-200">
           {player.nombre}
         </h3>
 

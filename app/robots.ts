@@ -7,6 +7,6 @@ export default function robots(): MetadataRoute.Robots {
       allow: '/',
       disallow: ['/api/', '/_next/'],
     },
-    sitemap: 'https://athletic-ia.vercel.app/sitemap.xml', // Ajustar al dominio final estimado o genérico
+    sitemap: 'https://indautxu-ia.vercel.app/sitemap.xml', // Ajustar al dominio final estimado o genérico
   };
 }
