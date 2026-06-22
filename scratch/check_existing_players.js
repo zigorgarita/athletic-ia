@@ -14,11 +14,13 @@ envContent.split('\n').forEach(line => {
 
 const supabase = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 
-async function check() {
-  const { data, error } = await supabase
-    .from('abp_player_roles')
-    .select('*')
-    .eq('abp_play_id', '9855ab9f-f2fc-46b6-8219-8478500be9aa');
-  console.log('Player Roles for klnjhj2:', data, 'Error:', error);
+async function run() {
+  const { data, error } = await supabase.from('players').select('id, nombre, apellidos, dorsal, demarcacion, fecha_nacimiento');
+  if (error) {
+    console.error('Error fetching players:', error);
+  } else {
+    console.log('Existing players count:', data.length);
+    console.log(data);
+  }
 }
-check();
+run();

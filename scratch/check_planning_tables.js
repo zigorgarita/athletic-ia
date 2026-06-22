@@ -15,10 +15,11 @@ envContent.split('\n').forEach(line => {
 const supabase = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 
 async function check() {
-  const { data, error } = await supabase
-    .from('abp_player_roles')
-    .select('*')
-    .eq('abp_play_id', '9855ab9f-f2fc-46b6-8219-8478500be9aa');
-  console.log('Player Roles for klnjhj2:', data, 'Error:', error);
+  const { data, error } = await supabase.from('planning_sessions').select('*').limit(1);
+  if (error) {
+    console.log('planning_sessions table does not exist or error:', error.message);
+  } else {
+    console.log('planning_sessions table exists! Records:', data);
+  }
 }
 check();

@@ -12,13 +12,22 @@ envContent.split('\n').forEach(line => {
   }
 });
 
-const supabase = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-async function check() {
+async function checkPlay() {
   const { data, error } = await supabase
-    .from('abp_player_roles')
+    .from('abp_plays')
     .select('*')
-    .eq('abp_play_id', '9855ab9f-f2fc-46b6-8219-8478500be9aa');
-  console.log('Player Roles for klnjhj2:', data, 'Error:', error);
+    .eq('titulo', 'ijiojoujuo')
+    .single();
+
+  if (error) {
+    console.error(error);
+  } else {
+    console.log(JSON.stringify(data, null, 2));
+  }
 }
-check();
+
+checkPlay();

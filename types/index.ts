@@ -318,3 +318,70 @@ export const FUNCIONES_TACTICAS = [
 
 export type FuncionTactica = typeof FUNCIONES_TACTICAS[number];
 
+// --- NUEVOS TIPOS DE PLANIFICACIÓN ---
+
+export interface PlanningPeriod {
+  id: string;
+  nombre: string;
+  orden: number;
+  created_at: string;
+}
+
+export interface PlanningSession {
+  id: string;
+  fecha: string;
+  hora_inicio: string | null;
+  hora_fin: string | null;
+  duracion_total: number;
+  campo_instalacion: string | null;
+  tipo_sesion: string | null;
+  objetivo_principal: string | null;
+  carga: string | null;
+  num_jugadores_previstos: number;
+  num_porteros_previstos: number;
+  jornada_id: string | null;
+  objetivo_semanal: string | null;
+  created_at: string;
+}
+
+export interface PlanningConcept {
+  id: string;
+  session_id: string;
+  categoria: string;
+  concepto: string;
+  created_at: string;
+}
+
+export interface PlanningTask {
+  id: string;
+  planning_session_id: string;
+  nombre_tarea: string;
+  tipo_tarea: string;
+  minutos: number;
+  jugadores: number | null;
+  espacio: string | null;
+  objetivo: string | null;
+  descripcion: string | null;
+  observaciones: string | null;
+  orden: number;
+  created_at: string;
+}
+
+export interface PlanningSessionPlayer {
+  id: string;
+  session_id: string;
+  player_id: string;
+  convocado: boolean;
+  estado_sesion: string | null;
+  created_at: string;
+}
+
+export interface PlanningDocument {
+  id: string;
+  planning_session_id: string;
+  nombre_documento: string;
+  tipo_documento: string;
+  url_storage: string;
+  fecha_subida: string;
+  created_at: string;
+}
