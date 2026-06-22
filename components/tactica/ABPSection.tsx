@@ -49,6 +49,8 @@ const ROLE_ABBRS: Record<string, string> = {
   'Primer palo': 'P.PALO',
   'Segundo palo': 'S.PALO',
   'Vigilancia': 'VIG',
+  'Defensa zona': 'D.ZONA',
+  'Marca individual': 'M.INDIV',
   'Libre': 'LIB',
   'Apoyo': 'APOYO',
   'Receptor': 'REC',
@@ -412,7 +414,21 @@ const getRolesForPlayType = (type: ABPType): string[] => {
   if (type === 'Saque inicial') {
     return ['Sacador', 'Apoyo', 'Receptor', 'Cambio de orientación', 'Profundidad', 'Vigilancia', 'Cobertura', 'Libre'];
   }
-  return ['Lanzador', 'Sacador', 'Rematador', 'Bloqueador', 'Arrastrador', 'Rechace', 'Cierre', 'Primer palo', 'Segundo palo', 'Vigilancia', 'Libre'];
+  return [
+    'Lanzador',
+    'Sacador',
+    'Rematador',
+    'Bloqueador',
+    'Arrastrador',
+    'Rechace',
+    'Cierre',
+    'Primer palo',
+    'Segundo palo',
+    'Vigilancia',
+    'Defensa zona',
+    'Marca individual',
+    'Libre'
+  ];
 };
 
 const getPositionsForPlay = (type: ABPType, zona?: string | null): { role: string; x: number; y: number }[] => {
@@ -523,6 +539,16 @@ const getFieldView = (type: ABPType, zona?: string | null): 'full' | 'attack' | 
 };
 
 export function ABPSection({ players }: ABPSectionProps) {
+  const getEstadoColor = (estado: string) => {
+    switch (estado) {
+      case 'Disponible': return 'bg-green-500/10 text-green-400 border-green-500/20';
+      case 'Lesionado': return 'bg-red-500/10 text-red-400 border-red-500/20';
+      case 'Duda': return 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20';
+      case 'Sancionado': return 'bg-orange-500/10 text-orange-400 border-orange-500/20';
+      default: return 'bg-slate-500/10 text-slate-400 border-slate-500/20';
+    }
+  };
+
   const [plays, setPlays] = useState<ABPPlay[]>([]);
   const [selectedPlay, setSelectedPlay] = useState<ABPPlay | null>(null);
   const [playRoles, setPlayRoles] = useState<(ABPPlayerRole & { player?: Player })[]>([]);
@@ -550,7 +576,7 @@ export function ABPSection({ players }: ABPSectionProps) {
   const [activeFilter, setActiveFilter] = useState<ABPType | 'Todos'>('Todos');
   const [playerSearch, setPlayerSearch] = useState('');
   const [playerFilterPos, setPlayerFilterPos] = useState<string>('Todas');
-  const [playerStatusTab, setPlayerStatusTab] = useState<'todos' | 'libres'>('todos');
+  const [playerStatusTab, setPlayerStatusTab] = useState<'todos' | 'libres' | 'ocupados'>('todos');
   
   // Board configuration state
   const isEditingPositions = true;
@@ -1205,11 +1231,28 @@ export function ABPSection({ players }: ABPSectionProps) {
       }));
     };
 
-    const handleDragEnd = () => {
+    const handleDragEnd = (endEvent: MouseEvent | TouchEvent) => {
       window.removeEventListener('mousemove', handleDragMove);
       window.removeEventListener('mouseup', handleDragEnd);
       window.removeEventListener('touchmove', handleDragMove);
       window.removeEventListener('touchend', handleDragEnd);
+
+      const currentX = 'touches' in endEvent ? (endEvent.changedTouches?.[0]?.clientX || 0) : (endEvent as MouseEvent).clientX;
+      const currentY = 'touches' in endEvent ? (endEvent.changedTouches?.[0]?.clientY || 0) : (endEvent as MouseEvent).clientY;
+
+      const sidebar = document.getElementById('players-sidebar');
+      if (sidebar) {
+        const sRect = sidebar.getBoundingClientRect();
+        if (
+          currentX >= sRect.left &&
+          currentX <= sRect.right &&
+          currentY >= sRect.top &&
+          currentY <= sRect.bottom
+        ) {
+          handleRemovePlayerFromRole(roleId);
+          setSuccessMsg('Jugador liberado y devuelto a la plantilla.');
+        }
+      }
     };
 
     window.addEventListener('mousemove', handleDragMove);
@@ -1345,7 +1388,9 @@ export function ABPSection({ players }: ABPSectionProps) {
 
     // Status filter
     const isAssigned = getAssignedPlayerIds().includes(p.id);
-    const matchesStatus = playerStatusTab === 'todos' || !isAssigned;
+    const matchesStatus = playerStatusTab === 'todos' || 
+                          (playerStatusTab === 'libres' && !isAssigned) ||
+                          (playerStatusTab === 'ocupados' && isAssigned);
 
     return matchesSearch && matchesPos && matchesStatus;
   });
@@ -1565,8 +1610,8 @@ export function ABPSection({ players }: ABPSectionProps) {
 
               {/* PIZARRA TÁCTICA E INFORMACIÓN */}
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                {/* LA PIZARRA (CAMPOGRAMA INTERACTIVO) - 7 cols */}
-                <div className="lg:col-span-7 flex flex-col items-center space-y-4">
+                {/* LA PIZARRA (CAMPOGRAMA INTERACTIVO) - 5 cols */}
+                <div className="lg:col-span-5 flex flex-col items-center space-y-4">
                   {/* Pizarra Táctica */}
                   <div className="w-full bg-slate-900/20 border border-slate-800/60 rounded-3xl p-4 flex flex-col items-center">
                     <div className="w-full flex justify-between items-center mb-3">
@@ -1619,6 +1664,53 @@ export function ABPSection({ players }: ABPSectionProps) {
                     {/* Area de Fútbol (SVG y Fichas Drag) */}
                     <div 
                       ref={containerRef}
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={async (e) => {
+                        e.preventDefault();
+                        if (!draggedPlayerId) return;
+                        const container = containerRef.current;
+                        if (!container) return;
+                        const rect = container.getBoundingClientRect();
+                        const x = ((e.clientX - rect.left) / rect.width) * 100;
+                        const y = ((e.clientY - rect.top) / rect.height) * 100;
+                        
+                        try {
+                          const player = players.find(p => p.id === draggedPlayerId);
+                          if (!player) return;
+
+                          // Evitar duplicidad en la jugada
+                          setPlayRoles(prev => prev.map(role => {
+                            if (role.player_id === player.id) {
+                              return { ...role, player_id: null, player: undefined };
+                            }
+                            return role;
+                          }));
+
+                          const { data, error } = await supabase
+                            .from('abp_player_roles')
+                            .insert({
+                              abp_play_id: selectedPlay.id,
+                              player_id: player.id,
+                              rol_asignado: 'Libre',
+                              posicion_x: parseFloat(x.toFixed(1)),
+                              posicion_y: parseFloat(y.toFixed(1)),
+                              etiqueta: 'LIB',
+                              orden: playRoles.length + 1
+                            })
+                            .select()
+                            .single();
+                          if (error) throw error;
+                          if (data) {
+                            setPlayRoles(prev => [...prev, { ...data, player }]);
+                            setSuccessMsg(`Añadido ${player.nombre} al campo.`);
+                          }
+                        } catch (err) {
+                          console.error('Error inserting player on drop:', err);
+                          setErrorMsg('No se pudo añadir el jugador al campo.');
+                        } finally {
+                          setDraggedPlayerId(null);
+                        }
+                      }}
                       className="relative w-full aspect-[4/3] bg-emerald-950/80 rounded-2xl border-2 border-emerald-500/25 overflow-hidden select-none"
                     >
                       {(() => {
@@ -1746,20 +1838,37 @@ export function ABPSection({ players }: ABPSectionProps) {
                               handleDragStart(e, role.id);
                             }}
                             onDragOver={(e) => e.preventDefault()}
-                            onDrop={() => handleDropOnRole(role.id)}
+                            onDrop={(e) => {
+                              e.stopPropagation();
+                              handleDropOnRole(role.id);
+                            }}
                           >
                             {/* Ficha Visual del Jugador / Rol */}
                             <div 
-                              className={`h-10 w-10 rounded-full border-2 flex items-center justify-center shadow-lg transition-transform duration-100 active:scale-110 ${
+                              className={`relative h-11 w-11 rounded-full border-2 flex items-center justify-center shadow-lg transition-transform duration-100 active:scale-110 ${
                                 player
                                   ? 'bg-slate-900 border-[#CC0E21] shadow-red-500/20'
-                                  : 'bg-slate-950 border-slate-700/80 border-dashed text-slate-400'
+                                  : 'bg-slate-950 border-slate-700/85 border-dashed text-slate-400'
                               }`}
                             >
+                              {player && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleRemovePlayerFromRole(role.id);
+                                    setSuccessMsg('Jugador liberado del puesto.');
+                                  }}
+                                  className="absolute -top-1 -right-1 bg-red-650 hover:bg-red-550 text-white rounded-full p-0.5 shadow-md z-20 border border-slate-950 transition-colors"
+                                  title="Liberar jugador"
+                                >
+                                  <X className="h-2 w-2" />
+                                </button>
+                              )}
                               {player ? (
-                                <div className="relative flex items-center justify-center w-full h-full">
+                                <div className="relative flex items-center justify-center w-full h-full rounded-full overflow-hidden">
                                   <Avatar src={player.foto_url} name={player.nombre} size="sm" />
-                                  <span className="absolute -bottom-1 -right-1 bg-[#CC0E21] text-white font-black text-[7px] h-3.5 w-3.5 rounded-full flex items-center justify-center border border-slate-900 shadow">
+                                  <span className="absolute bottom-0 right-0 bg-[#CC0E21] text-white font-black text-[7.5px] h-3.5 w-3.5 rounded-full flex items-center justify-center border border-slate-900 shadow">
                                     #{player.dorsal}
                                   </span>
                                 </div>
@@ -1769,20 +1878,20 @@ export function ABPSection({ players }: ABPSectionProps) {
                             </div>
 
                             {/* Nombre y Rol con Selector */}
-                            <div className="mt-1 bg-slate-950/90 border border-slate-800 px-1 py-0.5 rounded text-[8px] font-bold text-slate-300 max-w-[100px] flex flex-col items-center leading-tight select-none pointer-events-auto">
-                              <span className="truncate max-w-[85px]">{player ? player.nombre : (POSITION_ABBRS[role.rol_asignado] || role.rol_asignado)}</span>
-                              <div className="flex flex-col items-center gap-0.5 mt-0.5 text-[7px] text-slate-450 border-t border-slate-800/60 pt-0.5 w-full justify-center">
-                                <span className="truncate max-w-[85px] text-center">{role.rol_asignado}</span>
+                            <div className="mt-1 bg-slate-950/95 border border-slate-800 px-1.5 py-0.5 rounded text-[8px] font-bold text-slate-350 max-w-[100px] flex flex-col items-center leading-tight select-none pointer-events-auto shadow-md">
+                              <span className="truncate max-w-[85px] text-slate-100">{player ? player.nombre.split(' ')[0] : (POSITION_ABBRS[role.rol_asignado] || role.rol_asignado)}</span>
+                              <div className="flex flex-col items-center gap-0.5 mt-0.5 text-[7px] text-slate-400 border-t border-slate-800/60 pt-0.5 w-full justify-center">
+                                <span className="truncate max-w-[85px] text-center text-slate-400">{role.rol_asignado}</span>
                                 {isRealPosType && funcion_tactica && (
                                   <span className="bg-[#CC0E21]/20 text-[#CC0E21] border border-[#CC0E21]/30 px-1 py-0.2 rounded mt-0.5 font-black text-[6.5px]">
                                     {funcion_tactica}
                                   </span>
                                 )}
-                                <div className="relative shrink-0 mt-0.5">
+                                <div className="relative shrink-0 mt-0.5 flex items-center justify-center">
                                   <select
                                     value={role.rol_asignado}
                                     onChange={(e) => handleRoleChange(role.id, e.target.value)}
-                                    className="absolute inset-0 opacity-0 w-3 h-3 cursor-pointer"
+                                    className="absolute inset-0 opacity-0 w-4 h-4 cursor-pointer"
                                   >
                                     {isRealPosType ? (
                                       Object.keys(POSITION_ABBRS).map((pos) => (
@@ -1794,7 +1903,7 @@ export function ABPSection({ players }: ABPSectionProps) {
                                       ))
                                     )}
                                   </select>
-                                  <ChevronDown className="h-2 w-2 text-slate-500" />
+                                  <ChevronDown className="h-2 w-2 text-slate-450 hover:text-slate-300" />
                                 </div>
                               </div>
                             </div>
@@ -1806,7 +1915,7 @@ export function ABPSection({ players }: ABPSectionProps) {
                     <div className="w-full flex justify-between items-center mt-2.5">
                       <span className="text-[9px] text-slate-500 flex items-center gap-1">
                         <AlertCircle className="h-3 w-3 text-slate-600" />
-                        Arrastra las fichas en el campo para moverlas. Arrastra un jugador de la plantilla sobre una ficha para asignarlo.
+                        Arrastra fichas para moverlas, o suelta jugadores encima para asignarlos. Arrastra a la sidebar para liberarlos.
                       </span>
                       <Button 
                         variant="secondary"
@@ -1817,288 +1926,299 @@ export function ABPSection({ players }: ABPSectionProps) {
                       </Button>
                     </div>
                   </div>
+                </div>
 
-                  {/* Instrucciones & Vídeo */}
-                  <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Instrucciones */}
-                    <div className="p-4 bg-slate-900/40 border border-slate-800/80 rounded-2xl space-y-2">
-                      <h4 className="text-xs font-bold text-slate-400 flex items-center gap-1.5">
-                        <BookOpen className="h-3.5 w-3.5 text-[#CC0E21]" /> Instrucciones tácticas
-                      </h4>
-                      <div className="bg-slate-950/40 border border-slate-850 p-3 rounded-xl min-h-[120px] max-h-[220px] overflow-y-auto">
-                        {selectedPlay.descripcion ? (
-                          <p className="text-xs text-slate-350 whitespace-pre-line leading-relaxed">
-                            {selectedPlay.descripcion}
-                          </p>
-                        ) : (
-                          <p className="text-xs text-slate-600 italic">No se han registrado órdenes o instrucciones.</p>
-                        )}
-                      </div>
+                {/* COLUMNA LATERAL DE JUGADORES (SIDEBAR) - 3 cols */}
+                <div id="players-sidebar" className="lg:col-span-3 p-4 bg-slate-900/40 border border-slate-800/80 rounded-2xl flex flex-col space-y-3">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-xs font-bold text-slate-450 uppercase tracking-widest flex items-center gap-1.5">
+                      <UserCheck className="h-3.5 w-3.5 text-[#CC0E21]" /> Plantilla de Jugadores
+                    </h3>
+                    <div className="flex bg-slate-950 rounded-lg p-0.5 border border-slate-850 w-[140px]">
+                      <button
+                        type="button"
+                        onClick={() => setPlayerStatusTab('todos')}
+                        className={`flex-1 text-center py-1 text-[8px] font-bold rounded transition-colors ${
+                          playerStatusTab === 'todos' ? 'bg-slate-800 text-[#CC0E21]' : 'text-slate-500 hover:text-slate-350'
+                        }`}
+                      >
+                        TODOS
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPlayerStatusTab('libres')}
+                        className={`flex-1 text-center py-1 text-[8px] font-bold rounded transition-colors ${
+                          playerStatusTab === 'libres' ? 'bg-slate-800 text-[#CC0E21]' : 'text-slate-500 hover:text-slate-355'
+                        }`}
+                      >
+                        LIBRES
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPlayerStatusTab('ocupados')}
+                        className={`flex-1 text-center py-1 text-[8px] font-bold rounded transition-colors ${
+                          playerStatusTab === 'ocupados' ? 'bg-slate-800 text-[#CC0E21]' : 'text-slate-500 hover:text-slate-355'
+                        }`}
+                      >
+                        USADOS
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Inputs de Filtro */}
+                  <div className="flex flex-col gap-2">
+                    <div className="relative">
+                      <span className="absolute inset-y-0 left-2.5 flex items-center pointer-events-none">
+                        <Search className="h-3 w-3 text-slate-500" />
+                      </span>
+                      <input
+                        type="text"
+                        value={playerSearch}
+                        onChange={(e) => setPlayerSearch(e.target.value)}
+                        placeholder="Buscar dorsal/nombre..."
+                        className="w-full bg-slate-950 border border-slate-850 rounded-lg pl-8 pr-2.5 py-1 text-xs text-slate-300 placeholder-slate-650 outline-none focus:border-[#CC0E21]"
+                      />
                     </div>
 
-                    {/* Vídeo */}
-                    <div className="p-4 bg-slate-900/40 border border-slate-800/80 rounded-2xl space-y-2">
-                      <h4 className="text-xs font-bold text-slate-400 flex items-center gap-1.5">
-                        <Film className="h-3.5 w-3.5 text-blue-500" /> Vídeo táctico asociado
-                      </h4>
-                      {selectedPlay.video_url ? (
-                        <div className="relative aspect-video rounded-xl overflow-hidden border border-slate-800 bg-black">
-                          {getEmbedVideoUrl(selectedPlay.video_url) ? (
-                            <iframe
-                              src={getEmbedVideoUrl(selectedPlay.video_url) || ''}
-                              className="w-full h-full border-0"
-                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                              allowFullScreen
-                            />
-                          ) : (
-                            <video
-                              src={selectedPlay.video_url}
-                              controls
-                              className="w-full h-full object-contain"
-                            />
-                          )}
-                        </div>
-                      ) : (
-                        <div className="border border-slate-850 bg-slate-950/20 p-8 rounded-xl text-center text-xs text-slate-500 italic flex flex-col justify-center items-center h-[120px]">
-                          No hay un vídeo asociado. Usa &quot;Editar&quot; para añadir una URL de YouTube o subir un vídeo explicativo.
-                        </div>
-                      )}
-                    </div>
+                    <select
+                      value={playerFilterPos}
+                      onChange={(e) => setPlayerFilterPos(e.target.value)}
+                      className="bg-slate-950 border border-slate-850 rounded-lg px-2.5 py-1 text-xs text-slate-300 outline-none focus:border-[#CC0E21]"
+                    >
+                      <option value="Todas">Todas las posiciones</option>
+                      <option value="Portero">Portero</option>
+                      <option value="Defensa">Defensa</option>
+                      <option value="Centrocampista">Centrocampista</option>
+                      <option value="Delantero">Delantero</option>
+                    </select>
+                  </div>
+
+                  {/* Squad List */}
+                  <div className="space-y-1.5 max-h-[350px] overflow-y-auto pr-1">
+                    {filteredSquad.length === 0 ? (
+                      <p className="text-xs text-slate-550 italic text-center py-6">No hay jugadores disponibles.</p>
+                    ) : (
+                      filteredSquad.map((player) => {
+                        const isAssigned = getAssignedPlayerIds().includes(player.id);
+                        return (
+                          <div
+                            key={player.id}
+                            draggable
+                            onDragStart={() => handleSidebarDragStart(player.id)}
+                            onDoubleClick={() => handlePlayerDoubleClick(player.id)}
+                            className={`flex items-center justify-between p-2 rounded-xl border text-xs transition-all cursor-grab active:cursor-grabbing select-none ${
+                              isAssigned
+                                ? 'bg-slate-900/30 border-slate-850/40 text-slate-500 opacity-60'
+                                : 'bg-slate-950/60 border-slate-850 text-slate-200 hover:border-slate-800 hover:bg-slate-900/30'
+                            }`}
+                            title="Doble clic para asignar al puesto seleccionado o al primero libre"
+                          >
+                            <div className="flex items-center gap-2 truncate">
+                              <Avatar src={player.foto_url} name={player.nombre} size="sm" />
+                              <div className="truncate text-left">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-bold truncate leading-none mb-0.5 text-slate-250">
+                                    {player.nombre} {player.apellidos || ''}
+                                  </span>
+                                  <span className={`px-1 py-0.2 rounded text-[7px] font-black border uppercase tracking-wider ${getEstadoColor(player.estado)}`}>
+                                    {player.estado}
+                                  </span>
+                                </div>
+                                <span className="text-[9px] text-slate-500 font-semibold">
+                                  #{player.dorsal} - {player.demarcacion}
+                                </span>
+                              </div>
+                            </div>
+                            <span className="text-[9px] text-slate-500 bg-slate-900 border border-slate-800/80 px-1.5 py-0.5 rounded uppercase font-bold">
+                              {isAssigned ? 'Ocupado' : 'Asignar'}
+                            </span>
+                          </div>
+                        );
+                      })
+                    )}
                   </div>
                 </div>
 
-                {/* ASIGNACIÓN DE JUGADORES Y ROLES - 5 cols */}
-                <div className="lg:col-span-5 space-y-6">
-                  {/* PANEL: ROLES Y PUESTOS DE LA JUGADA */}
-                  <div className="p-4 bg-slate-900/40 border border-slate-800/80 rounded-2xl flex flex-col">
-                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
-                      <Layers className="h-3.5 w-3.5 text-[#CC0E21]" /> Puestos de la jugada ({playRoles.length})
-                    </h3>
+                {/* PANEL: ROLES Y PUESTOS DE LA JUGADA - 4 cols */}
+                <div className="lg:col-span-4 p-4 bg-slate-900/40 border border-slate-800/80 rounded-2xl flex flex-col">
+                  <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                    <Layers className="h-3.5 w-3.5 text-[#CC0E21]" /> Puestos de la jugada ({playRoles.length})
+                  </h3>
 
-                    {loadingRoles ? (
-                      <Skeleton className="h-40 w-full" />
-                    ) : playRoles.length === 0 ? (
-                      <p className="text-xs text-slate-500 italic text-center py-6 border border-dashed border-slate-800 rounded-xl">
-                        No hay puestos colocados en el campo. Usa &quot;Añadir Puesto&quot;.
-                      </p>
-                    ) : (
-                      <div className="space-y-3 max-h-[280px] overflow-y-auto pr-1">
-                        {playRoles.map((role) => {
-                          const isRealPosType = isRealPositionPlayType(selectedPlay.tipo);
-                          const { funcion_tactica, comentario } = parseComentario(role.comentario);
-                          const label = role.etiqueta || (isRealPosType ? POSITION_ABBRS[role.rol_asignado] : ROLE_ABBRS[role.rol_asignado]) || 'P';
+                  {loadingRoles ? (
+                    <Skeleton className="h-40 w-full" />
+                  ) : playRoles.length === 0 ? (
+                    <p className="text-xs text-slate-550 italic text-center py-6 border border-dashed border-slate-800 rounded-xl">
+                      No hay puestos colocados en el campo. Usa &quot;Añadir Puesto&quot;.
+                    </p>
+                  ) : (
+                    <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
+                      {playRoles.map((role) => {
+                        const isRealPosType = isRealPositionPlayType(selectedPlay.tipo);
+                        const { funcion_tactica, comentario } = parseComentario(role.comentario);
+                        const label = role.etiqueta || (isRealPosType ? POSITION_ABBRS[role.rol_asignado] : ROLE_ABBRS[role.rol_asignado]) || 'P';
 
-                          return (
-                            <div 
-                              key={role.id}
-                              className="bg-slate-950/60 border border-slate-850 p-2.5 rounded-xl space-y-2 transition-all hover:border-slate-800"
-                            >
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <span className="h-6 w-8 bg-slate-900 border border-slate-800 text-[9px] text-[#CC0E21] font-bold rounded flex items-center justify-center">
-                                    {label}
-                                  </span>
-                                  {isRealPosType ? (
-                                    <select
-                                      value={role.rol_asignado}
-                                      onChange={(e) => handleRoleChange(role.id, e.target.value)}
-                                      className="bg-slate-900 border border-slate-800 text-xs font-semibold text-slate-300 rounded px-2 py-0.5 outline-none focus:border-[#CC0E21]"
-                                    >
-                                      {Object.keys(POSITION_ABBRS).map((pos) => (
-                                        <option key={pos} value={pos}>{pos}</option>
-                                      ))}
-                                    </select>
-                                  ) : (
-                                    <select
-                                      value={role.rol_asignado}
-                                      onChange={(e) => handleRoleChange(role.id, e.target.value)}
-                                      className="bg-slate-900 border border-slate-800 text-xs font-semibold text-slate-300 rounded px-2 py-0.5 outline-none focus:border-[#CC0E21]"
-                                    >
-                                      {getRolesForPlayType(selectedPlay.tipo).map((opt) => (
-                                        <option key={opt} value={opt}>{opt}</option>
-                                      ))}
-                                    </select>
-                                  )}
-
-                                  {isRealPosType && (
-                                    <select
-                                      value={funcion_tactica}
-                                      onChange={(e) => {
-                                        const nextCom = serializeComentario(e.target.value, comentario);
-                                        handleCommentChange(role.id, nextCom);
-                                      }}
-                                      className="bg-slate-900/60 border border-slate-800 text-[10px] text-[#CC0E21] rounded px-1.5 py-0.5 outline-none"
-                                    >
-                                      <option value="">-- Sin función --</option>
-                                      <option value="Sacador">Sacador</option>
-                                      <option value="Apoyo">Apoyo</option>
-                                      <option value="Tercer hombre">Tercer hombre</option>
-                                      <option value="Receptor">Receptor</option>
-                                      <option value="Profundidad">Profundidad</option>
-                                      <option value="Vigilancia">Vigilancia</option>
-                                      <option value="Cobertura">Cobertura</option>
-                                    </select>
-                                  )}
-                                </div>
-
-                                <button
-                                  onClick={() => handleRemoveRoleNode(role.id)}
-                                  className="p-1 hover:bg-red-500/20 hover:text-red-400 rounded-lg text-slate-500"
-                                  title="Borrar este puesto de la jugada"
-                                >
-                                  <X className="h-3.5 w-3.5" />
-                                </button>
-                              </div>
-
-                              {/* Asignar jugador */}
-                              <div className="flex items-center gap-2">
-                                <select
-                                  value={role.player_id || ''}
-                                  onChange={(e) => handleAssignPlayerDirect(role.id, e.target.value)}
-                                  className="flex-1 bg-slate-900 border border-slate-800 text-xs text-slate-350 rounded px-2.5 py-1 outline-none focus:border-[#CC0E21]"
-                                >
-                                  <option value="">-- Sin asignar (Vacío) --</option>
-                                  {players.map((p) => (
-                                    <option key={p.id} value={p.id}>
-                                      #{p.dorsal} - {p.nombre} {p.apellidos || ''} ({p.demarcacion})
-                                    </option>
-                                  ))}
-                                </select>
-
-                                {role.player_id && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleRemovePlayerFromRole(role.id)}
-                                    className="p-1 text-slate-550 hover:text-slate-300 hover:bg-slate-800 rounded"
-                                    title="Desasignar jugador"
+                        return (
+                          <div 
+                            key={role.id}
+                            className="bg-slate-950/60 border border-slate-855 p-2.5 rounded-xl space-y-2 transition-all hover:border-slate-800"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="h-6 w-8 bg-slate-900 border border-slate-800 text-[9px] text-[#CC0E21] font-bold rounded flex items-center justify-center">
+                                  {label}
+                                </span>
+                                {isRealPosType ? (
+                                  <select
+                                    value={role.rol_asignado}
+                                    onChange={(e) => handleRoleChange(role.id, e.target.value)}
+                                    className="bg-slate-900 border border-slate-800 text-xs font-semibold text-slate-300 rounded px-2 py-0.5 outline-none focus:border-[#CC0E21]"
                                   >
-                                    <X className="h-3 w-3" />
-                                  </button>
+                                    {Object.keys(POSITION_ABBRS).map((pos) => (
+                                      <option key={pos} value={pos}>{pos}</option>
+                                    ))}
+                                  </select>
+                                ) : (
+                                  <select
+                                    value={role.rol_asignado}
+                                    onChange={(e) => handleRoleChange(role.id, e.target.value)}
+                                    className="bg-slate-900 border border-slate-800 text-xs font-semibold text-slate-300 rounded px-2 py-0.5 outline-none focus:border-[#CC0E21]"
+                                  >
+                                    {getRolesForPlayType(selectedPlay.tipo).map((opt) => (
+                                      <option key={opt} value={opt}>{opt}</option>
+                                    ))}
+                                  </select>
+                                )}
+
+                                {isRealPosType && (
+                                  <select
+                                    value={funcion_tactica}
+                                    onChange={(e) => {
+                                      const nextCom = serializeComentario(e.target.value, comentario);
+                                      handleCommentChange(role.id, nextCom);
+                                    }}
+                                    className="bg-slate-900/60 border border-slate-800 text-[10px] text-[#CC0E21] rounded px-1.5 py-0.5 outline-none"
+                                  >
+                                    <option value="">-- Sin función --</option>
+                                    <option value="Sacador">Sacador</option>
+                                    <option value="Apoyo">Apoyo</option>
+                                    <option value="Tercer hombre">Tercer hombre</option>
+                                    <option value="Receptor">Receptor</option>
+                                    <option value="Profundidad">Profundidad</option>
+                                    <option value="Vigilancia">Vigilancia</option>
+                                    <option value="Cobertura">Cobertura</option>
+                                  </select>
                                 )}
                               </div>
 
-                              {/* Comentario / Movimiento */}
-                              <input
-                                type="text"
-                                value={isRealPosType ? comentario : (role.comentario || '')}
-                                onChange={(e) => {
-                                  if (isRealPosType) {
-                                    const nextCom = serializeComentario(funcion_tactica, e.target.value);
-                                    handleCommentChange(role.id, nextCom);
-                                  } else {
-                                    handleCommentChange(role.id, e.target.value);
-                                  }
-                                }}
-                                placeholder={isRealPosType ? "Añadir movimiento o variante táctica..." : "Ej. Bloqueo al central o desmarque de arrastre..."}
-                                className="w-full bg-slate-900/60 border border-slate-850/80 rounded px-2 py-0.5 text-[10px] text-slate-400 placeholder-slate-650 outline-none focus:border-slate-800"
-                              />
+                              <button
+                                onClick={() => handleRemoveRoleNode(role.id)}
+                                className="p-1 hover:bg-red-500/20 hover:text-red-400 rounded-lg text-slate-500"
+                                title="Borrar este puesto de la jugada"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
                             </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
 
-                  {/* PANEL: PLANTILLA DE JUGADORES */}
-                  <div className="p-4 bg-slate-900/40 border border-slate-800/80 rounded-2xl flex flex-col space-y-3">
-                    <div className="flex justify-between items-center">
-                      <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-                        <UserCheck className="h-3.5 w-3.5 text-[#CC0E21]" /> Plantilla de Jugadores
-                      </h3>
-                      <div className="flex bg-slate-950 rounded-lg p-0.5 border border-slate-850">
-                        <button
-                          type="button"
-                          onClick={() => setPlayerStatusTab('todos')}
-                          className={`px-2 py-1 text-[9px] font-bold rounded-md transition-colors ${
-                            playerStatusTab === 'todos' ? 'bg-slate-800 text-[#CC0E21]' : 'text-slate-500 hover:text-slate-300'
-                          }`}
-                        >
-                          TODOS
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setPlayerStatusTab('libres')}
-                          className={`px-2 py-1 text-[9px] font-bold rounded-md transition-colors ${
-                            playerStatusTab === 'libres' ? 'bg-slate-800 text-[#CC0E21]' : 'text-slate-500 hover:text-slate-300'
-                          }`}
-                        >
-                          LIBRES
-                        </button>
-                      </div>
-                    </div>
+                            {/* Asignar jugador */}
+                            <div className="flex items-center gap-2">
+                              <select
+                                value={role.player_id || ''}
+                                onChange={(e) => handleAssignPlayerDirect(role.id, e.target.value)}
+                                className="flex-1 bg-slate-900 border border-slate-800 text-xs text-slate-350 rounded px-2.5 py-1 outline-none focus:border-[#CC0E21]"
+                              >
+                                <option value="">-- Sin asignar (Vacío) --</option>
+                                {players.map((p) => (
+                                  <option key={p.id} value={p.id}>
+                                    #{p.dorsal} - {p.nombre} {p.apellidos || ''} ({p.demarcacion})
+                                  </option>
+                                ))}
+                              </select>
 
-                    {/* Inputs de Filtro */}
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="relative">
-                        <span className="absolute inset-y-0 left-2.5 flex items-center pointer-events-none">
-                          <Search className="h-3 w-3 text-slate-500" />
-                        </span>
-                        <input
-                          type="text"
-                          value={playerSearch}
-                          onChange={(e) => setPlayerSearch(e.target.value)}
-                          placeholder="Buscar dorsal/nombre..."
-                          className="w-full bg-slate-950 border border-slate-850 rounded-lg pl-8 pr-2.5 py-1 text-xs text-slate-300 placeholder-slate-650 outline-none focus:border-[#CC0E21]"
-                        />
-                      </div>
-
-                      <select
-                        value={playerFilterPos}
-                        onChange={(e) => setPlayerFilterPos(e.target.value)}
-                        className="bg-slate-950 border border-slate-850 rounded-lg px-2.5 py-1 text-xs text-slate-300 outline-none focus:border-[#CC0E21]"
-                      >
-                        <option value="Todas">Todas las posiciones</option>
-                        <option value="Portero">Portero</option>
-                        <option value="Defensa">Defensa</option>
-                        <option value="Centrocampista">Centrocampista</option>
-                        <option value="Delantero">Delantero</option>
-                      </select>
-                    </div>
-
-                    {/* Squad List */}
-                    <div className="space-y-1.5 max-h-[260px] overflow-y-auto pr-1">
-                      {filteredSquad.length === 0 ? (
-                        <p className="text-xs text-slate-550 italic text-center py-6">No hay jugadores disponibles.</p>
-                      ) : (
-                        filteredSquad.map((player) => {
-                          const isAssigned = getAssignedPlayerIds().includes(player.id);
-                          return (
-                            <div
-                              key={player.id}
-                              draggable
-                              onDragStart={() => handleSidebarDragStart(player.id)}
-                              onDoubleClick={() => handlePlayerDoubleClick(player.id)}
-                              className={`flex items-center justify-between p-2 rounded-xl border text-xs transition-all cursor-grab active:cursor-grabbing select-none ${
-                                isAssigned
-                                  ? 'bg-slate-900/30 border-slate-850/40 text-slate-500 opacity-50'
-                                  : 'bg-slate-950/60 border-slate-850 text-slate-200 hover:border-slate-800'
-                              }`}
-                              title="Doble clic para asignar al puesto seleccionado o al primero libre"
-                            >
-                              <div className="flex items-center gap-2.5 truncate">
-                                <Avatar src={player.foto_url} name={player.nombre} size="sm" />
-                                <div className="truncate text-left">
-                                  <span className="block font-bold truncate leading-none mb-0.5">
-                                    {player.nombre} {player.apellidos || ''}
-                                  </span>
-                                  <span className="text-[9px] text-slate-500 font-semibold">
-                                    #{player.dorsal} - {player.demarcacion}
-                                  </span>
-                                </div>
-                              </div>
-                              <span className="text-[9px] text-slate-650 bg-slate-900 border border-slate-800/80 px-1.5 py-0.5 rounded uppercase font-bold">
-                                {isAssigned ? 'Ocupado' : 'Asignar'}
-                              </span>
+                              {role.player_id && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemovePlayerFromRole(role.id)}
+                                  className="p-1 text-slate-550 hover:text-slate-300 hover:bg-slate-800 rounded"
+                                  title="Desasignar jugador"
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              )}
                             </div>
-                          );
-                        })
-                      )}
+
+                            {/* Comentario / Movimiento */}
+                            <input
+                              type="text"
+                              value={isRealPosType ? comentario : (role.comentario || '')}
+                              onChange={(e) => {
+                                if (isRealPosType) {
+                                  const nextCom = serializeComentario(funcion_tactica, e.target.value);
+                                  handleCommentChange(role.id, nextCom);
+                                } else {
+                                  handleCommentChange(role.id, e.target.value);
+                                }
+                              }}
+                              placeholder={isRealPosType ? "Añadir movimiento o variante táctica..." : "Ej. Bloqueo al central o desmarque de arrastre..."}
+                              className="w-full bg-slate-900/60 border border-slate-850/80 rounded px-2 py-0.5 text-[10px] text-slate-400 placeholder-slate-650 outline-none focus:border-slate-800"
+                            />
+                          </div>
+                        );
+                      })}
                     </div>
-                  </div>
+                  )}
                 </div>
               </div>
+
+              {/* Instrucciones & Vídeo - Colocados abajo a ancho completo */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                {/* Instrucciones */}
+                <div className="p-5 bg-slate-900/40 border border-slate-800/80 rounded-2xl space-y-2">
+                  <h4 className="text-xs font-bold text-slate-400 flex items-center gap-1.5 uppercase tracking-wider">
+                    <BookOpen className="h-3.5 w-3.5 text-[#CC0E21]" /> Instrucciones tácticas
+                  </h4>
+                  <div className="bg-slate-950/40 border border-slate-850 p-4 rounded-xl min-h-[140px] max-h-[220px] overflow-y-auto">
+                    {selectedPlay.descripcion ? (
+                      <p className="text-xs text-slate-350 whitespace-pre-line leading-relaxed">
+                        {selectedPlay.descripcion}
+                      </p>
+                    ) : (
+                      <p className="text-xs text-slate-650 italic">No se han registrado órdenes o instrucciones.</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Vídeo */}
+                <div className="p-5 bg-slate-900/40 border border-slate-800/80 rounded-2xl space-y-2">
+                  <h4 className="text-xs font-bold text-slate-400 flex items-center gap-1.5 uppercase tracking-wider">
+                    <Film className="h-3.5 w-3.5 text-blue-500" /> Vídeo táctico asociado
+                  </h4>
+                  {selectedPlay.video_url ? (
+                    <div className="relative aspect-video rounded-xl overflow-hidden border border-slate-800 bg-black">
+                      {getEmbedVideoUrl(selectedPlay.video_url) ? (
+                        <iframe
+                          src={getEmbedVideoUrl(selectedPlay.video_url) || ''}
+                          className="w-full h-full border-0"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          allowFullScreen
+                        />
+                      ) : (
+                        <video
+                          src={selectedPlay.video_url}
+                          controls
+                          className="w-full h-full object-contain"
+                        />
+                      )}
+                    </div>
+                  ) : (
+                    <div className="border border-slate-850 bg-slate-950/20 p-8 rounded-xl text-center text-xs text-slate-500 italic flex flex-col justify-center items-center h-[140px]">
+                      No hay un vídeo asociado. Usa &quot;Editar&quot; para añadir una URL de YouTube o subir un vídeo explicativo.
+                    </div>
+                  )}
+              </div>
             </div>
-          ) : (
+          </div>
+        ) : (
             <div className="p-16 text-center border border-dashed border-slate-800 bg-slate-900/10 rounded-2xl flex flex-col items-center justify-center space-y-4">
               <BookOpen className="h-12 w-12 text-slate-600" />
               <div className="space-y-1">
