@@ -1,4 +1,4 @@
--- Script para la creación de las tablas de Planificación
+-- Script Idempotente para la creación de las tablas de Planificación
 
 -- 1. Crear planning_periods
 CREATE TABLE IF NOT EXISTS planning_periods (
@@ -26,7 +26,7 @@ ON CONFLICT (nombre) DO NOTHING;
 -- 2. Crear planning_sessions
 CREATE TABLE IF NOT EXISTS planning_sessions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    fecha DATE NOT NULL UNIQUE,
+    fecha DATE NOT NULL,
     hora_inicio TEXT,
     hora_fin TEXT,
     duracion_total INTEGER DEFAULT 0, -- en minutos
@@ -89,6 +89,13 @@ CREATE TABLE IF NOT EXISTS planning_documents (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
+-- Crear índices de optimización para consultas por fecha y relaciones (en el orden correcto una vez creadas las tablas)
+CREATE INDEX IF NOT EXISTS idx_planning_sessions_fecha ON planning_sessions(fecha);
+CREATE INDEX IF NOT EXISTS idx_planning_concepts_session ON planning_concepts(session_id);
+CREATE INDEX IF NOT EXISTS idx_planning_tasks_session ON planning_tasks(planning_session_id);
+CREATE INDEX IF NOT EXISTS idx_planning_session_players_session ON planning_session_players(session_id);
+CREATE INDEX IF NOT EXISTS idx_planning_documents_session ON planning_documents(planning_session_id);
+
 -- Habilitar RLS
 ALTER TABLE planning_periods ENABLE ROW LEVEL SECURITY;
 ALTER TABLE planning_sessions ENABLE ROW LEVEL SECURITY;
@@ -97,7 +104,38 @@ ALTER TABLE planning_tasks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE planning_session_players ENABLE ROW LEVEL SECURITY;
 ALTER TABLE planning_documents ENABLE ROW LEVEL SECURITY;
 
--- Políticas públicas (Lectura/Escritura para desarrollo)
+-- Limpieza preventiva de políticas antiguas para evitar errores de duplicación
+DROP POLICY IF EXISTS "Public Read" ON planning_periods;
+DROP POLICY IF EXISTS "Public Insert" ON planning_periods;
+DROP POLICY IF EXISTS "Public Update" ON planning_periods;
+DROP POLICY IF EXISTS "Public Delete" ON planning_periods;
+
+DROP POLICY IF EXISTS "Public Read" ON planning_sessions;
+DROP POLICY IF EXISTS "Public Insert" ON planning_sessions;
+DROP POLICY IF EXISTS "Public Update" ON planning_sessions;
+DROP POLICY IF EXISTS "Public Delete" ON planning_sessions;
+
+DROP POLICY IF EXISTS "Public Read" ON planning_concepts;
+DROP POLICY IF EXISTS "Public Insert" ON planning_concepts;
+DROP POLICY IF EXISTS "Public Update" ON planning_concepts;
+DROP POLICY IF EXISTS "Public Delete" ON planning_concepts;
+
+DROP POLICY IF EXISTS "Public Read" ON planning_tasks;
+DROP POLICY IF EXISTS "Public Insert" ON planning_tasks;
+DROP POLICY IF EXISTS "Public Update" ON planning_tasks;
+DROP POLICY IF EXISTS "Public Delete" ON planning_tasks;
+
+DROP POLICY IF EXISTS "Public Read" ON planning_session_players;
+DROP POLICY IF EXISTS "Public Insert" ON planning_session_players;
+DROP POLICY IF EXISTS "Public Update" ON planning_session_players;
+DROP POLICY IF EXISTS "Public Delete" ON planning_session_players;
+
+DROP POLICY IF EXISTS "Public Read" ON planning_documents;
+DROP POLICY IF EXISTS "Public Insert" ON planning_documents;
+DROP POLICY IF EXISTS "Public Update" ON planning_documents;
+DROP POLICY IF EXISTS "Public Delete" ON planning_documents;
+
+-- Creación de Políticas RLS Públicas
 CREATE POLICY "Public Read" ON planning_periods FOR SELECT USING (true);
 CREATE POLICY "Public Insert" ON planning_periods FOR INSERT WITH CHECK (true);
 CREATE POLICY "Public Update" ON planning_periods FOR UPDATE USING (true) WITH CHECK (true);
