@@ -363,6 +363,15 @@ export interface PlanningSession {
   jornada_id: string | null;
   objetivo_semanal: string | null;
   created_at: string;
+  // Planificación V2
+  estado?: string | null;
+  evaluacion_completada?: boolean;
+  evaluacion_duracion_real?: number | null;
+  evaluacion_observaciones?: string | null;
+  categoria_filtro?: string | null;
+  hora_convocatoria?: string | null;
+  observaciones_convocatoria?: string | null;
+  checklist_material?: any;
 }
 
 export interface PlanningConcept {
@@ -385,6 +394,23 @@ export interface PlanningTask {
   descripcion: string | null;
   observaciones: string | null;
   orden: number;
+  created_at: string;
+  // Planificación V2
+  responsable_staff?: string | null;
+  responsable_staff_otro?: string | null;
+}
+
+export interface PlanningTaskLibrary {
+  id: string;
+  nombre: string;
+  tipo_tarea: string;
+  minutos_defecto: number;
+  jugadores_defecto: number | null;
+  espacio_defecto: string | null;
+  objetivo: string | null;
+  descripcion: string;
+  observaciones: string | null;
+  creado_por: string;
   created_at: string;
 }
 
