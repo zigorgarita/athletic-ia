@@ -406,3 +406,39 @@ export interface PlanningDocument {
   fecha_subida: string;
   created_at: string;
 }
+
+export type AttendanceStatus = 'Asiste' | 'No asiste' | 'Lesionado' | 'Duda' | 'Sancionado' | 'Baja temporal';
+
+export interface TrainingAttendance {
+  id?: string;
+  session_id: string;
+  player_id: string | null;
+  player_full_name_backup?: string | null;
+  player_dorsal_backup?: number | null;
+  attendance_status: AttendanceStatus;
+  absence_reason?: string | null;
+  attendance_notes?: string | null;
+  recorded_by?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface TrainingEvaluation {
+  id?: string;
+  session_id: string;
+  player_id: string | null;
+  player_full_name_backup?: string | null;
+  player_dorsal_backup?: number | null;
+  actitud?: number | null;
+  intensidad?: number | null;
+  comprension_tactica?: number | null;
+  ejecucion_tecnica?: number | null;
+  compromiso_defensivo?: number | null;
+  compromiso_ofensivo?: number | null;
+  valoracion_global?: number | null;
+  observaciones?: string | null;
+  fecha_evaluacion?: string;
+  evaluated_by?: string;
+  created_at?: string;
+  updated_at?: string;
+}

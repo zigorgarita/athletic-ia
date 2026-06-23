@@ -905,6 +905,20 @@ export function PlanificacionClient() {
         title={selectedDate ? `SESIÓN DE ENTRENAMIENTO - ${selectedDate}` : 'DETALLE DE LA SESIÓN'}
       >
         <div className="space-y-6 text-slate-100">
+          {sessionForm.id && (
+            <div className="p-4 rounded-xl bg-[#CC0E21]/10 border border-[#CC0E21]/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-fadeIn">
+              <div>
+                <h4 className="text-xs font-bold text-slate-200">Control de Asistencia y Rendimiento</h4>
+                <p className="text-[10px] text-slate-450">Registra quién ha asistido a esta sesión y valora su trabajo diario.</p>
+              </div>
+              <a
+                href={`/asistencia?session_id=${sessionForm.id}`}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#CC0E21] hover:bg-[#a80b1a] text-white text-xs font-bold transition-all shadow-md shrink-0 text-center justify-center"
+              >
+                Registrar Asistencia ➔
+              </a>
+            </div>
+          )}
           
           {/* DATOS BÁSICOS */}
           <div className="space-y-3">

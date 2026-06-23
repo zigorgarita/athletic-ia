@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 import React, { useState, useEffect, useMemo } from 'react';
 import { Player, DetailedEvaluation, PlayerInjury } from '@/types';
+import { supabase } from '@/lib/supabase';
 import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -47,8 +48,86 @@ interface PlayerDetailProps {
 
 export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
   const [currentPlayer, setCurrentPlayer] = useState<Player>(player);
-  const [activeTab, setActiveTab] = useState<'profile' | 'deportivo' | 'valoraciones' | 'stats' | 'lesiones' | 'observations'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'deportivo' | 'valoraciones' | 'stats' | 'lesiones' | 'observations' | 'entrenamientos'>('profile');
   
+  // Training Attendance States
+  const [trainingAttendance, setTrainingAttendance] = useState<any[]>([]);
+  const [trainingEvaluations, setTrainingEvaluations] = useState<any[]>([]);
+  const [loadingTraining, setLoadingTraining] = useState(false);
+
+  // Load training history
+  useEffect(() => {
+    async function loadTrainingHistory() {
+      if (!currentPlayer.id) return;
+      try {
+        setLoadingTraining(true);
+        // Fetch attendance with session details
+        const { data: attData, error: attErr } = await supabase
+          .from('training_attendance')
+          .select(`
+            *,
+            planning_sessions (
+              id,
+              fecha,
+              tipo_sesion,
+              objetivo_principal,
+              carga
+            )
+          `)
+          .eq('player_id', currentPlayer.id)
+          .order('created_at', { ascending: false });
+        
+        if (attErr) throw attErr;
+
+        // Fetch evaluations
+        const { data: evalData, error: evalErr } = await supabase
+          .from('training_evaluations')
+          .select('*')
+          .eq('player_id', currentPlayer.id);
+        
+        if (evalErr) throw evalErr;
+
+        setTrainingAttendance(attData || []);
+        setTrainingEvaluations(evalData || []);
+      } catch (err) {
+        console.error('Error loading training history:', err);
+      } finally {
+        setLoadingTraining(false);
+      }
+    }
+
+    if (activeTab === 'entrenamientos') {
+      loadTrainingHistory();
+    }
+  }, [currentPlayer.id, activeTab]);
+
+  // Compute training stats
+  const trainingStats = useMemo(() => {
+    const total = trainingAttendance.length;
+    const attendedList = trainingAttendance.filter(a => a.attendance_status === 'Asiste');
+    const attended = attendedList.length;
+    const absences = trainingAttendance.filter(a => a.attendance_status === 'No asiste').length;
+    const lesionados = trainingAttendance.filter(a => a.attendance_status === 'Lesionado').length;
+    const bajas = trainingAttendance.filter(a => a.attendance_status === 'Baja temporal').length;
+    
+    const denominator = total - lesionados - bajas;
+    const attendancePct = denominator > 0 ? Math.round((attended / denominator) * 100) : 0;
+    
+    // Average evaluation
+    const ratedEvals = trainingEvaluations.filter(e => e.valoracion_global !== null && e.valoracion_global !== undefined);
+    const avgValuation = ratedEvals.length > 0
+      ? Number((ratedEvals.reduce((sum, e) => sum + Number(e.valoracion_global), 0) / ratedEvals.length).toFixed(1))
+      : null;
+
+    return {
+      total,
+      attended,
+      absences,
+      attendancePct,
+      avgValuation
+    };
+  }, [trainingAttendance, trainingEvaluations]);
+
   // Custom hooks
   const { evaluations, loading: loadingEvals, refetch: refetchEvals } = useEvaluations(currentPlayer.id);
   const { createEvaluation, loading: savingEval, error: evalSaveError } = useCreateEvaluation();
@@ -564,6 +643,17 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
         >
           <ClipboardList className="h-4 w-4" />
           Observaciones
+        </button>
+        <button
+          onClick={() => setActiveTab('entrenamientos')}
+          className={`flex items-center gap-2 px-5 py-3.5 border-b-2 text-sm font-semibold transition-all duration-200 ${
+            activeTab === 'entrenamientos'
+              ? 'border-[#CC0E21] text-[#CC0E21] bg-[#CC0E21]/5'
+              : 'border-transparent text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <Calendar className="h-4 w-4" />
+          Entrenamientos
         </button>
       </div>
 
@@ -1123,6 +1213,133 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Tab 7: Historial de Entrenamientos */}
+        {activeTab === 'entrenamientos' && (
+          <div className="space-y-6">
+            <h3 className="text-base font-bold text-slate-100 flex items-center gap-1.5">
+              <Calendar className="h-5 w-5 text-[#CC0E21]" />
+              Historial de Entrenamientos y Rendimiento
+            </h3>
+
+            {loadingTraining ? (
+              <div className="space-y-4">
+                <div className="h-16 bg-slate-800 rounded animate-pulse" />
+                <div className="h-16 bg-slate-800 rounded animate-pulse" />
+              </div>
+            ) : trainingAttendance.length === 0 ? (
+              <div className="p-8 border border-dashed border-slate-800 rounded-2xl text-center text-slate-500 text-sm">
+                No hay registros de entrenamientos para este jugador.
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {/* Resumen de Asistencia */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800/50 text-center">
+                    <span className="text-[10px] text-slate-500 font-bold uppercase block">Entrenamientos Convocados</span>
+                    <span className="text-2xl font-black text-white">{trainingStats.total}</span>
+                  </div>
+                  <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800/50 text-center">
+                    <span className="text-[10px] text-green-400 font-bold uppercase block">Asistidos</span>
+                    <span className="text-2xl font-black text-green-400">{trainingStats.attended}</span>
+                  </div>
+                  <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800/50 text-center">
+                    <span className="text-[10px] text-red-400 font-bold uppercase block">Ausencias</span>
+                    <span className="text-2xl font-black text-red-500">{trainingStats.absences}</span>
+                  </div>
+                  <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800/50 text-center">
+                    <span className="text-[10px] text-[#CC0E21] font-bold uppercase block">Media de Valoración</span>
+                    <span className="text-2xl font-black text-[#CC0E21]">
+                      {trainingStats.avgValuation !== null ? `${trainingStats.avgValuation} ★` : '-'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Porcentaje de asistencia en barra visual */}
+                <div className="p-4 bg-slate-900/30 border border-slate-800/80 rounded-xl space-y-2">
+                  <div className="flex justify-between items-center text-xs font-bold">
+                    <span className="text-slate-400">Porcentaje de Asistencia Real</span>
+                    <span className="text-white">{trainingStats.attendancePct}%</span>
+                  </div>
+                  <div className="w-full bg-slate-950 h-2.5 rounded-full overflow-hidden border border-slate-800/60">
+                    <div 
+                      className={`h-full rounded-full transition-all duration-500 ${
+                        trainingStats.attendancePct >= 85 ? 'bg-green-500' :
+                        trainingStats.attendancePct >= 70 ? 'bg-amber-500' : 'bg-red-650'
+                      }`}
+                      style={{ width: `${trainingStats.attendancePct}%` }}
+                    />
+                  </div>
+                  <p className="text-[9px] text-slate-500">
+                    * Excluye las sesiones marcadas como &quot;Lesionado&quot; o &quot;Baja temporal&quot; del denominador para calcular la asistencia real del jugador.
+                  </p>
+                </div>
+
+                {/* Timeline de sesiones */}
+                <div className="overflow-x-auto rounded-2xl border border-slate-800/85 bg-slate-900/20 shadow-xl">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-800 bg-slate-900/60 text-slate-400 text-[10px] font-black uppercase tracking-wider">
+                        <th className="px-4 py-3">Fecha</th>
+                        <th className="px-4 py-3">Tipo Sesión</th>
+                        <th className="px-4 py-3">Objetivo</th>
+                        <th className="px-4 py-3">Estado</th>
+                        <th className="px-4 py-3">Valoración Global</th>
+                        <th className="px-4 py-3">Notas / Comentarios</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60 text-xs text-slate-200">
+                      {trainingAttendance.map(att => {
+                        const session = att.planning_sessions || {};
+                        const valuation = trainingEvaluations.find(e => e.session_id === att.session_id) || {};
+                        
+                        return (
+                          <tr key={att.id} className="hover:bg-slate-800/20 transition-colors">
+                            <td className="px-4 py-3 font-semibold text-slate-400">
+                              {session.fecha || '-'}
+                            </td>
+                            <td className="px-4 py-3 font-bold text-slate-200">
+                              {session.tipo_sesion || '-'}
+                            </td>
+                            <td className="px-4 py-3 text-slate-400">
+                              {session.objetivo_principal || '-'}
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className={`text-[10px] font-black px-2 py-0.5 rounded-lg border ${
+                                att.attendance_status === 'Asiste' ? 'bg-green-950/20 text-green-400 border-green-900/30' :
+                                att.attendance_status === 'No asiste' ? 'bg-red-950/20 text-red-400 border-red-900/30' :
+                                'bg-slate-850 text-slate-350 border-slate-700/40'
+                              }`}>
+                                {att.attendance_status}
+                              </span>
+                              {att.absence_reason && (
+                                <span className="block text-[9px] text-slate-500 mt-0.5">
+                                  Motivo: {att.absence_reason}
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3">
+                              {att.attendance_status === 'Asiste' && valuation.valoracion_global !== undefined && valuation.valoracion_global !== null ? (
+                                <span className="text-amber-400 font-bold flex items-center gap-0.5">
+                                  <Star className="h-3.5 w-3.5 fill-amber-400" /> {Number(valuation.valoracion_global).toFixed(1)}
+                                </span>
+                              ) : (
+                                <span className="text-slate-600">-</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-slate-300 italic max-w-xs truncate" title={valuation.observaciones || att.attendance_notes || ''}>
+                              {valuation.observaciones || att.attendance_notes || '-'}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
           </div>
