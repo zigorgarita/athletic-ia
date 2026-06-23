@@ -580,6 +580,7 @@ export function ABPSection({ players }: ABPSectionProps) {
   
   // Board configuration state
   const isEditingPositions = true;
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   
@@ -1610,8 +1611,8 @@ export function ABPSection({ players }: ABPSectionProps) {
 
               {/* PIZARRA TÁCTICA E INFORMACIÓN */}
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                {/* LA PIZARRA (CAMPOGRAMA INTERACTIVO) - 5 cols */}
-                <div className="lg:col-span-5 flex flex-col items-center space-y-4">
+                {/* LA PIZARRA (CAMPOGRAMA INTERACTIVO) */}
+                <div className={`${showAdvanced ? 'lg:col-span-5' : 'lg:col-span-9'} flex flex-col items-center space-y-4`}>
                   {/* Pizarra Táctica */}
                   <div className="w-full bg-slate-900/20 border border-slate-800/60 rounded-3xl p-4 flex flex-col items-center">
                     <div className="w-full flex justify-between items-center mb-3">
@@ -1634,6 +1635,16 @@ export function ABPSection({ players }: ABPSectionProps) {
                         </div>
                       )}
                       <div className="flex gap-1.5">
+                        <Button
+                          variant={showAdvanced ? "primary" : "secondary"}
+                          onClick={() => setShowAdvanced(!showAdvanced)}
+                          className={`py-1 px-2.5 text-[10px] h-auto border transition-all ${
+                            showAdvanced ? 'bg-[#CC0E21] text-white border-transparent' : 'border-slate-800'
+                          }`}
+                          title="Muestra u oculta los puestos manuales de la jugada"
+                        >
+                          <Layers className="h-3 w-3 mr-1" /> {showAdvanced ? "Ocultar Puestos" : "Ver Puestos"}
+                        </Button>
                         <Button 
                           variant="secondary" 
                           onClick={handleResetPositions} 
@@ -1917,13 +1928,15 @@ export function ABPSection({ players }: ABPSectionProps) {
                         <AlertCircle className="h-3 w-3 text-slate-600" />
                         Arrastra fichas para moverlas, o suelta jugadores encima para asignarlos. Arrastra a la sidebar para liberarlos.
                       </span>
-                      <Button 
-                        variant="secondary"
-                        onClick={handleAddRoleNode}
-                        className="py-1 px-2 text-[10px] h-auto flex items-center gap-1 border border-slate-800 text-[#CC0E21]"
-                      >
-                        <PlusCircle className="h-3 w-3" /> Añadir Puesto
-                      </Button>
+                      {showAdvanced && (
+                        <Button 
+                          variant="secondary"
+                          onClick={handleAddRoleNode}
+                          className="py-1 px-2 text-[10px] h-auto flex items-center gap-1 border border-slate-800 text-[#CC0E21]"
+                        >
+                          <PlusCircle className="h-3 w-3" /> Añadir Puesto
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -2040,134 +2053,136 @@ export function ABPSection({ players }: ABPSectionProps) {
                 </div>
 
                 {/* PANEL: ROLES Y PUESTOS DE LA JUGADA - 4 cols */}
-                <div className="lg:col-span-4 p-4 bg-slate-900/40 border border-slate-800/80 rounded-2xl flex flex-col">
-                  <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
-                    <Layers className="h-3.5 w-3.5 text-[#CC0E21]" /> Puestos de la jugada ({playRoles.length})
-                  </h3>
+                {showAdvanced && (
+                  <div className="lg:col-span-4 p-4 bg-slate-900/40 border border-slate-800/80 rounded-2xl flex flex-col">
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                      <Layers className="h-3.5 w-3.5 text-[#CC0E21]" /> Puestos de la jugada ({playRoles.length})
+                    </h3>
 
-                  {loadingRoles ? (
-                    <Skeleton className="h-40 w-full" />
-                  ) : playRoles.length === 0 ? (
-                    <p className="text-xs text-slate-550 italic text-center py-6 border border-dashed border-slate-800 rounded-xl">
-                      No hay puestos colocados en el campo. Usa &quot;Añadir Puesto&quot;.
-                    </p>
-                  ) : (
-                    <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
-                      {playRoles.map((role) => {
-                        const isRealPosType = isRealPositionPlayType(selectedPlay.tipo);
-                        const { funcion_tactica, comentario } = parseComentario(role.comentario);
-                        const label = role.etiqueta || (isRealPosType ? POSITION_ABBRS[role.rol_asignado] : ROLE_ABBRS[role.rol_asignado]) || 'P';
+                    {loadingRoles ? (
+                      <Skeleton className="h-40 w-full" />
+                    ) : playRoles.length === 0 ? (
+                      <p className="text-xs text-slate-550 italic text-center py-6 border border-dashed border-slate-800 rounded-xl">
+                        No hay puestos colocados en el campo. Usa &quot;Añadir Puesto&quot;.
+                      </p>
+                    ) : (
+                      <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
+                        {playRoles.map((role) => {
+                          const isRealPosType = isRealPositionPlayType(selectedPlay.tipo);
+                          const { funcion_tactica, comentario } = parseComentario(role.comentario);
+                          const label = role.etiqueta || (isRealPosType ? POSITION_ABBRS[role.rol_asignado] : ROLE_ABBRS[role.rol_asignado]) || 'P';
 
-                        return (
-                          <div 
-                            key={role.id}
-                            className="bg-slate-950/60 border border-slate-855 p-2.5 rounded-xl space-y-2 transition-all hover:border-slate-800"
-                          >
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="h-6 w-8 bg-slate-900 border border-slate-800 text-[9px] text-[#CC0E21] font-bold rounded flex items-center justify-center">
-                                  {label}
-                                </span>
-                                {isRealPosType ? (
-                                  <select
-                                    value={role.rol_asignado}
-                                    onChange={(e) => handleRoleChange(role.id, e.target.value)}
-                                    className="bg-slate-900 border border-slate-800 text-xs font-semibold text-slate-300 rounded px-2 py-0.5 outline-none focus:border-[#CC0E21]"
-                                  >
-                                    {Object.keys(POSITION_ABBRS).map((pos) => (
-                                      <option key={pos} value={pos}>{pos}</option>
-                                    ))}
-                                  </select>
-                                ) : (
-                                  <select
-                                    value={role.rol_asignado}
-                                    onChange={(e) => handleRoleChange(role.id, e.target.value)}
-                                    className="bg-slate-900 border border-slate-800 text-xs font-semibold text-slate-300 rounded px-2 py-0.5 outline-none focus:border-[#CC0E21]"
-                                  >
-                                    {getRolesForPlayType(selectedPlay.tipo).map((opt) => (
-                                      <option key={opt} value={opt}>{opt}</option>
-                                    ))}
-                                  </select>
-                                )}
+                          return (
+                            <div 
+                              key={role.id}
+                              className="bg-slate-950/60 border border-slate-855 p-2.5 rounded-xl space-y-2 transition-all hover:border-slate-800"
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="h-6 w-8 bg-slate-900 border border-slate-800 text-[9px] text-[#CC0E21] font-bold rounded flex items-center justify-center">
+                                    {label}
+                                  </span>
+                                  {isRealPosType ? (
+                                    <select
+                                      value={role.rol_asignado}
+                                      onChange={(e) => handleRoleChange(role.id, e.target.value)}
+                                      className="bg-slate-900 border border-slate-800 text-xs font-semibold text-slate-300 rounded px-2 py-0.5 outline-none focus:border-[#CC0E21]"
+                                    >
+                                      {Object.keys(POSITION_ABBRS).map((pos) => (
+                                        <option key={pos} value={pos}>{pos}</option>
+                                      ))}
+                                    </select>
+                                  ) : (
+                                    <select
+                                      value={role.rol_asignado}
+                                      onChange={(e) => handleRoleChange(role.id, e.target.value)}
+                                      className="bg-slate-900 border border-slate-800 text-xs font-semibold text-slate-300 rounded px-2 py-0.5 outline-none focus:border-[#CC0E21]"
+                                    >
+                                      {getRolesForPlayType(selectedPlay.tipo).map((opt) => (
+                                        <option key={opt} value={opt}>{opt}</option>
+                                      ))}
+                                    </select>
+                                  )}
 
-                                {isRealPosType && (
-                                  <select
-                                    value={funcion_tactica}
-                                    onChange={(e) => {
-                                      const nextCom = serializeComentario(e.target.value, comentario);
-                                      handleCommentChange(role.id, nextCom);
-                                    }}
-                                    className="bg-slate-900/60 border border-slate-800 text-[10px] text-[#CC0E21] rounded px-1.5 py-0.5 outline-none"
+                                  {isRealPosType && (
+                                    <select
+                                      value={funcion_tactica}
+                                      onChange={(e) => {
+                                        const nextCom = serializeComentario(e.target.value, comentario);
+                                        handleCommentChange(role.id, nextCom);
+                                      }}
+                                      className="bg-slate-900/60 border border-slate-800 text-[10px] text-[#CC0E21] rounded px-1.5 py-0.5 outline-none"
+                                    >
+                                      <option value="">-- Sin función --</option>
+                                      <option value="Sacador">Sacador</option>
+                                      <option value="Apoyo">Apoyo</option>
+                                      <option value="Tercer hombre">Tercer hombre</option>
+                                      <option value="Receptor">Receptor</option>
+                                      <option value="Profundidad">Profundidad</option>
+                                      <option value="Vigilancia">Vigilancia</option>
+                                      <option value="Cobertura">Cobertura</option>
+                                    </select>
+                                  )}
+                                </div>
+
+                                <button
+                                  onClick={() => handleRemoveRoleNode(role.id)}
+                                  className="p-1 hover:bg-red-500/20 hover:text-red-400 rounded-lg text-slate-500"
+                                  title="Borrar este puesto de la jugada"
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+
+                              {/* Asignar jugador */}
+                              <div className="flex items-center gap-2">
+                                <select
+                                  value={role.player_id || ''}
+                                  onChange={(e) => handleAssignPlayerDirect(role.id, e.target.value)}
+                                  className="flex-1 bg-slate-900 border border-slate-800 text-xs text-slate-350 rounded px-2.5 py-1 outline-none focus:border-[#CC0E21]"
+                                >
+                                  <option value="">-- Sin asignar (Vacío) --</option>
+                                  {players.map((p) => (
+                                    <option key={p.id} value={p.id}>
+                                      #{p.dorsal} - {p.nombre} {p.apellidos || ''} ({p.demarcacion})
+                                    </option>
+                                  ))}
+                                </select>
+
+                                {role.player_id && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemovePlayerFromRole(role.id)}
+                                    className="p-1 text-slate-550 hover:text-slate-300 hover:bg-slate-800 rounded"
+                                    title="Desasignar jugador"
                                   >
-                                    <option value="">-- Sin función --</option>
-                                    <option value="Sacador">Sacador</option>
-                                    <option value="Apoyo">Apoyo</option>
-                                    <option value="Tercer hombre">Tercer hombre</option>
-                                    <option value="Receptor">Receptor</option>
-                                    <option value="Profundidad">Profundidad</option>
-                                    <option value="Vigilancia">Vigilancia</option>
-                                    <option value="Cobertura">Cobertura</option>
-                                  </select>
+                                    <X className="h-3 w-3" />
+                                  </button>
                                 )}
                               </div>
 
-                              <button
-                                onClick={() => handleRemoveRoleNode(role.id)}
-                                className="p-1 hover:bg-red-500/20 hover:text-red-400 rounded-lg text-slate-500"
-                                title="Borrar este puesto de la jugada"
-                              >
-                                <X className="h-3.5 w-3.5" />
-                              </button>
+                              {/* Comentario / Movimiento */}
+                              <input
+                                type="text"
+                                value={isRealPosType ? comentario : (role.comentario || '')}
+                                onChange={(e) => {
+                                  if (isRealPosType) {
+                                    const nextCom = serializeComentario(funcion_tactica, e.target.value);
+                                    handleCommentChange(role.id, nextCom);
+                                  } else {
+                                    handleCommentChange(role.id, e.target.value);
+                                  }
+                                }}
+                                placeholder={isRealPosType ? "Añadir movimiento o variante táctica..." : "Ej. Bloqueo al central o desmarque de arrastre..."}
+                                className="w-full bg-slate-900/60 border border-slate-855/80 rounded px-2 py-0.5 text-[10px] text-slate-400 placeholder-slate-650 outline-none focus:border-slate-800"
+                              />
                             </div>
-
-                            {/* Asignar jugador */}
-                            <div className="flex items-center gap-2">
-                              <select
-                                value={role.player_id || ''}
-                                onChange={(e) => handleAssignPlayerDirect(role.id, e.target.value)}
-                                className="flex-1 bg-slate-900 border border-slate-800 text-xs text-slate-350 rounded px-2.5 py-1 outline-none focus:border-[#CC0E21]"
-                              >
-                                <option value="">-- Sin asignar (Vacío) --</option>
-                                {players.map((p) => (
-                                  <option key={p.id} value={p.id}>
-                                    #{p.dorsal} - {p.nombre} {p.apellidos || ''} ({p.demarcacion})
-                                  </option>
-                                ))}
-                              </select>
-
-                              {role.player_id && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemovePlayerFromRole(role.id)}
-                                  className="p-1 text-slate-550 hover:text-slate-300 hover:bg-slate-800 rounded"
-                                  title="Desasignar jugador"
-                                >
-                                  <X className="h-3 w-3" />
-                                </button>
-                              )}
-                            </div>
-
-                            {/* Comentario / Movimiento */}
-                            <input
-                              type="text"
-                              value={isRealPosType ? comentario : (role.comentario || '')}
-                              onChange={(e) => {
-                                if (isRealPosType) {
-                                  const nextCom = serializeComentario(funcion_tactica, e.target.value);
-                                  handleCommentChange(role.id, nextCom);
-                                } else {
-                                  handleCommentChange(role.id, e.target.value);
-                                }
-                              }}
-                              placeholder={isRealPosType ? "Añadir movimiento o variante táctica..." : "Ej. Bloqueo al central o desmarque de arrastre..."}
-                              className="w-full bg-slate-900/60 border border-slate-850/80 rounded px-2 py-0.5 text-[10px] text-slate-400 placeholder-slate-650 outline-none focus:border-slate-800"
-                            />
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Instrucciones & Vídeo - Colocados abajo a ancho completo */}
