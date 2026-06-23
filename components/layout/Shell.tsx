@@ -38,7 +38,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
             <img src="/escudo.jpg" alt="S.D. Indautxu" className="h-full w-full object-cover" />
           </div>
           <div>
-            <span className="text-base font-bold tracking-tight text-white block">S.D. INDAUTXU</span>
+            <span className="text-base font-bold tracking-tight text-white block">INDAUTXU DH</span>
             <span className="text-xs text-slate-400 block -mt-1">Juvenil A • 2026/27</span>
           </div>
         </div>

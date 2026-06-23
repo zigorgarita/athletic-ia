@@ -15,13 +15,13 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "indautxu_26_27 - Gestión Deportiva",
+  title: "Indautxu DH 2026-27 - Gestión Deportiva",
   description: "Web App de Gestión de Plantilla de Fútbol y Evaluaciones de Rendimiento",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "indautxu_26_27",
+    title: "Indautxu DH",
   },
 };
 

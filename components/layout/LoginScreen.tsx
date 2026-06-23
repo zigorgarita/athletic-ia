@@ -119,7 +119,7 @@ export function LoginScreen({ children }: LoginScreenProps) {
 
         <div className="text-center mt-6">
           <span className="text-[10px] uppercase tracking-widest text-slate-600 font-bold">
-            Indautxu Juvenil A • 2026
+            Indautxu DH 2026-27
           </span>
         </div>
       </div>

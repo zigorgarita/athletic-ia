@@ -213,7 +213,7 @@ export default function GuiaPage() {
               <h2 className="text-2xl font-black text-slate-100 border-b border-slate-800 pb-2 print:text-black">CAPÍTULO 2: ACCESO Y NAVEGACIÓN</h2>
               <span className="text-xs font-bold text-slate-300 block">Acceso y Estructura</span>
               <p className="text-xs text-slate-350 leading-relaxed">
-                * <strong>URL de Acceso:</strong> <code>https://athletic-ia.vercel.app</code>
+                * <strong>URL de Acceso Principal:</strong> <code>https://indautxu2026.vercel.app</code> (también accesible desde la URL antigua <code>https://athletic-ia.vercel.app</code>)
                 <br />
                 * <strong>Menú Lateral / Inferior:</strong> Organiza las secciones principales de la app de forma responsiva (móviles y escritorio).
               </p>
