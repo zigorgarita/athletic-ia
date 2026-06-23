@@ -1,5 +1,5 @@
 export type Demarcacion = 'Portero' | 'Defensa' | 'Centrocampista' | 'Delantero' | 'Lateral' | 'Central' | 'Pivote' | 'Interior' | 'Extremo';
-export type EstadoJugador = 'Disponible' | 'Lesionado' | 'Duda' | 'Sancionado';
+export type EstadoJugador = 'Disponible' | 'Lesionado' | 'Duda' | 'Sancionado' | 'Baja temporal';
 export type Pierna = 'Diestro' | 'Zurdo' | 'Ambidiestro';
 export type ABPType =
   | 'Córner ofensivo'
@@ -37,6 +37,21 @@ export interface Player {
   updated_at: string;
 }
 
+export interface PlayerInjury {
+  id: string;
+  player_id: string;
+  fecha_lesion: string;
+  tipo_lesion: string;
+  diagnostico: string;
+  informado_por: 'Entrenador' | 'Segundo entrenador' | 'Preparador físico' | 'Fisio' | 'Jugador';
+  estado: 'Activa' | 'En recuperación' | 'Alta médica' | 'Recaída';
+  fecha_prevista_recuperacion: string | null;
+  fecha_real_recuperacion: string | null;
+  observaciones: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface DetailedEvaluation {
   id: string;
   player_id: string;
@@ -72,6 +87,12 @@ export interface DetailedEvaluation {
   
   // Métricas dinámicas por posición
   metricas?: Record<string, number> | null;
+  
+  // Nuevas columnas para valoraciones
+  perfil_especifico?: Record<string, number> | null;
+  valoraciones_generales?: Record<string, number> | null;
+  evaluado_por?: string | null;
+  valoracion_global?: number | null;
   
   created_at: string;
 }

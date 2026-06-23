@@ -1,5 +1,6 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 import React, { useState, useEffect, useMemo } from 'react';
-import { Player, DetailedEvaluation, METRICAS_POR_POSICION } from '@/types';
+import { Player, DetailedEvaluation, PlayerInjury } from '@/types';
 import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -11,11 +12,33 @@ import { useObservaciones } from '@/hooks/useObservaciones';
 import { usePlayerStats } from '@/hooks/usePlayerStats';
 import { useUpdatePlayer } from '@/hooks/useUpdatePlayer';
 import { useUploadPlayerPhoto } from '@/hooks/useUploadPlayerPhoto';
+import { usePlayerInjuries } from '@/hooks/usePlayerInjuries';
 import { compressImage } from '@/lib/image';
 import { 
   Award, ClipboardList, BarChart3, PlusCircle, 
-  Calendar, Check, Star, Sparkles 
+  Calendar, Check, Star, Sparkles, User, AlertTriangle,
+  History, Trash2, Heart, Plus, ShieldAlert
 } from 'lucide-react';
+
+const METRICAS_ESPECIFICAS: Record<string, string[]> = {
+  Portero: ['Juego aéreo', 'Blocaje', 'Reflejos', 'Juego con pies', 'Salida', 'Comunicación', 'Colocación'],
+  Central: ['Juego aéreo', 'Duelos defensivos', 'Anticipación', 'Salida de balón', 'Velocidad al espacio', 'Posicionamiento defensivo', 'Liderazgo defensivo'],
+  Defensa: ['Juego aéreo', 'Duelos defensivos', 'Anticipación', 'Salida de balón', 'Velocidad al espacio', 'Posicionamiento defensivo', 'Liderazgo defensivo'],
+  Lateral: ['Velocidad', 'Centros laterales', '1vs1 defensivo', '1vs1 ofensivo', 'Recorrido', 'Vigilancias', 'Defensa segundo palo'],
+  Pivote: ['Posicionamiento defensivo', 'Posicionamiento ofensivo', 'Juego aéreo', 'Pase corto', 'Pase largo', 'Orientación corporal', 'Toma de decisiones', 'Presión tras pérdida'],
+  Centrocampista: ['Posicionamiento defensivo', 'Posicionamiento ofensivo', 'Juego aéreo', 'Pase corto', 'Pase largo', 'Orientación corporal', 'Toma de decisiones', 'Presión tras pérdida'],
+  Interior: ['Posicionamiento defensivo', 'Posicionamiento ofensivo', 'Juego aéreo', 'Pase corto', 'Pase largo', 'Orientación corporal', 'Toma de decisiones', 'Presión tras pérdida'],
+  Mediapunta: ['Recibir entre líneas', 'Último pase', 'Giro', 'Toma de decisiones', 'Finalización', 'Creatividad', 'Trabajo defensivo'],
+  Extremo: ['1vs1', 'Velocidad', 'Desborde', 'Centros laterales', 'Ataque segundo palo', 'Retorno defensivo', 'Finalización'],
+  Delantero: ['Finalización', 'Juego de espaldas', 'Ataque al espacio', '1vs1', 'Velocidad', 'Remate', 'Presión', 'Movimientos de ruptura']
+};
+
+const METRICAS_GENERALES = {
+  TECNICA: ['Control', 'Pase', 'Conducción', 'Regate', 'Finalización'],
+  TACTICA: ['Toma de decisiones', 'Posicionamiento', 'Comprensión del juego', 'Trabajo sin balón', 'Relación con compañeros'],
+  CONDICIONAL: ['Velocidad', 'Aceleración', 'Resistencia', 'Fuerza', 'Potencia'],
+  MENTAL: ['Concentración', 'Competitividad', 'Liderazgo', 'Comunicación', 'Actitud']
+};
 
 interface PlayerDetailProps {
   player: Player;
@@ -24,39 +47,81 @@ interface PlayerDetailProps {
 
 export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
   const [currentPlayer, setCurrentPlayer] = useState<Player>(player);
-  const [activeTab, setActiveTab] = useState<'profile' | 'stats' | 'observations'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'deportivo' | 'valoraciones' | 'stats' | 'lesiones' | 'observations'>('profile');
   
   // Custom hooks
   const { evaluations, loading: loadingEvals, refetch: refetchEvals } = useEvaluations(currentPlayer.id);
-  const { createEvaluation } = useCreateEvaluation();
+  const { createEvaluation, loading: savingEval, error: evalSaveError } = useCreateEvaluation();
   const { observaciones, loading: loadingObs, createObservacion } = useObservaciones(currentPlayer.id);
   const { summary: statsSummary, loading: loadingStats } = usePlayerStats(currentPlayer.id);
   const { updatePlayer } = useUpdatePlayer();
   const { uploadPhoto, loading: uploadingPhoto } = useUploadPlayerPhoto();
+  const { injuries, loading: loadingInjuries, addInjury, updateInjury, deleteInjury } = usePlayerInjuries(currentPlayer.id);
 
-  // State for position-specific metrics
-  const [dynamicMetrics, setDynamicMetrics] = useState<Record<string, number>>({});
+  // State for ratings
+  const [perfilEspecífico, setPerfilEspecífico] = useState<Record<string, number>>({});
+  const [valoracionesGenerales, setValoracionesGenerales] = useState<Record<string, number>>({});
+  const [evaluador, setEvaluador] = useState<string>('Entrenador');
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [showError, setShowError] = useState<string | null>(null);
+
+  // Injuries tab local state
+  const [showInjuryForm, setShowInjuryForm] = useState(false);
+  const [injuryError, setInjuryError] = useState<string | null>(null);
+  const [newInjury, setNewInjury] = useState({
+    fecha_lesion: new Date().toISOString().split('T')[0],
+    tipo_lesion: '',
+    diagnostico: '',
+    informado_por: 'Fisio' as PlayerInjury['informado_por'],
+    estado: 'Activa' as PlayerInjury['estado'],
+    fecha_prevista_recuperacion: '',
+    fecha_real_recuperacion: '',
+    observaciones: ''
+  });
 
   const playerPosition = currentPlayer.demarcacion;
-  const metricsList = useMemo(() => METRICAS_POR_POSICION[playerPosition] || [], [playerPosition]);
+  const specificMetricsList = useMemo(() => METRICAS_ESPECIFICAS[playerPosition] || METRICAS_ESPECIFICAS['Centrocampista'], [playerPosition]);
 
   // Sync state with latest evaluation from DB if available
   useEffect(() => {
-    const initialMetrics: Record<string, number> = {};
-    metricsList.forEach(m => {
-      initialMetrics[m] = 3;
+    const initialSpecific: Record<string, number> = {};
+    specificMetricsList.forEach(m => {
+      initialSpecific[m] = 3;
+    });
+
+    const initialGeneral: Record<string, number> = {};
+    Object.values(METRICAS_GENERALES).flat().forEach(m => {
+      initialGeneral[m] = 3;
     });
 
     if (evaluations && evaluations.length > 0) {
       const latest = evaluations[0];
-      if (latest.metricas) {
-        metricsList.forEach(m => {
-          initialMetrics[m] = latest.metricas?.[m] ?? 3;
+      
+      // Load evaluator if stored
+      if (latest.evaluado_por) {
+        setEvaluador(latest.evaluado_por);
+      }
+
+      // Load specific metrics
+      if (latest.perfil_especifico) {
+        specificMetricsList.forEach(m => {
+          initialSpecific[m] = latest.perfil_especifico?.[m] ?? 3;
+        });
+      } else if (latest.metricas) {
+        // Fallback from old metricas field
+        specificMetricsList.forEach(m => {
+          initialSpecific[m] = latest.metricas?.[m] ?? 3;
+        });
+      }
+
+      // Load general metrics
+      if (latest.valoraciones_generales) {
+        Object.values(METRICAS_GENERALES).flat().forEach(m => {
+          initialGeneral[m] = latest.valoraciones_generales?.[m] ?? 3;
         });
       } else {
-        // Fallback/map from old columns if JSONB is empty
-        const oldFieldMap: Record<string, keyof DetailedEvaluation> = {
+        // Fallback mapping from individual fields
+        const fieldMap: Record<string, keyof DetailedEvaluation> = {
           'Velocidad': 'velocidad',
           'Aceleración': 'aceleracion',
           'Fuerza': 'fuerza',
@@ -64,7 +129,6 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
           'Juego aéreo': 'juego_aereo',
           'Marcaje': 'marcaje',
           'Entrada Defensiva': 'entrada_defensiva',
-          'Duelo defensivo': 'entrada_defensiva',
           'Posicionamiento': 'posicionamiento_defensivo',
           'Trabajo Defensivo': 'trabajo_defensivo',
           'Pase': 'pase_corto',
@@ -78,40 +142,60 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
           'Trabajo Ofensivo': 'trabajo_ofensivo',
           'Visión de juego': 'vision_juego',
           'Inteligencia táctica': 'inteligencia_tactica',
-          'Liderazgo': 'liderazgo',
+          'Liderazgo': 'liderazgo'
         };
-
-        metricsList.forEach(m => {
-          const oldField = oldFieldMap[m];
-          if (oldField && latest[oldField] !== undefined) {
-            initialMetrics[m] = latest[oldField] as number;
+        Object.values(METRICAS_GENERALES).flat().forEach(m => {
+          const field = fieldMap[m];
+          if (field && latest[field] !== undefined) {
+            initialGeneral[m] = latest[field] as number;
           }
         });
       }
     }
-    setDynamicMetrics(initialMetrics);
-  }, [evaluations, playerPosition, metricsList]);
+    setPerfilEspecífico(initialSpecific);
+    setValoracionesGenerales(initialGeneral);
+  }, [evaluations, playerPosition, specificMetricsList]);
 
-  // Handle rating metric change
-  const handleDynamicMetricChange = (metricName: string, val: number) => {
-    setDynamicMetrics(prev => ({
-      ...prev,
-      [metricName]: val
-    }));
+  // Handle rating change
+  const handleSpecificMetricChange = (metricName: string, val: number) => {
+    setPerfilEspecífico(prev => ({ ...prev, [metricName]: val }));
   };
 
-  // Save detailed evaluations
+  const handleGeneralMetricChange = (metricName: string, val: number) => {
+    setValoracionesGenerales(prev => ({ ...prev, [metricName]: val }));
+  };
+
+  // Recalculate global rating dynamically
+  const computedGlobalRating = useMemo(() => {
+    const specificVals = Object.values(perfilEspecífico);
+    const generalVals = Object.values(valoracionesGenerales);
+    const allVals = [...specificVals, ...generalVals];
+    if (allVals.length === 0) return 3.0;
+    const sum = allVals.reduce((acc, v) => acc + v, 0);
+    return Number((sum / allVals.length).toFixed(1));
+  }, [perfilEspecífico, valoracionesGenerales]);
+
+  // Save evaluations
   const handleSaveEvaluation = async () => {
+    setShowError(null);
+    setSaveSuccess(false);
+
     const payload: Omit<DetailedEvaluation, 'id' | 'created_at'> = {
       player_id: currentPlayer.id,
       fecha_evaluacion: new Date().toISOString().split('T')[0],
-      metricas: dynamicMetrics
+      perfil_especifico: perfilEspecífico,
+      valoraciones_generales: valoracionesGenerales,
+      evaluado_por: evaluador,
+      valoracion_global: computedGlobalRating
     };
+
     const saved = await createEvaluation(payload);
     if (saved) {
       setSaveSuccess(true);
       refetchEvals();
-      setTimeout(() => setSaveSuccess(false), 3000);
+      setTimeout(() => setSaveSuccess(false), 4000);
+    } else {
+      setShowError(evalSaveError || 'Error al conectar con la base de datos de Supabase.');
     }
   };
 
@@ -160,7 +244,85 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
     }
   };
 
+  // Handle Injury submit
+  const handleInjurySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setInjuryError(null);
+    if (!newInjury.tipo_lesion || !newInjury.diagnostico) {
+      setInjuryError('El tipo de lesión y el diagnóstico son obligatorios');
+      return;
+    }
+
+    const payload = {
+      player_id: currentPlayer.id,
+      fecha_lesion: newInjury.fecha_lesion,
+      tipo_lesion: newInjury.tipo_lesion,
+      diagnostico: newInjury.diagnostico,
+      informado_por: newInjury.informado_por,
+      estado: newInjury.estado,
+      fecha_prevista_recuperacion: newInjury.fecha_prevista_recuperacion || null,
+      fecha_real_recuperacion: newInjury.fecha_real_recuperacion || null,
+      observaciones: newInjury.observaciones || null
+    };
+
+    const saved = await addInjury(payload);
+    if (saved) {
+      // Sync player state with injury if active
+      if (newInjury.estado === 'Activa' || newInjury.estado === 'Recaída' || newInjury.estado === 'En recuperación') {
+        const updatedPlayer = await updatePlayer(currentPlayer.id, { estado: 'Lesionado' });
+        if (updatedPlayer) setCurrentPlayer(updatedPlayer);
+      }
+      setShowInjuryForm(false);
+      setNewInjury({
+        fecha_lesion: new Date().toISOString().split('T')[0],
+        tipo_lesion: '',
+        diagnostico: '',
+        informado_por: 'Fisio',
+        estado: 'Activa',
+        fecha_prevista_recuperacion: '',
+        fecha_real_recuperacion: '',
+        observaciones: ''
+      });
+    } else {
+      setInjuryError('Error al registrar la lesión en Supabase');
+    }
+  };
+
+  const handleUpdateInjuryStatus = async (injuryId: string, nextStatus: PlayerInjury['estado']) => {
+    const isCleared = nextStatus === 'Alta médica';
+    const updates: Partial<PlayerInjury> = { 
+      estado: nextStatus,
+      fecha_real_recuperacion: isCleared ? new Date().toISOString().split('T')[0] : null
+    };
+    
+    const updated = await updateInjury(injuryId, updates);
+    if (updated) {
+      // If cleared, set player back to Disponible
+      if (isCleared) {
+        const activeInjuries = injuries.filter(inj => inj.id !== injuryId && (inj.estado === 'Activa' || inj.estado === 'Recaída' || inj.estado === 'En recuperación'));
+        if (activeInjuries.length === 0) {
+          const updatedPlayer = await updatePlayer(currentPlayer.id, { estado: 'Disponible' });
+          if (updatedPlayer) setCurrentPlayer(updatedPlayer);
+        }
+      }
+    }
+  };
+
+  const handleDeleteInjury = async (injuryId: string) => {
+    if (confirm('¿Estás seguro de que deseas eliminar esta lesión del historial?')) {
+      const ok = await deleteInjury(injuryId);
+      if (ok) {
+        const activeInjuries = injuries.filter(inj => inj.id !== injuryId && (inj.estado === 'Activa' || inj.estado === 'Recaída' || inj.estado === 'En recuperación'));
+        if (activeInjuries.length === 0 && currentPlayer.estado === 'Lesionado') {
+          const updatedPlayer = await updatePlayer(currentPlayer.id, { estado: 'Disponible' });
+          if (updatedPlayer) setCurrentPlayer(updatedPlayer);
+        }
+      }
+    }
+  };
+
   const getAge = (birthDateString: string) => {
+    if (!birthDateString) return '-';
     const today = new Date();
     const birthDate = new Date(birthDateString);
     let age = today.getFullYear() - birthDate.getFullYear();
@@ -170,12 +332,6 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
     }
     return age;
   };
-
-  // Calculate global rating average based on active position-specific metrics
-  const activeMetrics = Object.values(dynamicMetrics);
-  const globalRatingAvg = activeMetrics.length > 0 
-    ? (activeMetrics.reduce((acc, curr) => acc + curr, 0) / activeMetrics.length).toFixed(1)
-    : '-';
 
   return (
     <div className="space-y-6">
@@ -189,10 +345,10 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
 
       {/* Tarjeta de Encabezado Principal */}
       <div className="p-6 rounded-3xl bg-slate-900/40 border border-slate-800/80 backdrop-blur-xl flex flex-col md:flex-row gap-6 items-center md:items-start relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-64 h-64 rounded-full bg-green-500/5 blur-[80px] pointer-events-none" />
+        <div className="absolute top-0 right-0 w-64 h-64 rounded-full bg-[#CC0E21]/5 blur-[80px] pointer-events-none" />
         
         {/* Foto de Perfil Grande */}
-        <div className="relative group cursor-pointer h-32 w-32 rounded-full overflow-hidden border-4 border-slate-800/80 shadow-2xl transition-all duration-300 hover:border-green-500/50">
+        <div className="relative group cursor-pointer h-32 w-32 rounded-full overflow-hidden border-4 border-slate-850 shadow-2xl transition-all duration-300 hover:border-[#CC0E21]/40">
           <input
             type="file"
             accept="image/*"
@@ -216,7 +372,7 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
           <Avatar src={currentPlayer.foto_url} name={currentPlayer.nombre} size="xl" className="h-full w-full object-cover" />
           {!currentPlayer.foto_url && (
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/20 group-hover:bg-slate-950/40 transition-colors duration-200">
-              <span className="absolute bottom-2 text-[8px] text-green-400 font-extrabold uppercase tracking-wider bg-slate-950/90 px-2 py-0.5 rounded-full border border-green-500/30">
+              <span className="absolute bottom-2 text-[8px] text-[#CC0E21] font-extrabold uppercase tracking-wider bg-slate-950/90 px-2 py-0.5 rounded-full border border-[#CC0E21]/30">
                 {uploadingPhoto ? 'Subiendo...' : 'Añadir foto'}
               </span>
             </div>
@@ -228,7 +384,7 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
               </span>
             </div>
           )}
-          <div className="absolute bottom-1 right-1 bg-green-500 text-slate-950 font-black h-6 w-6 rounded-lg flex items-center justify-center text-[10px] shadow-lg z-20">
+          <div className="absolute bottom-1 right-1 bg-[#CC0E21] text-white font-black h-6 w-6 rounded-lg flex items-center justify-center text-[10px] shadow-lg z-20">
             #{currentPlayer.dorsal}
           </div>
         </div>
@@ -243,14 +399,14 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
               <select
                 value={currentPlayer.demarcacion}
                 onChange={async (e) => {
-                  const newPos = e.target.value as Player['demarcacion'];
+                  const newPos = e.target.value as any;
                   const updated = await updatePlayer(currentPlayer.id, { demarcacion: newPos });
                   if (updated) {
                     setCurrentPlayer(updated);
                   }
                 }}
-                className="bg-slate-900/80 hover:bg-slate-800 text-green-400 border border-green-500/20 rounded-xl px-3 py-1 text-xs outline-none focus:border-green-500 cursor-pointer font-bold transition-all duration-200 shadow-md shadow-green-500/5 appearance-none pr-8"
-                style={{ backgroundImage: `url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%2322c55e' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E")`, backgroundPosition: 'right 0.5rem center', backgroundSize: '1.25rem', backgroundRepeat: 'no-repeat' }}
+                className="bg-slate-900/80 hover:bg-slate-800 text-[#CC0E21] border border-[#CC0E21]/20 rounded-xl px-3 py-1 text-xs outline-none focus:border-[#CC0E21] cursor-pointer font-bold transition-all duration-200 shadow-md shadow-[#CC0E21]/5 appearance-none pr-8"
+                style={{ backgroundImage: `url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%23CC0E21' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E")`, backgroundPosition: 'right 0.5rem center', backgroundSize: '1.25rem', backgroundRepeat: 'no-repeat' }}
               >
                 <option value="Portero" className="bg-slate-950 text-slate-200">Portero</option>
                 <option value="Lateral" className="bg-slate-950 text-slate-200">Lateral</option>
@@ -268,9 +424,10 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
                 currentPlayer.estado === 'Disponible' ? 'bg-green-950/20 text-green-400 border-green-900/30' :
                 currentPlayer.estado === 'Lesionado' ? 'bg-red-950/20 text-red-400 border-red-900/30' :
                 currentPlayer.estado === 'Duda' ? 'bg-amber-950/20 text-amber-400 border-amber-900/30' :
-                'bg-slate-950/20 text-slate-400 border-slate-900/30'
+                currentPlayer.estado === 'Sancionado' ? 'bg-orange-950/20 text-orange-400 border-orange-900/30' :
+                'bg-slate-850/40 text-slate-400 border-slate-700/50'
               }`}>
-                {currentPlayer.estado === 'Duda' ? 'Duda Semanal' : currentPlayer.estado}
+                {currentPlayer.estado}
               </span>
             )}
           </div>
@@ -303,7 +460,7 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
                       setCurrentPlayer(updated);
                     }
                   }}
-                  className="bg-slate-900/40 hover:bg-slate-800/60 text-slate-200 border border-slate-700/30 rounded-lg px-2 py-0.5 text-xs outline-none focus:border-green-500 cursor-pointer font-semibold appearance-none pr-6 w-full"
+                  className="bg-slate-900/40 hover:bg-slate-800/60 text-slate-200 border border-slate-700/30 rounded-lg px-2 py-0.5 text-xs outline-none focus:border-[#CC0E21] cursor-pointer font-semibold appearance-none pr-6 w-full"
                   style={{ backgroundImage: `url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%2394a3b8' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E")`, backgroundPosition: 'right 0.35rem center', backgroundSize: '1rem', backgroundRepeat: 'no-repeat' }}
                 >
                   <option value="" className="bg-slate-950 text-slate-350">Ninguna</option>
@@ -321,14 +478,14 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-4 text-xs text-slate-400 pt-1 justify-center md:justify-start">
+          <div className="flex flex-wrap gap-4 text-xs text-slate-400 pt-1 justify-center md:justify-start items-center">
             {currentPlayer.rol_abp && (
               <span><strong className="text-slate-300">Rol ABP:</strong> {currentPlayer.rol_abp}</span>
             )}
             <span>
-              <strong className="text-slate-300">Valoración Global:</strong> 
-              <span className="text-green-400 font-extrabold ml-1.5 flex items-center gap-0.5 inline-flex">
-                <Star className="h-3 w-3 fill-green-400 text-green-400" /> {globalRatingAvg}
+              <strong className="text-slate-300">Valoración Global Vigente:</strong> 
+              <span className="text-amber-400 font-extrabold ml-1.5 flex items-center gap-0.5 inline-flex">
+                <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" /> {computedGlobalRating}
               </span>
             </span>
           </div>
@@ -336,23 +493,61 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-slate-800">
+      <div className="flex overflow-x-auto border-b border-slate-800 scrollbar-none whitespace-nowrap">
         <button
           onClick={() => setActiveTab('profile')}
-          className={`flex items-center gap-2 px-6 py-3.5 border-b-2 text-sm font-semibold transition-all duration-200 ${
+          className={`flex items-center gap-2 px-5 py-3.5 border-b-2 text-sm font-semibold transition-all duration-200 ${
             activeTab === 'profile'
-              ? 'border-green-500 text-green-400 bg-green-500/5'
+              ? 'border-[#CC0E21] text-[#CC0E21] bg-[#CC0E21]/5'
+              : 'border-transparent text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <User className="h-4 w-4" />
+          Datos Generales
+        </button>
+        <button
+          onClick={() => setActiveTab('deportivo')}
+          className={`flex items-center gap-2 px-5 py-3.5 border-b-2 text-sm font-semibold transition-all duration-200 ${
+            activeTab === 'deportivo'
+              ? 'border-[#CC0E21] text-[#CC0E21] bg-[#CC0E21]/5'
+              : 'border-transparent text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <Sparkles className="h-4 w-4" />
+          Perfil Deportivo
+        </button>
+        <button
+          onClick={() => setActiveTab('valoraciones')}
+          className={`flex items-center gap-2 px-5 py-3.5 border-b-2 text-sm font-semibold transition-all duration-200 ${
+            activeTab === 'valoraciones'
+              ? 'border-[#CC0E21] text-[#CC0E21] bg-[#CC0E21]/5'
               : 'border-transparent text-slate-400 hover:text-slate-200'
           }`}
         >
           <Award className="h-4 w-4" />
-          Perfil y Valoraciones
+          Valoraciones
+        </button>
+        <button
+          onClick={() => setActiveTab('lesiones')}
+          className={`flex items-center gap-2 px-5 py-3.5 border-b-2 text-sm font-semibold transition-all duration-200 ${
+            activeTab === 'lesiones'
+              ? 'border-[#CC0E21] text-[#CC0E21] bg-[#CC0E21]/5'
+              : 'border-transparent text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <ShieldAlert className="h-4 w-4" />
+          Lesiones
+          {injuries.filter(i => i.estado === 'Activa' || i.estado === 'Recaída').length > 0 && (
+            <span className="ml-1 bg-red-600 text-white text-[9px] px-1.5 py-0.5 rounded-full font-black">
+              {injuries.filter(i => i.estado === 'Activa' || i.estado === 'Recaída').length}
+            </span>
+          )}
         </button>
         <button
           onClick={() => setActiveTab('stats')}
-          className={`flex items-center gap-2 px-6 py-3.5 border-b-2 text-sm font-semibold transition-all duration-200 ${
+          className={`flex items-center gap-2 px-5 py-3.5 border-b-2 text-sm font-semibold transition-all duration-200 ${
             activeTab === 'stats'
-              ? 'border-green-500 text-green-400 bg-green-500/5'
+              ? 'border-[#CC0E21] text-[#CC0E21] bg-[#CC0E21]/5'
               : 'border-transparent text-slate-400 hover:text-slate-200'
           }`}
         >
@@ -361,9 +556,9 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
         </button>
         <button
           onClick={() => setActiveTab('observations')}
-          className={`flex items-center gap-2 px-6 py-3.5 border-b-2 text-sm font-semibold transition-all duration-200 ${
+          className={`flex items-center gap-2 px-5 py-3.5 border-b-2 text-sm font-semibold transition-all duration-200 ${
             activeTab === 'observations'
-              ? 'border-green-500 text-green-400 bg-green-500/5'
+              ? 'border-[#CC0E21] text-[#CC0E21] bg-[#CC0E21]/5'
               : 'border-transparent text-slate-400 hover:text-slate-200'
           }`}
         >
@@ -374,33 +569,109 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
 
       {/* Contenido de las Tabs */}
       <div className="pt-2">
+        {/* Banner de errores de guardado global */}
+        {showError && (
+          <div className="mb-4 p-4 bg-red-950/30 border border-red-900/40 text-red-400 rounded-2xl flex items-start gap-2.5 text-xs animate-shake">
+            <AlertTriangle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
+            <div>
+              <strong className="font-bold block">Error al guardar valoraciones:</strong>
+              <span className="opacity-90">{showError}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Tab 1: Datos Generales */}
         {activeTab === 'profile' && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="md:col-span-2 space-y-6">
+              <div className="p-6 bg-slate-900/40 border border-slate-800/80 rounded-2xl space-y-4">
+                <h3 className="text-sm font-bold text-slate-200 uppercase tracking-wider border-b border-slate-850 pb-2">Información del Jugador</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                  <div>
+                    <span className="text-slate-500 font-bold block mb-0.5">Nombre Completo</span>
+                    <span className="text-slate-200 text-sm font-medium">{currentPlayer.nombre} {currentPlayer.apellidos}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 font-bold block mb-0.5">Equipo</span>
+                    <span className="text-slate-200 text-sm font-medium">Juvenil {currentPlayer.equipo}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 font-bold block mb-0.5">Dorsal</span>
+                    <span className="text-slate-200 text-sm font-medium">#{currentPlayer.dorsal}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 font-bold block mb-0.5">Fecha Nacimiento</span>
+                    <span className="text-slate-200 text-sm font-medium">{currentPlayer.fecha_nacimiento}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 font-bold block mb-0.5">Posición Principal</span>
+                    <span className="text-slate-200 text-sm font-medium">{currentPlayer.demarcacion}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 font-bold block mb-0.5">Posición Secundaria</span>
+                    <span className="text-slate-200 text-sm font-medium">{currentPlayer.posicion_secundaria || 'Ninguna'}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="space-y-6">
+              <div className="p-6 bg-slate-900/40 border border-slate-800/80 rounded-2xl space-y-4">
+                <h3 className="text-sm font-bold text-slate-200 uppercase tracking-wider border-b border-slate-850 pb-2">Antropometría y Físico</h3>
+                <div className="grid grid-cols-2 gap-4 text-xs">
+                  <div>
+                    <span className="text-slate-500 font-bold block mb-0.5">Altura</span>
+                    <span className="text-slate-200 text-sm font-medium">{currentPlayer.altura ? `${currentPlayer.altura} m` : 'No registrada'}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 font-bold block mb-0.5">Peso</span>
+                    <span className="text-slate-200 text-sm font-medium">{currentPlayer.peso ? `${currentPlayer.peso} kg` : 'No registrado'}</span>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="text-slate-500 font-bold block mb-0.5">Pierna Dominante</span>
+                    <span className="text-slate-200 text-sm font-medium">{currentPlayer.pierna_dominante}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Tab 2: Perfil Deportivo */}
+        {activeTab === 'deportivo' && (
           <div className="space-y-6">
-            {/* Cabecera Guardar Valoraciones */}
-            {/* Cabecera Guardar Valoraciones */}
             <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 bg-slate-900/60 p-5 rounded-2xl border border-slate-800/80">
               <div>
                 <h3 className="text-base font-bold text-slate-100 flex items-center gap-1.5">
                   <Sparkles className="h-4 w-4 text-amber-400" />
-                  Sistema de Rendimiento ({playerPosition.toUpperCase()})
+                  Perfil Específico por Posición ({playerPosition.toUpperCase()})
                 </h3>
                 <p className="text-xs text-slate-400 mt-1">
-                  Métricas personalizadas para la posición de {playerPosition.toLowerCase()}. La valoración global se calcula promediando estas métricas.
+                  Evalúa las características clave para la posición principal del jugador.
                 </p>
               </div>
               <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1">
+                  <User className="h-3.5 w-3.5 text-slate-500" />
+                  <input
+                    type="text"
+                    value={evaluador}
+                    onChange={e => setEvaluador(e.target.value)}
+                    placeholder="Evaluador..."
+                    className="bg-slate-950 border border-slate-800 text-xs px-2.5 py-1.5 rounded-lg text-slate-200 outline-none w-32 focus:border-[#CC0E21]"
+                  />
+                </div>
                 {saveSuccess && (
                   <span className="text-xs text-green-400 font-bold flex items-center gap-1">
-                    <Check className="h-4 w-4" /> ¡Guardado en Supabase!
+                    <Check className="h-4 w-4" /> ¡Guardado!
                   </span>
                 )}
-                <Button onClick={handleSaveEvaluation} className="px-5 py-2 font-bold text-xs">
+                <Button onClick={handleSaveEvaluation} loading={savingEval} className="px-5 py-2 font-bold text-xs">
                   Guardar Valoraciones
                 </Button>
               </div>
             </div>
 
-            {/* Grid de Métricas específicas */}
             {loadingEvals ? (
               <div className="p-6 rounded-2xl border border-slate-800 space-y-4">
                 <div className="h-6 w-32 bg-slate-800 rounded animate-pulse" />
@@ -408,16 +679,16 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
               </div>
             ) : (
               <div className="p-6 rounded-2xl bg-slate-900/20 border border-slate-800/70 space-y-6">
-                <h3 className="text-sm font-bold text-green-400 uppercase tracking-wider border-b border-slate-800/60 pb-2 flex items-center gap-2">
-                  <Award className="h-4 w-4 text-green-500" /> Atributos de Posición
+                <h3 className="text-sm font-bold text-[#CC0E21] uppercase tracking-wider border-b border-slate-800/60 pb-2 flex items-center gap-2">
+                  <Award className="h-4 w-4 text-[#CC0E21]" /> Habilidades Clave
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3">
-                  {metricsList.map((metric) => (
+                  {specificMetricsList.map((metric) => (
                     <StarRating
                       key={metric}
                       label={metric}
-                      value={dynamicMetrics[metric] ?? 3}
-                      onChange={(val) => handleDynamicMetricChange(metric, val)}
+                      value={perfilEspecífico[metric] ?? 3}
+                      onChange={(val) => handleSpecificMetricChange(metric, val)}
                       size={20}
                     />
                   ))}
@@ -427,6 +698,227 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
           </div>
         )}
 
+        {/* Tab 3: Valoraciones Generales */}
+        {activeTab === 'valoraciones' && (
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 bg-slate-900/60 p-5 rounded-2xl border border-slate-800/80">
+              <div>
+                <h3 className="text-base font-bold text-slate-100 flex items-center gap-1.5">
+                  <Award className="h-4 w-4 text-[#CC0E21]" />
+                  Valoraciones Generales
+                </h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  Atributos globales estructurados por categorías técnicas, tácticas, físicas y mentales.
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1">
+                  <User className="h-3.5 w-3.5 text-slate-500" />
+                  <input
+                    type="text"
+                    value={evaluador}
+                    onChange={e => setEvaluador(e.target.value)}
+                    placeholder="Evaluador..."
+                    className="bg-slate-950 border border-slate-800 text-xs px-2.5 py-1.5 rounded-lg text-slate-200 outline-none w-32 focus:border-[#CC0E21]"
+                  />
+                </div>
+                {saveSuccess && (
+                  <span className="text-xs text-green-400 font-bold flex items-center gap-1">
+                    <Check className="h-4 w-4" /> ¡Guardado!
+                  </span>
+                )}
+                <Button onClick={handleSaveEvaluation} loading={savingEval} className="px-5 py-2 font-bold text-xs">
+                  Guardar Valoraciones
+                </Button>
+              </div>
+            </div>
+
+            {loadingEvals ? (
+              <div className="p-6 rounded-2xl border border-slate-800 space-y-4">
+                <div className="h-6 w-32 bg-slate-800 rounded animate-pulse" />
+                <div className="h-24 w-full bg-slate-900 rounded animate-pulse" />
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {Object.entries(METRICAS_GENERALES).map(([cat, list]) => (
+                  <div key={cat} className="p-5 rounded-2xl bg-slate-900/20 border border-slate-800/70 space-y-4">
+                    <h4 className="text-xs font-bold text-slate-350 uppercase tracking-wider border-b border-slate-850 pb-1.5">
+                      {cat}
+                    </h4>
+                    <div className="space-y-3">
+                      {list.map(metric => (
+                        <StarRating
+                          key={metric}
+                          label={metric}
+                          value={valoracionesGenerales[metric] ?? 3}
+                          onChange={(val) => handleGeneralMetricChange(metric, val)}
+                          size={18}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Tab 4: Historial de Lesiones */}
+        {activeTab === 'lesiones' && (
+          <div className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h3 className="text-base font-bold text-slate-100 flex items-center gap-1.5">
+                <History className="h-5 w-5 text-slate-400" />
+                Historial Médico de Lesiones
+              </h3>
+              <Button onClick={() => setShowInjuryForm(!showInjuryForm)} variant={showInjuryForm ? 'secondary' : 'primary'} className="flex items-center gap-1 text-xs">
+                <Plus className="h-3.5 w-3.5" />
+                {showInjuryForm ? 'Ocultar Formulario' : 'Registrar Lesión'}
+              </Button>
+            </div>
+
+            {showInjuryForm && (
+              <form onSubmit={handleInjurySubmit} className="p-5 rounded-2xl bg-slate-900/40 border border-slate-800 space-y-4">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Nueva Ficha de Lesión</h4>
+                {injuryError && (
+                  <div className="p-3 bg-red-950/25 border border-red-900/40 text-red-405 text-xs rounded-xl">
+                    {injuryError}
+                  </div>
+                )}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <Input 
+                    label="Fecha de Lesión *" 
+                    type="date"
+                    value={newInjury.fecha_lesion} 
+                    onChange={e => setNewInjury(prev => ({ ...prev, fecha_lesion: e.target.value }))} 
+                  />
+                  <Input 
+                    label="Tipo de Lesión *" 
+                    placeholder="Ej: Esguince tobillo, Rotura fibrilar" 
+                    value={newInjury.tipo_lesion} 
+                    onChange={e => setNewInjury(prev => ({ ...prev, tipo_lesion: e.target.value }))} 
+                  />
+                  <Input 
+                    label="Diagnóstico / Detalles *" 
+                    placeholder="Ej: Grado II ligamento lateral externo" 
+                    value={newInjury.diagnostico} 
+                    onChange={e => setNewInjury(prev => ({ ...prev, diagnostico: e.target.value }))} 
+                  />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs text-slate-450 font-bold block mb-1">Informado Por</label>
+                    <select
+                      value={newInjury.informado_por}
+                      onChange={e => setNewInjury(prev => ({ ...prev, informado_por: e.target.value as any }))}
+                      className="w-full bg-slate-950 border border-slate-800 text-xs px-3 py-2 rounded-xl text-slate-200 outline-none"
+                    >
+                      <option value="Fisio">Fisioterapeuta</option>
+                      <option value="Preparador físico">Preparador Físico</option>
+                      <option value="Entrenador">Entrenador</option>
+                      <option value="Segundo entrenador">Segundo Entrenador</option>
+                      <option value="Jugador">Propio Jugador</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-450 font-bold block mb-1">Estado de Lesión</label>
+                    <select
+                      value={newInjury.estado}
+                      onChange={e => setNewInjury(prev => ({ ...prev, estado: e.target.value as any }))}
+                      className="w-full bg-slate-950 border border-slate-800 text-xs px-3 py-2 rounded-xl text-slate-200 outline-none"
+                    >
+                      <option value="Activa">Activa / De baja</option>
+                      <option value="En recuperación">En Readaptación</option>
+                      <option value="Alta médica">Alta Médica</option>
+                      <option value="Recaída">Recaída</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Input 
+                    label="Fecha Prevista Recuperación" 
+                    type="date"
+                    value={newInjury.fecha_prevista_recuperacion}
+                    onChange={e => setNewInjury(prev => ({ ...prev, fecha_prevista_recuperacion: e.target.value }))} 
+                  />
+                  <Input 
+                    label="Fecha Real Alta" 
+                    type="date"
+                    disabled={newInjury.estado !== 'Alta médica'}
+                    value={newInjury.fecha_real_recuperacion}
+                    onChange={e => setNewInjury(prev => ({ ...prev, fecha_real_recuperacion: e.target.value }))} 
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-slate-450 font-bold block mb-1">Observaciones Médicas</label>
+                  <textarea 
+                    className="w-full h-20 px-3 py-2 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-200 outline-none focus:border-[#CC0E21]"
+                    value={newInjury.observaciones}
+                    onChange={e => setNewInjury(prev => ({ ...prev, observaciones: e.target.value }))}
+                  />
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button type="submit" className="px-5 py-2 text-xs font-bold">
+                    Guardar Ficha Médica
+                  </Button>
+                </div>
+              </form>
+            )}
+
+            {loadingInjuries ? (
+              <div className="space-y-3">
+                <div className="h-16 bg-slate-800 rounded animate-pulse" />
+                <div className="h-16 bg-slate-800 rounded animate-pulse" />
+              </div>
+            ) : injuries.length === 0 ? (
+              <div className="p-8 border border-dashed border-slate-800 rounded-2xl text-center text-slate-500 text-sm">
+                No hay historial de lesiones registrado para este jugador.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {injuries.map(injury => (
+                  <div key={injury.id} className="p-5 rounded-2xl bg-slate-900/30 border border-slate-800/80 space-y-3 relative group">
+                    <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b border-slate-850 pb-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-xs text-slate-500 font-semibold">{injury.fecha_lesion}</span>
+                        <strong className="text-slate-100 text-xs">{injury.tipo_lesion}</strong>
+                        <Badge variant="default" className="text-[9px] bg-slate-800 text-slate-350">{injury.informado_por}</Badge>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <select
+                          value={injury.estado}
+                          onChange={e => handleUpdateInjuryStatus(injury.id, e.target.value as any)}
+                          className="bg-slate-950 border border-slate-850 text-[10px] px-2 py-0.5 rounded-lg text-slate-300 outline-none"
+                        >
+                          <option value="Activa">Baja Activa</option>
+                          <option value="En recuperación">En recuperación</option>
+                          <option value="Alta médica">Alta Médica</option>
+                          <option value="Recaída">Recaída</option>
+                        </select>
+                        <button 
+                          onClick={() => handleDeleteInjury(injury.id)} 
+                          className="text-red-500 hover:text-red-400 p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="text-xs space-y-1.5 text-slate-300">
+                      <div><strong className="text-slate-500">Diagnóstico:</strong> {injury.diagnostico}</div>
+                      {injury.observaciones && <div><strong className="text-slate-500">Observaciones:</strong> {injury.observaciones}</div>}
+                      <div className="grid grid-cols-2 gap-4 text-[10px] text-slate-500 pt-1">
+                        <div>Prevista: {injury.fecha_prevista_recuperacion || 'No especificada'}</div>
+                        <div>Alta Real: {injury.fecha_real_recuperacion || 'Aún de baja'}</div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Tab 5: Estadísticas Acumuladas */}
         {activeTab === 'stats' && (
           <div className="p-6 bg-slate-900/40 border border-slate-800/80 rounded-2xl">
             <h3 className="text-base font-bold text-slate-100 mb-4">Estadísticas Acumuladas de Liga</h3>
@@ -487,9 +979,9 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
           </div>
         )}
 
+        {/* Tab 6: Observaciones de Partidos */}
         {activeTab === 'observations' && (
           <div className="space-y-6">
-            {/* Cabecera & Botón agregar */}
             <div className="flex justify-between items-center">
               <h3 className="text-base font-bold text-slate-100">Histórico de Observaciones</h3>
               <Button onClick={() => setShowObsForm(!showObsForm)} variant={showObsForm ? 'secondary' : 'primary'} className="flex items-center gap-1 text-xs">
@@ -498,17 +990,14 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
               </Button>
             </div>
 
-            {/* Formulario Observación */}
             {showObsForm && (
               <form onSubmit={handleObsSubmit} className="p-5 rounded-2xl bg-slate-900/40 border border-slate-800 space-y-4">
                 <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Registrar Ficha de Partido</h4>
-                
                 {obsError && (
                   <div className="p-3 bg-red-950/20 border border-red-900/30 text-red-400 text-xs rounded-xl">
                     {obsError}
                   </div>
                 )}
-
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <Input 
                     label="Rival *" 
@@ -529,12 +1018,11 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
                     onChange={e => setNewObs(prev => ({ ...prev, minutos_jugados: Number(e.target.value) }))} 
                   />
                 </div>
-
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="text-xs text-slate-400 font-bold block mb-1">Observación Técnica</label>
                     <textarea 
-                      className="w-full h-20 px-3 py-2 rounded-xl bg-slate-950/60 border border-slate-800 text-sm text-slate-200 outline-none focus:border-green-500"
+                      className="w-full h-20 px-3 py-2 rounded-xl bg-slate-950/60 border border-slate-800 text-sm text-slate-200 outline-none focus:border-[#CC0E21]"
                       value={newObs.observacion_tecnica}
                       onChange={e => setNewObs(prev => ({ ...prev, observacion_tecnica: e.target.value }))}
                     />
@@ -542,7 +1030,7 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
                   <div>
                     <label className="text-xs text-slate-400 font-bold block mb-1">Observación Táctica</label>
                     <textarea 
-                      className="w-full h-20 px-3 py-2 rounded-xl bg-slate-950/60 border border-slate-800 text-sm text-slate-200 outline-none focus:border-green-500"
+                      className="w-full h-20 px-3 py-2 rounded-xl bg-slate-950/60 border border-slate-800 text-sm text-slate-200 outline-none focus:border-[#CC0E21]"
                       value={newObs.observacion_tactica}
                       onChange={e => setNewObs(prev => ({ ...prev, observacion_tactica: e.target.value }))}
                     />
@@ -550,7 +1038,7 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
                   <div>
                     <label className="text-xs text-slate-400 font-bold block mb-1">Observación Física</label>
                     <textarea 
-                      className="w-full h-20 px-3 py-2 rounded-xl bg-slate-950/60 border border-slate-800 text-sm text-slate-200 outline-none focus:border-green-500"
+                      className="w-full h-20 px-3 py-2 rounded-xl bg-slate-950/60 border border-slate-800 text-sm text-slate-200 outline-none focus:border-[#CC0E21]"
                       value={newObs.observacion_fisica}
                       onChange={e => setNewObs(prev => ({ ...prev, observacion_fisica: e.target.value }))}
                     />
@@ -558,13 +1046,12 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
                   <div>
                     <label className="text-xs text-slate-400 font-bold block mb-1">Observación Mental / Actitudinal</label>
                     <textarea 
-                      className="w-full h-20 px-3 py-2 rounded-xl bg-slate-950/60 border border-slate-800 text-sm text-slate-200 outline-none focus:border-green-500"
+                      className="w-full h-20 px-3 py-2 rounded-xl bg-slate-950/60 border border-slate-800 text-sm text-slate-200 outline-none focus:border-[#CC0E21]"
                       value={newObs.observacion_mental}
                       onChange={e => setNewObs(prev => ({ ...prev, observacion_mental: e.target.value }))}
                     />
                   </div>
                 </div>
-
                 <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-3 border-t border-slate-800">
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-slate-400 font-bold">Valoración Global:</span>
@@ -577,7 +1064,6 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
               </form>
             )}
 
-            {/* Listado Timeline Observaciones */}
             {loadingObs ? (
               <div className="space-y-4">
                 {[1, 2].map(i => (
@@ -609,7 +1095,6 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
                         </span>
                       </div>
                     </div>
-
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                       {obs.observacion_tecnica && (
                         <div>

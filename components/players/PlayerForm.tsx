@@ -52,7 +52,7 @@ const playerSchema = zod.object({
     .optional()
     .or(zod.literal('')),
   pierna_dominante: zod.enum(['Diestro', 'Zurdo', 'Ambidiestro']),
-  estado: zod.enum(['Disponible', 'Lesionado', 'Duda', 'Sancionado']),
+  estado: zod.enum(['Disponible', 'Lesionado', 'Duda', 'Sancionado', 'Baja temporal']),
   rol_abp: zod.string().nullable().optional(),
   foto_url: zod.string().nullable().optional(),
   equipo: zod.enum(['DH', 'B']),
@@ -75,6 +75,7 @@ interface FormValues {
   foto_url?: string | null;
   equipo: 'DH' | 'B';
 }
+
 
 interface PlayerFormProps {
   player?: Player | null;
@@ -245,6 +246,7 @@ export function PlayerForm({ player, onSubmit, onCancel, onDelete, isSubmitting 
     { value: 'Lesionado', label: 'Lesionado' },
     { value: 'Duda', label: 'Duda Semanal' },
     { value: 'Sancionado', label: 'Sancionado' },
+    { value: 'Baja temporal', label: 'Baja temporal' },
   ];
 
   const equipoOptions = [
