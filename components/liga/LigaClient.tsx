@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { useMatches } from '@/hooks/useMatches';
 import { Match, MatchPlayerStats } from '@/types';
 import { MatchForm } from '@/components/liga/MatchForm';
@@ -207,6 +208,13 @@ export function LigaClient() {
 
                 {/* Acciones */}
                 <div className="flex items-center justify-end gap-2 border-t border-slate-800/40 md:border-transparent pt-3 md:pt-0">
+                  <Link
+                    href={`/liga/${match.id}`}
+                    className="flex items-center gap-1.5 text-xs font-bold py-1.5 px-3 rounded-lg bg-slate-850 hover:bg-slate-800 border border-slate-700 text-slate-200 transition-colors"
+                  >
+                    <Trophy className="h-3.5 w-3.5 text-[#CC0E21]" />
+                    Centro de Partido
+                  </Link>
                   <Button
                     onClick={() => handleOpenConvo(match)}
                     variant="primary"

@@ -468,3 +468,87 @@ export interface TrainingEvaluation {
   created_at?: string;
   updated_at?: string;
 }
+
+// --- TIPOS DE CENTRO DE PARTIDO (LIGA V2) ---
+
+export interface MatchABPPlay {
+  id: string;
+  match_id: string;
+  tipo: string;
+  titulo: string;
+  descripcion: string | null;
+  video_url: string | null;
+  tipo_origen: 'Enlace' | 'Archivo';
+  created_at: string;
+}
+
+export interface MatchABPPlayerRole {
+  id: string;
+  match_abp_play_id: string;
+  player_id: string | null;
+  player_full_name_backup: string | null;
+  player_dorsal_backup: number | null;
+  rol_asignado: string;
+  posicion_x: number | null;
+  posicion_y: number | null;
+  etiqueta?: string | null;
+  comentario?: string | null;
+  orden?: number | null;
+  created_at: string;
+}
+
+export interface MatchFullVideo {
+  id: string;
+  match_id: string;
+  tipo_video: 'Completo' | 'Primera Parte' | 'Segunda Parte';
+  tipo_origen: 'Enlace' | 'Archivo';
+  video_url: string;
+  nombre_descriptivo: string | null;
+  created_at: string;
+}
+
+export interface MatchVideoClip {
+  id: string;
+  match_id: string;
+  categoria: 'OFENSIVO' | 'DEFENSIVO';
+  subcategoria: string;
+  titulo: string;
+  tipo_origen: 'Enlace' | 'Archivo';
+  video_url: string;
+  comentario_tecnico: string | null;
+  created_at: string;
+}
+
+export interface MatchStrategicAction {
+  id: string;
+  match_id: string;
+  tipo: 'VIGILAR' | 'RECALCAR';
+  aspecto: string;
+  descripcion: string | null;
+  tipo_origen: 'Enlace' | 'Archivo';
+  video_url: string;
+  created_at: string;
+}
+
+export interface MatchCustomVideo {
+  id: string;
+  match_id: string;
+  etiqueta: 'Delanteros' | 'Centrales' | 'Pivotes' | 'Individual' | 'Otros';
+  titulo: string;
+  tipo_origen: 'Enlace' | 'Archivo';
+  video_url: string;
+  created_at: string;
+}
+
+export interface MatchDocument {
+  id: string;
+  match_id: string;
+  nombre_documento: string;
+  tipo_documento: string;
+  tipo_origen: 'Enlace' | 'Archivo';
+  url_storage: string;
+  fecha: string;
+  comentario: string | null;
+  created_at: string;
+}
+
