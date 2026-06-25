@@ -173,7 +173,6 @@ BEGIN
 END;
 $$;
 
--- B) Guardar (INSERT/UPDATE) seguro genérico para una fila
 CREATE OR REPLACE FUNCTION exec_secure_upsert(
     target_table TEXT,
     payload JSONB,
@@ -210,11 +209,10 @@ BEGIN
     IF conflict_columns IS NULL OR cardinality(conflict_columns) = 0 THEN
         -- INSERT simple
         query := format(
-            'INSERT INTO %I (%s) VALUES (%s) RETURNING to_jsonb(t) FROM (SELECT %I.*) t',
+            'INSERT INTO %I AS t (%s) VALUES (%s) RETURNING to_jsonb(t)',
             target_table,
             array_to_string(cols, ', '),
-            array_to_string(vals, ', '),
-            target_table
+            array_to_string(vals, ', ')
         );
     ELSE
         -- INSERT con ON CONFLICT UPDATE
@@ -227,22 +225,20 @@ BEGIN
 
         IF update_exprs IS NULL OR cardinality(update_exprs) = 0 THEN
             query := format(
-                'INSERT INTO %I (%s) VALUES (%s) ON CONFLICT (%s) DO NOTHING RETURNING to_jsonb(t) FROM (SELECT %I.*) t',
+                'INSERT INTO %I AS t (%s) VALUES (%s) ON CONFLICT (%s) DO NOTHING RETURNING to_jsonb(t)',
                 target_table,
                 array_to_string(cols, ', '),
                 array_to_string(vals, ', '),
-                array_to_string(conflict_columns, ', '),
-                target_table
+                array_to_string(conflict_columns, ', ')
             );
         ELSE
             query := format(
-                'INSERT INTO %I (%s) VALUES (%s) ON CONFLICT (%s) DO UPDATE SET %s RETURNING to_jsonb(t) FROM (SELECT %I.*) t',
+                'INSERT INTO %I AS t (%s) VALUES (%s) ON CONFLICT (%s) DO UPDATE SET %s RETURNING to_jsonb(t)',
                 target_table,
                 array_to_string(cols, ', '),
                 array_to_string(vals, ', '),
                 array_to_string(conflict_columns, ', '),
-                array_to_string(update_exprs, ', '),
-                target_table
+                array_to_string(update_exprs, ', ')
             );
         END IF;
     END IF;
