@@ -32,11 +32,14 @@ export function useMatchVideos() {
     setCreating(true);
     setError(null);
     try {
+      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
       const { data, error: supabaseError } = await supabase
-        .from('match_videos')
-        .insert([video])
-        .select()
-        .single();
+        .rpc('exec_secure_upsert', {
+          target_table: 'match_videos',
+          payload: video,
+          conflict_columns: null,
+          staff_passkey: passkey
+        });
 
       if (supabaseError) throw supabaseError;
       setVideos((prev) => [data, ...prev]);

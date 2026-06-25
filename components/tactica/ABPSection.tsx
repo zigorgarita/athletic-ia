@@ -1013,19 +1013,22 @@ export function ABPSection({ players }: ABPSectionProps) {
     setErrorMsg(null);
 
     try {
+      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
       const { data, error } = await supabase
-        .from('abp_player_roles')
-        .insert({
-          abp_play_id: selectedPlay.id,
-          player_id: null,
-          rol_asignado: 'Libre',
-          posicion_x: 50.0,
-          posicion_y: 50.0,
-          etiqueta: 'LIB',
-          orden: playRoles.length + 1
-        })
-        .select()
-        .single();
+        .rpc('exec_secure_upsert', {
+          target_table: 'abp_player_roles',
+          payload: {
+            abp_play_id: selectedPlay.id,
+            player_id: null,
+            rol_asignado: 'Libre',
+            posicion_x: 50.0,
+            posicion_y: 50.0,
+            etiqueta: 'LIB',
+            orden: playRoles.length + 1
+          },
+          conflict_columns: null,
+          staff_passkey: passkey
+        });
 
       if (error) throw error;
       
@@ -1176,9 +1179,14 @@ export function ABPSection({ players }: ABPSectionProps) {
       }
 
       if (rolesPayload.length > 0) {
+        const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
         const { error: insertError } = await supabase
-          .from('abp_player_roles')
-          .insert(rolesPayload);
+          .rpc('exec_secure_bulk_upsert', {
+            target_table: 'abp_player_roles',
+            payloads: rolesPayload,
+            conflict_columns: null,
+            staff_passkey: passkey
+          });
 
         if (insertError) throw insertError;
       }
