@@ -9,10 +9,13 @@ export function useDeletePlayer() {
     setLoading(true);
     setError(null);
     try {
+      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
       const { error: supabaseError } = await supabase
-        .from('players')
-        .delete()
-        .eq('id', id);
+        .rpc('exec_secure_delete', {
+          target_table: 'players',
+          record_id: id,
+          staff_passkey: passkey
+        });
 
       if (supabaseError) throw supabaseError;
       return true;

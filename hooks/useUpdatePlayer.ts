@@ -12,12 +12,14 @@ export function useUpdatePlayer() {
     setLoading(true);
     setError(null);
     try {
+      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
       const { data, error: supabaseError } = await supabase
-        .from('players')
-        .update(player)
-        .eq('id', id)
-        .select()
-        .single();
+        .rpc('exec_secure_upsert', {
+          target_table: 'players',
+          payload: { ...player, id },
+          conflict_columns: ['id'],
+          staff_passkey: passkey
+        });
 
       if (supabaseError) throw supabaseError;
       return data;

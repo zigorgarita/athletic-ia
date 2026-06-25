@@ -12,12 +12,14 @@ export function useCreateEvaluation() {
     setLoading(true);
     setError(null);
     try {
-      // Use upsert to handle one evaluation per player per day
+      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
       const { data, error: supabaseError } = await supabase
-        .from('detailed_evaluations')
-        .upsert(evaluation, { onConflict: 'player_id,fecha_evaluacion' })
-        .select()
-        .single();
+        .rpc('exec_secure_upsert', {
+          target_table: 'detailed_evaluations',
+          payload: evaluation,
+          conflict_columns: ['player_id', 'fecha_evaluacion'],
+          staff_passkey: passkey
+        });
 
       if (supabaseError) throw supabaseError;
       return data;

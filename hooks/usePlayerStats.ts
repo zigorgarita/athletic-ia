@@ -77,10 +77,14 @@ export function usePlayerStats(playerId: string | null) {
   const updatePlayerStats = useCallback(async (statId: string, updates: Partial<MatchPlayerStats>) => {
     setError(null);
     try {
+      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
       const { error: supabaseError } = await supabase
-        .from('match_player_stats')
-        .update(updates)
-        .eq('id', statId);
+        .rpc('exec_secure_upsert', {
+          target_table: 'match_player_stats',
+          payload: { ...updates, id: statId },
+          conflict_columns: ['id'],
+          staff_passkey: passkey
+        });
 
       if (supabaseError) throw supabaseError;
       await fetchStats();

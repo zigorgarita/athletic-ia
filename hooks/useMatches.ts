@@ -28,11 +28,14 @@ export function useMatches() {
   const createMatch = useCallback(async (matchData: Omit<Match, 'id' | 'created_at'>): Promise<Match | null> => {
     setError(null);
     try {
+      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
       const { data, error: supabaseError } = await supabase
-        .from('matches')
-        .insert([matchData])
-        .select()
-        .single();
+        .rpc('exec_secure_upsert', {
+          target_table: 'matches',
+          payload: matchData,
+          conflict_columns: null,
+          staff_passkey: passkey
+        });
 
       if (supabaseError) throw supabaseError;
       setMatches((prev) => [...prev, data].sort((a, b) => a.jornada - b.jornada));
@@ -46,12 +49,14 @@ export function useMatches() {
   const updateMatch = useCallback(async (id: string, matchData: Partial<Omit<Match, 'id' | 'created_at'>>): Promise<Match | null> => {
     setError(null);
     try {
+      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
       const { data, error: supabaseError } = await supabase
-        .from('matches')
-        .update(matchData)
-        .eq('id', id)
-        .select()
-        .single();
+        .rpc('exec_secure_upsert', {
+          target_table: 'matches',
+          payload: { ...matchData, id },
+          conflict_columns: ['id'],
+          staff_passkey: passkey
+        });
 
       if (supabaseError) throw supabaseError;
       setMatches((prev) => prev.map((m) => (m.id === id ? data : m)));
@@ -65,10 +70,13 @@ export function useMatches() {
   const deleteMatch = useCallback(async (id: string): Promise<boolean> => {
     setError(null);
     try {
+      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
       const { error: supabaseError } = await supabase
-        .from('matches')
-        .delete()
-        .eq('id', id);
+        .rpc('exec_secure_delete', {
+          target_table: 'matches',
+          record_id: id,
+          staff_passkey: passkey
+        });
 
       if (supabaseError) throw supabaseError;
       setMatches((prev) => prev.filter((m) => m.id !== id));
@@ -99,19 +107,25 @@ export function useMatches() {
     playerStatsList: Omit<MatchPlayerStats, 'id' | 'created_at'>[]
   ): Promise<boolean> => {
     try {
-      // 1. Delete existing stats for this match to overwrite/sync clean
+      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
+      // 1. Delete existing stats for this match securely
       const { error: deleteError } = await supabase
-        .from('match_player_stats')
-        .delete()
-        .eq('match_id', matchId);
+        .rpc('delete_match_player_stats_secure', {
+          target_match_id: matchId,
+          staff_passkey: passkey
+        });
 
       if (deleteError) throw deleteError;
 
-      // 2. Insert new stats list if not empty
+      // 2. Insert new stats list if not empty securely
       if (playerStatsList.length > 0) {
         const { error: insertError } = await supabase
-          .from('match_player_stats')
-          .insert(playerStatsList);
+          .rpc('exec_secure_bulk_upsert', {
+            target_table: 'match_player_stats',
+            payloads: playerStatsList,
+            conflict_columns: null,
+            staff_passkey: passkey
+          });
         if (insertError) throw insertError;
       }
 

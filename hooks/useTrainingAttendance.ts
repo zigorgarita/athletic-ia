@@ -47,11 +47,16 @@ export function useTrainingAttendance() {
     setLoading(true);
     setError(null);
     try {
+      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
       // 1. Upsert attendance rows if any
       if (attendance.length > 0) {
         const { error: attError } = await supabase
-          .from('training_attendance')
-          .upsert(attendance, { onConflict: 'session_id,player_id' });
+          .rpc('exec_secure_bulk_upsert', {
+            target_table: 'training_attendance',
+            payloads: attendance,
+            conflict_columns: ['session_id', 'player_id'],
+            staff_passkey: passkey
+          });
         
         if (attError) throw attError;
       }
@@ -59,8 +64,12 @@ export function useTrainingAttendance() {
       // 2. Upsert evaluation rows if any
       if (evaluations.length > 0) {
         const { error: evalError } = await supabase
-          .from('training_evaluations')
-          .upsert(evaluations, { onConflict: 'session_id,player_id' });
+          .rpc('exec_secure_bulk_upsert', {
+            target_table: 'training_evaluations',
+            payloads: evaluations,
+            conflict_columns: ['session_id', 'player_id'],
+            staff_passkey: passkey
+          });
 
         if (evalError) throw evalError;
       }

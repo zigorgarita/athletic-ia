@@ -315,14 +315,19 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
   // Tab 1: General Info Save
   const handleSaveGeneralInfo = async () => {
     try {
+      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
       const { error } = await supabase
-        .from('matches')
-        .update({
-          hora: matchHora || null,
-          campo: matchCampo || null,
-          clasificacion_nota: matchClasificacionNota || null
-        })
-        .eq('id', matchId);
+        .rpc('exec_secure_upsert', {
+          target_table: 'matches',
+          payload: {
+            id: matchId,
+            hora: matchHora || null,
+            campo: matchCampo || null,
+            clasificacion_nota: matchClasificacionNota || null
+          },
+          conflict_columns: ['id'],
+          staff_passkey: passkey
+        });
 
       if (error) throw error;
       setIsEditingInfo(false);
@@ -346,18 +351,21 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
       if (playErr) throw playErr;
 
       // 2. Clone play to match_abp_plays
+      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
       const { data: clonedPlay, error: cloneErr } = await supabase
-        .from('match_abp_plays')
-        .insert({
-          match_id: matchId,
-          tipo: masterPlay.tipo,
-          titulo: masterPlay.titulo,
-          descripcion: masterPlay.descripcion,
-          video_url: masterPlay.video_url,
-          tipo_origen: 'Enlace'
-        })
-        .select()
-        .single();
+        .rpc('exec_secure_upsert', {
+          target_table: 'match_abp_plays',
+          payload: {
+            match_id: matchId,
+            tipo: masterPlay.tipo,
+            titulo: masterPlay.titulo,
+            descripcion: masterPlay.descripcion,
+            video_url: masterPlay.video_url,
+            tipo_origen: 'Enlace'
+          },
+          conflict_columns: null,
+          staff_passkey: passkey
+        });
       if (cloneErr) throw cloneErr;
 
       // 3. Get master roles
@@ -386,8 +394,12 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
         });
 
         const { error: rolesInsertErr } = await supabase
-          .from('match_abp_player_roles')
-          .insert(clonedRoles);
+          .rpc('exec_secure_bulk_upsert', {
+            target_table: 'match_abp_player_roles',
+            payloads: clonedRoles,
+            conflict_columns: null,
+            staff_passkey: passkey
+          });
         if (rolesInsertErr) throw rolesInsertErr;
       }
 
@@ -411,18 +423,21 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
         finalUrl = await uploadFile(abpFile, 'match-abp');
       }
 
+      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
       const { data: play, error: playErr } = await supabase
-        .from('match_abp_plays')
-        .insert({
-          match_id: matchId,
-          tipo: newABPTipo,
-          titulo: newABPTitle,
-          descripcion: newABPDesc,
-          video_url: finalUrl || null,
-          tipo_origen: newABPOrigin
-        })
-        .select()
-        .single();
+        .rpc('exec_secure_upsert', {
+          target_table: 'match_abp_plays',
+          payload: {
+            match_id: matchId,
+            tipo: newABPTipo,
+            titulo: newABPTitle,
+            descripcion: newABPDesc,
+            video_url: finalUrl || null,
+            tipo_origen: newABPOrigin
+          },
+          conflict_columns: null,
+          staff_passkey: passkey
+        });
       if (playErr) throw playErr;
 
       // Create default empty roles (say 6 default roles)
@@ -447,8 +462,12 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
       }));
 
       const { error: rolesErr } = await supabase
-        .from('match_abp_player_roles')
-        .insert(rolesPayload);
+        .rpc('exec_secure_bulk_upsert', {
+          target_table: 'match_abp_player_roles',
+          payloads: rolesPayload,
+          conflict_columns: null,
+          staff_passkey: passkey
+        });
       if (rolesErr) throw rolesErr;
 
       setNewABPTitle('');
@@ -478,10 +497,14 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
       if (posX !== undefined) updates.posicion_x = posX;
       if (posY !== undefined) updates.posicion_y = posY;
 
+      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
       const { error } = await supabase
-        .from('match_abp_player_roles')
-        .update(updates)
-        .eq('id', roleId);
+        .rpc('exec_secure_upsert', {
+          target_table: 'match_abp_player_roles',
+          payload: { ...updates, id: roleId },
+          conflict_columns: ['id'],
+          staff_passkey: passkey
+        });
 
       if (error) throw error;
 
@@ -496,10 +519,13 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
   const handleDeleteMatchABP = async (id: string) => {
     if (!confirm('¿Estás seguro de que deseas eliminar esta ABP específica del partido?')) return;
     try {
+      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
       const { error } = await supabase
-        .from('match_abp_plays')
-        .delete()
-        .eq('id', id);
+        .rpc('exec_secure_delete', {
+          target_table: 'match_abp_plays',
+          record_id: id,
+          staff_passkey: passkey
+        });
       if (error) throw error;
       loadAllData();
     } catch (err: unknown) {
@@ -511,6 +537,7 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
   const handleSaveFullVideos = async () => {
     setIsSavingFullVideos(true);
     try {
+      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
       const videoTypes: { type: 'Completo' | 'Primera Parte' | 'Segunda Parte', url: string, origin: 'Enlace' | 'Archivo', file: File | null }[] = [
         { type: 'Completo', url: completoUrl, origin: completoOrigin, file: completoFile },
         { type: 'Primera Parte', url: p1Url, origin: p1Origin, file: p1File },
@@ -528,25 +555,33 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
         if (existing) {
           if (finalUrl) {
             const { error } = await supabase
-              .from('match_full_videos')
-              .update({
-                video_url: finalUrl,
-                tipo_origen: vt.origin
-              })
-              .eq('id', existing.id);
+              .rpc('exec_secure_upsert', {
+                target_table: 'match_full_videos',
+                payload: { id: existing.id, video_url: finalUrl, tipo_origen: vt.origin },
+                conflict_columns: ['id'],
+                staff_passkey: passkey
+              });
             if (error) throw error;
           } else {
             // Delete if cleared
-            await supabase.from('match_full_videos').delete().eq('id', existing.id);
+            await supabase.rpc('exec_secure_delete', {
+              target_table: 'match_full_videos',
+              record_id: existing.id,
+              staff_passkey: passkey
+            });
           }
         } else if (finalUrl) {
           const { error } = await supabase
-            .from('match_full_videos')
-            .insert({
-              match_id: matchId,
-              tipo_video: vt.type,
-              tipo_origen: vt.origin,
-              video_url: finalUrl
+            .rpc('exec_secure_upsert', {
+              target_table: 'match_full_videos',
+              payload: {
+                match_id: matchId,
+                tipo_video: vt.type,
+                tipo_origen: vt.origin,
+                video_url: finalUrl
+              },
+              conflict_columns: null,
+              staff_passkey: passkey
             });
           if (error) throw error;
         }
@@ -577,16 +612,21 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
 
       if (!finalUrl) throw new Error('Es necesario un archivo o enlace para el clip');
 
+      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
       const { error } = await supabase
-        .from('match_video_clips')
-        .insert({
-          match_id: matchId,
-          categoria: clipCategory,
-          subcategoria: clipSubcategory,
-          titulo: clipTitle,
-          tipo_origen: clipOrigin,
-          video_url: finalUrl,
-          comentario_tecnico: clipComment || null
+        .rpc('exec_secure_upsert', {
+          target_table: 'match_video_clips',
+          payload: {
+            match_id: matchId,
+            categoria: clipCategory,
+            subcategoria: clipSubcategory,
+            titulo: clipTitle,
+            tipo_origen: clipOrigin,
+            video_url: finalUrl,
+            comentario_tecnico: clipComment || null
+          },
+          conflict_columns: null,
+          staff_passkey: passkey
         });
 
       if (error) throw error;
@@ -608,7 +648,12 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
   const handleDeleteClip = async (id: string) => {
     if (!confirm('¿Deseas eliminar este corte de vídeo?')) return;
     try {
-      const { error } = await supabase.from('match_video_clips').delete().eq('id', id);
+      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
+      const { error } = await supabase.rpc('exec_secure_delete', {
+        target_table: 'match_video_clips',
+        record_id: id,
+        staff_passkey: passkey
+      });
       if (error) throw error;
       loadAllData();
     } catch (err: unknown) {
@@ -629,15 +674,20 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
 
       if (!finalUrl) throw new Error('Es necesario un archivo o enlace para la acción');
 
+      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
       const { error } = await supabase
-        .from('match_strategic_actions')
-        .insert({
-          match_id: matchId,
-          tipo: actionType,
-          aspecto: actionAspect,
-          descripcion: actionDesc || null,
-          tipo_origen: actionOrigin,
-          video_url: finalUrl
+        .rpc('exec_secure_upsert', {
+          target_table: 'match_strategic_actions',
+          payload: {
+            match_id: matchId,
+            tipo: actionType,
+            aspecto: actionAspect,
+            descripcion: actionDesc || null,
+            tipo_origen: actionOrigin,
+            video_url: finalUrl
+          },
+          conflict_columns: null,
+          staff_passkey: passkey
         });
 
       if (error) throw error;
@@ -659,7 +709,12 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
   const handleDeleteAction = async (id: string) => {
     if (!confirm('¿Deseas eliminar esta acción táctica?')) return;
     try {
-      const { error } = await supabase.from('match_strategic_actions').delete().eq('id', id);
+      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
+      const { error } = await supabase.rpc('exec_secure_delete', {
+        target_table: 'match_strategic_actions',
+        record_id: id,
+        staff_passkey: passkey
+      });
       if (error) throw error;
       loadAllData();
     } catch (err: unknown) {
@@ -680,14 +735,19 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
 
       if (!finalUrl) throw new Error('Es necesario un archivo o enlace para el vídeo');
 
+      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
       const { error } = await supabase
-        .from('match_custom_videos')
-        .insert({
-          match_id: matchId,
-          etiqueta: customLabel,
-          titulo: customTitle,
-          tipo_origen: customOrigin,
-          video_url: finalUrl
+        .rpc('exec_secure_upsert', {
+          target_table: 'match_custom_videos',
+          payload: {
+            match_id: matchId,
+            etiqueta: customLabel,
+            titulo: customTitle,
+            tipo_origen: customOrigin,
+            video_url: finalUrl
+          },
+          conflict_columns: null,
+          staff_passkey: passkey
         });
 
       if (error) throw error;
@@ -708,7 +768,12 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
   const handleDeleteCustomVideo = async (id: string) => {
     if (!confirm('¿Deseas eliminar este vídeo?')) return;
     try {
-      const { error } = await supabase.from('match_custom_videos').delete().eq('id', id);
+      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
+      const { error } = await supabase.rpc('exec_secure_delete', {
+        target_table: 'match_custom_videos',
+        record_id: id,
+        staff_passkey: passkey
+      });
       if (error) throw error;
       loadAllData();
     } catch (err: unknown) {
@@ -720,16 +785,21 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
   const handleSaveReport = async () => {
     setIsSavingReport(true);
     try {
+      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
       const { error } = await supabase
-        .from('matches')
-        .update({
-          analisis_resumen: reportResumen || null,
-          analisis_positivos: reportPositivos || null,
-          analisis_mejorar: reportMejorar || null,
-          analisis_claves: reportClaves || null,
-          analisis_conclusiones: reportConclusiones || null
-        })
-        .eq('id', matchId);
+        .rpc('exec_secure_upsert', {
+          target_table: 'matches',
+          payload: {
+            id: matchId,
+            analisis_resumen: reportResumen || null,
+            analisis_positivos: reportPositivos || null,
+            analisis_mejorar: reportMejorar || null,
+            analisis_claves: reportClaves || null,
+            analisis_conclusiones: reportConclusiones || null
+          },
+          conflict_columns: ['id'],
+          staff_passkey: passkey
+        });
 
       if (error) throw error;
       loadAllData();
@@ -755,15 +825,20 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
 
       if (!finalUrl) throw new Error('Es necesario un archivo o enlace para el documento');
 
+      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
       const { error } = await supabase
-        .from('match_documents')
-        .insert({
-          match_id: matchId,
-          nombre_documento: docName,
-          tipo_documento: docType,
-          tipo_origen: docOrigin,
-          url_storage: finalUrl,
-          comentario: docComment || null
+        .rpc('exec_secure_upsert', {
+          target_table: 'match_documents',
+          payload: {
+            match_id: matchId,
+            nombre_documento: docName,
+            tipo_documento: docType,
+            tipo_origen: docOrigin,
+            url_storage: finalUrl,
+            comentario: docComment || null
+          },
+          conflict_columns: null,
+          staff_passkey: passkey
         });
 
       if (error) throw error;
@@ -785,7 +860,12 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
   const handleDeleteDoc = async (id: string) => {
     if (!confirm('¿Deseas eliminar este documento?')) return;
     try {
-      const { error } = await supabase.from('match_documents').delete().eq('id', id);
+      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
+      const { error } = await supabase.rpc('exec_secure_delete', {
+        target_table: 'match_documents',
+        record_id: id,
+        staff_passkey: passkey
+      });
       if (error) throw error;
       loadAllData();
     } catch (err: unknown) {

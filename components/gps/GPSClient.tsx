@@ -128,7 +128,12 @@ export function GPSClient() {
     if (!confirm('¿Seguro que deseas eliminar esta sesión de GPS y todos sus datos?')) return;
 
     try {
-      const { error } = await supabase.from('gps_sessions').delete().eq('id', sessionId);
+      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
+      const { error } = await supabase.rpc('exec_secure_delete', {
+        target_table: 'gps_sessions',
+        record_id: sessionId,
+        staff_passkey: passkey
+      });
       if (error) throw error;
       
       if (selectedSession?.id === sessionId) {
@@ -269,14 +274,17 @@ export function GPSClient() {
 
     try {
       // 1. Create session
+      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
       const { data: sessionDataRes, error: sessionErr } = await supabase
-        .from('gps_sessions')
-        .insert({
-          fecha: sessionDate,
-          descripcion: sessionDesc || null
-        })
-        .select()
-        .single();
+        .rpc('exec_secure_upsert', {
+          target_table: 'gps_sessions',
+          payload: {
+            fecha: sessionDate,
+            descripcion: sessionDesc || null
+          },
+          conflict_columns: null,
+          staff_passkey: passkey
+        });
 
       if (sessionErr) throw sessionErr;
       const newSessionId = sessionDataRes.id;
@@ -316,7 +324,13 @@ export function GPSClient() {
         };
       }).filter(p => p !== null);
 
-      const { error: dataErr } = await supabase.from('gps_data').insert(payload);
+      const { error: dataErr } = await supabase
+        .rpc('exec_secure_bulk_upsert', {
+          target_table: 'gps_data',
+          payloads: payload,
+          conflict_columns: null,
+          staff_passkey: passkey
+        });
       if (dataErr) throw dataErr;
 
       // Close modal & reload

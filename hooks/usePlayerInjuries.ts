@@ -31,11 +31,14 @@ export function usePlayerInjuries(playerId: string | null) {
     setLoading(true);
     setError(null);
     try {
+      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
       const { data, error: supabaseError } = await supabase
-        .from('player_injuries')
-        .insert([injury])
-        .select()
-        .single();
+        .rpc('exec_secure_upsert', {
+          target_table: 'player_injuries',
+          payload: injury,
+          conflict_columns: null,
+          staff_passkey: passkey
+        });
 
       if (supabaseError) throw supabaseError;
       
@@ -54,12 +57,14 @@ export function usePlayerInjuries(playerId: string | null) {
     setLoading(true);
     setError(null);
     try {
+      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
       const { data, error: supabaseError } = await supabase
-        .from('player_injuries')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single();
+        .rpc('exec_secure_upsert', {
+          target_table: 'player_injuries',
+          payload: { ...updates, id },
+          conflict_columns: ['id'],
+          staff_passkey: passkey
+        });
 
       if (supabaseError) throw supabaseError;
       
@@ -77,10 +82,13 @@ export function usePlayerInjuries(playerId: string | null) {
     setLoading(true);
     setError(null);
     try {
+      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
       const { error: supabaseError } = await supabase
-        .from('player_injuries')
-        .delete()
-        .eq('id', id);
+        .rpc('exec_secure_delete', {
+          target_table: 'player_injuries',
+          record_id: id,
+          staff_passkey: passkey
+        });
 
       if (supabaseError) throw supabaseError;
       

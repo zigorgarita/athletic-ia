@@ -30,11 +30,14 @@ export function useObservaciones(playerId: string | null) {
   const createObservacion = useCallback(async (obs: Omit<Observacion, 'id' | 'created_at'>): Promise<Observacion | null> => {
     setError(null);
     try {
+      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
       const { data, error: supabaseError } = await supabase
-        .from('observaciones')
-        .insert([obs])
-        .select()
-        .single();
+        .rpc('exec_secure_upsert', {
+          target_table: 'observaciones',
+          payload: obs,
+          conflict_columns: null,
+          staff_passkey: passkey
+        });
 
       if (supabaseError) throw supabaseError;
       setObservaciones((prev) => [data, ...prev]);

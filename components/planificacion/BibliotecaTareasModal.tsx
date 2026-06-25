@@ -58,10 +58,13 @@ export function BibliotecaTareasModal({ isOpen, onClose, onSelectTask }: Bibliot
     e.stopPropagation();
     if (!confirm('¿Estás seguro de que deseas eliminar esta tarea de la biblioteca táctica permanente?')) return;
     try {
+      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
       const { error } = await supabase
-        .from('planning_task_library')
-        .delete()
-        .eq('id', taskId);
+        .rpc('exec_secure_delete', {
+          target_table: 'planning_task_library',
+          record_id: taskId,
+          staff_passkey: passkey
+        });
       if (error) throw error;
       
       setTasks(prev => prev.filter(t => t.id !== taskId));

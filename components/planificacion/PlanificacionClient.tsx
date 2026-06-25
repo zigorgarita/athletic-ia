@@ -383,7 +383,13 @@ export function PlanificacionClient() {
         creado_por: task.responsable_staff || 'Cuerpo Técnico'
       };
 
-      const { error } = await supabase.from('planning_task_library').upsert(payload, { onConflict: 'nombre' });
+      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
+      const { error } = await supabase.rpc('exec_secure_upsert', {
+        target_table: 'planning_task_library',
+        payload,
+        conflict_columns: ['nombre'],
+        staff_passkey: passkey
+      });
       if (error) throw error;
       alert(`¡"${task.nombre_tarea}" se ha guardado/actualizado correctamente en la Biblioteca Táctica!`);
     } catch (err: unknown) {
@@ -549,11 +555,14 @@ export function PlanificacionClient() {
         checklist_material: sessionForm.checklist_material
       };
 
+      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
       const { data: newSession, error: sErr } = await supabase
-        .from('planning_sessions')
-        .insert([duplicatedSessionPayload])
-        .select()
-        .single();
+        .rpc('exec_secure_upsert', {
+          target_table: 'planning_sessions',
+          payload: duplicatedSessionPayload,
+          conflict_columns: null,
+          staff_passkey: passkey
+        });
       if (sErr) throw sErr;
 
       const newSessionId = newSession.id;
@@ -565,7 +574,12 @@ export function PlanificacionClient() {
           categoria: c.categoria,
           concepto: c.concepto
         }));
-        const { error: cErr } = await supabase.from('planning_concepts').insert(conceptPayloads);
+        const { error: cErr } = await supabase.rpc('exec_secure_bulk_upsert', {
+          target_table: 'planning_concepts',
+          payloads: conceptPayloads,
+          conflict_columns: null,
+          staff_passkey: passkey
+        });
         if (cErr) throw cErr;
       }
 
@@ -585,7 +599,12 @@ export function PlanificacionClient() {
           responsable_staff: t.responsable_staff || 'Primer Entrenador',
           responsable_staff_otro: t.responsable_staff_otro || null
         }));
-        const { error: tErr } = await supabase.from('planning_tasks').insert(taskPayloads);
+        const { error: tErr } = await supabase.rpc('exec_secure_bulk_upsert', {
+          target_table: 'planning_tasks',
+          payloads: taskPayloads,
+          conflict_columns: null,
+          staff_passkey: passkey
+        });
         if (tErr) throw tErr;
       }
 
@@ -596,7 +615,12 @@ export function PlanificacionClient() {
           player_id: pId,
           convocado: true
         }));
-        const { error: rErr } = await supabase.from('planning_session_players').insert(playerPayloads);
+        const { error: rErr } = await supabase.rpc('exec_secure_bulk_upsert', {
+          target_table: 'planning_session_players',
+          payloads: playerPayloads,
+          conflict_columns: null,
+          staff_passkey: passkey
+        });
         if (rErr) throw rErr;
       }
 
@@ -707,11 +731,14 @@ ${sessionForm.observaciones_convocatoria || 'Sin observaciones.'}`;
 
       let sessionId = sessionForm.id;
       if (!sessionId) {
+        const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
         const { data: newSession, error: sErr } = await supabase
-          .from('planning_sessions')
-          .insert([sessionForm])
-          .select()
-          .single();
+          .rpc('exec_secure_upsert', {
+            target_table: 'planning_sessions',
+            payload: sessionForm,
+            conflict_columns: null,
+            staff_passkey: passkey
+          });
         if (sErr) throw sErr;
         sessionId = newSession.id;
         setSessionForm(newSession);
@@ -743,11 +770,14 @@ ${sessionForm.observaciones_convocatoria || 'Sin observaciones.'}`;
         url_storage: publicUrl
       };
 
+      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
       const { data: insertedDoc, error: dbErr } = await supabase
-        .from('planning_documents')
-        .insert([docPayload])
-        .select()
-        .single();
+        .rpc('exec_secure_upsert', {
+          target_table: 'planning_documents',
+          payload: docPayload,
+          conflict_columns: null,
+          staff_passkey: passkey
+        });
 
       if (dbErr) throw dbErr;
 
@@ -771,10 +801,13 @@ ${sessionForm.observaciones_convocatoria || 'Sin observaciones.'}`;
         await supabase.storage.from('planning-documents').remove([relativePath]);
       }
 
+      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
       const { error: dbErr } = await supabase
-        .from('planning_documents')
-        .delete()
-        .eq('id', docId);
+        .rpc('exec_secure_delete', {
+          target_table: 'planning_documents',
+          record_id: docId,
+          staff_passkey: passkey
+        });
 
       if (dbErr) throw dbErr;
 
@@ -794,30 +827,39 @@ ${sessionForm.observaciones_convocatoria || 'Sin observaciones.'}`;
       let sessionId = sessionForm.id;
 
       // 1. Save main session
+      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
       if (isNew) {
         const { data: newSession, error: sErr } = await supabase
-          .from('planning_sessions')
-          .insert([sessionForm])
-          .select()
-          .single();
+          .rpc('exec_secure_upsert', {
+            target_table: 'planning_sessions',
+            payload: sessionForm,
+            conflict_columns: null,
+            staff_passkey: passkey
+          });
         if (sErr) throw sErr;
         sessionId = newSession.id;
         setSessionForm(newSession);
         setSessions(prev => [...prev, newSession]);
       } else {
         const { error: sErr } = await supabase
-          .from('planning_sessions')
-          .update(sessionForm)
-          .eq('id', sessionId);
+          .rpc('exec_secure_upsert', {
+            target_table: 'planning_sessions',
+            payload: { ...sessionForm, id: sessionId },
+            conflict_columns: ['id'],
+            staff_passkey: passkey
+          });
         if (sErr) throw sErr;
         setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, ...sessionForm } as PlanningSession : s));
       }
 
       // 2. Save concepts
       const { error: cDeleteErr } = await supabase
-        .from('planning_concepts')
-        .delete()
-        .eq('session_id', sessionId);
+        .rpc('exec_secure_delete_by_col', {
+          target_table: 'planning_concepts',
+          col_name: 'session_id',
+          col_value: sessionId,
+          staff_passkey: passkey
+        });
       if (cDeleteErr) throw cDeleteErr;
 
       if (selectedConcepts.length > 0) {
@@ -826,11 +868,19 @@ ${sessionForm.observaciones_convocatoria || 'Sin observaciones.'}`;
           categoria: c.categoria,
           concepto: c.concepto
         }));
-        const { data: newConcepts, error: cInsertErr } = await supabase
-          .from('planning_concepts')
-          .insert(conceptPayloads)
-          .select();
+        const { error: cInsertErr } = await supabase
+          .rpc('exec_secure_bulk_upsert', {
+            target_table: 'planning_concepts',
+            payloads: conceptPayloads,
+            conflict_columns: null,
+            staff_passkey: passkey
+          });
         if (cInsertErr) throw cInsertErr;
+
+        const { data: newConcepts } = await supabase
+          .from('planning_concepts')
+          .select('*')
+          .eq('session_id', sessionId);
         
         setConcepts(prev => [
           ...prev.filter(c => c.session_id !== sessionId),
@@ -842,9 +892,12 @@ ${sessionForm.observaciones_convocatoria || 'Sin observaciones.'}`;
 
       // 3. Save tasks
       const { error: tDeleteErr } = await supabase
-        .from('planning_tasks')
-        .delete()
-        .eq('planning_session_id', sessionId);
+        .rpc('exec_secure_delete_by_col', {
+          target_table: 'planning_tasks',
+          col_name: 'planning_session_id',
+          col_value: sessionId,
+          staff_passkey: passkey
+        });
       if (tDeleteErr) throw tDeleteErr;
 
       if (sessionTasks.length > 0) {
@@ -862,11 +915,19 @@ ${sessionForm.observaciones_convocatoria || 'Sin observaciones.'}`;
           responsable_staff: t.responsable_staff || 'Primer Entrenador',
           responsable_staff_otro: t.responsable_staff_otro || null
         }));
-        const { data: newTasks, error: tInsertErr } = await supabase
-          .from('planning_tasks')
-          .insert(taskPayloads)
-          .select();
+        const { error: tInsertErr } = await supabase
+          .rpc('exec_secure_bulk_upsert', {
+            target_table: 'planning_tasks',
+            payloads: taskPayloads,
+            conflict_columns: null,
+            staff_passkey: passkey
+          });
         if (tInsertErr) throw tInsertErr;
+
+        const { data: newTasks } = await supabase
+          .from('planning_tasks')
+          .select('*')
+          .eq('planning_session_id', sessionId);
 
         setTasks(prev => [
           ...prev.filter(t => t.planning_session_id !== sessionId),
@@ -879,9 +940,12 @@ ${sessionForm.observaciones_convocatoria || 'Sin observaciones.'}`;
 
       // 4. Save Summoned Players
       const { error: rDeleteErr } = await supabase
-        .from('planning_session_players')
-        .delete()
-        .eq('session_id', sessionId);
+        .rpc('exec_secure_delete_by_col', {
+          target_table: 'planning_session_players',
+          col_name: 'session_id',
+          col_value: sessionId,
+          staff_passkey: passkey
+        });
       if (rDeleteErr) throw rDeleteErr;
 
       if (summonedPlayerIds.length > 0) {
@@ -890,11 +954,19 @@ ${sessionForm.observaciones_convocatoria || 'Sin observaciones.'}`;
           player_id: pId,
           convocado: true
         }));
-        const { data: newPlayers, error: rInsertErr } = await supabase
-          .from('planning_session_players')
-          .insert(playerPayloads)
-          .select();
+        const { error: rInsertErr } = await supabase
+          .rpc('exec_secure_bulk_upsert', {
+            target_table: 'planning_session_players',
+            payloads: playerPayloads,
+            conflict_columns: null,
+            staff_passkey: passkey
+          });
         if (rInsertErr) throw rInsertErr;
+
+        const { data: newPlayers } = await supabase
+          .from('planning_session_players')
+          .select('*')
+          .eq('session_id', sessionId);
 
         setSessionPlayers(prev => [
           ...prev.filter(sp => sp.session_id !== sessionId),

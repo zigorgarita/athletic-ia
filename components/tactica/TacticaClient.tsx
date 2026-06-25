@@ -443,12 +443,23 @@ export function TacticaClient() {
         orientaciones_individuales: tareasLineas || null
       };
 
+      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
       let error;
       if (currentLineupId) {
-        const res = await supabase.from('tactical_lineups').update(payload).eq('id', currentLineupId);
+        const res = await supabase.rpc('exec_secure_upsert', {
+          target_table: 'tactical_lineups',
+          payload: { ...payload, id: currentLineupId },
+          conflict_columns: ['id'],
+          staff_passkey: passkey
+        });
         error = res.error;
       } else {
-        const res = await supabase.from('tactical_lineups').insert(payload);
+        const res = await supabase.rpc('exec_secure_upsert', {
+          target_table: 'tactical_lineups',
+          payload: payload,
+          conflict_columns: null,
+          staff_passkey: passkey
+        });
         error = res.error;
       }
 
@@ -523,7 +534,12 @@ export function TacticaClient() {
     e.stopPropagation();
     if (!confirm('¿Seguro que deseas eliminar esta pizarra táctica?')) return;
     try {
-      const { error } = await supabase.from('tactical_lineups').delete().eq('id', id);
+      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
+      const { error } = await supabase.rpc('exec_secure_delete', {
+        target_table: 'tactical_lineups',
+        record_id: id,
+        staff_passkey: passkey
+      });
       if (error) throw error;
       if (currentLineupId === id) {
         setCurrentLineupId(null);
