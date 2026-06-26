@@ -3,11 +3,10 @@
 import React, { useState } from 'react';
 import { 
   Calendar as CalendarIcon, Plus, Printer, RefreshCw, 
-  BookOpen, Check, X, Clock, MapPin, ShieldAlert, AlertTriangle,
-  Award, Play, ChevronLeft, ChevronRight, CheckCircle2,
+  BookOpen, Check, X, Clock, MapPin, 
+  Award, Play, CheckCircle2,
   Trash2, Share2
 } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
 
 // Mock material checklist interface
 interface MockChecklist {
@@ -283,31 +282,80 @@ export function PlanificacionClient() {
     triggerToast('¡Convocatoria de WhatsApp copiada al portapapeles!');
   };
 
-  // UI styling helpers based on session type
+  // Helper to calculate Match Day tag dynamically
+  const getMatchDayTag = (session: MockSession, allSessions: MockSession[]) => {
+    if (session.tipo_sesion === 'Partido') return 'MATCH DAY';
+    const matchSession = allSessions.find(s => s.tipo_sesion === 'Partido');
+    if (!matchSession) return '';
+    const matchDate = new Date(matchSession.fecha);
+    const currentDate = new Date(session.fecha);
+    const diffTime = currentDate.getTime() - matchDate.getTime();
+    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+    if (diffDays === 0) return 'MATCH DAY';
+    if (diffDays > 0) return `REC / MD+${diffDays}`;
+    return `MD${diffDays}`;
+  };
+
   const getTypeConfig = (type: string) => {
     switch (type) {
       case 'Entrenamiento':
-        return { border: 'border-l-4 border-l-blue-600', badge: 'bg-blue-950/40 text-blue-400 border border-blue-900/60' };
+        return { 
+          border: 'border-t-[5px] border-t-blue-500', 
+          bg: 'bg-slate-900/60 hover:bg-slate-900/80', 
+          badge: 'bg-blue-500/10 text-blue-400 border border-blue-500/20',
+          icon: '⚽'
+        };
       case 'Partido':
-        return { border: 'border-l-4 border-l-emerald-600', badge: 'bg-emerald-950/40 text-emerald-400 border border-emerald-900/60' };
+        return { 
+          border: 'border-2 border-emerald-500 bg-gradient-to-br from-emerald-950/30 to-slate-900/80 shadow-emerald-950/20', 
+          bg: 'bg-emerald-950/20 hover:bg-emerald-950/30', 
+          badge: 'bg-emerald-500 text-slate-950 font-black px-2.5 py-0.5 rounded-full',
+          icon: '🏆'
+        };
       case 'Libre':
-        return { border: 'border-l-4 border-l-slate-700', badge: 'bg-slate-900 text-slate-500 border border-slate-800' };
+        return { 
+          border: 'border-t-[5px] border-t-slate-700 opacity-60', 
+          bg: 'bg-slate-900/20 hover:bg-slate-900/30', 
+          badge: 'bg-slate-800 text-slate-500',
+          icon: '💤'
+        };
       case 'Recuperación':
-        return { border: 'border-l-4 border-l-cyan-600', badge: 'bg-cyan-950/40 text-cyan-400 border border-cyan-900/60' };
+        return { 
+          border: 'border-t-[5px] border-t-cyan-500', 
+          bg: 'bg-slate-900/60 hover:bg-slate-900/80', 
+          badge: 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20',
+          icon: '🔋'
+        };
       case 'Prepartido':
-        return { border: 'border-l-4 border-l-amber-600', badge: 'bg-amber-950/40 text-amber-400 border border-amber-900/60' };
+        return { 
+          border: 'border-t-[5px] border-t-amber-500', 
+          bg: 'bg-slate-900/60 hover:bg-slate-900/80', 
+          badge: 'bg-amber-500/10 text-amber-400 border border-amber-500/20',
+          icon: '⚡'
+        };
       default:
-        return { border: 'border-l-4 border-l-slate-500', badge: 'bg-slate-850 text-slate-400' };
+        return { 
+          border: 'border-t-[5px] border-t-slate-500', 
+          bg: 'bg-slate-900/60 hover:bg-slate-900/80', 
+          badge: 'bg-slate-800 text-slate-400',
+          icon: '📋'
+        };
     }
   };
 
-  // Weekly Dashboard calculation
+  // Weekly Dashboard calculations
   const totalVolume = sessions.reduce((acc, s) => acc + (s.duracion_total || 0), 0);
   const activeSessionsCount = sessions.filter(s => s.tipo_sesion !== 'Libre').length;
-  const injuryCount = MOCK_PLAYERS.filter(p => p.estado === 'Lesionado').length;
+  
+  // Squad breakdown
+  const availableCount = MOCK_PLAYERS.filter(p => p.estado === 'Disponible').length;
+  const injuredCount = MOCK_PLAYERS.filter(p => p.estado === 'Lesionado').length;
+  const doubtCount = MOCK_PLAYERS.filter(p => p.estado === 'Duda').length;
+
+  const matchSession = sessions.find(s => s.tipo_sesion === 'Partido');
 
   return (
-    <div className="space-y-6 select-none pb-12">
+    <div className="space-y-6 select-none pb-12 text-slate-100 font-sans">
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-slate-900 border-2 border-[#CC0E21] px-4 py-3 rounded-2xl shadow-2xl text-slate-100 text-sm font-bold animate-fadeIn">
@@ -316,167 +364,220 @@ export function PlanificacionClient() {
         </div>
       )}
 
-      {/* Cabecera superior */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-        <div className="space-y-1">
-          <h1 className="text-3xl font-extrabold tracking-tight text-slate-100 flex items-center gap-3">
-            <div className="h-9 w-9 rounded-xl bg-[#CC0E21]/15 border border-[#CC0E21]/30 flex items-center justify-center">
-              <CalendarIcon className="h-5 w-5 text-[#CC0E21]" />
+      {/* CABECERA SUPERIOR - CUADERNO DE ENTRENADOR V3 */}
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 items-stretch">
+        {/* Widget del Microciclo y Datos Físicos */}
+        <div className="xl:col-span-4 p-5 rounded-2xl bg-slate-900/40 border border-slate-800/80 flex flex-col justify-between space-y-4">
+          <div className="flex justify-between items-start">
+            <div>
+              <span className="text-[10px] font-black tracking-widest text-[#CC0E21] uppercase">PLANIFICACIÓN SEMANAL</span>
+              <h1 className="text-2xl font-black tracking-tight text-slate-100">MICROCICLO 32</h1>
             </div>
-            PLANIFICACIÓN <span className="text-[#CC0E21]">V3</span>
-          </h1>
-          <p className="text-slate-450 text-sm">
-            Panel de control diario para el cuerpo técnico (División de Honor).
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-bold text-slate-400 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-xl">
-            🛠️ Modo Simulación / Maqueta UX
-          </span>
-
-          <div className="flex bg-slate-950 border border-slate-850 p-1 rounded-xl">
-            <button 
-              onClick={() => setViewMode('semanal')}
-              className={`text-xs px-3.5 py-1.5 font-bold rounded-lg transition-all ${viewMode === 'semanal' ? 'bg-[#CC0E21] text-white shadow' : 'text-slate-400 hover:text-slate-200'}`}
-            >
-              Vista Semanal
-            </button>
-            <button 
-              onClick={() => setViewMode('mensual')}
-              className={`text-xs px-3.5 py-1.5 font-bold rounded-lg transition-all ${viewMode === 'mensual' ? 'bg-[#CC0E21] text-white shadow' : 'text-slate-400 hover:text-slate-200'}`}
-            >
-              Vista Mensual
-            </button>
+            <div className="flex bg-slate-950 border border-slate-850 p-1 rounded-xl">
+              <button 
+                onClick={() => setViewMode('semanal')}
+                className={`text-xs px-3.5 py-1.5 font-bold rounded-lg transition-all ${viewMode === 'semanal' ? 'bg-[#CC0E21] text-white shadow' : 'text-slate-450 hover:text-slate-200'}`}
+              >
+                Semanal
+              </button>
+              <button 
+                onClick={() => setViewMode('mensual')}
+                className={`text-xs px-3.5 py-1.5 font-bold rounded-lg transition-all ${viewMode === 'mensual' ? 'bg-[#CC0E21] text-white shadow' : 'text-slate-450 hover:text-slate-200'}`}
+              >
+                Mensual
+              </button>
+            </div>
           </div>
 
-          <Button 
-            onClick={() => handleDayClick('2026-06-29')}
-            className="flex items-center gap-1 text-xs font-bold px-3 py-2 bg-[#CC0E21] hover:bg-[#a80b1a] text-white"
-          >
-            <Plus className="h-4 w-4" />
-            Nueva Sesión
-          </Button>
+          {/* Estado de la plantilla */}
+          <div className="border-t border-slate-800/60 pt-3">
+            <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1.5">Estado de la Plantilla</span>
+            <div className="flex items-center gap-3 text-xs font-black">
+              <span className="flex items-center gap-1.5 bg-green-950/40 border border-green-900/40 px-2.5 py-1 rounded-lg text-green-400">
+                <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                {availableCount} Disponibles
+              </span>
+              <span className="flex items-center gap-1.5 bg-red-950/40 border border-red-900/40 px-2.5 py-1 rounded-lg text-red-400">
+                <span className="h-2 w-2 rounded-full bg-red-500" />
+                {injuredCount} Lesionados
+              </span>
+              <span className="flex items-center gap-1.5 bg-amber-950/40 border border-amber-900/40 px-2.5 py-1 rounded-lg text-amber-400">
+                <span className="h-2 w-2 rounded-full bg-amber-500" />
+                {doubtCount} Dudas
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Banner del Objetivo Semanal */}
+        <div className="xl:col-span-4 p-5 rounded-2xl bg-slate-900/40 border border-slate-800/80 flex flex-col justify-between">
+          <div>
+            <span className="text-[10px] font-black tracking-widest text-[#CC0E21] uppercase">OBJETIVO TÁCTICO SEMANAL</span>
+            <div className="mt-2 text-base font-extrabold text-slate-200 leading-snug">
+              Presión tras pérdida en bloque alto y transiciones rápidas verticales buscando finalizaciones en menos de 8 segundos.
+            </div>
+          </div>
+          <div className="text-[10px] text-slate-450 font-bold flex items-center gap-1 border-t border-slate-800/60 pt-3 mt-3">
+            <Clock className="h-3.5 w-3.5 text-slate-500" />
+            <span>Volumen total planificado: {totalVolume} minutos en {activeSessionsCount} sesiones.</span>
+          </div>
+        </div>
+
+        {/* Widget Prominente: Partido de la Semana */}
+        <div className="xl:col-span-4 p-5 rounded-2xl bg-gradient-to-br from-red-950/20 via-slate-900/50 to-slate-900/60 border-2 border-[#CC0E21]/20 flex flex-col justify-between relative overflow-hidden group">
+          <div className="absolute right-0 top-0 text-red-500/5 text-8xl font-black select-none pointer-events-none transform translate-x-6 -translate-y-4">
+            🏆
+          </div>
+          
+          <div className="flex justify-between items-start z-10">
+            <div>
+              <span className="text-[9px] font-black tracking-widest text-red-400 bg-red-500/10 px-2 py-0.5 rounded-md border border-red-500/20 uppercase">
+                PARTIDO DE LA SEMANA
+              </span>
+              <div className="mt-2 flex items-center gap-3">
+                <div className="h-9 w-9 rounded-full bg-[#CC0E21] flex items-center justify-center font-black text-white text-xs border border-red-400 shadow">
+                  SDI
+                </div>
+                <span className="text-xs font-bold text-slate-400">VS</span>
+                <div className="h-9 w-9 rounded-full bg-blue-900 flex items-center justify-center font-black text-white text-xs border border-blue-400 shadow">
+                  ZA
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-100">{matchSession?.rival || 'Zaragoza Juvenil A'}</h3>
+                  <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">División de Honor Juvenil</p>
+                </div>
+              </div>
+            </div>
+            
+            {matchSession && (
+              <div className="text-right">
+                <span className="text-[10px] font-black text-red-400 bg-red-950/50 border border-red-900/40 px-2.5 py-1 rounded-lg block">
+                  FALTAN 2 DÍAS
+                </span>
+              </div>
+            )}
+          </div>
+
+          <div className="border-t border-slate-800/60 pt-2.5 mt-3 flex justify-between items-center text-[10px] font-bold text-slate-350 z-10">
+            <span className="flex items-center gap-1">
+              📅 {matchSession?.fecha || '2026-06-27'}
+            </span>
+            <span className="flex items-center gap-1">
+              ⏰ {matchSession?.hora_inicio || '16:30'}h
+            </span>
+            <span className="flex items-center gap-1 truncate max-w-[150px]">
+              📍 {matchSession?.campo_instalacion || 'Estadio La Florida'}
+            </span>
+          </div>
         </div>
       </div>
 
-      {/* DASHBOARD RESUMEN DE LA SEMANA */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-5 rounded-2xl bg-slate-900/30 border border-slate-800/80 backdrop-blur-md">
-        <div className="space-y-1">
-          <span className="text-[10px] uppercase tracking-wider font-extrabold text-slate-500">Tipo de Microciclo</span>
-          <div className="text-lg font-black text-slate-100 flex items-center gap-2">
-            <Award className="h-4 w-4 text-[#CC0E21]" />
-            Competitivo (J32)
-          </div>
-        </div>
-        <div className="space-y-1 border-l border-slate-800/60 pl-4">
-          <span className="text-[10px] uppercase tracking-wider font-extrabold text-slate-500">Volumen Semanal</span>
-          <div className="text-lg font-black text-slate-100 flex items-center gap-2">
-            <Clock className="h-4 w-4 text-[#CC0E21]" />
-            {totalVolume} min <span className="text-xs text-slate-500">({activeSessionsCount} sesiones)</span>
-          </div>
-        </div>
-        <div className="space-y-1 border-l border-slate-800/60 pl-4">
-          <span className="text-[10px] uppercase tracking-wider font-extrabold text-slate-500">Enfoque de Carga</span>
-          <div className="text-lg font-black text-slate-100 flex items-center gap-2">
-            <ShieldAlert className="h-4 w-4 text-amber-500" />
-            Impacto / Alta
-          </div>
-        </div>
-        <div className="space-y-1 border-l border-slate-800/60 pl-4">
-          <span className="text-[10px] uppercase tracking-wider font-extrabold text-slate-500">Disponibilidad Médica</span>
-          <div className="text-lg font-black text-slate-100 flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-red-500" />
-            90% <span className="text-xs text-slate-500">({injuryCount} lesionados)</span>
-          </div>
-        </div>
-      </div>
-
-      {/* VISTA PRINCIPAL: SEMANAS Y DÍAS */}
+      {/* VISTA PRINCIPAL: CALENDARIO SEMANAL */}
       {viewMode === 'semanal' ? (
         <div className="space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
-            <div className="flex items-center gap-2">
-              <h2 className="text-lg font-black text-slate-200">MICROCICLO SEMANAL</h2>
-              <span className="text-xs font-bold text-slate-500 bg-slate-900 px-2 py-0.5 rounded-lg border border-slate-800">Part. vs Zaragoza</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <button className="p-1 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200">
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-              <span className="text-xs font-black text-slate-300 px-2">Semana 32</span>
-              <button className="p-1 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200">
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-7 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-7 gap-3.5">
             {sessions.map((session) => {
               const config = getTypeConfig(session.tipo_sesion);
               const date = new Date(session.fecha);
-              const dayName = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'][date.getDay()];
+              const dayName = ['DOM', 'LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB'][date.getDay()];
+              const isToday = session.fecha === '2026-06-26';
+              const matchDayTag = getMatchDayTag(session, sessions);
+              const tasks = MOCK_TASKS[session.id] || [];
 
               return (
                 <div
                   key={session.id}
                   onClick={() => handleDayClick(session.fecha)}
-                  className={`p-4 rounded-2xl bg-slate-900/30 border border-slate-800 hover:border-slate-700/85 transition-all duration-200 cursor-pointer flex flex-col justify-between min-h-[190px] shadow-lg hover:shadow-xl relative group ${config.border}`}
+                  className={`p-4 rounded-2xl transition-all duration-200 cursor-pointer flex flex-col justify-between min-h-[380px] shadow-xl relative group border-2 ${
+                    isToday 
+                      ? 'border-[#CC0E21] bg-slate-900/90 ring-4 ring-[#CC0E21]/15 shadow-2xl scale-[1.01]' 
+                      : 'border-slate-800/90 bg-slate-900/30 hover:border-slate-700/80'
+                  } ${session.tipo_sesion === 'Partido' ? config.border : ''}`}
                 >
-                  <div className="space-y-3">
-                    {/* Fila superior: Día y tipo */}
-                    <div className="flex items-center justify-between">
+                  {/* Tag Superior de Hoy o Match Day */}
+                  {isToday && (
+                    <span className="absolute -top-3 left-4 text-[9px] font-black tracking-widest bg-[#CC0E21] text-white px-2.5 py-0.5 rounded-full shadow-lg border border-red-400 uppercase">
+                      HOY
+                    </span>
+                  )}
+
+                  <div className="space-y-4">
+                    {/* Fila superior: Día de la semana y Nomenclatura deportiva */}
+                    <div className="flex items-center justify-between border-b border-slate-800/50 pb-2">
                       <div className="flex items-baseline gap-1.5">
-                        <span className="text-xs font-bold text-slate-400">{dayName}</span>
-                        <span className="text-base font-extrabold text-slate-200">{date.getDate()}</span>
+                        <span className="text-xs font-black text-slate-400">{dayName}</span>
+                        <span className="text-lg font-black text-slate-100">{date.getDate()}</span>
                       </div>
-                      <span className={`text-[9px] px-2 py-0.5 rounded-full font-extrabold tracking-wide uppercase ${config.badge}`}>
-                        {session.tipo_sesion}
+                      <span className="text-[9px] font-black tracking-wider text-slate-500 bg-slate-950 px-2 py-0.5 rounded border border-slate-850 uppercase">
+                        {matchDayTag}
                       </span>
                     </div>
 
-                    {/* Fila del medio: Datos informativos */}
+                    {/* Fila Tipo de Sesión con Icono */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-black tracking-wider uppercase text-slate-400">
+                        {config.icon} {session.tipo_sesion}
+                      </span>
+                      {session.duracion_total > 0 && (
+                        <span className="text-[10px] font-mono text-slate-450 font-bold">
+                          {session.duracion_total} min
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Fila de Datos e Información del Día */}
                     {session.tipo_sesion !== 'Libre' ? (
-                      <div className="space-y-1.5">
-                        <div className="flex items-center gap-1.5 text-slate-400 text-[10px] font-bold">
-                          <Clock className="h-3.5 w-3.5 text-slate-500 shrink-0" />
-                          <span>{session.hora_inicio || 'N/D'}</span>
+                      <div className="space-y-3.5">
+                        {/* Horario y campo */}
+                        <div className="text-[10px] font-bold text-slate-450 flex flex-wrap items-center gap-1">
+                          <span>⏰ {session.hora_inicio}</span>
                           {session.campo_instalacion && (
                             <>
                               <span className="text-slate-700">•</span>
-                              <MapPin className="h-3.5 w-3.5 text-slate-500 shrink-0 truncate max-w-[80px]" />
-                              <span className="truncate max-w-[80px]">{session.campo_instalacion.split(' ')[0]}</span>
+                              <span className="truncate max-w-[90px]">📍 {session.campo_instalacion.split(' ')[0]}</span>
                             </>
                           )}
                         </div>
 
-                        {session.rival && (
-                          <div className="text-[10px] font-extrabold text-red-400 flex items-center gap-1">
-                            <Award className="h-3 w-3 shrink-0" />
-                            <span>Rival: {session.rival}</span>
+                        {/* Objetivo principal */}
+                        <div className="space-y-1">
+                          <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block">OBJETIVO:</span>
+                          <p className="text-xs font-black text-slate-200 leading-tight">
+                            {session.objetivo_principal}
+                          </p>
+                        </div>
+
+                        {/* Contenidos / Tareas Rápidas */}
+                        {tasks.length > 0 && (
+                          <div className="space-y-1">
+                            <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block">TAREAS:</span>
+                            <ul className="space-y-1 text-[11px] text-slate-400 font-bold">
+                              {tasks.map(t => (
+                                <li key={t.id} className="flex items-start gap-1">
+                                  <span className="text-[#CC0E21] shrink-0">•</span>
+                                  <span className="truncate">{t.nombre_tarea}</span>
+                                </li>
+                              ))}
+                            </ul>
                           </div>
                         )}
-
-                        <p className="text-xs font-bold text-slate-200 line-clamp-2 leading-tight">
-                          {session.objetivo_principal}
-                        </p>
                       </div>
                     ) : (
-                      <div className="py-4 text-center text-xs text-slate-600 font-bold italic">
-                        Descanso General
+                      <div className="py-16 text-center text-xs text-slate-600 font-black italic uppercase tracking-wider">
+                        Descanso
                       </div>
                     )}
                   </div>
 
-                  {/* Estado / Carga inferior */}
+                  {/* Fila inferior: Estado de Carga e Incidencias */}
                   {session.tipo_sesion !== 'Libre' && (
-                    <div className="flex items-center justify-between border-t border-slate-800/40 pt-2.5 mt-2">
-                      <span className={`text-[9px] px-1.5 py-0.5 rounded-md font-extrabold ${
-                        session.estado === 'Realizada' ? 'bg-green-950 text-green-400 border border-green-900/40' : 'bg-amber-950 text-amber-400 border border-amber-900/40'
+                    <div className="border-t border-slate-800/50 pt-3 mt-4 flex items-center justify-between">
+                      <span className={`text-[9px] px-2 py-0.5 rounded font-black ${
+                        session.estado === 'Realizada' ? 'bg-green-950/40 text-green-400 border border-green-900/40' : 'bg-amber-950/40 text-amber-400 border border-amber-900/40'
                       }`}>
                         {session.estado}
                       </span>
-                      <span className="text-[9px] text-slate-450 font-bold">
+                      <span className="text-[9px] text-slate-450 font-bold uppercase tracking-wider">
                         Carga: {session.carga}
                       </span>
                     </div>
@@ -487,11 +588,11 @@ export function PlanificacionClient() {
           </div>
         </div>
       ) : (
-        /* VISTA MENSUAL DEL CALENDARIO COMPLETO (MAX ESTATE) */
+        /* VISTA MENSUAL DEL CALENDARIO COMPLETO (PANTALLA COMPLETA) */
         <div className="space-y-4">
-          <div className="grid grid-cols-7 gap-2 text-center">
-            {['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'].map(day => (
-              <div key={day} className="text-xs font-bold text-slate-500 py-1 uppercase tracking-wider">
+          <div className="grid grid-cols-7 gap-2 text-center border-b border-slate-800/80 pb-2">
+            {['LUNES', 'MARTES', 'MIÉRCOLES', 'JUEVES', 'VIERNES', 'SÁBADO', 'DOMINGO'].map(day => (
+              <div key={day} className="text-xs font-black text-slate-500 uppercase tracking-wider">
                 {day}
               </div>
             ))}
@@ -506,26 +607,28 @@ export function PlanificacionClient() {
                 <div
                   key={session.id}
                   onClick={() => handleDayClick(session.fecha)}
-                  className={`min-h-[120px] p-3 rounded-2xl bg-slate-900/30 border border-slate-800 hover:border-slate-700 transition-all cursor-pointer flex flex-col justify-between ${config.border}`}
+                  className={`min-h-[140px] p-3 rounded-2xl bg-slate-900/30 border border-slate-800 hover:border-slate-700/80 transition-all cursor-pointer flex flex-col justify-between ${
+                    session.tipo_sesion === 'Partido' ? 'border-emerald-500/60 bg-emerald-950/10' : ''
+                  }`}
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-black text-slate-400">{date.getDate()}</span>
-                    <span className={`text-[8px] px-1 rounded font-bold uppercase ${config.badge}`}>
+                    <span className={`text-[8px] px-1.5 py-0.5 rounded font-bold uppercase ${config.badge}`}>
                       {session.tipo_sesion}
                     </span>
                   </div>
 
                   {session.tipo_sesion !== 'Libre' ? (
-                    <div className="space-y-1">
+                    <div className="space-y-1 mt-2">
                       <div className="text-[10px] font-black text-slate-200 truncate">{session.tipo_sesion}</div>
-                      <div className="text-[9px] text-slate-550 truncate">{session.objetivo_principal}</div>
-                      <div className="flex items-center justify-between text-[8px] mt-1">
-                        <span className={session.estado === 'Realizada' ? 'text-green-400' : 'text-amber-400'}>{session.estado}</span>
-                        <span className="text-slate-500">Carga: {session.carga}</span>
+                      <div className="text-[9px] text-slate-450 truncate font-semibold">{session.objetivo_principal}</div>
+                      <div className="flex items-center justify-between text-[8px] mt-2 pt-1 border-t border-slate-800/40">
+                        <span className={session.estado === 'Realizada' ? 'text-green-400' : 'text-amber-400 font-bold'}>{session.estado}</span>
+                        <span className="text-slate-500 font-mono">C: {session.carga}</span>
                       </div>
                     </div>
                   ) : (
-                    <div className="text-[9px] text-slate-700 italic text-center">Descanso</div>
+                    <div className="text-[9px] text-slate-650 italic text-center py-4">Descanso</div>
                   )}
                 </div>
               );
@@ -541,7 +644,7 @@ export function PlanificacionClient() {
         className={`fixed inset-0 z-40 bg-black/60 backdrop-blur-sm transition-opacity duration-300 ${isPanelOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} 
         onClick={() => setIsPanelOpen(false)}
       />
-      
+
       <div 
         className={`fixed top-0 right-0 h-full w-full sm:w-[580px] bg-slate-950 border-l border-slate-850 shadow-2xl z-50 transform transition-transform duration-300 overflow-y-auto flex flex-col ${
           isPanelOpen ? 'translate-x-0' : 'translate-x-full'
