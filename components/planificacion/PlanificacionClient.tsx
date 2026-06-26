@@ -31,7 +31,7 @@ interface MockChecklist {
 interface MockSession {
   id: string;
   fecha: string;
-  tipo_sesion: 'Entrenamiento' | 'Partido' | 'Libre' | 'Recuperación' | 'Prepartido';
+  tipo_sesion: 'Entrenamiento' | 'Partido' | 'Libre' | 'Recuperación' | 'Prepartido' | 'Viaje' | 'Postpartido';
   hora_inicio: string;
   hora_fin: string;
   duracion_total: number;
@@ -300,44 +300,50 @@ export function PlanificacionClient() {
     switch (type) {
       case 'Entrenamiento':
         return { 
-          border: 'border-t-[5px] border-t-blue-500', 
-          bg: 'bg-slate-900/60 hover:bg-slate-900/80', 
-          badge: 'bg-blue-500/10 text-blue-400 border border-blue-500/20',
+          border: 'border-slate-800', 
+          badge: 'bg-slate-900 text-slate-350 border border-slate-800',
           icon: '⚽'
         };
       case 'Partido':
         return { 
-          border: 'border-2 border-emerald-500 bg-gradient-to-br from-emerald-950/30 to-slate-900/80 shadow-emerald-950/20', 
-          bg: 'bg-emerald-950/20 hover:bg-emerald-950/30', 
-          badge: 'bg-emerald-500 text-slate-950 font-black px-2.5 py-0.5 rounded-full',
+          border: 'border-emerald-500 bg-emerald-950/15', 
+          badge: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30',
           icon: '🏆'
         };
       case 'Libre':
         return { 
-          border: 'border-t-[5px] border-t-slate-700 opacity-60', 
-          bg: 'bg-slate-900/20 hover:bg-slate-900/30', 
-          badge: 'bg-slate-800 text-slate-500',
+          border: 'border-slate-900 opacity-50', 
+          badge: 'bg-slate-950 text-slate-650',
           icon: '💤'
         };
       case 'Recuperación':
         return { 
-          border: 'border-t-[5px] border-t-cyan-500', 
-          bg: 'bg-slate-900/60 hover:bg-slate-900/80', 
-          badge: 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20',
+          border: 'border-slate-800', 
+          badge: 'bg-slate-900 text-slate-400 border border-slate-800',
           icon: '🔋'
         };
       case 'Prepartido':
         return { 
-          border: 'border-t-[5px] border-t-amber-500', 
-          bg: 'bg-slate-900/60 hover:bg-slate-900/80', 
-          badge: 'bg-amber-500/10 text-amber-400 border border-amber-500/20',
+          border: 'border-slate-800', 
+          badge: 'bg-slate-900 text-slate-400 border border-slate-850',
           icon: '⚡'
+        };
+      case 'Viaje':
+        return { 
+          border: 'border-slate-800', 
+          badge: 'bg-slate-900 text-slate-450 border border-slate-850',
+          icon: '🚌'
+        };
+      case 'Postpartido':
+        return { 
+          border: 'border-slate-800', 
+          badge: 'bg-slate-900 text-slate-450 border border-slate-850',
+          icon: '📝'
         };
       default:
         return { 
-          border: 'border-t-[5px] border-t-slate-500', 
-          bg: 'bg-slate-900/60 hover:bg-slate-900/80', 
-          badge: 'bg-slate-800 text-slate-400',
+          border: 'border-slate-800', 
+          badge: 'bg-slate-900 text-slate-400',
           icon: '📋'
         };
     }
@@ -355,11 +361,11 @@ export function PlanificacionClient() {
   const matchSession = sessions.find(s => s.tipo_sesion === 'Partido');
 
   return (
-    <div className="space-y-6 select-none pb-12 text-slate-100 font-sans">
+    <div className="space-y-6 select-none pb-12 text-slate-100 font-sans antialiased">
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-slate-900 border-2 border-[#CC0E21] px-4 py-3 rounded-2xl shadow-2xl text-slate-100 text-sm font-bold animate-fadeIn">
-          <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0" />
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-slate-950 border border-[#CC0E21] px-4 py-3 rounded-xl shadow-2xl text-slate-200 text-xs font-bold animate-fadeIn">
+          <CheckCircle2 className="h-4.5 w-4.5 text-green-500 shrink-0" />
           <span>{toastMessage}</span>
         </div>
       )}
@@ -367,22 +373,22 @@ export function PlanificacionClient() {
       {/* CABECERA SUPERIOR - CUADERNO DE ENTRENADOR V3 */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 items-stretch">
         {/* Widget del Microciclo y Datos Físicos */}
-        <div className="xl:col-span-4 p-5 rounded-2xl bg-slate-900/40 border border-slate-800/80 flex flex-col justify-between space-y-4">
+        <div className="xl:col-span-4 p-6 rounded-2xl bg-slate-900/30 border border-slate-800/60 flex flex-col justify-between space-y-5">
           <div className="flex justify-between items-start">
             <div>
-              <span className="text-[10px] font-black tracking-widest text-[#CC0E21] uppercase">PLANIFICACIÓN SEMANAL</span>
-              <h1 className="text-2xl font-black tracking-tight text-slate-100">MICROCICLO 32</h1>
+              <span className="text-[9px] font-black tracking-widest text-slate-500 uppercase">PLANIFICACIÓN</span>
+              <h1 className="text-xl font-black tracking-tight text-slate-100 mt-0.5">MICROCICLO 32</h1>
             </div>
             <div className="flex bg-slate-950 border border-slate-850 p-1 rounded-xl">
               <button 
                 onClick={() => setViewMode('semanal')}
-                className={`text-xs px-3.5 py-1.5 font-bold rounded-lg transition-all ${viewMode === 'semanal' ? 'bg-[#CC0E21] text-white shadow' : 'text-slate-450 hover:text-slate-200'}`}
+                className={`text-[10px] px-3 py-1 font-bold rounded-lg transition-all ${viewMode === 'semanal' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:text-slate-350'}`}
               >
                 Semanal
               </button>
               <button 
                 onClick={() => setViewMode('mensual')}
-                className={`text-xs px-3.5 py-1.5 font-bold rounded-lg transition-all ${viewMode === 'mensual' ? 'bg-[#CC0E21] text-white shadow' : 'text-slate-450 hover:text-slate-200'}`}
+                className={`text-[10px] px-3 py-1 font-bold rounded-lg transition-all ${viewMode === 'mensual' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:text-slate-355'}`}
               >
                 Mensual
               </button>
@@ -390,84 +396,71 @@ export function PlanificacionClient() {
           </div>
 
           {/* Estado de la plantilla */}
-          <div className="border-t border-slate-800/60 pt-3">
-            <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1.5">Estado de la Plantilla</span>
-            <div className="flex items-center gap-3 text-xs font-black">
-              <span className="flex items-center gap-1.5 bg-green-950/40 border border-green-900/40 px-2.5 py-1 rounded-lg text-green-400">
-                <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-                {availableCount} Disponibles
+          <div className="border-t border-slate-850 pt-3">
+            <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-2">DISPONIBILIDAD PLANTILLA</span>
+            <div className="flex items-center gap-2 text-[11px] font-bold">
+              <span className="flex items-center gap-1 bg-slate-950 border border-slate-850 px-2 py-1 rounded text-slate-300">
+                🟢 <span className="text-white font-extrabold">{availableCount}</span> Disp.
               </span>
-              <span className="flex items-center gap-1.5 bg-red-950/40 border border-red-900/40 px-2.5 py-1 rounded-lg text-red-400">
-                <span className="h-2 w-2 rounded-full bg-red-500" />
-                {injuredCount} Lesionados
+              <span className="flex items-center gap-1 bg-slate-950 border border-slate-850 px-2 py-1 rounded text-slate-400">
+                🔴 <span className="text-white font-extrabold">{injuredCount}</span> Les.
               </span>
-              <span className="flex items-center gap-1.5 bg-amber-950/40 border border-amber-900/40 px-2.5 py-1 rounded-lg text-amber-400">
-                <span className="h-2 w-2 rounded-full bg-amber-500" />
-                {doubtCount} Dudas
+              <span className="flex items-center gap-1 bg-slate-950 border border-slate-850 px-2 py-1 rounded text-slate-400">
+                🟡 <span className="text-white font-extrabold">{doubtCount}</span> Duda
               </span>
             </div>
           </div>
         </div>
 
         {/* Banner del Objetivo Semanal */}
-        <div className="xl:col-span-4 p-5 rounded-2xl bg-slate-900/40 border border-slate-800/80 flex flex-col justify-between">
+        <div className="xl:col-span-4 p-6 rounded-2xl bg-slate-900/30 border border-slate-800/60 flex flex-col justify-between">
           <div>
-            <span className="text-[10px] font-black tracking-widest text-[#CC0E21] uppercase">OBJETIVO TÁCTICO SEMANAL</span>
-            <div className="mt-2 text-base font-extrabold text-slate-200 leading-snug">
+            <span className="text-[9px] font-black tracking-widest text-[#CC0E21] uppercase">OBJETIVO SEMANAL</span>
+            <div className="mt-2 text-sm font-semibold text-slate-200 leading-relaxed">
               Presión tras pérdida en bloque alto y transiciones rápidas verticales buscando finalizaciones en menos de 8 segundos.
             </div>
           </div>
-          <div className="text-[10px] text-slate-450 font-bold flex items-center gap-1 border-t border-slate-800/60 pt-3 mt-3">
-            <Clock className="h-3.5 w-3.5 text-slate-500" />
-            <span>Volumen total planificado: {totalVolume} minutos en {activeSessionsCount} sesiones.</span>
+          <div className="text-[10px] text-slate-550 font-medium flex items-center gap-1 border-t border-slate-850 pt-3 mt-3">
+            <Clock className="h-3.5 w-3.5 text-slate-655" />
+            <span>Volumen planificado: {totalVolume} min | {activeSessionsCount} sesiones</span>
           </div>
         </div>
 
         {/* Widget Prominente: Partido de la Semana */}
-        <div className="xl:col-span-4 p-5 rounded-2xl bg-gradient-to-br from-red-950/20 via-slate-900/50 to-slate-900/60 border-2 border-[#CC0E21]/20 flex flex-col justify-between relative overflow-hidden group">
-          <div className="absolute right-0 top-0 text-red-500/5 text-8xl font-black select-none pointer-events-none transform translate-x-6 -translate-y-4">
-            🏆
-          </div>
-          
+        <div className="xl:col-span-4 p-6 rounded-2xl bg-slate-900/30 border border-slate-800/60 flex flex-col justify-between relative overflow-hidden group">
           <div className="flex justify-between items-start z-10">
             <div>
-              <span className="text-[9px] font-black tracking-widest text-red-400 bg-red-500/10 px-2 py-0.5 rounded-md border border-red-500/20 uppercase">
+              <span className="text-[9px] font-black tracking-widest text-emerald-400 bg-emerald-500/5 px-2 py-0.5 rounded border border-emerald-500/10 uppercase">
                 PARTIDO DE LA SEMANA
               </span>
-              <div className="mt-2 flex items-center gap-3">
-                <div className="h-9 w-9 rounded-full bg-[#CC0E21] flex items-center justify-center font-black text-white text-xs border border-red-400 shadow">
+              <div className="mt-3 flex items-center gap-2">
+                <div className="h-7 w-7 rounded-full bg-slate-950 flex items-center justify-center font-bold text-white text-[10px] border border-slate-800">
                   SDI
                 </div>
-                <span className="text-xs font-bold text-slate-400">VS</span>
-                <div className="h-9 w-9 rounded-full bg-blue-900 flex items-center justify-center font-black text-white text-xs border border-blue-400 shadow">
+                <span className="text-[10px] font-bold text-slate-600">VS</span>
+                <div className="h-7 w-7 rounded-full bg-slate-950 flex items-center justify-center font-bold text-white text-[10px] border border-slate-800">
                   ZA
                 </div>
                 <div>
-                  <h3 className="text-sm font-black text-slate-100">{matchSession?.rival || 'Zaragoza Juvenil A'}</h3>
-                  <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">División de Honor Juvenil</p>
+                  <h3 className="text-xs font-black text-slate-200">{matchSession?.rival || 'Zaragoza Juvenil A'}</h3>
+                  <p className="text-[8px] text-slate-500 font-extrabold uppercase tracking-wider">División de Honor</p>
                 </div>
               </div>
             </div>
             
             {matchSession && (
               <div className="text-right">
-                <span className="text-[10px] font-black text-red-400 bg-red-950/50 border border-red-900/40 px-2.5 py-1 rounded-lg block">
+                <span className="text-[9px] font-black text-[#CC0E21] bg-[#CC0E21]/5 border border-[#CC0E21]/15 px-2 py-0.5 rounded uppercase">
                   FALTAN 2 DÍAS
                 </span>
               </div>
             )}
           </div>
 
-          <div className="border-t border-slate-800/60 pt-2.5 mt-3 flex justify-between items-center text-[10px] font-bold text-slate-350 z-10">
-            <span className="flex items-center gap-1">
-              📅 {matchSession?.fecha || '2026-06-27'}
-            </span>
-            <span className="flex items-center gap-1">
-              ⏰ {matchSession?.hora_inicio || '16:30'}h
-            </span>
-            <span className="flex items-center gap-1 truncate max-w-[150px]">
-              📍 {matchSession?.campo_instalacion || 'Estadio La Florida'}
-            </span>
+          <div className="border-t border-slate-850 pt-2.5 mt-3 flex justify-between items-center text-[10px] font-semibold text-slate-400 z-10">
+            <span>📅 {matchSession?.fecha || '2026-06-27'}</span>
+            <span>⏰ {matchSession?.hora_inicio || '16:30'}h</span>
+            <span className="truncate max-w-[150px]">📍 {matchSession?.campo_instalacion || 'La Florida'}</span>
           </div>
         </div>
       </div>
@@ -488,38 +481,38 @@ export function PlanificacionClient() {
                 <div
                   key={session.id}
                   onClick={() => handleDayClick(session.fecha)}
-                  className={`p-4 rounded-2xl transition-all duration-200 cursor-pointer flex flex-col justify-between min-h-[380px] shadow-xl relative group border-2 ${
+                  className={`p-4 rounded-xl transition-all duration-150 cursor-pointer flex flex-col justify-between min-h-[380px] border relative ${
                     isToday 
-                      ? 'border-[#CC0E21] bg-slate-900/90 ring-4 ring-[#CC0E21]/15 shadow-2xl scale-[1.01]' 
-                      : 'border-slate-800/90 bg-slate-900/30 hover:border-slate-700/80'
-                  } ${session.tipo_sesion === 'Partido' ? config.border : ''}`}
+                      ? 'border-[#CC0E21] bg-slate-900/60 ring-2 ring-[#CC0E21]/10' 
+                      : `${config.border} bg-slate-950/20 hover:border-slate-700/80`
+                  }`}
                 >
-                  {/* Tag Superior de Hoy o Match Day */}
+                  {/* Tag Superior de Hoy */}
                   {isToday && (
-                    <span className="absolute -top-3 left-4 text-[9px] font-black tracking-widest bg-[#CC0E21] text-white px-2.5 py-0.5 rounded-full shadow-lg border border-red-400 uppercase">
+                    <span className="absolute -top-2.5 left-4 text-[8px] font-black tracking-widest bg-[#CC0E21] text-white px-2 py-0.5 rounded shadow">
                       HOY
                     </span>
                   )}
 
                   <div className="space-y-4">
-                    {/* Fila superior: Día de la semana y Nomenclatura deportiva */}
-                    <div className="flex items-center justify-between border-b border-slate-800/50 pb-2">
-                      <div className="flex items-baseline gap-1.5">
-                        <span className="text-xs font-black text-slate-400">{dayName}</span>
-                        <span className="text-lg font-black text-slate-100">{date.getDate()}</span>
+                    {/* Fila superior: Día y Nomenclatura deportiva */}
+                    <div className="flex items-center justify-between border-b border-slate-900 pb-2">
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-[10px] font-black text-slate-500">{dayName}</span>
+                        <span className="text-sm font-black text-slate-200">{date.getDate()}</span>
                       </div>
-                      <span className="text-[9px] font-black tracking-wider text-slate-500 bg-slate-950 px-2 py-0.5 rounded border border-slate-850 uppercase">
+                      <span className="text-[8px] font-black text-slate-500 bg-slate-950 px-1.5 py-0.5 rounded border border-slate-900 uppercase">
                         {matchDayTag}
                       </span>
                     </div>
 
                     {/* Fila Tipo de Sesión con Icono */}
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-black tracking-wider uppercase text-slate-400">
+                      <span className="text-[9px] font-black tracking-wider uppercase text-slate-400">
                         {config.icon} {session.tipo_sesion}
                       </span>
                       {session.duracion_total > 0 && (
-                        <span className="text-[10px] font-mono text-slate-450 font-bold">
+                        <span className="text-[9px] font-mono text-slate-500 font-bold">
                           {session.duracion_total} min
                         </span>
                       )}
@@ -529,20 +522,20 @@ export function PlanificacionClient() {
                     {session.tipo_sesion !== 'Libre' ? (
                       <div className="space-y-3.5">
                         {/* Horario y campo */}
-                        <div className="text-[10px] font-bold text-slate-450 flex flex-wrap items-center gap-1">
+                        <div className="text-[9px] font-bold text-slate-500 flex flex-wrap items-center gap-1">
                           <span>⏰ {session.hora_inicio}</span>
                           {session.campo_instalacion && (
                             <>
-                              <span className="text-slate-700">•</span>
+                              <span>•</span>
                               <span className="truncate max-w-[90px]">📍 {session.campo_instalacion.split(' ')[0]}</span>
                             </>
                           )}
                         </div>
 
                         {/* Objetivo principal */}
-                        <div className="space-y-1">
-                          <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block">OBJETIVO:</span>
-                          <p className="text-xs font-black text-slate-200 leading-tight">
+                        <div className="space-y-0.5">
+                          <span className="text-[8px] font-black text-slate-650 uppercase tracking-wider block">OBJETIVO:</span>
+                          <p className="text-xs font-bold text-slate-200 leading-relaxed">
                             {session.objetivo_principal}
                           </p>
                         </div>
@@ -550,11 +543,11 @@ export function PlanificacionClient() {
                         {/* Contenidos / Tareas Rápidas */}
                         {tasks.length > 0 && (
                           <div className="space-y-1">
-                            <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block">TAREAS:</span>
-                            <ul className="space-y-1 text-[11px] text-slate-400 font-bold">
+                            <span className="text-[8px] font-black text-slate-655 uppercase tracking-wider block">CONTENIDOS:</span>
+                            <ul className="space-y-1 text-[10px] text-slate-400 font-medium">
                               {tasks.map(t => (
                                 <li key={t.id} className="flex items-start gap-1">
-                                  <span className="text-[#CC0E21] shrink-0">•</span>
+                                  <span className="text-slate-600 shrink-0">•</span>
                                   <span className="truncate">{t.nombre_tarea}</span>
                                 </li>
                               ))}
@@ -563,21 +556,21 @@ export function PlanificacionClient() {
                         )}
                       </div>
                     ) : (
-                      <div className="py-16 text-center text-xs text-slate-600 font-black italic uppercase tracking-wider">
+                      <div className="py-20 text-center text-[10px] text-slate-700 font-black italic uppercase tracking-widest">
                         Descanso
                       </div>
                     )}
                   </div>
 
-                  {/* Fila inferior: Estado de Carga e Incidencias */}
+                  {/* Fila inferior: Estado de Carga */}
                   {session.tipo_sesion !== 'Libre' && (
-                    <div className="border-t border-slate-800/50 pt-3 mt-4 flex items-center justify-between">
-                      <span className={`text-[9px] px-2 py-0.5 rounded font-black ${
-                        session.estado === 'Realizada' ? 'bg-green-950/40 text-green-400 border border-green-900/40' : 'bg-amber-950/40 text-amber-400 border border-amber-900/40'
+                    <div className="border-t border-slate-900/60 pt-2.5 mt-3 flex items-center justify-between">
+                      <span className={`text-[8px] px-1.5 py-0.5 rounded font-black ${
+                        session.estado === 'Realizada' ? 'bg-green-950/20 text-green-400 border border-green-900/10' : 'bg-amber-950/20 text-amber-400 border border-amber-900/10'
                       }`}>
                         {session.estado}
                       </span>
-                      <span className="text-[9px] text-slate-450 font-bold uppercase tracking-wider">
+                      <span className="text-[8px] text-slate-500 font-bold uppercase tracking-wider">
                         Carga: {session.carga}
                       </span>
                     </div>
@@ -628,7 +621,7 @@ export function PlanificacionClient() {
                       </div>
                     </div>
                   ) : (
-                    <div className="text-[9px] text-slate-650 italic text-center py-4">Descanso</div>
+                    <div className="text-[9px] text-slate-655 italic text-center py-4">Descanso</div>
                   )}
                 </div>
               );
@@ -702,6 +695,8 @@ export function PlanificacionClient() {
                     <option value="Libre">Libre / Descanso</option>
                     <option value="Recuperación">Recuperación</option>
                     <option value="Prepartido">Prepartido / Activación</option>
+                    <option value="Viaje">Viaje / Traslado</option>
+                    <option value="Postpartido">Postpartido / Análisis</option>
                   </select>
                 </div>
 
