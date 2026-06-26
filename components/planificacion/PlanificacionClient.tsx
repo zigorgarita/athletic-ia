@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { supabase } from '@/lib/supabase';
 import { 
   Calendar as CalendarIcon, Plus, Printer, RefreshCw, 
   BookOpen, Check, X, Clock, MapPin, 
@@ -72,148 +73,36 @@ interface MockPlayer {
   estado: 'Disponible' | 'Lesionado' | 'Duda' | 'Sancionado';
 }
 
-// Static mock configuration
-const MOCK_PLAYERS: MockPlayer[] = [
-  { id: 'p1', nombre: 'Ander', apellidos: 'Ibarreta', dorsal: 1, demarcacion: 'Portero', estado: 'Disponible' },
-  { id: 'p2', nombre: 'Mikel', apellidos: 'Arruti', dorsal: 2, demarcacion: 'Central derecho', estado: 'Disponible' },
-  { id: 'p3', nombre: 'Iker', apellidos: 'Garmendia', dorsal: 4, demarcacion: 'Central izquierdo', estado: 'Lesionado' },
-  { id: 'p4', nombre: 'Jon', apellidos: 'Larrañaga', dorsal: 3, demarcacion: 'Lateral izquierdo', estado: 'Disponible' },
-  { id: 'p5', nombre: 'Gorka', apellidos: 'Elustondo', dorsal: 5, demarcacion: 'Pivote', estado: 'Disponible' },
-  { id: 'p6', nombre: 'Julen', apellidos: 'Guerrero', dorsal: 8, demarcacion: 'Interior izquierdo', estado: 'Disponible' },
-  { id: 'p7', nombre: 'Unai', apellidos: 'López', dorsal: 10, demarcacion: 'Media punta', estado: 'Duda' },
-  { id: 'p8', nombre: 'Asier', apellidos: 'Villalibre', dorsal: 9, demarcacion: 'Delantero centro', estado: 'Disponible' },
-  { id: 'p9', nombre: 'Oier', apellidos: 'Sancet', dorsal: 11, demarcacion: 'Extremo izquierdo', estado: 'Disponible' },
-  { id: 'p10', nombre: 'Nico', apellidos: 'Serrano', dorsal: 7, demarcacion: 'Extremo derecho', estado: 'Disponible' }
-];
-
-const MOCK_SESSIONS: MockSession[] = [
-  {
-    id: 's1',
-    fecha: '2026-06-22',
-    tipo_sesion: 'Libre',
-    hora_inicio: '',
-    hora_fin: '',
-    duracion_total: 0,
-    campo_instalacion: '',
-    objetivo_principal: 'Descanso programado',
-    carga: 'Recuperación',
-    estado: 'Realizada'
-  },
-  {
-    id: 's2',
-    fecha: '2026-06-23',
-    tipo_sesion: 'Entrenamiento',
-    hora_inicio: '18:30',
-    hora_fin: '20:00',
-    duracion_total: 90,
-    campo_instalacion: 'Iparralde (Campo Central)',
-    objetivo_principal: 'Salida de balón de tres y basculación defensiva',
-    carga: 'Media',
-    estado: 'Realizada',
-    hora_convocatoria: '18:00',
-    ropa_convocatoria: 'Camiseta azul de entreno, pantalón corto negro, medias azules.',
-    checklist_material: { balones: 16, petos: ['Rojo', 'Azul'], conos: 12, chinos: 20, gps: true, agua: true },
-    evaluacion_completada: true,
-    evaluacion_duracion_real: 90,
-    evaluacion_observaciones: 'Muy buena intensidad en la fase de posesión. Ander sintió fatiga leve en el aductor.',
-    rpe_medio: 6
-  },
-  {
-    id: 's3',
-    fecha: '2026-06-24',
-    tipo_sesion: 'Libre',
-    hora_inicio: '',
-    hora_fin: '',
-    duracion_total: 0,
-    campo_instalacion: '',
-    objetivo_principal: 'Descanso semanal',
-    carga: 'Recuperación',
-    estado: 'Realizada'
-  },
-  {
-    id: 's4',
-    fecha: '2026-06-25',
-    tipo_sesion: 'Entrenamiento',
-    hora_inicio: '18:30',
-    hora_fin: '20:15',
-    duracion_total: 105,
-    campo_instalacion: 'Iparralde (Campo Central)',
-    objetivo_principal: 'Presión alta y transiciones rápidas tras recuperación',
-    carga: 'Alta',
-    estado: 'Realizada',
-    hora_convocatoria: '18:00',
-    ropa_convocatoria: 'Camiseta blanca de entreno, pantalón negro, medias blancas.',
-    checklist_material: { balones: 18, petos: ['Rojo', 'Verde'], conos: 15, chinos: 25, gps: true, tablet: true, agua: true, botiquin: true },
-    evaluacion_completada: true,
-    evaluacion_duracion_real: 100,
-    evaluacion_observaciones: 'Sesión muy física. Completados todos los bloques salvo la vuelta a la calma que se recortó por falta de luz.',
-    rpe_medio: 8
-  },
-  {
-    id: 's5',
-    fecha: '2026-06-26',
-    tipo_sesion: 'Prepartido',
-    hora_inicio: '18:30',
-    hora_fin: '19:30',
-    duracion_total: 60,
-    campo_instalacion: 'Iparralde (Fútbol 7)',
-    objetivo_principal: 'ABP y reactivación neuromuscular',
-    carga: 'Baja',
-    estado: 'Planificada',
-    hora_convocatoria: '18:15',
-    ropa_convocatoria: 'Polo oficial de paseo azul, pantalón corto negro.',
-    checklist_material: { balones: 10, petos: ['Verde', 'Amarillo'], conos: 6, chinos: 10, cronometro: true, agua: true },
-  },
-  {
-    id: 's6',
-    fecha: '2026-06-27',
-    tipo_sesion: 'Partido',
-    hora_inicio: '16:30',
-    hora_fin: '18:15',
-    duracion_total: 105,
-    campo_instalacion: 'Estadio La Florida (Sestao)',
-    objetivo_principal: 'Jornada 32: SD Indautxu vs Zaragoza Juvenil A',
-    carga: 'Muy alta',
-    estado: 'Planificada',
-    rival: 'Zaragoza Juvenil A',
-    hora_convocatoria: '14:45',
-    ropa_convocatoria: 'Equipación oficial de juego (Camiseta rojiblanca, pantalón azul, medias rojas).'
-  },
-  {
-    id: 's7',
-    fecha: '2026-06-28',
-    tipo_sesion: 'Recuperación',
-    hora_inicio: '10:30',
-    hora_fin: '11:30',
-    duracion_total: 60,
-    campo_instalacion: 'Gimnasio y Spa Iparralde',
-    objetivo_principal: 'Trabajo regenerativo, movilidad articular y spa',
-    carga: 'Recuperación',
-    estado: 'Planificada',
-    hora_convocatoria: '10:15',
-    ropa_convocatoria: 'Chándal oficial del club.'
-  }
-];
-
-const MOCK_TASKS: Record<string, MockTask[]> = {
-  s2: [
-    { id: 't1', nombre_tarea: 'Calentamiento dinámico y movilidad', tipo_tarea: 'Calentamiento', minutos: 15, jugadores: 20, espacio: 'Medio campo', objetivo: 'Activación muscular', descripcion: 'Movilidad articular general seguida de sprints progresivos y saltos de valla.', responsable_staff: 'Preparador Físico' },
-    { id: 't2', nombre_tarea: 'Rondo 4x4 + 3 apoyos neutros', tipo_tarea: 'Rondo', minutos: 20, jugadores: 11, espacio: '15x15m', objetivo: 'Mantener posesión y pase rápido', descripcion: 'El equipo en posesión busca dar 10 pases seguidos. Al perder balón cambian roles.', responsable_staff: 'Segundo Entrenador' },
-    { id: 't3', nombre_tarea: 'Salida de tres en campo completo con rival pasivo', tipo_tarea: 'Juego de posición', minutos: 40, jugadores: 18, espacio: 'Todo el campo', objetivo: 'Salida de balón estructurada', descripcion: 'Se entrena el inicio del juego desde el portero con tres defensas centrales y pivote cayendo a bandas.', responsable_staff: 'Primer Entrenador' }
-  ],
-  s4: [
-    { id: 't4', nombre_tarea: 'Juego reducido de presión tras pérdida', tipo_tarea: 'Juego reducido', minutos: 30, jugadores: 16, espacio: '30x40m', objetivo: 'Reacción tras pérdida', descripcion: 'Partidos de 4vs4 con porterías pequeñas. Al perder el balón, el equipo debe presionar en menos de 3 segundos.', responsable_staff: 'Primer Entrenador' },
-    { id: 't5', nombre_tarea: 'Partido condicionado 10vs10', tipo_tarea: 'Partido condicionado', minutos: 50, jugadores: 20, espacio: 'Todo el campo', objetivo: 'Aplicar conceptos defensivos', descripcion: 'Partido normal pero los goles marcados tras recuperación en campo contrario valen doble.', responsable_staff: 'Primer Entrenador' }
-  ]
-};
-
+// Mock interface type definitions are kept for state typing
 export function PlanificacionClient() {
   // Views and navigation
   const [viewMode, setViewMode] = useState<'semanal' | 'mensual'>('semanal');
+  const [loading, setLoading] = useState(true);
   
-  // Data states (Simulated mockup)
-  const [sessions, setSessions] = useState<MockSession[]>(MOCK_SESSIONS);
-  const [selectedDate, setSelectedDate] = useState<string>('2026-06-25');
+  // Nombres de días abreviados en español y cálculo de semana
+  const [currentMonday, setCurrentMonday] = useState<Date>(() => {
+    const d = new Date('2026-06-26'); // Contexto de fecha base
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    return new Date(d.setDate(diff));
+  });
+
+  const getDaysOfWeek = (monday: Date) => {
+    const days = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      days.push(d.toISOString().split('T')[0]);
+    }
+    return days;
+  };
+
+  // Data states connected to Supabase
+  const [sessions, setSessions] = useState<MockSession[]>([]);
+  const [allTasksMap, setAllTasksMap] = useState<Record<string, MockTask[]>>({});
+  const [players, setPlayers] = useState<MockPlayer[]>([]);
+  
+  const [selectedDate, setSelectedDate] = useState<string>('2026-06-26');
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'basicos' | 'tareas' | 'convocatoria' | 'evaluacion'>('basicos');
   
@@ -230,6 +119,171 @@ export function PlanificacionClient() {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
+  // 1. Fetch summoned players from Supabase
+  const fetchSummonedPlayers = async (sessionId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('planning_session_players')
+        .select('player_id, convocado')
+        .eq('session_id', sessionId);
+      if (error) throw error;
+      const summoned = data?.filter(p => p.convocado).map(p => p.player_id) || [];
+      setSummonedPlayerIds(summoned);
+    } catch (err) {
+      console.error('Error fetching summoned players:', err);
+    }
+  };
+
+  // 2. Fetch all database planning data for the selected week
+  const fetchWeekData = useCallback(async (mondayDate: Date) => {
+    setLoading(true);
+    try {
+      const days = getDaysOfWeek(mondayDate);
+      const start = days[0];
+      const end = days[6];
+
+      // Fetch sessions in range
+      const { data: dbSessions, error: sErr } = await supabase
+        .from('planning_sessions')
+        .select('*')
+        .gte('fecha', start)
+        .lte('fecha', end)
+        .order('fecha', { ascending: true });
+      if (sErr) throw sErr;
+
+      // Fetch tasks for these sessions
+      const sessionIds = dbSessions?.map(s => s.id) || [];
+      let dbTasks: {
+        id: string;
+        planning_session_id: string;
+        nombre_tarea: string;
+        tipo_tarea: string;
+        minutos: number;
+        jugadores?: number | null;
+        espacio?: string | null;
+        objetivo?: string | null;
+        descripcion?: string | null;
+        observaciones?: string | null;
+        responsable_staff?: string | null;
+      }[] = [];
+      if (sessionIds.length > 0) {
+        const { data, error: tErr } = await supabase
+          .from('planning_tasks')
+          .select('*')
+          .in('planning_session_id', sessionIds)
+          .order('orden', { ascending: true });
+        if (tErr) throw tErr;
+        dbTasks = data || [];
+      }
+
+      // Group tasks by session_id
+      const tasksMap: Record<string, MockTask[]> = {};
+      dbTasks.forEach(task => {
+        if (!tasksMap[task.planning_session_id]) {
+          tasksMap[task.planning_session_id] = [];
+        }
+        tasksMap[task.planning_session_id].push({
+          id: task.id,
+          nombre_tarea: task.nombre_tarea,
+          tipo_tarea: task.tipo_tarea,
+          minutos: task.minutos,
+          jugadores: task.jugadores || 0,
+          espacio: task.espacio || '',
+          objetivo: task.objetivo || '',
+          descripcion: task.descripcion || '',
+          observaciones: task.observaciones || '',
+          responsable_staff: task.responsable_staff || 'Primer Entrenador'
+        });
+      });
+
+      // Construct a complete list of 7 days
+      const fullWeekSessions: MockSession[] = days.map(day => {
+        const existing = dbSessions?.find(s => s.fecha === day);
+        if (existing) {
+          return {
+            id: existing.id,
+            fecha: existing.fecha,
+            tipo_sesion: (existing.tipo_sesion || 'Entrenamiento') as MockSession['tipo_sesion'],
+            hora_inicio: existing.hora_inicio || '',
+            hora_fin: existing.hora_fin || '',
+            duracion_total: existing.duracion_total || 0,
+            campo_instalacion: existing.campo_instalacion || '',
+            objetivo_principal: existing.objetivo_principal || '',
+            carga: (existing.carga || 'Media') as MockSession['carga'],
+            estado: (existing.estado || 'Planificada') as MockSession['estado'],
+            rival: existing.rival || undefined,
+            hora_convocatoria: existing.hora_convocatoria || '',
+            ropa_convocatoria: existing.observaciones_convocatoria || '',
+            checklist_material: existing.checklist_material || {},
+            evaluacion_completada: existing.evaluacion_completada || false,
+            evaluacion_duracion_real: existing.evaluacion_duracion_real || undefined,
+            evaluacion_observaciones: existing.evaluacion_observaciones || ''
+          };
+        } else {
+          return {
+            id: `temp-${day}`,
+            fecha: day,
+            tipo_sesion: 'Libre',
+            hora_inicio: '',
+            hora_fin: '',
+            duracion_total: 0,
+            campo_instalacion: '',
+            objetivo_principal: 'Descanso programado',
+            carga: 'Recuperación',
+            estado: 'Borrador'
+          };
+        }
+      });
+
+      setSessions(fullWeekSessions);
+      setAllTasksMap(tasksMap);
+    } catch (err) {
+      console.error('Error fetching week data:', err);
+      triggerToast('Error al conectar con Supabase');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Fetch players on mount
+  useEffect(() => {
+    const fetchPlayers = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('players')
+          .select('*')
+          .order('dorsal', { ascending: true });
+        if (error) throw error;
+        setPlayers(data || []);
+      } catch (err) {
+        console.error('Error loading players:', err);
+      }
+    };
+    fetchPlayers();
+  }, []);
+
+  // Fetch week sessions when currentMonday changes
+  useEffect(() => {
+    fetchWeekData(currentMonday);
+  }, [currentMonday, fetchWeekData]);
+
+  // Week navigation
+  const handlePrevWeek = () => {
+    setCurrentMonday(prev => {
+      const nextM = new Date(prev);
+      nextM.setDate(prev.getDate() - 7);
+      return nextM;
+    });
+  };
+
+  const handleNextWeek = () => {
+    setCurrentMonday(prev => {
+      const nextM = new Date(prev);
+      nextM.setDate(prev.getDate() + 7);
+      return nextM;
+    });
+  };
+
   // Open sidebar/drawer on day click
   const handleDayClick = (dateStr: string) => {
     setSelectedDate(dateStr);
@@ -237,9 +291,12 @@ export function PlanificacionClient() {
 
     if (existing) {
       setSessionForm({ ...existing });
-      setSessionTasks(MOCK_TASKS[existing.id] || []);
-      // Preset summoned players (all available by default)
-      setSummonedPlayerIds(MOCK_PLAYERS.filter(p => p.estado === 'Disponible').map(p => p.id));
+      setSessionTasks(allTasksMap[existing.id] || []);
+      if (!existing.id.startsWith('temp-')) {
+        fetchSummonedPlayers(existing.id);
+      } else {
+        setSummonedPlayerIds(players.filter(p => p.estado === 'Disponible').map(p => p.id));
+      }
     } else {
       setSessionForm({
         fecha: dateStr,
@@ -248,11 +305,11 @@ export function PlanificacionClient() {
         hora_fin: '20:00',
         duracion_total: 90,
         campo_instalacion: 'Iparralde',
-        objetivo_principal: 'Diseño táctico nuevo',
+        objetivo_principal: 'Organización táctica',
         carga: 'Media',
         estado: 'Borrador',
         hora_convocatoria: '18:00',
-        ropa_convocatoria: 'Camiseta oficial de entrenamiento.'
+        ropa_convocatoria: 'Polo oficial y chándal.'
       });
       setSessionTasks([]);
       setSummonedPlayerIds([]);
@@ -261,15 +318,154 @@ export function PlanificacionClient() {
     setIsPanelOpen(true);
   };
 
-  // Handle simulated action buttons
-  const handleSaveSimulated = () => {
-    const updated = sessions.map(s => s.fecha === sessionForm.fecha ? { ...s, ...sessionForm } as MockSession : s);
-    if (!sessions.some(s => s.fecha === sessionForm.fecha)) {
-      updated.push({ ...sessionForm, id: 's' + (updated.length + 1) } as MockSession);
+  // Handle save actions via RPC (Phase C)
+  const handleSaveReal = async () => {
+    setLoading(true);
+    try {
+      const sessionPayload: {
+        id?: string;
+        fecha?: string;
+        tipo_sesion?: string;
+        hora_inicio?: string | null;
+        hora_fin?: string | null;
+        duracion_total?: number;
+        campo_instalacion?: string | null;
+        objetivo_principal?: string | null;
+        carga?: string;
+        estado?: string;
+        hora_convocatoria?: string | null;
+        observaciones_convocatoria?: string | null;
+        checklist_material?: Record<string, unknown>;
+        evaluacion_completada?: boolean;
+        evaluacion_duracion_real?: number | null;
+        evaluacion_observaciones?: string | null;
+      } = {
+        fecha: sessionForm.fecha,
+        tipo_sesion: sessionForm.tipo_sesion,
+        hora_inicio: sessionForm.hora_inicio || null,
+        hora_fin: sessionForm.hora_fin || null,
+        duracion_total: Number(sessionForm.duracion_total) || 0,
+        campo_instalacion: sessionForm.campo_instalacion || null,
+        objetivo_principal: sessionForm.objetivo_principal || null,
+        carga: sessionForm.carga || 'Media',
+        estado: sessionForm.estado || 'Planificada',
+        hora_convocatoria: sessionForm.hora_convocatoria || null,
+        observaciones_convocatoria: sessionForm.ropa_convocatoria || null,
+        checklist_material: (sessionForm.checklist_material as Record<string, unknown>) || {}
+      };
+
+      if (sessionForm.evaluacion_completada) {
+        sessionPayload.evaluacion_completada = true;
+        sessionPayload.evaluacion_duracion_real = sessionForm.evaluacion_duracion_real ? Number(sessionForm.evaluacion_duracion_real) : null;
+        sessionPayload.evaluacion_observaciones = sessionForm.evaluacion_observaciones || null;
+      }
+
+      const isNew = !sessionForm.id || sessionForm.id.startsWith('temp-');
+      if (!isNew) {
+        sessionPayload.id = sessionForm.id;
+      }
+
+      const { data: sessionResult, error: sErr } = await supabase.rpc('exec_secure_upsert', {
+        target_table: 'planning_sessions',
+        payload: sessionPayload,
+        conflict_columns: ['id'],
+        staff_passkey: 'indautxu2026'
+      });
+      if (sErr) throw sErr;
+
+      const savedSession = sessionResult as { id: string };
+      const sessionId = savedSession.id;
+
+      // Clean up deleted tasks from this session
+      if (!isNew) {
+        const { data: existingTasks } = await supabase
+          .from('planning_tasks')
+          .select('id')
+          .eq('planning_session_id', sessionId);
+        
+        if (existingTasks) {
+          for (const extTask of existingTasks) {
+            if (!sessionTasks.some(t => t.id === extTask.id)) {
+              await supabase.rpc('exec_secure_delete', {
+                target_table: 'planning_tasks',
+                record_id: extTask.id,
+                staff_passkey: 'indautxu2026'
+              });
+            }
+          }
+        }
+      }
+
+      // Upsert current tasks
+      if (sessionTasks.length > 0) {
+        const taskPayloads = sessionTasks.map((t, idx) => {
+          const payload: {
+            id?: string;
+            planning_session_id: string;
+            nombre_tarea: string;
+            tipo_tarea: string;
+            minutos: number;
+            jugadores?: number | null;
+            espacio?: string | null;
+            objetivo?: string | null;
+            descripcion?: string | null;
+            observaciones?: string | null;
+            orden: number;
+          } = {
+            planning_session_id: sessionId,
+            nombre_tarea: t.nombre_tarea,
+            tipo_tarea: t.tipo_tarea,
+            minutos: Number(t.minutos) || 0,
+            jugadores: t.jugadores || null,
+            espacio: t.espacio || null,
+            objetivo: t.objetivo || null,
+            descripcion: t.descripcion || null,
+            observaciones: t.observaciones || null,
+            orden: idx
+          };
+          if (t.id && !t.id.startsWith('t') && !t.id.startsWith('temp-')) {
+            payload.id = t.id;
+          }
+          return payload;
+        });
+
+        const { error: tErr } = await supabase.rpc('exec_secure_bulk_upsert', {
+          target_table: 'planning_tasks',
+          payloads: taskPayloads,
+          conflict_columns: ['id'],
+          staff_passkey: 'indautxu2026'
+        });
+        if (tErr) throw tErr;
+      }
+
+      // Save summoned players
+      const playerPayloads = players.map(p => {
+        const isSummoned = summonedPlayerIds.includes(p.id);
+        return {
+          session_id: sessionId,
+          player_id: p.id,
+          convocado: isSummoned,
+          estado_sesion: p.estado
+        };
+      });
+
+      const { error: pErr } = await supabase.rpc('exec_secure_bulk_upsert', {
+        target_table: 'planning_session_players',
+        payloads: playerPayloads,
+        conflict_columns: ['session_id', 'player_id'],
+        staff_passkey: 'indautxu2026'
+      });
+      if (pErr) throw pErr;
+
+      triggerToast('¡Sesión guardada con éxito en Supabase!');
+      setIsPanelOpen(false);
+      fetchWeekData(currentMonday);
+    } catch (err) {
+      console.error('Error saving session:', err);
+      triggerToast(err instanceof Error ? err.message : 'Error al guardar la sesión');
+    } finally {
+      setLoading(false);
     }
-    setSessions(updated);
-    setIsPanelOpen(false);
-    triggerToast('¡Sesión guardada con éxito (Modo Simulación)!');
   };
 
   const handleDuplicateSimulated = () => {
@@ -354,17 +550,26 @@ export function PlanificacionClient() {
   const activeSessionsCount = sessions.filter(s => s.tipo_sesion !== 'Libre').length;
   
   // Squad breakdown
-  const availableCount = MOCK_PLAYERS.filter(p => p.estado === 'Disponible').length;
-  const injuredCount = MOCK_PLAYERS.filter(p => p.estado === 'Lesionado').length;
-  const doubtCount = MOCK_PLAYERS.filter(p => p.estado === 'Duda').length;
+  const availableCount = players.filter(p => p.estado === 'Disponible').length;
+  const injuredCount = players.filter(p => p.estado === 'Lesionado').length;
+  const doubtCount = players.filter(p => p.estado === 'Duda').length;
 
   const matchSession = sessions.find(s => s.tipo_sesion === 'Partido');
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
+        <div className="h-8 w-8 rounded-full border-2 border-slate-700 border-t-[#CC0E21] animate-spin" />
+        <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Cargando Cuaderno...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 select-none pb-12 text-slate-100 font-sans antialiased">
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-slate-950 border border-[#CC0E21] px-4 py-3 rounded-xl shadow-2xl text-slate-200 text-xs font-bold animate-fadeIn">
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-slate-950 border border-[#CC0E21] px-4 py-3 rounded-xl text-slate-200 text-xs font-bold animate-fadeIn">
           <CheckCircle2 className="h-4.5 w-4.5 text-green-500 shrink-0" />
           <span>{toastMessage}</span>
         </div>
@@ -379,16 +584,34 @@ export function PlanificacionClient() {
               <span className="text-[9px] font-black tracking-widest text-slate-500 uppercase">PLANIFICACIÓN</span>
               <h1 className="text-xl font-black tracking-tight text-slate-100 mt-0.5">MICROCICLO 32</h1>
             </div>
-            <div className="flex bg-slate-950 border border-slate-850 p-1 rounded-xl">
+            <div className="flex bg-slate-950 border border-slate-855 p-1 rounded-xl gap-1 items-center">
+              <button 
+                onClick={handlePrevWeek}
+                className="px-1.5 py-0.5 rounded text-slate-500 hover:text-slate-200 font-bold transition-all text-xs"
+                title="Semana anterior"
+              >
+                ◀
+              </button>
+              <span className="text-[9px] font-bold text-slate-400 font-mono tracking-tighter uppercase px-1">
+                W: {currentMonday.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' })}
+              </span>
+              <button 
+                onClick={handleNextWeek}
+                className="px-1.5 py-0.5 rounded text-slate-500 hover:text-slate-200 font-bold transition-all text-xs"
+                title="Semana siguiente"
+              >
+                ▶
+              </button>
+              <span className="text-slate-800 text-xs">|</span>
               <button 
                 onClick={() => setViewMode('semanal')}
-                className={`text-[10px] px-3 py-1 font-bold rounded-lg transition-all ${viewMode === 'semanal' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:text-slate-350'}`}
+                className={`text-[9px] px-2.5 py-1 font-bold rounded transition-all ${viewMode === 'semanal' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:text-slate-350'}`}
               >
                 Semanal
               </button>
               <button 
                 onClick={() => setViewMode('mensual')}
-                className={`text-[10px] px-3 py-1 font-bold rounded-lg transition-all ${viewMode === 'mensual' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:text-slate-355'}`}
+                className={`text-[9px] px-2.5 py-1 font-bold rounded transition-all ${viewMode === 'mensual' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:text-slate-355'}`}
               >
                 Mensual
               </button>
@@ -475,7 +698,7 @@ export function PlanificacionClient() {
               const dayName = ['DOM', 'LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB'][date.getDay()];
               const isToday = session.fecha === '2026-06-26';
               const matchDayTag = getMatchDayTag(session, sessions);
-              const tasks = MOCK_TASKS[session.id] || [];
+              const tasks = allTasksMap[session.id] || [];
 
               return (
                 <div
@@ -991,7 +1214,7 @@ export function PlanificacionClient() {
                 </div>
 
                 <div className="space-y-1.5 max-h-[220px] overflow-y-auto pr-1">
-                  {MOCK_PLAYERS.map(player => {
+                  {players.map(player => {
                     const isSummoned = summonedPlayerIds.includes(player.id);
                     const isInjured = player.estado === 'Lesionado';
                     return (
@@ -1131,7 +1354,7 @@ export function PlanificacionClient() {
               Cancelar
             </button>
             <button
-              onClick={handleSaveSimulated}
+              onClick={handleSaveReal}
               className="px-4 py-2 rounded-xl bg-[#CC0E21] hover:bg-[#a80b1a] text-white text-xs font-bold shadow-md shadow-[#CC0E21]/15"
             >
               Guardar Cambios
