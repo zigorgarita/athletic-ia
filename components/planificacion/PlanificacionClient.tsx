@@ -97,6 +97,35 @@ export function PlanificacionClient() {
     return days;
   };
 
+  const getDaysOfMonthGrid = (date: Date) => {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    // First day of the month
+    const firstDay = new Date(year, month, 1);
+    // Last day of the month
+    const lastDay = new Date(year, month + 1, 0);
+
+    // Start on the Monday of the week containing firstDay
+    const firstDayOfWeek = firstDay.getDay();
+    const daysToSub = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1;
+    const startDate = new Date(firstDay);
+    startDate.setDate(firstDay.getDate() - daysToSub);
+
+    // End on the Sunday of the week containing lastDay
+    const lastDayOfWeek = lastDay.getDay();
+    const daysToAdd = lastDayOfWeek === 0 ? 0 : 7 - lastDayOfWeek;
+    const endDate = new Date(lastDay);
+    endDate.setDate(lastDay.getDate() + daysToAdd);
+
+    const days = [];
+    const curr = new Date(startDate);
+    while (curr <= endDate) {
+      days.push(curr.toISOString().split('T')[0]);
+      curr.setDate(curr.getDate() + 1);
+    }
+    return days;
+  };
+
   // Data states connected to Supabase
   const [sessions, setSessions] = useState<MockSession[]>([]);
   const [allTasksMap, setAllTasksMap] = useState<Record<string, MockTask[]>>({});
@@ -134,13 +163,15 @@ export function PlanificacionClient() {
     }
   };
 
-  // 2. Fetch all database planning data for the selected week
-  const fetchWeekData = useCallback(async (mondayDate: Date) => {
+  // 2. Fetch all database planning data for the selected period
+  const fetchWeekData = useCallback(async (mondayDate: Date, currentMode: 'semanal' | 'mensual') => {
     setLoading(true);
     try {
-      const days = getDaysOfWeek(mondayDate);
+      const days = currentMode === 'semanal' 
+        ? getDaysOfWeek(mondayDate) 
+        : getDaysOfMonthGrid(mondayDate);
       const start = days[0];
-      const end = days[6];
+      const end = days[days.length - 1];
 
       // Fetch sessions in range
       const { data: dbSessions, error: sErr } = await supabase
@@ -196,8 +227,8 @@ export function PlanificacionClient() {
         });
       });
 
-      // Construct a complete list of 7 days
-      const fullWeekSessions: MockSession[] = days.map(day => {
+      // Construct a complete list of all grid days
+      const fullPeriodSessions: MockSession[] = days.map(day => {
         const existing = dbSessions?.find(s => s.fecha === day);
         if (existing) {
           return {
@@ -235,10 +266,10 @@ export function PlanificacionClient() {
         }
       });
 
-      setSessions(fullWeekSessions);
+      setSessions(fullPeriodSessions);
       setAllTasksMap(tasksMap);
     } catch (err) {
-      console.error('Error fetching week data:', err);
+      console.error('Error fetching period data:', err);
       triggerToast('Error al conectar con Supabase');
     } finally {
       setLoading(false);
@@ -262,27 +293,36 @@ export function PlanificacionClient() {
     fetchPlayers();
   }, []);
 
-  // Fetch week sessions when currentMonday changes
+  // Fetch period sessions when currentMonday or viewMode changes
   useEffect(() => {
-    fetchWeekData(currentMonday);
-  }, [currentMonday, fetchWeekData]);
+    fetchWeekData(currentMonday, viewMode);
+  }, [currentMonday, viewMode, fetchWeekData]);
 
-  // Week navigation
-  const handlePrevWeek = () => {
+  // Period navigation
+  const handlePrevPeriod = () => {
     setCurrentMonday(prev => {
       const nextM = new Date(prev);
-      nextM.setDate(prev.getDate() - 7);
+      if (viewMode === 'semanal') {
+        nextM.setDate(prev.getDate() - 7);
+      } else {
+        nextM.setMonth(prev.getMonth() - 1);
+      }
       return nextM;
     });
   };
 
-  const handleNextWeek = () => {
+  const handleNextPeriod = () => {
     setCurrentMonday(prev => {
       const nextM = new Date(prev);
-      nextM.setDate(prev.getDate() + 7);
+      if (viewMode === 'semanal') {
+        nextM.setDate(prev.getDate() + 7);
+      } else {
+        nextM.setMonth(prev.getMonth() + 1);
+      }
       return nextM;
     });
   };
+
 
   // Open sidebar/drawer on day click
   const handleDayClick = (dateStr: string) => {
@@ -459,7 +499,7 @@ export function PlanificacionClient() {
 
       triggerToast('¡Sesión guardada con éxito en Supabase!');
       setIsPanelOpen(false);
-      fetchWeekData(currentMonday);
+      fetchWeekData(currentMonday, viewMode);
     } catch (err) {
       console.error('Error saving session:', err);
       triggerToast(err instanceof Error ? err.message : 'Error al guardar la sesión');
@@ -586,19 +626,22 @@ export function PlanificacionClient() {
             </div>
             <div className="flex bg-slate-950 border border-slate-855 p-1 rounded-xl gap-1 items-center">
               <button 
-                onClick={handlePrevWeek}
+                onClick={handlePrevPeriod}
                 className="px-1.5 py-0.5 rounded text-slate-500 hover:text-slate-200 font-bold transition-all text-xs"
-                title="Semana anterior"
+                title={viewMode === 'semanal' ? "Semana anterior" : "Mes anterior"}
               >
                 ◀
               </button>
               <span className="text-[9px] font-bold text-slate-400 font-mono tracking-tighter uppercase px-1">
-                W: {currentMonday.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' })}
+                {viewMode === 'semanal' 
+                  ? `W: ${currentMonday.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' })}`
+                  : currentMonday.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })
+                }
               </span>
               <button 
-                onClick={handleNextWeek}
+                onClick={handleNextPeriod}
                 className="px-1.5 py-0.5 rounded text-slate-500 hover:text-slate-200 font-bold transition-all text-xs"
-                title="Semana siguiente"
+                title={viewMode === 'semanal' ? "Semana siguiente" : "Mes siguiente"}
               >
                 ▶
               </button>
@@ -804,51 +847,209 @@ export function PlanificacionClient() {
           </div>
         </div>
       ) : (
-        /* VISTA MENSUAL DEL CALENDARIO COMPLETO (PANTALLA COMPLETA) */
-        <div className="space-y-4">
-          <div className="grid grid-cols-7 gap-2 text-center border-b border-slate-800/80 pb-2">
+        /* VISTA MENSUAL DEL CALENDARIO COMPLETO (TABLERO TÁCTICO V4) */
+        <div className="space-y-6">
+          {/* BARRA DE KPIs MENSUAL */}
+          {(() => {
+            const monthMinutes = sessions.reduce((acc, s) => acc + (s.duracion_total || 0), 0);
+            const countTrainings = sessions.filter(s => s.tipo_sesion === 'Entrenamiento').length;
+            const countMatches = sessions.filter(s => s.tipo_sesion === 'Partido').length;
+            const countRecup = sessions.filter(s => s.tipo_sesion === 'Recuperación').length;
+            const countRest = sessions.filter(s => s.tipo_sesion === 'Libre').length;
+            const countTrips = sessions.filter(s => s.tipo_sesion === 'Viaje').length;
+
+            return (
+              <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-xl bg-slate-900/20 border border-slate-850/40 text-xs text-slate-400 font-semibold tracking-wide backdrop-blur-sm">
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-100 font-black">📅 {currentMonday.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }).toUpperCase()}</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+                  <span>⏱️ <strong className="text-slate-200">{monthMinutes} min</strong> totales</span>
+                  <span>⚽ <strong className="text-slate-200">{countTrainings}</strong> Entrenamientos</span>
+                  <span>🏆 <strong className="text-slate-200">{countMatches}</strong> Partidos</span>
+                  <span>🔋 <strong className="text-slate-200">{countRecup}</strong> Recuperaciones</span>
+                  <span>💤 <strong className="text-slate-200">{countRest}</strong> Descansos</span>
+                  <span>🚌 <strong className="text-slate-200">{countTrips}</strong> Viajes</span>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* CABECERAS DE DÍAS */}
+          <div className="grid grid-cols-7 gap-4 text-center pb-1">
             {['LUNES', 'MARTES', 'MIÉRCOLES', 'JUEVES', 'VIERNES', 'SÁBADO', 'DOMINGO'].map(day => (
-              <div key={day} className="text-xs font-black text-slate-500 uppercase tracking-wider">
+              <div key={day} className="text-[10px] font-black text-slate-500 tracking-wider">
                 {day}
               </div>
             ))}
           </div>
 
-          <div className="grid grid-cols-7 gap-2.5">
+          {/* CUADRÍCULA DE CELDAS ESTILO APPLE */}
+          <div className="grid grid-cols-7 gap-0 border-t border-l border-slate-800/40 rounded-xl overflow-hidden bg-slate-900/5">
             {sessions.map(session => {
               const date = new Date(session.fecha);
-              const config = getTypeConfig(session.tipo_sesion);
+              const isCurrentMonth = date.getMonth() === currentMonday.getMonth();
+              
+              // Map charge colors to glows/bars
+              const getChargeStyles = (charge: string) => {
+                switch (charge) {
+                  case 'Muy alta':
+                    return { color: 'bg-red-500', glow: 'shadow-[0_0_8px_rgba(239,68,68,0.7)]' };
+                  case 'Alta':
+                    return { color: 'bg-orange-500', glow: 'shadow-[0_0_8px_rgba(249,115,22,0.7)]' };
+                  case 'Media':
+                    return { color: 'bg-amber-400', glow: 'shadow-[0_0_8px_rgba(251,191,36,0.7)]' };
+                  case 'Baja':
+                    return { color: 'bg-sky-500', glow: 'shadow-[0_0_8px_rgba(14,165,233,0.7)]' };
+                  case 'Recuperación':
+                    return { color: 'bg-emerald-500', glow: 'shadow-[0_0_8px_rgba(16,185,129,0.7)]' };
+                  default:
+                    return { color: 'bg-slate-500', glow: 'shadow-[0_0_8px_rgba(148,163,184,0.4)]' };
+                }
+              };
+
+              const chargeStyles = getChargeStyles(session.carga);
+              const tooltipPos = (date.getDay() === 0 || date.getDay() === 6) 
+                ? 'right-full top-0 mr-2' 
+                : 'left-full top-0 ml-2';
+
+              if (session.tipo_sesion === 'Partido') {
+                return (
+                  <div
+                    key={session.id}
+                    onClick={() => handleDayClick(session.fecha)}
+                    className={`min-h-[145px] p-3 flex flex-col justify-between hover:bg-slate-900/10 transition-all cursor-pointer relative group/day select-none border-b border-r border-slate-800/40 ${
+                      !isCurrentMonth ? 'opacity-40' : ''
+                    }`}
+                  >
+                    <div className="flex justify-between items-start">
+                      <span className="text-xs font-black text-slate-400">{date.getDate()}</span>
+                    </div>
+
+                    <div className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold px-2.5 py-2 rounded-lg text-[9px] tracking-wide shadow-[0_2px_8px_rgba(16,185,129,0.3)] block text-center space-y-1 transition-colors">
+                      <div className="flex items-center justify-between text-[7px] opacity-90 border-b border-emerald-500/35 pb-1 font-mono">
+                        <span>⏰ {session.hora_inicio || '12:00'}h</span>
+                        <span className="font-black text-amber-300">MATCH DAY</span>
+                      </div>
+                      <div className="flex items-center justify-center gap-1.5 py-0.5">
+                        <span className="filter drop-shadow text-xs">🛡️</span>
+                        <span className="truncate font-black max-w-[85px] uppercase">{session.rival || 'Zaragoza Juv A'}</span>
+                      </div>
+                    </div>
+
+                    <div className="h-2 w-full bg-transparent" />
+
+                    {/* Tooltip Táctico Flotante */}
+                    <div className={`absolute ${tooltipPos} w-60 p-4 rounded-xl bg-slate-950/95 border border-slate-800 shadow-2xl opacity-0 pointer-events-none group-hover/day:opacity-100 transition-opacity duration-200 z-30 space-y-2.5 backdrop-blur-md`}>
+                      <div className="flex items-center justify-between border-b border-slate-900 pb-1.5">
+                        <span className="text-[10px] font-black text-emerald-400 uppercase tracking-wider">🏆 Partido Oficial</span>
+                        <span className="text-[8px] px-1.5 py-0.5 rounded font-black bg-emerald-950 text-emerald-400">
+                          {session.estado}
+                        </span>
+                      </div>
+                      <div className="space-y-1.5 text-[10px] text-slate-400">
+                        <p className="font-bold text-slate-100 leading-snug">🛡️ Rival: <span className="text-white">{session.rival || 'Zaragoza Juv A'}</span></p>
+                        <p>📍 Campo: {session.campo_instalacion || 'Iparralde'}</p>
+                        <p>⏰ Hora Citación: {session.hora_convocatoria || '11:00'}h</p>
+                        <p>👕 Ropa: {session.ropa_convocatoria || 'Oficial de juego'}</p>
+                        <p>⚡ Carga: <span className="font-bold text-slate-200">{session.carga}</span></p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+
+              if (session.tipo_sesion === 'Libre') {
+                return (
+                  <div
+                    key={session.id}
+                    onClick={() => handleDayClick(session.fecha)}
+                    className={`min-h-[145px] p-3 flex flex-col justify-between hover:bg-slate-900/10 transition-all cursor-pointer relative group/day select-none border-b border-r border-slate-800/40 ${
+                      !isCurrentMonth ? 'opacity-20' : ''
+                    }`}
+                  >
+                    <span className="text-xs font-bold text-slate-600">{date.getDate()}</span>
+                    <div className="flex-1" />
+                  </div>
+                );
+              }
+
+              // Normal Session (Entrenamiento, Recuperación, Viaje, Prepartido, Postpartido)
+              const sessionIcon = session.tipo_sesion === 'Entrenamiento' ? '⚽' : session.tipo_sesion === 'Recuperación' ? '🔋' : session.tipo_sesion === 'Viaje' ? '🚌' : '📋';
+              const shortName = session.objetivo_principal || 'Sesión de trabajo';
 
               return (
                 <div
                   key={session.id}
                   onClick={() => handleDayClick(session.fecha)}
-                  className={`min-h-[140px] p-3 rounded-2xl bg-slate-900/30 border border-slate-800 hover:border-slate-700/80 transition-all cursor-pointer flex flex-col justify-between ${
-                    session.tipo_sesion === 'Partido' ? 'border-emerald-500/60 bg-emerald-950/10' : ''
+                  className={`min-h-[145px] p-3 flex flex-col justify-between hover:bg-slate-900/10 transition-all cursor-pointer relative group/day select-none border-b border-r border-slate-800/40 ${
+                    !isCurrentMonth ? 'opacity-30' : ''
                   }`}
                 >
-                  <div className="flex items-center justify-between">
+                  <div className="flex justify-between items-start">
                     <span className="text-xs font-black text-slate-400">{date.getDate()}</span>
-                    <span className={`text-[8px] px-1.5 py-0.5 rounded font-bold uppercase ${config.badge}`}>
-                      {session.tipo_sesion}
-                    </span>
                   </div>
 
-                  {session.tipo_sesion !== 'Libre' ? (
-                    <div className="space-y-1 mt-2">
-                      <div className="text-[10px] font-black text-slate-200 truncate">{session.tipo_sesion}</div>
-                      <div className="text-[9px] text-slate-450 truncate font-semibold">{session.objetivo_principal}</div>
-                      <div className="flex items-center justify-between text-[8px] mt-2 pt-1 border-t border-slate-800/40">
-                        <span className={session.estado === 'Realizada' ? 'text-green-400' : 'text-amber-400 font-bold'}>{session.estado}</span>
-                        <span className="text-slate-500 font-mono">C: {session.carga}</span>
-                      </div>
+                  {/* Píldora horizontal de evento */}
+                  <div className={`w-full px-2.5 py-1.5 rounded-lg border text-[9px] font-bold flex items-center justify-between shadow-sm transition-all ${
+                    session.carga === 'Muy alta' ? 'bg-red-500/10 text-red-300 border-red-500/20' :
+                    session.carga === 'Alta' ? 'bg-orange-500/10 text-orange-300 border-orange-500/20' :
+                    session.carga === 'Media' ? 'bg-amber-400/10 text-amber-300 border-amber-400/20' :
+                    session.carga === 'Baja' ? 'bg-sky-500/10 text-sky-300 border-sky-500/20' :
+                    'bg-emerald-500/10 text-emerald-300 border-emerald-500/20'
+                  }`}>
+                    <span className="truncate max-w-[80px] font-mono">{session.hora_inicio || '18:30'} {shortName}</span>
+                    <span className="text-[10px]">{sessionIcon}</span>
+                  </div>
+
+                  {/* LED de carga física */}
+                  <div className="flex justify-end mt-1">
+                    <div className={`h-1.5 w-6 rounded-full ${chargeStyles.color} ${chargeStyles.glow}`} />
+                  </div>
+
+                  {/* Tooltip Táctico Flotante */}
+                  <div className={`absolute ${tooltipPos} w-60 p-4 rounded-xl bg-slate-950/95 border border-slate-800 shadow-2xl opacity-0 pointer-events-none group-hover/day:opacity-100 transition-opacity duration-200 z-30 space-y-2.5 backdrop-blur-md`}>
+                    <div className="flex items-center justify-between border-b border-slate-900 pb-1.5">
+                      <span className="text-[10px] font-black text-slate-350 uppercase tracking-wider">{session.tipo_sesion}</span>
+                      <span className={`text-[8px] px-1.5 py-0.5 rounded font-black ${
+                        session.estado === 'Realizada' ? 'bg-green-950 text-green-400' : 'bg-amber-950 text-amber-400'
+                      }`}>
+                        {session.estado}
+                      </span>
                     </div>
-                  ) : (
-                    <div className="text-[9px] text-slate-655 italic text-center py-4">Descanso</div>
-                  )}
+                    <div className="space-y-1.5 text-[10px] text-slate-400">
+                      <p className="font-bold text-slate-100 leading-snug">🎯 Objetivo: <span className="text-white font-medium">{session.objetivo_principal || 'Sesión General'}</span></p>
+                      <p>⏱️ Duración: {session.duracion_total} min</p>
+                      <p>⚡ Carga de trabajo: <span className="font-bold text-slate-200">{session.carga}</span></p>
+                      {session.campo_instalacion && <p>📍 Campo: {session.campo_instalacion}</p>}
+                    </div>
+                  </div>
                 </div>
               );
             })}
+          </div>
+
+          {/* LEYENDA INFERIOR DE CARGAS */}
+          <div className="flex justify-center items-center gap-6 pt-4 border-t border-slate-900/40 text-[9px] font-black text-slate-500 uppercase tracking-widest select-none">
+            <span className="text-slate-600">CARGA FÍSICA:</span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.7)]" /> Muy alta
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.7)]" /> Alta
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.7)]" /> Media
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full bg-sky-500 shadow-[0_0_8px_rgba(14,165,233,0.7)]" /> Baja / Viaje
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.7)]" /> Recuperación
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full bg-slate-700" /> Descanso
+            </span>
           </div>
         </div>
       )}
