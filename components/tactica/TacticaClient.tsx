@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { usePlayers } from '@/hooks/usePlayers';
-import { TacticalLineup, Match } from '@/types';
+import { TacticalLineup, Match, Player } from '@/types';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
@@ -11,19 +11,14 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { Avatar } from '@/components/ui/Avatar';
 import { 
   Layout, Save, FolderOpen, RefreshCw, AlertCircle, 
-  CheckCircle, Users, Trash2, ChevronDown, Copy, Plus, X, ShieldAlert,
-  Zap, Award, HelpCircle, User, Star, ArrowRight, BookOpen, Edit3
+  CheckCircle, Users, Trash2, Copy, Plus, X, ShieldAlert,
+  Zap, Award, HelpCircle, User, Star, ArrowRight, BookOpen, Edit3,
+  ArrowRightLeft
 } from 'lucide-react';
 import { useEditMode } from '@/context/EditModeContext';
+import { TacticalField, PositionNode } from './TacticalField';
 
-interface PositionNode {
-  id: number;
-  label: string; // POR, LD, LI, etc.
-  x: number; // %
-  y: number; // %
-  player_id: string | null;
-  notas_entrenador?: string;
-}
+
 
 const POSITION_ROLES = ['POR', 'LD', 'LI', 'DFC', 'MCD', 'MC', 'MCO', 'ED', 'EI', 'DC'];
 
@@ -214,7 +209,8 @@ export function TacticaClient() {
 
   // Board states
   const [selectedFormation, setSelectedFormation] = useState<string>('1-4-2-3-1');
-  const [nodes, setNodes] = useState<PositionNode[]>([]);
+  const [nodesPropio, setNodesPropio] = useState<PositionNode[]>([]);
+  const [nodesRival, setNodesRival] = useState<PositionNode[]>([]);
   const [lineupName, setLineupName] = useState<string>('');
   const [lineupNotes, setLineupNotes] = useState<string>('');
   const [selectedMatchId, setSelectedMatchId] = useState<string>('');
@@ -235,13 +231,18 @@ export function TacticaClient() {
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const containerRef = useRef<HTMLDivElement>(null);
+  // Modal node editor states
+  const [editingNode, setEditingNode] = useState<{ team: 'propio' | 'rival'; node: PositionNode } | null>(null);
+  const [editNodeName, setEditNodeName] = useState('');
+  const [editNodeNumber, setEditNodeNumber] = useState('');
+  const [editNodeRole, setEditNodeRole] = useState('');
+  const [editNodeNotes, setEditNodeNotes] = useState('');
 
   // Initialize nodes based on selected formation
   useEffect(() => {
     if (!currentLineupId) {
       const defaultCoords = FORMATIONS[selectedFormation]?.coords || [];
-      setNodes(
+      setNodesPropio(
         defaultCoords.map((coord) => ({
           ...coord,
           player_id: null,
@@ -250,6 +251,61 @@ export function TacticaClient() {
       );
     }
   }, [selectedFormation, currentLineupId]);
+
+  // Initialize rival nodes based on rival formation
+  useEffect(() => {
+    if (!currentLineupId) {
+      const defaultCoords = FORMATIONS[rivalFormation]?.coords || [];
+      setNodesRival(
+        defaultCoords.map((coord) => ({
+          ...coord,
+          player_id: null,
+          notas_entrenador: ''
+        }))
+      );
+    }
+  }, [rivalFormation, currentLineupId]);
+
+  // Helper to open node editor
+  const handleOpenNodeEditor = (team: 'propio' | 'rival', node: PositionNode) => {
+    const assignedPlayer = team === 'propio' ? players.find(p => p.id === node.player_id) : null;
+    
+    setEditingNode({ team, node });
+    setEditNodeName(node.customName || (assignedPlayer ? assignedPlayer.nombre : ''));
+    setEditNodeNumber(node.customNumber || (assignedPlayer ? assignedPlayer.dorsal.toString() : ''));
+    setEditNodeRole(node.label);
+    setEditNodeNotes(node.notas_entrenador || '');
+  };
+
+  // Helper to save node custom details
+  const handleSaveNodeDetails = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingNode) return;
+
+    const { team, node } = editingNode;
+    const updater = (prev: PositionNode[]) =>
+      prev.map((n) => {
+        if (n.id === node.id) {
+          return {
+            ...n,
+            label: editNodeRole,
+            customName: editNodeName.trim() || undefined,
+            customNumber: editNodeNumber.trim() || undefined,
+            notas_entrenador: editNodeNotes.trim() || undefined,
+          };
+        }
+        return n;
+      });
+
+    if (team === 'propio') {
+      setNodesPropio(updater);
+    } else {
+      setNodesRival(updater);
+    }
+
+    setEditingNode(null);
+    setSuccessMsg('Ficha de posición actualizada correctamente.');
+  };
 
   // Load tactical proposals when systems change
   useEffect(() => {
@@ -299,118 +355,83 @@ export function TacticaClient() {
   const handleFormationChange = (formationKey: string) => {
     setSelectedFormation(formationKey);
     const defaultCoords = FORMATIONS[formationKey]?.coords || [];
-    setNodes(prev => {
+    setNodesPropio(prev => {
       return defaultCoords.map(coord => {
         const existingNode = prev.find(n => n.id === coord.id);
         return {
           ...coord,
           player_id: existingNode ? existingNode.player_id : null,
-          notas_entrenador: existingNode?.notas_entrenador || ''
+          notas_entrenador: existingNode?.notas_entrenador || '',
+          customName: existingNode?.customName,
+          customNumber: existingNode?.customNumber
         };
       });
     });
   };
 
-  // --- Drag & Drop logic for free movement of nodes ---
-  const handleDragStart = (e: React.MouseEvent | React.TouchEvent, nodeId: number) => {
-    const target = e.target as HTMLElement;
-    if (target.tagName === 'SELECT' || target.closest('.no-drag')) return;
-
-    const isTouch = 'touches' in e;
-    const startX = isTouch ? e.touches[0].clientX : e.clientX;
-    const startY = isTouch ? e.touches[0].clientY : e.clientY;
-    
-    const node = nodes.find(n => n.id === nodeId);
-    if (!node) return;
-    
-    const initialX = node.x;
-    const initialY = node.y;
-
-    const container = containerRef.current;
-    if (!container) return;
-    const rect = container.getBoundingClientRect();
-
-    const handleDragMove = (moveEvent: MouseEvent | TouchEvent) => {
-      const currentX = 'touches' in moveEvent ? moveEvent.touches[0].clientX : moveEvent.clientX;
-      const currentY = 'touches' in moveEvent ? moveEvent.touches[0].clientY : moveEvent.clientY;
-      
-      const deltaX = ((currentX - startX) / rect.width) * 100;
-      const deltaY = ((currentY - startY) / rect.height) * 100;
-
-      setNodes(prev => prev.map(n => {
-        if (n.id === nodeId) {
-          return {
-            ...n,
-            x: Math.max(4, Math.min(96, initialX + deltaX)),
-            y: Math.max(4, Math.min(96, initialY + deltaY))
-          };
-        }
-        return n;
-      }));
-    };
-
-    const handleDragEnd = () => {
-      window.removeEventListener('mousemove', handleDragMove);
-      window.removeEventListener('mouseup', handleDragEnd);
-      window.removeEventListener('touchmove', handleDragMove);
-      window.removeEventListener('touchend', handleDragEnd);
-    };
-
-    window.addEventListener('mousemove', handleDragMove);
-    window.addEventListener('mouseup', handleDragEnd);
-    window.addEventListener('touchmove', handleDragMove, { passive: false });
-    window.addEventListener('touchend', handleDragEnd);
+  const handleRivalFormationChange = (formationKey: string) => {
+    setRivalFormation(formationKey);
+    const defaultCoords = FORMATIONS[formationKey]?.coords || [];
+    setNodesRival(prev => {
+      return defaultCoords.map(coord => {
+        const existingNode = prev.find(n => n.id === coord.id);
+        return {
+          ...coord,
+          player_id: null,
+          notas_entrenador: existingNode?.notas_entrenador || '',
+          customName: existingNode?.customName,
+          customNumber: existingNode?.customNumber
+        };
+      });
+    });
   };
 
-  // --- HTML5 Drag & Drop Handlers ---
-  const handlePlayerAssign = (nodeId: number, playerId: string | null) => {
-    setNodes(prev => prev.map(n => {
-      if (n.id === nodeId) {
-        return { ...n, player_id: playerId };
-      }
-      // Avoid duplicates
-      if (playerId && n.player_id === playerId && n.id !== nodeId) {
-        return { ...n, player_id: null };
-      }
-      return n;
-    }));
+  const handleSwapPizarras = () => {
+    const tempNodes = [...nodesPropio];
+    const tempForm = selectedFormation;
+
+    setNodesPropio(nodesRival);
+    setNodesRival(tempNodes);
+
+    setSelectedFormation(rivalFormation);
+    setRivalFormation(tempForm);
+
+    setSuccessMsg('Intercambiadas las pizarras tácticas de ambos campos.');
   };
 
-  const handlePitchNodeDrop = (e: React.DragEvent, targetNodeId: number) => {
-    e.preventDefault();
-    const rawData = e.dataTransfer.getData('text/plain');
-    if (!rawData) return;
-
-    if (rawData.startsWith('node:')) {
-      const parts = rawData.split(':');
-      const sourceNodeId = parseInt(parts[1]);
-      const sourcePlayerId = parts[2];
-      
-      const targetNode = nodes.find(n => n.id === targetNodeId);
-      const targetPlayerId = targetNode ? targetNode.player_id : null;
-      
-      setNodes(prev => prev.map(n => {
-        if (n.id === targetNodeId) {
-          return { ...n, player_id: sourcePlayerId };
-        }
-        if (n.id === sourceNodeId) {
-          return { ...n, player_id: targetPlayerId };
-        }
-        return n;
-      }));
-    } else {
-      // Direct drag from roster sidebar
-      handlePlayerAssign(targetNodeId, rawData);
-    }
+  const handleCopyPropioToRival = () => {
+    setNodesRival(nodesPropio.map(n => ({
+      ...n,
+      player_id: null, // Clear roster player reference for rival
+      customName: n.customName || players.find(p => p.id === n.player_id)?.nombre || undefined,
+      customNumber: n.customNumber || players.find(p => p.id === n.player_id)?.dorsal.toString() || undefined
+    })));
+    setRivalFormation(selectedFormation);
+    setSuccessMsg('Copiada la alineación de nuestro equipo al rival.');
   };
 
-  const handleRoleChange = (nodeId: number, newRole: string) => {
-    setNodes(prev => prev.map(n => n.id === nodeId ? { ...n, label: newRole } : n));
+  const handleCopyRivalToPropio = () => {
+    setNodesPropio(nodesRival.map(n => ({
+      ...n,
+      player_id: null,
+      customName: n.customName,
+      customNumber: n.customNumber
+    })));
+    setSelectedFormation(rivalFormation);
+    setSuccessMsg('Copiada la alineación del rival a nuestro equipo.');
   };
 
-  const handlePlayerNoteChange = (nodeId: number, notes: string) => {
-    setNodes(prev => prev.map(n => n.id === nodeId ? { ...n, notas_entrenador: notes } : n));
-  };
+  // Helper to extract clean coordinate info
+  const formatNodeForDb = (n: PositionNode) => ({
+    id: n.id,
+    label: n.label,
+    x: parseFloat(n.x.toFixed(1)),
+    y: parseFloat(n.y.toFixed(1)),
+    player_id: n.player_id,
+    notas_entrenador: n.notas_entrenador || '',
+    customName: n.customName || undefined,
+    customNumber: n.customNumber || undefined
+  });
 
   // --- Save Tactical Lineup ---
   async function handleSaveLineup() {
@@ -429,14 +450,10 @@ export function TacticaClient() {
         sistema_propio: selectedFormation,
         sistema_rival: rivalFormation,
         notas: lineupNotes || null,
-        posiciones: nodes.map(n => ({
-          id: n.id,
-          label: n.label,
-          x: parseFloat(n.x.toFixed(1)),
-          y: parseFloat(n.y.toFixed(1)),
-          player_id: n.player_id,
-          notas_entrenador: n.notas_entrenador || ''
-        })),
+        posiciones: {
+          propio: nodesPropio.map(formatNodeForDb),
+          rival: nodesRival.map(formatNodeForDb)
+        },
         match_id: selectedMatchId || null,
         ventajas: ventajas || null,
         desventajas: desventajas || null,
@@ -494,16 +511,48 @@ export function TacticaClient() {
     setDueloClave(lineup.duelo_clave || '');
     setTareasLineas(lineup.orientaciones_individuales || '');
     
-    // Load position nodes
-    if (Array.isArray(lineup.posiciones)) {
-      setNodes((lineup.posiciones as PositionNode[]).map((p) => ({
-        id: p.id,
-        label: p.label,
-        x: p.x,
-        y: p.y,
-        player_id: p.player_id,
-        notas_entrenador: p.notas_entrenador || ''
-      })));
+    // Load position nodes with backward compatibility
+    if (lineup.posiciones && typeof lineup.posiciones === 'object') {
+      const posObj = lineup.posiciones as { propio?: PositionNode[]; rival?: PositionNode[] };
+      if (posObj.propio && posObj.rival) {
+        setNodesPropio((posObj.propio as PositionNode[]).map((p) => ({
+          id: p.id,
+          label: p.label,
+          x: p.x,
+          y: p.y,
+          player_id: p.player_id,
+          notas_entrenador: p.notas_entrenador || '',
+          customName: p.customName,
+          customNumber: p.customNumber
+        })));
+        setNodesRival((posObj.rival as PositionNode[]).map((p) => ({
+          id: p.id,
+          label: p.label,
+          x: p.x,
+          y: p.y,
+          player_id: p.player_id,
+          notas_entrenador: p.notas_entrenador || '',
+          customName: p.customName,
+          customNumber: p.customNumber
+        })));
+      } else if (Array.isArray(lineup.posiciones)) {
+        // Format legacy array
+        setNodesPropio((lineup.posiciones as PositionNode[]).map((p) => ({
+          id: p.id,
+          label: p.label,
+          x: p.x,
+          y: p.y,
+          player_id: p.player_id,
+          notas_entrenador: p.notas_entrenador || ''
+        })));
+        // Initialize default rival nodes
+        const defaultRivalCoords = FORMATIONS[lineup.sistema_rival || '1-4-3-3']?.coords || [];
+        setNodesRival(defaultRivalCoords.map(coord => ({
+          ...coord,
+          player_id: null,
+          notas_entrenador: ''
+        })));
+      }
     }
     setSuccessMsg(`Cargada la pizarra: "${lineup.nombre_pizarra || lineup.nombre_sistema}"`);
   };
@@ -521,8 +570,16 @@ export function TacticaClient() {
   const handleResetBoard = () => {
     if (confirm('¿Deseas restablecer la posición y vaciar todos los jugadores?')) {
       const defaultCoords = FORMATIONS[selectedFormation]?.coords || [];
-      setNodes(
+      setNodesPropio(
         defaultCoords.map((coord) => ({
+          ...coord,
+          player_id: null,
+          notas_entrenador: ''
+        }))
+      );
+      const defaultRivalCoords = FORMATIONS[rivalFormation]?.coords || [];
+      setNodesRival(
+        defaultRivalCoords.map((coord) => ({
           ...coord,
           player_id: null,
           notas_entrenador: ''
@@ -561,7 +618,22 @@ export function TacticaClient() {
     }
   }
 
-  const getAssignedPlayerIds = () => nodes.map(n => n.player_id).filter(id => !!id);
+  const getAssignedPlayerIds = () => nodesPropio.map(n => n.player_id).filter(id => !!id);
+
+  const handleRosterClick = (player: Player) => {
+    if (!isEditMode) return;
+    const isAssigned = getAssignedPlayerIds().includes(player.id);
+    if (isAssigned) {
+      setNodesPropio(prev => prev.map(n => n.player_id === player.id ? { ...n, player_id: null } : n));
+    } else {
+      const emptyNode = nodesPropio.find(n => !n.player_id);
+      if (emptyNode) {
+        setNodesPropio(prev => prev.map(n => n.id === emptyNode.id ? { ...n, player_id: player.id } : n));
+      } else {
+        alert('El campo está completo. Quita o sustituye un jugador.');
+      }
+    }
+  };
 
   if (loadingPlayers) {
     return (
@@ -698,7 +770,7 @@ export function TacticaClient() {
             <Select
               label="Sistema Rival"
               value={rivalFormation}
-              onChange={(e) => setRivalFormation(e.target.value)}
+              onChange={(e) => handleRivalFormationChange(e.target.value)}
               options={Object.keys(FORMATIONS).map(f => ({ value: f, label: FORMATIONS[f].label }))}
             />
 
@@ -760,110 +832,55 @@ export function TacticaClient() {
           </div>
         </div>
 
-        {/* Center column: Soccer field (6/12) */}
-        <div className="lg:col-span-6 flex flex-col items-center">
-          <div
-            ref={containerRef}
-            className="relative w-full aspect-[2/3] max-w-[480px] bg-emerald-950/90 rounded-[2.5rem] border border-emerald-500/20 overflow-hidden shadow-2xl select-none"
-          >
-            {/* SVG Pitch Lines */}
-            <svg viewBox="0 0 400 600" className="absolute inset-0 w-full h-full pointer-events-none opacity-20">
-              <rect x="15" y="15" width="370" height="570" fill="none" stroke="#fff" strokeWidth="2" />
-              <line x1="15" y1="300" x2="385" y2="300" stroke="#fff" strokeWidth="2" />
-              <circle cx="200" cy="300" r="50" fill="none" stroke="#fff" strokeWidth="2" />
-              <circle cx="200" cy="300" r="4" fill="#fff" />
-              <rect x="100" y="15" width="200" height="90" fill="none" stroke="#fff" strokeWidth="2" />
-              <rect x="150" y="15" width="100" height="30" fill="none" stroke="#fff" strokeWidth="2" />
-              <circle cx="200" cy="75" r="3" fill="#fff" />
-              <path d="M 160 105 A 50 50 0 0 0 240 105" fill="none" stroke="#fff" strokeWidth="2" />
-              <rect x="100" y="495" width="200" height="90" fill="none" stroke="#fff" strokeWidth="2" />
-              <rect x="150" y="495" width="100" height="30" fill="none" stroke="#fff" strokeWidth="2" />
-              <circle cx="200" cy="525" r="3" fill="#fff" />
-              <path d="M 160 495 A 50 50 0 0 1 240 495" fill="none" stroke="#fff" strokeWidth="2" />
-            </svg>
+        {/* Center column: Soccer fields (6/12) */}
+        <div className="lg:col-span-6 flex flex-col items-center gap-6">
+          <TacticalField
+            team="propio"
+            nodes={nodesPropio}
+            players={players}
+            isEditMode={isEditMode}
+            onNodesChange={setNodesPropio}
+            onNodeClick={(node) => handleOpenNodeEditor('propio', node)}
+          />
 
-            {/* Render Nodes / Players */}
-            {nodes.map((node) => {
-              const assignedPlayer = players.find(p => p.id === node.player_id);
-              const playerName = assignedPlayer 
-                ? assignedPlayer.nombre.split(' ')[0] 
-                : node.label;
-                
-              return (
-                <div
-                  key={node.id}
-                  style={{
-                    left: `${node.x}%`,
-                    top: `${node.y}%`,
-                    transform: 'translate(-50%, -50%)',
-                  }}
-                  className="absolute z-10 flex flex-col items-center cursor-move"
-                  onMouseDown={(e) => handleDragStart(e, node.id)}
-                  onTouchStart={(e) => handleDragStart(e, node.id)}
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    e.dataTransfer.dropEffect = 'move';
-                  }}
-                  onDrop={(e) => handlePitchNodeDrop(e, node.id)}
-                  draggable={!!node.player_id}
-                  onDragStart={(e) => {
-                    if (node.player_id) {
-                      e.dataTransfer.setData('text/plain', `node:${node.id}:${node.player_id}`);
-                      e.dataTransfer.effectAllowed = 'move';
-                    }
-                  }}
-                >
-                  {/* Outer circle with glow and premium style */}
-                  <div className={`h-14 w-14 rounded-full border-2 bg-slate-950 flex items-center justify-center shadow-xl transition-transform duration-100 group-hover:scale-105 ${
-                    assignedPlayer ? 'border-[#CC0E21] shadow-red-500/20' : 'border-slate-800 bg-slate-900/60'
-                  }`}>
-                    {assignedPlayer ? (
-                      <Avatar src={assignedPlayer.foto_url} name={assignedPlayer.nombre} size="sm" className="w-full h-full" />
-                    ) : (
-                      <span className="text-[10px] font-black text-slate-500">{node.label}</span>
-                    )}
-                  </div>
+          {/* UTILITIES TOOLBAR */}
+          {isEditMode && (
+            <div className="flex items-center gap-3 p-2 bg-slate-900/50 rounded-2xl border border-slate-800/80 w-full max-w-[480px] justify-around">
+              <button
+                onClick={handleSwapPizarras}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl bg-slate-950 hover:bg-slate-850 text-slate-300 hover:text-white border border-slate-800 transition-all"
+                title="Intercambia las dos pizarras tácticas"
+              >
+                <RefreshCw className="h-3.5 w-3.5 text-orange-400 animate-spin-hover" />
+                Intercambiar campos
+              </button>
+              <button
+                onClick={handleCopyPropioToRival}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl bg-slate-950 hover:bg-slate-850 text-slate-300 hover:text-white border border-slate-800 transition-all"
+                title="Copia el dibujo propio al del rival"
+              >
+                <ArrowRightLeft className="h-3.5 w-3.5 text-blue-400" />
+                Copiar a Rival
+              </button>
+              <button
+                onClick={handleCopyRivalToPropio}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl bg-slate-950 hover:bg-slate-850 text-slate-300 hover:text-white border border-slate-800 transition-all"
+                title="Copia el dibujo del rival al propio"
+              >
+                <ArrowRightLeft className="h-3.5 w-3.5 text-emerald-450" />
+                Copiar a Propio
+              </button>
+            </div>
+          )}
 
-                  {/* Position overlay badge */}
-                  <div className="absolute -top-2 bg-slate-950 border border-slate-800/80 px-1 py-0.2 rounded text-[7px] font-extrabold text-[#CC0E21] no-drag">
-                    {node.label}
-                  </div>
-
-                  {/* Name overlay */}
-                  <div className="mt-1 bg-slate-950/90 border border-slate-900 px-1.5 py-0.2 rounded-lg text-[8px] font-bold text-slate-200 flex items-center gap-1 select-none pointer-events-auto no-drag shadow-md">
-                    <span className="truncate max-w-[50px]">{playerName}</span>
-                    
-                    {/* Inline select to change role */}
-                    <div className="relative">
-                      <select
-                        value={node.label}
-                        onChange={(e) => handleRoleChange(node.id, e.target.value)}
-                        className="absolute inset-0 opacity-0 w-3 h-3 cursor-pointer"
-                      >
-                        {POSITION_ROLES.map(role => (
-                          <option key={role} value={role}>{role}</option>
-                        ))}
-                      </select>
-                      <ChevronDown className="h-2 w-2 text-slate-500 hover:text-slate-200" />
-                    </div>
-
-                    {/* Clear button */}
-                    {assignedPlayer && (
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handlePlayerAssign(node.id, null);
-                        }} 
-                        className="ml-0.5 text-slate-500 hover:text-red-400"
-                      >
-                        <X className="h-2 w-2" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          <TacticalField
+            team="rival"
+            nodes={nodesRival}
+            players={players}
+            isEditMode={isEditMode}
+            onNodesChange={setNodesRival}
+            onNodeClick={(node) => handleOpenNodeEditor('rival', node)}
+          />
         </div>
 
         {/* Right column: Roster sidebar (3/12) */}
@@ -890,21 +907,7 @@ export function TacticaClient() {
                         e.dataTransfer.effectAllowed = 'move';
                       }
                     }}
-                    onClick={() => {
-                      if (isAssigned) {
-                        // Find occupied node and clear it
-                        const node = nodes.find(n => n.player_id === p.id);
-                        if (node) handlePlayerAssign(node.id, null);
-                      } else {
-                        // Find first empty node
-                        const emptyNode = nodes.find(n => !n.player_id);
-                        if (emptyNode) {
-                          handlePlayerAssign(emptyNode.id, p.id);
-                        } else {
-                          alert('El campo está completo. Quita o sustituye un jugador.');
-                        }
-                      }
-                    }}
+                    onClick={() => handleRosterClick(p)}
                     className={`flex items-center justify-between p-2 rounded-xl text-xs border transition-all cursor-grab select-none active:cursor-grabbing ${
                       isAssigned
                         ? 'bg-slate-900/20 border-slate-850/40 text-slate-500 opacity-60'
@@ -1027,7 +1030,7 @@ export function TacticaClient() {
         </div>
 
         <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2">
-          {nodes.map(node => {
+          {nodesPropio.map(node => {
             const assignedPlayer = players.find(p => p.id === node.player_id);
             if (!assignedPlayer) return null;
 
@@ -1061,7 +1064,10 @@ export function TacticaClient() {
                   </label>
                   <textarea
                     value={node.notas_entrenador || ''}
-                    onChange={(e) => handlePlayerNoteChange(node.id, e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setNodesPropio(prev => prev.map(n => n.id === node.id ? { ...n, notas_entrenador: val } : n));
+                    }}
                     placeholder={`Escribe notas tácticas específicas para ${assignedPlayer.nombre.split(' ')[0]}...`}
                     className="w-full min-h-[70px] bg-slate-950/80 border border-slate-850 focus:border-[#CC0E21]/50 rounded-xl px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none transition-colors"
                   />
@@ -1070,13 +1076,105 @@ export function TacticaClient() {
             );
           })}
 
-          {nodes.filter(n => !!n.player_id).length === 0 && (
+          {nodesPropio.filter(n => !!n.player_id).length === 0 && (
             <p className="text-xs text-slate-500 italic p-4 text-center">
               Asigna jugadores de la plantilla en el campo para configurar sus notas y orientaciones.
             </p>
           )}
         </div>
       </div>
+
+      {/* Modal para Editar Ficha / Posición */}
+      {editingNode && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+          <div className="w-full max-w-md p-6 bg-slate-900 border border-slate-800 rounded-3xl space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+              <h3 className="text-sm font-bold text-slate-200 uppercase tracking-wider">
+                Editar Ficha ({editingNode.team === 'propio' ? 'Nuestro Equipo' : 'Rival'})
+              </h3>
+              <button
+                onClick={() => setEditingNode(null)}
+                className="text-slate-500 hover:text-slate-350"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveNodeDetails} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1.5">
+                  Nombre del Jugador
+                </label>
+                <input
+                  type="text"
+                  value={editNodeName}
+                  onChange={(e) => setEditNodeName(e.target.value)}
+                  placeholder="Ej: John Doe"
+                  className="w-full px-3 py-2 text-xs rounded-xl bg-slate-950/70 border border-slate-800 text-slate-100 placeholder-slate-500 outline-none focus:border-[#CC0E21] focus:ring-1 focus:ring-[#CC0E21]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1.5">
+                  Dorsal
+                </label>
+                <input
+                  type="text"
+                  value={editNodeNumber}
+                  onChange={(e) => setEditNodeNumber(e.target.value)}
+                  placeholder="Ej: 10"
+                  className="w-full px-3 py-2 text-xs rounded-xl bg-slate-950/70 border border-slate-800 text-slate-100 placeholder-slate-500 outline-none focus:border-[#CC0E21] focus:ring-1 focus:ring-[#CC0E21]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1.5">
+                  Rol / Posición
+                </label>
+                <select
+                  value={editNodeRole}
+                  onChange={(e) => setEditNodeRole(e.target.value)}
+                  className="w-full px-3 py-2 text-xs rounded-xl bg-slate-950/70 border border-slate-800 text-slate-100 outline-none focus:border-[#CC0E21] focus:ring-1 focus:ring-[#CC0E21]"
+                >
+                  {POSITION_ROLES.map(role => (
+                    <option key={role} value={role} className="bg-slate-900">{role}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1.5">
+                  Notas Tácticas
+                </label>
+                <textarea
+                  value={editNodeNotes}
+                  onChange={(e) => setEditNodeNotes(e.target.value)}
+                  placeholder="Notas tácticas específicas para esta ficha..."
+                  className="w-full min-h-[80px] px-3 py-2 text-xs rounded-xl bg-slate-950/70 border border-slate-800 text-slate-100 placeholder-slate-500 outline-none focus:border-[#CC0E21] focus:ring-1 focus:ring-[#CC0E21] resize-none"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setEditingNode(null)}
+                  className="flex-1 text-xs"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  variant="primary"
+                  className="flex-1 text-xs"
+                >
+                  Guardar Ficha
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
