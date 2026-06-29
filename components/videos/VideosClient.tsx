@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { useEditMode } from '@/context/EditModeContext';
 
 // Lazy load modales pesados
 const VideoFormModal = dynamic(
@@ -46,6 +47,7 @@ const MESES = [
 ];
 
 export function VideosClient() {
+  const { isEditMode } = useEditMode();
   const { videos, loading, creating, error: fetchError, createVideo, refetch } = useMatchVideos();
   const { updateVideo, loading: updating } = useUpdateMatchVideo();
   const { deleteVideo } = useDeleteMatchVideo();
@@ -175,10 +177,12 @@ export function VideosClient() {
             Visualiza, añade y analiza resúmenes de partidos y análisis tácticos en video.
           </p>
         </div>
-        <Button onClick={handleCreateVideoClick} className="flex items-center gap-1.5 self-start sm:self-auto">
-          <Plus className="h-4 w-4" />
-          Añadir Video
-        </Button>
+        {isEditMode && (
+          <Button onClick={handleCreateVideoClick} className="flex items-center gap-1.5 self-start sm:self-auto">
+            <Plus className="h-4 w-4" />
+            Añadir Video
+          </Button>
+        )}
       </div>
 
       {/* Barra de Filtros */}

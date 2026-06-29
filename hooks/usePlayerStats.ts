@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { MatchPlayerStats } from '@/types';
+import { useEditMode } from '@/context/EditModeContext';
 
 export interface PlayerStatsSummary {
   partidos: number;
@@ -35,6 +36,7 @@ export function usePlayerStats(playerId: string | null) {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { verifyWritePermission } = useEditMode();
 
   const fetchStats = useCallback(async () => {
     if (!playerId) return;
@@ -77,6 +79,7 @@ export function usePlayerStats(playerId: string | null) {
   const updatePlayerStats = useCallback(async (statId: string, updates: Partial<MatchPlayerStats>) => {
     setError(null);
     try {
+      verifyWritePermission();
       const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
       const { error: supabaseError } = await supabase
         .rpc('exec_secure_upsert', {

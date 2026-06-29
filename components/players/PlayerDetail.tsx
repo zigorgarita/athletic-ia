@@ -20,6 +20,7 @@ import {
   Calendar, Check, Star, Sparkles, User, AlertTriangle,
   History, Trash2, Heart, Plus, ShieldAlert
 } from 'lucide-react';
+import { useEditMode } from '@/context/EditModeContext';
 
 const METRICAS_ESPECIFICAS: Record<string, string[]> = {
   Portero: ['Juego aéreo', 'Blocaje', 'Reflejos', 'Juego con pies', 'Salida', 'Comunicación', 'Colocación'],
@@ -49,6 +50,7 @@ interface PlayerDetailProps {
 export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
   const [currentPlayer, setCurrentPlayer] = useState<Player>(player);
   const [activeTab, setActiveTab] = useState<'profile' | 'deportivo' | 'valoraciones' | 'stats' | 'lesiones' | 'observations' | 'entrenamientos'>('profile');
+  const { isEditMode } = useEditMode();
   
   // Training Attendance States
   const [trainingAttendance, setTrainingAttendance] = useState<any[]>([]);
@@ -431,7 +433,7 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
           <input
             type="file"
             accept="image/*"
-            disabled={uploadingPhoto}
+            disabled={uploadingPhoto || !isEditMode}
             onChange={async (e) => {
               const file = e.target.files?.[0];
               if (file) {
@@ -445,8 +447,8 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
                 }
               }
             }}
-            className="absolute inset-0 opacity-0 cursor-pointer z-30"
-            title="Cambiar foto"
+            className={`absolute inset-0 opacity-0 z-30 ${isEditMode ? 'cursor-pointer' : 'cursor-default'}`}
+            title={isEditMode ? "Cambiar foto" : "Solo lectura"}
           />
           <Avatar src={currentPlayer.foto_url} name={currentPlayer.nombre} size="xl" className="h-full w-full object-cover" />
           {!currentPlayer.foto_url && (
@@ -477,6 +479,7 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
             <div className="relative self-center md:self-auto">
               <select
                 value={currentPlayer.demarcacion}
+                disabled={!isEditMode}
                 onChange={async (e) => {
                   const newPos = e.target.value as any;
                   const updated = await updatePlayer(currentPlayer.id, { demarcacion: newPos });
@@ -484,7 +487,7 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
                     setCurrentPlayer(updated);
                   }
                 }}
-                className="bg-slate-900/80 hover:bg-slate-800 text-[#CC0E21] border border-[#CC0E21]/20 rounded-xl px-3 py-1 text-xs outline-none focus:border-[#CC0E21] cursor-pointer font-bold transition-all duration-200 shadow-md shadow-[#CC0E21]/5 appearance-none pr-8"
+                className={`bg-slate-900/80 hover:bg-slate-800 text-[#CC0E21] border border-[#CC0E21]/20 rounded-xl px-3 py-1 text-xs outline-none focus:border-[#CC0E21] cursor-pointer font-bold transition-all duration-200 shadow-md shadow-[#CC0E21]/5 appearance-none pr-8 ${!isEditMode ? 'opacity-70 cursor-not-allowed' : ''}`}
                 style={{ backgroundImage: `url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%23CC0E21' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E")`, backgroundPosition: 'right 0.5rem center', backgroundSize: '1.25rem', backgroundRepeat: 'no-repeat' }}
               >
                 <option value="Portero" className="bg-slate-950 text-slate-200">Portero</option>
@@ -532,6 +535,7 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
               <div className="relative">
                 <select
                   value={currentPlayer.posicion_secundaria || ''}
+                  disabled={!isEditMode}
                   onChange={async (e) => {
                     const newPos = e.target.value || null;
                     const updated = await updatePlayer(currentPlayer.id, { posicion_secundaria: newPos });
@@ -539,7 +543,7 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
                       setCurrentPlayer(updated);
                     }
                   }}
-                  className="bg-slate-900/40 hover:bg-slate-800/60 text-slate-200 border border-slate-700/30 rounded-lg px-2 py-0.5 text-xs outline-none focus:border-[#CC0E21] cursor-pointer font-semibold appearance-none pr-6 w-full"
+                  className={`bg-slate-900/40 hover:bg-slate-800/60 text-slate-200 border border-slate-700/30 rounded-lg px-2 py-0.5 text-xs outline-none focus:border-[#CC0E21] cursor-pointer font-semibold appearance-none pr-6 w-full ${!isEditMode ? 'opacity-70 cursor-not-allowed' : ''}`}
                   style={{ backgroundImage: `url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%2394a3b8' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E")`, backgroundPosition: 'right 0.35rem center', backgroundSize: '1rem', backgroundRepeat: 'no-repeat' }}
                 >
                   <option value="" className="bg-slate-950 text-slate-350">Ninguna</option>
@@ -756,9 +760,11 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
                     <Check className="h-4 w-4" /> ¡Guardado!
                   </span>
                 )}
-                <Button onClick={handleSaveEvaluation} loading={savingEval} className="px-5 py-2 font-bold text-xs">
-                  Guardar Valoraciones
-                </Button>
+                {isEditMode && (
+                  <Button onClick={handleSaveEvaluation} loading={savingEval} className="px-5 py-2 font-bold text-xs">
+                    Guardar Valoraciones
+                  </Button>
+                )}
               </div>
             </div>
 
@@ -778,7 +784,7 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
                       key={metric}
                       label={metric}
                       value={perfilEspecífico[metric] ?? 3}
-                      onChange={(val) => handleSpecificMetricChange(metric, val)}
+                      onChange={isEditMode ? (val) => handleSpecificMetricChange(metric, val) : undefined}
                       size={20}
                     />
                   ))}
@@ -807,6 +813,7 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
                   <input
                     type="text"
                     value={evaluador}
+                    disabled={!isEditMode}
                     onChange={e => setEvaluador(e.target.value)}
                     placeholder="Evaluador..."
                     className="bg-slate-950 border border-slate-800 text-xs px-2.5 py-1.5 rounded-lg text-slate-200 outline-none w-32 focus:border-[#CC0E21]"
@@ -817,9 +824,11 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
                     <Check className="h-4 w-4" /> ¡Guardado!
                   </span>
                 )}
-                <Button onClick={handleSaveEvaluation} loading={savingEval} className="px-5 py-2 font-bold text-xs">
-                  Guardar Valoraciones
-                </Button>
+                {isEditMode && (
+                  <Button onClick={handleSaveEvaluation} loading={savingEval} className="px-5 py-2 font-bold text-xs">
+                    Guardar Valoraciones
+                  </Button>
+                )}
               </div>
             </div>
 
@@ -841,7 +850,7 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
                           key={metric}
                           label={metric}
                           value={valoracionesGenerales[metric] ?? 3}
-                          onChange={(val) => handleGeneralMetricChange(metric, val)}
+                          onChange={isEditMode ? (val) => handleGeneralMetricChange(metric, val) : undefined}
                           size={18}
                         />
                       ))}
@@ -861,10 +870,12 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
                 <History className="h-5 w-5 text-slate-400" />
                 Historial Médico de Lesiones
               </h3>
-              <Button onClick={() => setShowInjuryForm(!showInjuryForm)} variant={showInjuryForm ? 'secondary' : 'primary'} className="flex items-center gap-1 text-xs">
-                <Plus className="h-3.5 w-3.5" />
-                {showInjuryForm ? 'Ocultar Formulario' : 'Registrar Lesión'}
-              </Button>
+              {isEditMode && (
+                <Button onClick={() => setShowInjuryForm(!showInjuryForm)} variant={showInjuryForm ? 'secondary' : 'primary'} className="flex items-center gap-1 text-xs">
+                  <Plus className="h-3.5 w-3.5" />
+                  {showInjuryForm ? 'Ocultar Formulario' : 'Registrar Lesión'}
+                </Button>
+              )}
             </div>
 
             {showInjuryForm && (
@@ -977,6 +988,7 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
                       <div className="flex items-center gap-3">
                         <select
                           value={injury.estado}
+                          disabled={!isEditMode}
                           onChange={e => handleUpdateInjuryStatus(injury.id, e.target.value as any)}
                           className="bg-slate-950 border border-slate-850 text-[10px] px-2 py-0.5 rounded-lg text-slate-300 outline-none"
                         >
@@ -985,12 +997,14 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
                           <option value="Alta médica">Alta Médica</option>
                           <option value="Recaída">Recaída</option>
                         </select>
-                        <button 
-                          onClick={() => handleDeleteInjury(injury.id)} 
-                          className="text-red-500 hover:text-red-400 p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
+                        {isEditMode && (
+                          <button 
+                            onClick={() => handleDeleteInjury(injury.id)} 
+                            className="text-red-500 hover:text-red-400 p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        )}
                       </div>
                     </div>
                     <div className="text-xs space-y-1.5 text-slate-300">

@@ -5,6 +5,7 @@ import { MatchVideo } from '@/types';
 import { parseVideoUrl } from '@/lib/video';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { useEditMode } from '@/context/EditModeContext';
 
 interface VideoCardProps {
   video: MatchVideo;
@@ -14,6 +15,7 @@ interface VideoCardProps {
 }
 
 export function VideoCard({ video, onPlay, onEdit, onDelete }: VideoCardProps) {
+  const { isEditMode } = useEditMode();
   const [isExpanded, setIsExpanded] = useState(false);
   const { type, thumbnailUrl } = parseVideoUrl(video.video_url);
 
@@ -147,24 +149,26 @@ export function VideoCard({ video, onPlay, onEdit, onDelete }: VideoCardProps) {
               Reproducir
             </Button>
 
-            <div className="flex items-center gap-2">
-              <Button
-                onClick={() => onEdit(video)}
-                variant="ghost"
-                className="h-8 w-8 p-0 text-slate-400 hover:text-[#CC0E21] hover:bg-[#CC0E21]/10 rounded-lg"
-                title="Editar video"
-              >
-                <Edit className="h-4 w-4" />
-              </Button>
-              <Button
-                onClick={() => onDelete(video.id)}
-                variant="ghost"
-                className="h-8 w-8 p-0 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg"
-                title="Eliminar video"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </div>
+            {isEditMode && (
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={() => onEdit(video)}
+                  variant="ghost"
+                  className="h-8 w-8 p-0 text-slate-400 hover:text-[#CC0E21] hover:bg-[#CC0E21]/10 rounded-lg"
+                  title="Editar video"
+                >
+                  <Edit className="h-4 w-4" />
+                </Button>
+                <Button
+                  onClick={() => onDelete(video.id)}
+                  variant="ghost"
+                  className="h-8 w-8 p-0 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg"
+                  title="Eliminar video"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       </div>

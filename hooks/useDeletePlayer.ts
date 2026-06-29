@@ -1,14 +1,17 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import { useEditMode } from '@/context/EditModeContext';
 
 export function useDeletePlayer() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { verifyWritePermission } = useEditMode();
 
   const deletePlayer = useCallback(async (id: string): Promise<boolean> => {
     setLoading(true);
     setError(null);
     try {
+      verifyWritePermission();
       const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
       const { error: supabaseError } = await supabase
         .rpc('exec_secure_delete', {
@@ -16,6 +19,7 @@ export function useDeletePlayer() {
           record_id: id,
           staff_passkey: passkey
         });
+
 
       if (supabaseError) throw supabaseError;
       return true;

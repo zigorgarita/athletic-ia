@@ -14,6 +14,7 @@ import {
   Save, RefreshCw, Copy, Edit2, Search, UserCheck, 
   PlusCircle, Check, ChevronDown, Folder, FolderOpen
 } from 'lucide-react';
+import { useEditMode } from '@/context/EditModeContext';
 
 interface ABPSectionProps {
   players: Player[];
@@ -539,6 +540,7 @@ const getFieldView = (type: ABPType, zona?: string | null): 'full' | 'attack' | 
 };
 
 export function ABPSection({ players }: ABPSectionProps) {
+  const { isEditMode } = useEditMode();
   const getEstadoColor = (estado: string) => {
     switch (estado) {
       case 'Disponible': return 'bg-green-500/10 text-green-400 border-green-500/20';
@@ -1494,20 +1496,22 @@ export function ABPSection({ players }: ABPSectionProps) {
           <div className="p-4 bg-slate-900/40 border border-slate-800/80 rounded-2xl space-y-3">
             <div className="flex justify-between items-center">
               <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Selector de Jugadas</h3>
-              <Button 
-                variant="primary" 
-                onClick={() => {
-                  setPlayTitle('');
-                  setPlayDesc('');
-                  setPlayVideoUrl('');
-                  setVideoFile(null);
-                  setIsPlayModalOpen(true);
-                }}
-                className="py-1 px-2.5 text-[10px] h-auto flex items-center gap-1 bg-[#CC0E21] hover:bg-red-500 text-white font-bold"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                Nueva Jugada
-              </Button>
+              {isEditMode && (
+                <Button 
+                  variant="primary" 
+                  onClick={() => {
+                    setPlayTitle('');
+                    setPlayDesc('');
+                    setPlayVideoUrl('');
+                    setVideoFile(null);
+                    setIsPlayModalOpen(true);
+                  }}
+                  className="py-1 px-2.5 text-[10px] h-auto flex items-center gap-1 bg-[#CC0E21] hover:bg-red-500 text-white font-bold"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Nueva Jugada
+                </Button>
+              )}
             </div>
             <p className="text-[10px] text-slate-500">
               Organiza tus jugadas de estrategia tácticas (ABP). Cada una contiene su estructura de fichas, notas y vídeo táctico.
@@ -1625,34 +1629,36 @@ export function ABPSection({ players }: ABPSectionProps) {
                   <h2 className="text-xl font-extrabold text-slate-100">{selectedPlay.titulo}</h2>
                 </div>
 
-                <div className="flex flex-wrap gap-2">
-                  <Button 
-                    variant="secondary"
-                    onClick={openEditModal}
-                    className="py-1.5 px-3 text-xs flex items-center gap-1.5 border border-slate-800"
-                  >
-                    <Edit2 className="h-3.5 w-3.5" />
-                    Editar Título/Info
-                  </Button>
-                  <Button 
-                    variant="secondary"
-                    onClick={handleDuplicatePlay}
-                    loading={isDuplicating}
-                    className="py-1.5 px-3 text-xs flex items-center gap-1.5 border border-slate-800"
-                  >
-                    <Copy className="h-3.5 w-3.5" />
-                    Duplicar
-                  </Button>
-                  <Button 
-                    variant="primary"
-                    onClick={handleSavePositions}
-                    loading={isSaving}
-                    className="py-1.5 px-4 text-xs flex items-center gap-1.5 bg-[#CC0E21] hover:bg-red-500 text-white font-bold"
-                  >
-                    <Save className="h-3.5 w-3.5" />
-                    Guardar Cambios
-                  </Button>
-                </div>
+                {isEditMode && (
+                  <div className="flex flex-wrap gap-2">
+                    <Button 
+                      variant="secondary"
+                      onClick={openEditModal}
+                      className="py-1.5 px-3 text-xs flex items-center gap-1.5 border border-slate-800"
+                    >
+                      <Edit2 className="h-3.5 w-3.5" />
+                      Editar Título/Info
+                    </Button>
+                    <Button 
+                      variant="secondary"
+                      onClick={handleDuplicatePlay}
+                      loading={isDuplicating}
+                      className="py-1.5 px-3 text-xs flex items-center gap-1.5 border border-slate-800"
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                      Duplicar
+                    </Button>
+                    <Button 
+                      variant="primary"
+                      onClick={handleSavePositions}
+                      loading={isSaving}
+                      className="py-1.5 px-4 text-xs flex items-center gap-1.5 bg-[#CC0E21] hover:bg-red-500 text-white font-bold"
+                    >
+                      <Save className="h-3.5 w-3.5" />
+                      Guardar Cambios
+                    </Button>
+                  </div>
+                )}
               </div>
 
               {/* PIZARRA TÁCTICA E INFORMACIÓN */}
@@ -1691,22 +1697,26 @@ export function ABPSection({ players }: ABPSectionProps) {
                         >
                           <Layers className="h-3 w-3 mr-1" /> {showAdvanced ? "Ocultar Puestos" : "Ver Puestos"}
                         </Button>
-                        <Button 
-                          variant="secondary" 
-                          onClick={handleResetPositions} 
-                          className="py-1 px-2.5 text-[10px] h-auto border border-slate-800"
-                          title="Restablece posiciones a su esquema inicial"
-                        >
-                          <RefreshCw className="h-3 w-3 mr-1" /> Reiniciar
-                        </Button>
-                        <Button 
-                          variant="secondary" 
-                          onClick={handleAutoAssignPlayers} 
-                          className="py-1 px-2.5 text-[10px] h-auto border border-slate-800"
-                          title="Asigna jugadores de la plantilla automáticamente"
-                        >
-                          <UserCheck className="h-3 w-3 mr-1" /> Auto-Asignar
-                        </Button>
+                        {isEditMode && (
+                          <>
+                            <Button 
+                              variant="secondary" 
+                              onClick={handleResetPositions} 
+                              className="py-1 px-2.5 text-[10px] h-auto border border-slate-800"
+                              title="Restablece posiciones a su esquema inicial"
+                            >
+                              <RefreshCw className="h-3 w-3 mr-1" /> Reiniciar
+                            </Button>
+                            <Button 
+                              variant="secondary" 
+                              onClick={handleAutoAssignPlayers} 
+                              className="py-1 px-2.5 text-[10px] h-auto border border-slate-800"
+                              title="Asigna jugadores de la plantilla automáticamente"
+                            >
+                              <UserCheck className="h-3 w-3 mr-1" /> Auto-Asignar
+                            </Button>
+                          </>
+                        )}
                         <Button 
                           variant="ghost" 
                           onClick={handleClearPlay} 

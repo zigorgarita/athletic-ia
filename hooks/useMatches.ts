@@ -1,11 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Match, MatchPlayerStats } from '@/types';
+import { useEditMode } from '@/context/EditModeContext';
 
 export function useMatches() {
   const [matches, setMatches] = useState<Match[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { verifyWritePermission } = useEditMode();
 
   const fetchMatches = useCallback(async () => {
     setLoading(true);
@@ -28,6 +30,7 @@ export function useMatches() {
   const createMatch = useCallback(async (matchData: Omit<Match, 'id' | 'created_at'>): Promise<Match | null> => {
     setError(null);
     try {
+      verifyWritePermission();
       const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
       const { data, error: supabaseError } = await supabase
         .rpc('exec_secure_upsert', {
@@ -49,6 +52,7 @@ export function useMatches() {
   const updateMatch = useCallback(async (id: string, matchData: Partial<Omit<Match, 'id' | 'created_at'>>): Promise<Match | null> => {
     setError(null);
     try {
+      verifyWritePermission();
       const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
       const { data, error: supabaseError } = await supabase
         .rpc('exec_secure_upsert', {
@@ -70,6 +74,7 @@ export function useMatches() {
   const deleteMatch = useCallback(async (id: string): Promise<boolean> => {
     setError(null);
     try {
+      verifyWritePermission();
       const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
       const { error: supabaseError } = await supabase
         .rpc('exec_secure_delete', {
@@ -107,6 +112,7 @@ export function useMatches() {
     playerStatsList: Omit<MatchPlayerStats, 'id' | 'created_at'>[]
   ): Promise<boolean> => {
     try {
+      verifyWritePermission();
       const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
       // 1. Delete existing stats for this match securely
       const { error: deleteError } = await supabase

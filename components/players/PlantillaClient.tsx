@@ -16,12 +16,14 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
 import { supabase } from '@/lib/supabase';
+import { useEditMode } from '@/context/EditModeContext';
 
 export function PlantillaClient() {
   const { players, loading, error, refetch } = usePlayers();
   const { createPlayer, loading: creating, error: createError } = useCreatePlayer();
   const { updatePlayer, loading: updating, error: updateError } = useUpdatePlayer();
   const { deletePlayer, error: deleteError } = useDeletePlayer();
+  const { isEditMode } = useEditMode();
 
   // Navigation state (list vs details)
   const [activePlayerForDetail, setActivePlayerForDetail] = useState<Player | null>(null);
@@ -261,10 +263,12 @@ export function PlantillaClient() {
             Fichas completas y gestión de futbolistas ({players.length})
           </p>
         </div>
-        <Button onClick={handleOpenAddModal} className="flex items-center gap-1.5 self-start sm:self-auto">
-          <Plus className="h-4 w-4" />
-          Añadir Jugador
-        </Button>
+        {isEditMode && (
+          <Button onClick={handleOpenAddModal} className="flex items-center gap-1.5 self-start sm:self-auto">
+            <Plus className="h-4 w-4" />
+            Añadir Jugador
+          </Button>
+        )}
       </div>
 
       {error && (
@@ -483,20 +487,24 @@ export function PlantillaClient() {
                         >
                           <Eye className="h-4 w-4" />
                         </button>
-                        <button 
-                          onClick={(e) => handleOpenEditModal(e, player)} 
-                          className="h-8 w-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-[#CC0E21] hover:bg-slate-800/50 transition-colors duration-150"
-                          title="Editar"
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </button>
-                        <button 
-                          onClick={(e) => handleDelete(e, player.id)} 
-                          className="h-8 w-8 flex items-center justify-center rounded-lg text-red-500 hover:text-red-400 hover:bg-red-950/20 border border-transparent hover:border-red-900/30 transition-colors duration-150"
-                          title="Eliminar"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        {isEditMode && (
+                          <>
+                            <button 
+                              onClick={(e) => handleOpenEditModal(e, player)} 
+                              className="h-8 w-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-[#CC0E21] hover:bg-slate-800/50 transition-colors duration-150"
+                              title="Editar"
+                            >
+                              <Edit2 className="h-4 w-4" />
+                            </button>
+                            <button 
+                              onClick={(e) => handleDelete(e, player.id)} 
+                              className="h-8 w-8 flex items-center justify-center rounded-lg text-red-500 hover:text-red-400 hover:bg-red-950/20 border border-transparent hover:border-red-900/30 transition-colors duration-150"
+                              title="Eliminar"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>

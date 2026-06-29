@@ -8,6 +8,7 @@ import {
   Award, Play, CheckCircle2,
   Trash2, Share2
 } from 'lucide-react';
+import { useEditMode } from '@/context/EditModeContext';
 
 // Mock material checklist interface
 interface MockChecklist {
@@ -75,6 +76,7 @@ interface MockPlayer {
 
 // Mock interface type definitions are kept for state typing
 export function PlanificacionClient() {
+  const { isEditMode, verifyWritePermission } = useEditMode();
   // Views and navigation
   const [viewMode, setViewMode] = useState<'semanal' | 'mensual'>('semanal');
   const [loading, setLoading] = useState(true);
@@ -360,6 +362,12 @@ export function PlanificacionClient() {
 
   // Handle save actions via RPC (Phase C)
   const handleSaveReal = async () => {
+    try {
+      verifyWritePermission();
+    } catch (e) {
+      triggerToast(e instanceof Error ? e.message : 'No autorizado');
+      return;
+    }
     setLoading(true);
     try {
       const sessionPayload: {
@@ -1538,13 +1546,15 @@ export function PlanificacionClient() {
               PDF Sesión
             </button>
 
-            <button
-              onClick={handleDuplicateSimulated}
-              className="p-2 rounded-xl bg-slate-900 hover:bg-slate-855 border border-slate-800 text-slate-400 hover:text-slate-200"
-              title="Duplicar esta sesión"
-            >
-              <RefreshCw className="h-4 w-4 text-[#CC0E21]" />
-            </button>
+            {isEditMode && (
+              <button
+                onClick={handleDuplicateSimulated}
+                className="p-2 rounded-xl bg-slate-900 hover:bg-slate-855 border border-slate-800 text-slate-400 hover:text-slate-200"
+                title="Duplicar esta sesión"
+              >
+                <RefreshCw className="h-4 w-4 text-[#CC0E21]" />
+              </button>
+            )}
           </div>
 
           <div className="flex gap-2">
@@ -1554,12 +1564,14 @@ export function PlanificacionClient() {
             >
               Cancelar
             </button>
-            <button
-              onClick={handleSaveReal}
-              className="px-4 py-2 rounded-xl bg-[#CC0E21] hover:bg-[#a80b1a] text-white text-xs font-bold shadow-md shadow-[#CC0E21]/15"
-            >
-              Guardar Cambios
-            </button>
+            {isEditMode && (
+              <button
+                onClick={handleSaveReal}
+                className="px-4 py-2 rounded-xl bg-[#CC0E21] hover:bg-[#a80b1a] text-white text-xs font-bold shadow-md shadow-[#CC0E21]/15"
+              >
+                Guardar Cambios
+              </button>
+            )}
           </div>
         </div>
       </div>

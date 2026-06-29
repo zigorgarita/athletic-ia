@@ -1,14 +1,17 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import { useEditMode } from '@/context/EditModeContext';
 
 export function useUploadPlayerPhoto() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { verifyWritePermission } = useEditMode();
 
   const uploadPhoto = useCallback(async (file: File, filename: string): Promise<string | null> => {
     setLoading(true);
     setError(null);
     try {
+      verifyWritePermission();
       // Obtener la extensión del archivo y generar un nombre único
       const fileExt = file.name.split('.').pop();
       const cleanName = filename.toLowerCase().replace(/[^a-z0-9]/g, '-');
@@ -20,6 +23,7 @@ export function useUploadPlayerPhoto() {
           cacheControl: '3600',
           upsert: true,
         });
+
 
       if (uploadError) throw uploadError;
 

@@ -1,10 +1,12 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Users, Shield, Trophy, BarChart3, Activity, Layout, ArrowRightLeft, Calendar, CheckSquare, HelpCircle } from 'lucide-react';
+import { Users, Shield, Trophy, BarChart3, Activity, Layout, ArrowRightLeft, Calendar, CheckSquare, HelpCircle, Unlock, LogOut } from 'lucide-react';
 import { LoginScreen } from './LoginScreen';
+import { useEditMode } from '@/context/EditModeContext';
+import { EditModeModal } from './EditModeModal';
 
 interface NavItem {
   name: string;
@@ -27,24 +29,26 @@ const navigation: NavItem[] = [
 
 export function Shell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { isEditMode, lockEditing } = useEditMode();
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   return (
     <LoginScreen>
       <div className="flex min-h-screen flex-col bg-slate-950 text-slate-100">
       {/* Header fijo superior */}
-      <header className="sticky top-0 z-40 flex h-16 w-full items-center justify-between border-b border-slate-800/80 bg-slate-900/80 px-6 backdrop-blur-md">
-        <div className="flex items-center gap-3">
+      <header className="sticky top-0 z-40 flex h-16 w-full items-center justify-between border-b border-slate-800/80 bg-slate-900/80 px-4 md:px-6 backdrop-blur-md gap-4">
+        <div className="flex items-center gap-3 shrink-0">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl overflow-hidden bg-slate-900 border border-slate-800 shadow-lg shadow-red-500/5">
             <img src="/escudo.jpg" alt="S.D. Indautxu" className="h-full w-full object-cover" />
           </div>
-          <div>
+          <div className="hidden sm:block">
             <span className="text-base font-bold tracking-tight text-white block">INDAUTXU DH</span>
             <span className="text-xs text-slate-400 block -mt-1">Juvenil A • 2026/27</span>
           </div>
         </div>
 
         {/* Navegación horizontal en Header para pantallas medianas/grandes */}
-        <nav className="hidden md:flex items-center gap-1">
+        <nav className="hidden lg:flex items-center gap-1 overflow-x-auto">
           {navigation.map((item) => {
             const Icon = item.icon;
             const isActive = pathname.startsWith(item.href);
@@ -52,7 +56,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
               <Link
                 key={item.name}
                 href={item.href}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
+                className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 shrink-0 ${
                   isActive
                     ? 'bg-slate-800 text-[#CC0E21] border border-[#CC0E21]/20'
                     : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 border border-transparent'
@@ -64,7 +68,41 @@ export function Shell({ children }: { children: React.ReactNode }) {
             );
           })}
         </nav>
+
+        {/* Control del Modo Edición */}
+        <div className="flex items-center gap-2 shrink-0">
+          {isEditMode ? (
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-red-950/40 text-red-400 border border-red-900/30 shadow-sm">
+                <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                ✏️ Edición activada
+              </span>
+              <button
+                onClick={lockEditing}
+                className="flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded-xl bg-slate-850 hover:bg-slate-800 text-slate-350 hover:text-white transition-all border border-slate-700/80"
+                title="Volver a Solo Lectura"
+              >
+                <LogOut className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Salir de edición</span>
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-900/80 text-slate-450 border border-slate-805">
+                🔒 Solo lectura
+              </span>
+              <button
+                onClick={() => setIsModalOpen(true)}
+                className="flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded-xl bg-[#CC0E21]/10 text-[#CC0E21] hover:bg-[#CC0E21]/25 hover:text-red-400 transition-all border border-[#CC0E21]/20"
+              >
+                <Unlock className="h-3.5 w-3.5" />
+                <span>Desbloquear edición</span>
+              </button>
+            </div>
+          )}
+        </div>
       </header>
+
 
       <div className="flex flex-1">
         {/* Sidebar en Escritorio (Visible en md, colapsado/oculto en pantallas menores) */}
@@ -127,7 +165,9 @@ export function Shell({ children }: { children: React.ReactNode }) {
           );
         })}
       </div>
+      <EditModeModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
     </div>
     </LoginScreen>
   );
 }
+

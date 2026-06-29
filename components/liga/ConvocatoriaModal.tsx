@@ -5,6 +5,7 @@ import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Trophy, ChevronDown, ChevronUp } from 'lucide-react';
+import { useEditMode } from '@/context/EditModeContext';
 
 interface ConvocatoriaModalProps {
   match: Match;
@@ -17,6 +18,7 @@ export function ConvocatoriaModal({ match, onClose, onSave, initialStats }: Conv
   const { players, loading: loadingPlayers } = usePlayers();
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const { isEditMode } = useEditMode();
 
   // Convocation state: map of playerId -> 'no_convocado' | 'titular' | 'suplente'
   const [convocation, setConvocation] = useState<Record<string, 'no_convocado' | 'titular' | 'suplente'>>({});
@@ -354,9 +356,11 @@ export function ConvocatoriaModal({ match, onClose, onSave, initialStats }: Conv
         <Button type="button" variant="secondary" onClick={onClose}>
           Cancelar
         </Button>
-        <Button type="button" onClick={handleSave} loading={isSaving} className="px-6">
-          Guardar Convocatoria
-        </Button>
+        {isEditMode && (
+          <Button type="button" onClick={handleSave} loading={isSaving} className="px-6">
+            Guardar Convocatoria
+          </Button>
+        )}
       </div>
     </div>
   );

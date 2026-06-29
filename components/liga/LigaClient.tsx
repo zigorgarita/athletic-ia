@@ -11,8 +11,10 @@ import { Modal } from '@/components/ui/Modal';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Badge } from '@/components/ui/Badge';
 import { Trophy, Plus, Calendar, Edit, Trash2, ClipboardList } from 'lucide-react';
+import { useEditMode } from '@/context/EditModeContext';
 
 export function LigaClient() {
+  const { isEditMode } = useEditMode();
   const {
     matches,
     loading,
@@ -109,10 +111,12 @@ export function LigaClient() {
             Control de partidos, resultados de liga, convocatorias de jugadores y estadísticas.
           </p>
         </div>
-        <Button onClick={handleOpenAddMatch} className="flex items-center gap-1.5 self-start sm:self-auto">
-          <Plus className="h-4 w-4" />
-          Programar Partido
-        </Button>
+        {isEditMode && (
+          <Button onClick={handleOpenAddMatch} className="flex items-center gap-1.5 self-start sm:self-auto">
+            <Plus className="h-4 w-4" />
+            Programar Partido
+          </Button>
+        )}
       </div>
 
       {/* Alerta de Error Principal */}
@@ -137,9 +141,11 @@ export function LigaClient() {
               Comienza programando los partidos de liga de tu equipo para registrar marcadores y estadísticas.
             </p>
           </div>
-          <Button onClick={handleOpenAddMatch} variant="secondary" className="mt-2">
-            Programar Primer Partido
-          </Button>
+          {isEditMode && (
+            <Button onClick={handleOpenAddMatch} variant="secondary" className="mt-2">
+              Programar Primer Partido
+            </Button>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4">
@@ -223,22 +229,26 @@ export function LigaClient() {
                     <ClipboardList className="h-3.5 w-3.5" />
                     Convocatoria y Stats
                   </Button>
-                  <Button
-                    onClick={() => handleOpenEditMatch(match)}
-                    variant="ghost"
-                    className="h-9 w-9 p-0 text-slate-400 hover:text-[#CC0E21] hover:bg-[#CC0E21]/10 rounded-lg"
-                    title="Editar partido"
-                  >
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    onClick={() => handleDeleteMatch(match.id)}
-                    variant="ghost"
-                    className="h-9 w-9 p-0 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg"
-                    title="Eliminar partido"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  {isEditMode && (
+                    <>
+                      <Button
+                        onClick={() => handleOpenEditMatch(match)}
+                        variant="ghost"
+                        className="h-9 w-9 p-0 text-slate-400 hover:text-[#CC0E21] hover:bg-[#CC0E21]/10 rounded-lg"
+                        title="Editar partido"
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        onClick={() => handleDeleteMatch(match.id)}
+                        variant="ghost"
+                        className="h-9 w-9 p-0 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg"
+                        title="Eliminar partido"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </>
+                  )}
                 </div>
               </div>
             );

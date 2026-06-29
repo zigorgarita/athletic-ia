@@ -1,10 +1,12 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { TrainingAttendance, TrainingEvaluation } from '@/types';
+import { useEditMode } from '@/context/EditModeContext';
 
 export function useTrainingAttendance() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { verifyWritePermission } = useEditMode();
 
   const fetchSessionAttendance = useCallback(async (sessionId: string) => {
     if (!sessionId) return { attendance: [], evaluations: [] };
@@ -47,6 +49,7 @@ export function useTrainingAttendance() {
     setLoading(true);
     setError(null);
     try {
+      verifyWritePermission();
       const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
       // 1. Upsert attendance rows if any
       if (attendance.length > 0) {

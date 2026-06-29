@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 import { Shell } from "@/components/layout/Shell";
+import { EditModeProvider } from "@/context/EditModeContext";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -35,8 +36,11 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <Shell>{children}</Shell>
+        <EditModeProvider>
+          <Shell>{children}</Shell>
+        </EditModeProvider>
       </body>
     </html>
   );
 }
+

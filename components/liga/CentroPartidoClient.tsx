@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
+import { useEditMode } from '@/context/EditModeContext';
 import {
   Player, Match, MatchPlayerStats, MatchABPPlay, MatchABPPlayerRole,
   MatchFullVideo, MatchVideoClip, MatchStrategicAction, MatchCustomVideo, MatchDocument,
@@ -36,6 +37,7 @@ const TABS = [
 ];
 
 export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
+  const { isEditMode } = useEditMode();
   const [activeTab, setActiveTab] = useState('general');
   const [match, setMatch] = useState<Match | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
@@ -982,15 +984,17 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
                     <MapPin className="h-4.5 w-4.5 text-[#CC0E21]" />
                     Detalles del Encuentro
                   </h3>
-                  <button
-                    onClick={() => {
-                      if (isEditingInfo) handleSaveGeneralInfo();
-                      else setIsEditingInfo(true);
-                    }}
-                    className="text-xs text-[#CC0E21] hover:underline font-bold"
-                  >
-                    {isEditingInfo ? 'Guardar' : 'Editar'}
-                  </button>
+                  {isEditMode && (
+                    <button
+                      onClick={() => {
+                        if (isEditingInfo) handleSaveGeneralInfo();
+                        else setIsEditingInfo(true);
+                      }}
+                      className="text-xs text-[#CC0E21] hover:underline font-bold"
+                    >
+                      {isEditingInfo ? 'Guardar' : 'Editar'}
+                    </button>
+                  )}
                 </div>
                 <div className="space-y-3">
                   <div>

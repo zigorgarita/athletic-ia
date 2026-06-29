@@ -16,6 +16,8 @@ import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
 import { Select } from '@/components/ui/Select';
 
+import { useEditMode } from '@/context/EditModeContext';
+
 const EvaluationChart = dynamic(
   () => import('@/components/evaluations/EvaluationChart').then((mod) => mod.EvaluationChart),
   {
@@ -35,6 +37,7 @@ const EvaluationForm = dynamic(
 export function EvaluacionesClient() {
   const { players, loading: loadingPlayers } = usePlayers();
   const { createEvaluation, loading: creating, error: createError } = useCreateEvaluation();
+  const { isEditMode } = useEditMode();
 
   const [activeTab, setActiveTab] = useState<'ranking' | 'detail'>('ranking');
   const [selectedPlayerId, setSelectedPlayerId] = useState<string>('');
@@ -116,11 +119,14 @@ export function EvaluacionesClient() {
             Historial de rendimiento deportivo y ranking de rendimiento.
           </p>
         </div>
-        <Button onClick={() => setIsModalOpen(true)} className="flex items-center gap-1.5 self-start sm:self-auto">
-          <Plus className="h-4 w-4" />
-          Nueva Evaluación
-        </Button>
+        {isEditMode && (
+          <Button onClick={() => setIsModalOpen(true)} className="flex items-center gap-1.5 self-start sm:self-auto">
+            <Plus className="h-4 w-4" />
+            Nueva Evaluación
+          </Button>
+        )}
       </div>
+
 
       {/* Tabs */}
       <div className="flex border-b border-slate-800">

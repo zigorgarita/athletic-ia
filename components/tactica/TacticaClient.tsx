@@ -14,6 +14,7 @@ import {
   CheckCircle, Users, Trash2, ChevronDown, Copy, Plus, X, ShieldAlert,
   Zap, Award, HelpCircle, User, Star, ArrowRight, BookOpen, Edit3
 } from 'lucide-react';
+import { useEditMode } from '@/context/EditModeContext';
 
 interface PositionNode {
   id: number;
@@ -205,6 +206,7 @@ const DEFAULT_RECOMMENDATIONS: Record<string, string> = {
 };
 
 export function TacticaClient() {
+  const { isEditMode } = useEditMode();
   const { players, loading: loadingPlayers } = usePlayers();
 
   // Selected lineup / ID for update
@@ -586,18 +588,22 @@ export function TacticaClient() {
 
         {/* Global Action Buttons */}
         <div className="flex items-center gap-2 flex-wrap">
-          <Button variant="secondary" onClick={handleResetBoard} className="flex items-center gap-1.5 text-xs bg-slate-900/60 border-slate-800">
-            <RefreshCw className="h-3.5 w-3.5 text-orange-400" /> Restablecer
-          </Button>
-          {currentLineupId && (
+          {isEditMode && (
+            <Button variant="secondary" onClick={handleResetBoard} className="flex items-center gap-1.5 text-xs bg-slate-900/60 border-slate-800">
+              <RefreshCw className="h-3.5 w-3.5 text-orange-400" /> Restablecer
+            </Button>
+          )}
+          {currentLineupId && isEditMode && (
             <Button variant="secondary" onClick={handleDuplicateLineup} className="flex items-center gap-1.5 text-xs bg-slate-900/60 border-slate-800">
               <Copy className="h-3.5 w-3.5 text-blue-400" /> Duplicar Pizarra
             </Button>
           )}
-          <Button variant="primary" onClick={handleSaveLineup} loading={isSaving} className="flex items-center gap-1.5 text-xs">
-            <Save className="h-3.5 w-3.5" /> {currentLineupId ? 'Actualizar' : 'Guardar'}
-          </Button>
-          {currentLineupId && (
+          {isEditMode && (
+            <Button variant="primary" onClick={handleSaveLineup} loading={isSaving} className="flex items-center gap-1.5 text-xs">
+              <Save className="h-3.5 w-3.5" /> {currentLineupId ? 'Actualizar' : 'Guardar'}
+            </Button>
+          )}
+          {currentLineupId && isEditMode && (
             <Button 
               variant="secondary" 
               onClick={() => {
