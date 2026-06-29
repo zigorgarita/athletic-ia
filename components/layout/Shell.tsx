@@ -29,7 +29,7 @@ const navigation: NavItem[] = [
 
 export function Shell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { isEditMode, lockEditing } = useEditMode();
+  const { isEditMode, currentUser, lockEditing } = useEditMode();
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   return (
@@ -75,7 +75,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
             <div className="flex items-center gap-2">
               <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-red-950/40 text-red-400 border border-red-900/30 shadow-sm">
                 <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                ✏️ Edición activada
+                🟢 Edición activada · {currentUser?.name}
               </span>
               <button
                 onClick={lockEditing}

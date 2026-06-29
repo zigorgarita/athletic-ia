@@ -5,7 +5,8 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 export type UserRole = 'admin' | 'editor' | 'reader';
 
 export interface UserProfile {
-  username: string;
+  id: string;
+  name: string;
   role: UserRole;
   canEdit: boolean;
 }
@@ -21,13 +22,15 @@ interface EditModeContextType {
 
 const EditModeContext = createContext<EditModeContextType | undefined>(undefined);
 
-const AUTHORIZED_USERS: Record<string, { pass: string; role: UserRole }> = {
+const AUTHORIZED_USERS: Record<string, { pass: string; name: string; role: UserRole }> = {
   zigor: {
     pass: process.env.NEXT_PUBLIC_EDIT_PASSWORD_ZIGOR || 'indautxuzigor2026',
+    name: 'Zigor',
     role: 'admin',
   },
   aitor: {
     pass: process.env.NEXT_PUBLIC_EDIT_PASSWORD_AITOR || 'indautxuaitor2026',
+    name: 'Aitor',
     role: 'editor',
   },
 };
@@ -65,7 +68,8 @@ export function EditModeProvider({ children }: { children: React.ReactNode }) {
 
     if (authData && authData.pass === pass) {
       const profile: UserProfile = {
-        username: userLower,
+        id: userLower,
+        name: authData.name,
         role: authData.role,
         canEdit: authData.role === 'admin' || authData.role === 'editor',
       };
@@ -80,7 +84,7 @@ export function EditModeProvider({ children }: { children: React.ReactNode }) {
       return { success: true };
     }
 
-    return { success: false, error: 'No autorizado' };
+    return { success: false, error: 'Usuario o contraseña incorrectos' };
   }, [lockEditing]);
 
   const verifyWritePermission = useCallback(() => {
