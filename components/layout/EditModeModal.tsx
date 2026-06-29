@@ -62,23 +62,31 @@ export function EditModeModal({ isOpen, onClose }: EditModeModalProps) {
         <div className="space-y-3">
           <div>
             <label className="block text-xs font-semibold text-slate-400 mb-1.5">
-              Usuario
+              Editor autorizado
             </label>
-            <input
-              type="text"
-              placeholder="Ej: zigor"
+            <select
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="w-full px-3.5 py-2.5 text-sm rounded-xl bg-slate-950/70 border border-slate-800 text-slate-100 placeholder-slate-500 outline-none transition-all duration-200 focus:border-[#CC0E21] focus:ring-1 focus:ring-[#CC0E21]"
+              className="w-full px-3.5 py-2.5 text-sm rounded-xl bg-slate-950/70 border border-slate-800 text-slate-100 outline-none transition-all duration-200 focus:border-[#CC0E21] focus:ring-1 focus:ring-[#CC0E21]"
               required
               disabled={loading}
               autoFocus
-            />
+            >
+              <option value="" disabled className="bg-slate-900 text-slate-500">
+                Selecciona un editor
+              </option>
+              <option value="zigor" className="bg-slate-900 text-slate-100">
+                Zigor
+              </option>
+              <option value="aitor" className="bg-slate-900 text-slate-100">
+                Aitor
+              </option>
+            </select>
           </div>
 
           <div>
             <label className="block text-xs font-semibold text-slate-400 mb-1.5">
-              Contraseña de Edición
+              Contraseña de edición
             </label>
             <div className="relative">
               <input
