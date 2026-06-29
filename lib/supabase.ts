@@ -27,32 +27,38 @@ function verifyWrite() {
   }
 }
 
-// Proxied supabase client enforcing write protections
-export const supabase = {
-  ...originalClient,
+// Proxied supabase client enforcing write protections using Proxy to preserve prototype methods
+export const supabase = new Proxy(originalClient, {
+  get(target, prop, receiver) {
+    if (prop === 'rpc') {
+      return (fn: string, args?: any, options?: any) => {
+        verifyWrite();
+        return target.rpc(fn, args, options);
+      };
+    }
+    if (prop === 'storage') {
+      const originalStorage = target.storage;
+      return {
+        ...originalStorage,
+        from(bucket: string) {
+          const originalBucket = originalStorage.from(bucket);
+          return {
+            ...originalBucket,
+            upload(path: string, file: any, options?: any) {
+              verifyWrite();
+              return originalBucket.upload(path, file, options);
+            }
+          };
+        }
+      };
+    }
 
-  // Intercept all RPC database operations (upserts, deletes)
-  rpc(fn: string, args?: any, options?: any) {
-    verifyWrite();
-    return originalClient.rpc(fn, args, options);
-  },
-
-  // Intercept storage uploads
-  get storage() {
-    const originalStorage = originalClient.storage;
-    return {
-      ...originalStorage,
-      from(bucket: string) {
-        const originalBucket = originalStorage.from(bucket);
-        return {
-          ...originalBucket,
-          upload(path: string, file: any, options?: any) {
-            verifyWrite();
-            return originalBucket.upload(path, file, options);
-          }
-        };
-      }
-    };
+    // Bind functions to target to preserve `this` context binding
+    const value = Reflect.get(target, prop, receiver);
+    if (typeof value === 'function') {
+      return value.bind(target);
+    }
+    return value;
   }
-} as unknown as typeof originalClient;
+}) as unknown as typeof originalClient;
 
