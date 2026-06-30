@@ -4,9 +4,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { 
   Calendar as CalendarIcon, Plus, Printer, RefreshCw, 
-  BookOpen, Check, X, Clock, MapPin, 
-  Award, Play, CheckCircle2,
-  Trash2, Share2
+  BookOpen, X, Clock, MapPin, 
+  Play, CheckCircle2,
+  Trash2, Share2, Info, Star
 } from 'lucide-react';
 import { useEditMode } from '@/context/EditModeContext';
 
@@ -50,6 +50,7 @@ interface MockSession {
   evaluacion_duracion_real?: number;
   evaluacion_observaciones?: string;
   rpe_medio?: number; // Rating of Perceived Exertion (1-10)
+  valoracion_media_jugadores?: number;
 }
 
 interface MockTask {
@@ -135,7 +136,7 @@ export function PlanificacionClient() {
   
   const [selectedDate, setSelectedDate] = useState<string>('2026-06-26');
   const [isPanelOpen, setIsPanelOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'basicos' | 'tareas' | 'convocatoria' | 'evaluacion'>('basicos');
+  const [activeTab, setActiveTab] = useState<'basicos' | 'tareas' | 'asistencia' | 'evaluacion'>('basicos');
   
   // Form states
   const [sessionForm, setSessionForm] = useState<Partial<MockSession>>({});
@@ -250,7 +251,8 @@ export function PlanificacionClient() {
             checklist_material: existing.checklist_material || {},
             evaluacion_completada: existing.evaluacion_completada || false,
             evaluacion_duracion_real: existing.evaluacion_duracion_real || undefined,
-            evaluacion_observaciones: existing.evaluacion_observaciones || ''
+            evaluacion_observaciones: existing.evaluacion_observaciones || '',
+            valoracion_media_jugadores: existing.valoracion_media_jugadores || undefined
           };
         } else {
           return {
@@ -1010,8 +1012,26 @@ export function PlanificacionClient() {
                     <span className="text-[10px]">{sessionIcon}</span>
                   </div>
 
+                  {/* Contenidos globales trabajados cortos */}
+                  {(() => {
+                    const sessionTasksList = allTasksMap[session.id] || [];
+                    if (sessionTasksList.length > 0) {
+                      return (
+                        <div className="mt-1 space-y-0.5 max-h-[45px] overflow-hidden">
+                          {sessionTasksList.slice(0, 3).map((t, tidx) => (
+                            <div key={t.id || tidx} className="text-[8px] text-slate-400 truncate font-semibold leading-tight pl-1 border-l border-slate-800">
+                              {t.nombre_tarea}
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
+
                   {/* LED de carga física */}
-                  <div className="flex justify-end mt-1">
+                  <div className="flex justify-between items-center mt-1">
+                    <span className="text-[8px] text-slate-500 font-mono font-bold uppercase">{session.tipo_sesion}</span>
                     <div className={`h-1.5 w-6 rounded-full ${chargeStyles.color} ${chargeStyles.glow}`} />
                   </div>
 
@@ -1084,17 +1104,27 @@ export function PlanificacionClient() {
               {selectedDate}
             </h3>
           </div>
-          <button 
-            onClick={() => setIsPanelOpen(false)}
-            className="p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200"
-          >
-            <X className="h-4 w-4" />
-          </button>
+          <div className="flex items-center gap-2">
+            {isEditMode && (
+              <button
+                onClick={handleSaveReal}
+                className="px-3.5 py-1.5 rounded-xl bg-[#CC0E21] hover:bg-[#a80b1a] text-white text-xs font-bold shadow-md shadow-[#CC0E21]/15 transition-all"
+              >
+                Guardar Cambios
+              </button>
+            )}
+            <button 
+              onClick={() => setIsPanelOpen(false)}
+              className="p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </div>
 
         {/* Ficha Lateral TABS */}
         <div className="flex border-b border-slate-850 bg-slate-900/20 px-3">
-          {(['basicos', 'tareas', 'convocatoria', 'evaluacion'] as const).map(tab => (
+          {(['basicos', 'tareas', 'asistencia', 'evaluacion'] as const).map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -1104,7 +1134,7 @@ export function PlanificacionClient() {
                   : 'border-transparent text-slate-500 hover:text-slate-355'
               }`}
             >
-              {tab === 'basicos' ? 'Datos Básicos' : tab === 'tareas' ? 'Ejercicios' : tab === 'convocatoria' ? 'Logística' : 'Evaluación'}
+              {tab === 'basicos' ? 'Datos Básicos' : tab === 'tareas' ? 'Ejercicios' : tab === 'asistencia' ? 'Asistencia' : 'Evaluación'}
             </button>
           ))}
         </div>
@@ -1330,99 +1360,70 @@ export function PlanificacionClient() {
                   No hay tareas planificadas para hoy. Importa de la biblioteca o añade manual.
                 </div>
               )}
+
+              {/* Subida o asociación de PDF de la sesión */}
+              <div className="pt-4 border-t border-slate-850 space-y-2.5">
+                <h4 className="text-xs font-extrabold text-slate-400 uppercase tracking-wider">Documentación de Sesión (PDF)</h4>
+                <div className="p-4 rounded-xl bg-slate-900/40 border border-slate-850 space-y-3">
+                  <div className="flex flex-col gap-2">
+                    <label className="text-[10px] font-bold text-slate-450 uppercase">Enlace PDF de la sesión o Tarea</label>
+                    <input
+                      type="text"
+                      placeholder="https://enlace.com/sesion.pdf"
+                      value={sessionForm.evaluacion_observaciones?.includes('PDF:') ? sessionForm.evaluacion_observaciones.split('PDF:')[1].trim() : ''}
+                      onChange={e => {
+                        const baseObs = sessionForm.evaluacion_observaciones?.replace(/PDF:.*$/, '') || '';
+                        setSessionForm({
+                          ...sessionForm,
+                          evaluacion_observaciones: `${baseObs.trim()}\nPDF: ${e.target.value}`.trim()
+                        });
+                      }}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none focus:border-[#CC0E21]"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2 text-[10px] text-slate-500">
+                    <Info className="h-3.5 w-3.5 text-[#CC0E21]" />
+                    <span>Asocia el PDF de la sesión de entrenamiento aquí para compartirlo con el staff.</span>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
-          {/* TAB 3: LOGÍSTICA & MATERIAL */}
-          {activeTab === 'convocatoria' && (
+          {/* TAB 3: ASISTENCIA Y CONVOCATORIA */}
+          {activeTab === 'asistencia' && (
             <div className="space-y-4">
-              <div className="space-y-3">
-                <h4 className="text-xs font-extrabold text-slate-400 uppercase tracking-wider">Checklist de Material</h4>
-                <div className="grid grid-cols-2 gap-3 p-4 rounded-xl bg-slate-900/60 border border-slate-850">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-slate-300">Balones</span>
-                    <input 
-                      type="number" 
-                      defaultValue={16} 
-                      className="w-16 bg-slate-950 border border-slate-800 rounded px-2 py-1 text-xs text-slate-200 text-center" 
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-slate-300">Conos</span>
-                    <input 
-                      type="number" 
-                      defaultValue={12} 
-                      className="w-16 bg-slate-950 border border-slate-800 rounded px-2 py-1 text-xs text-slate-200 text-center" 
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-slate-300">Chinos / Discos</span>
-                    <input 
-                      type="number" 
-                      defaultValue={24} 
-                      className="w-16 bg-slate-950 border border-slate-800 rounded px-2 py-1 text-xs text-slate-200 text-center" 
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-slate-300">Picas</span>
-                    <input 
-                      type="number" 
-                      defaultValue={8} 
-                      className="w-16 bg-slate-950 border border-slate-800 rounded px-2 py-1 text-xs text-slate-200 text-center" 
-                    />
+              {/* Botón directo de Asistencia rápida */}
+              <div className="p-4 rounded-xl bg-slate-900 border border-slate-850 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0" />
+                  <div>
+                    <h5 className="text-xs font-bold text-slate-200">Pase de Lista Rápido</h5>
+                    <p className="text-[9px] text-slate-550">Registrar ausencias, justificaciones y valoraciones.</p>
                   </div>
                 </div>
-
-                <div className="space-y-1.5">
-                  <span className="text-[10px] font-bold text-slate-400 block">Colores de Petos:</span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {['Rojo', 'Azul', 'Verde', 'Amarillo', 'Rosa'].map(c => (
-                      <span key={c} className="text-[9px] font-bold px-2 py-1 rounded bg-slate-900 border border-slate-800 text-slate-200">
-                        Peto {c}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 text-xs font-bold text-slate-400 pt-2">
-                  <div className="flex items-center gap-2">
-                    <Check className="h-4 w-4 text-[#CC0E21]" />
-                    <span>Cronómetro</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Check className="h-4 w-4 text-[#CC0E21]" />
-                    <span>Dispositivos GPS</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Check className="h-4 w-4 text-[#CC0E21]" />
-                    <span>Botiquín médico</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Check className="h-4 w-4 text-[#CC0E21]" />
-                    <span>Agua hidratación</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Ropa convocatoria */}
-              <div className="space-y-2 pt-4 border-t border-slate-850">
-                <h4 className="text-xs font-extrabold text-slate-400 uppercase tracking-wider">Ropa Requerida</h4>
-                <textarea
-                  value={sessionForm.ropa_convocatoria || ''}
-                  onChange={e => setSessionForm({...sessionForm, ropa_convocatoria: e.target.value})}
-                  placeholder="Instrucciones de indumentaria..."
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none focus:border-[#CC0E21] h-16"
-                />
+                <button
+                  onClick={() => {
+                    if (sessionForm.id && !sessionForm.id.startsWith('temp-')) {
+                      window.location.href = `/asistencia?session_id=${sessionForm.id}`;
+                    } else {
+                      triggerToast('Guarde primero la sesión para registrar la asistencia.');
+                    }
+                  }}
+                  className="text-[10px] px-3 py-1.5 bg-[#CC0E21] text-white font-extrabold rounded-lg hover:bg-[#a80b1a] transition-all"
+                >
+                  Registrar Asistencia
+                </button>
               </div>
 
               {/* Convocatoria jugadores */}
-              <div className="space-y-2.5 pt-4 border-t border-slate-850">
+              <div className="space-y-2.5 pt-2">
                 <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-extrabold text-slate-400 uppercase tracking-wider">Lista de Convocatoria</h4>
-                  <span className="text-[10px] text-slate-500 font-bold">Autocartados lesionados</span>
+                  <h4 className="text-xs font-extrabold text-slate-400 uppercase tracking-wider">Convocados para el entrenamiento</h4>
+                  <span className="text-[10px] text-slate-500 font-bold">Autodescartados lesionados</span>
                 </div>
 
-                <div className="space-y-1.5 max-h-[220px] overflow-y-auto pr-1">
+                <div className="space-y-1.5 max-h-[300px] overflow-y-auto pr-1">
                   {players.map(player => {
                     const isSummoned = summonedPlayerIds.includes(player.id);
                     const isInjured = player.estado === 'Lesionado';
@@ -1467,56 +1468,45 @@ export function PlanificacionClient() {
           {/* TAB 4: EVALUACIÓN POST-ENTRENO */}
           {activeTab === 'evaluacion' && (
             <div className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Duración Real (minutos)</label>
-                <input
-                  type="number"
-                  defaultValue={sessionForm.evaluacion_duracion_real || sessionForm.duracion_total}
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 outline-none focus:border-[#CC0E21]"
-                />
+              {/* Valoración Media del Entrenamiento */}
+              <div className="p-5 rounded-xl bg-slate-900 border border-slate-850 flex flex-col items-center justify-center text-center space-y-2">
+                <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Valoración Media del Entrenamiento</span>
+                <div className="flex items-center gap-2">
+                  <Star className="h-6 w-6 text-amber-400 fill-amber-400" />
+                  <span className="text-3xl font-black text-slate-100">
+                    {sessionForm.valoracion_media_jugadores || 'N/A'}
+                  </span>
+                  <span className="text-slate-500 text-sm">/ 5</span>
+                </div>
+                <p className="text-[10px] text-slate-500">Calculada automáticamente a partir del pase de lista y las valoraciones individuales de los jugadores asistentes.</p>
               </div>
 
-              <div className="space-y-2">
+              {/* RPE y Observaciones principales */}
+              <div className="space-y-1.5">
                 <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">Fatiga Percibida (RPE Medio de la plantilla: 1-10)</label>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 bg-slate-900/60 p-3 rounded-xl border border-slate-850">
                   <input
                     type="range"
                     min="1"
                     max="10"
-                    defaultValue={sessionForm.rpe_medio || 6}
-                    className="flex-1 accent-[#CC0E21] bg-slate-900 rounded-lg h-2 border border-slate-800"
+                    value={sessionForm.rpe_medio || 6}
+                    className="flex-1 accent-[#CC0E21] bg-slate-950 rounded-lg h-2 border border-slate-800"
                     onChange={e => setSessionForm({...sessionForm, rpe_medio: Number(e.target.value)})}
                   />
-                  <span className="text-sm font-black text-[#CC0E21] bg-[#CC0E21]/15 px-2.5 py-1 rounded-xl border border-[#CC0E21]/20">
+                  <span className="text-xs font-black text-[#CC0E21] bg-[#CC0E21]/15 px-2.5 py-1 rounded-xl border border-[#CC0E21]/20 shrink-0">
                     {sessionForm.rpe_medio || 6} / 10
                   </span>
                 </div>
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Observaciones Post-Entrenamiento / Incidencias</label>
+                <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Conclusiones / Notas de la Evaluación</label>
                 <textarea
                   value={sessionForm.evaluacion_observaciones || ''}
                   onChange={e => setSessionForm({...sessionForm, evaluacion_observaciones: e.target.value})}
-                  placeholder="Detalla cómo se desarrolló el entrenamiento, variaciones de los ejercicios, actitudes a destacar..."
+                  placeholder="Detalla conclusiones de la sesión táctica..."
                   className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none focus:border-[#CC0E21] h-32"
                 />
-              </div>
-
-              <div className="p-4 rounded-xl bg-slate-900 border border-slate-850 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Award className="h-5 w-5 text-green-500 shrink-0" />
-                  <div>
-                    <h5 className="text-xs font-bold text-slate-200">Asistencia y Valoración</h5>
-                    <p className="text-[9px] text-slate-500">Métricas individuales ya preparadas.</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => triggerToast('Navegando a registrar asistencia...')}
-                  className="text-[10px] px-3 py-1.5 bg-[#CC0E21] text-white font-extrabold rounded-lg hover:bg-[#a80b1a] transition-all"
-                >
-                  Registrar Asistencia
-                </button>
               </div>
             </div>
           )}
@@ -1564,14 +1554,6 @@ export function PlanificacionClient() {
             >
               Cancelar
             </button>
-            {isEditMode && (
-              <button
-                onClick={handleSaveReal}
-                className="px-4 py-2 rounded-xl bg-[#CC0E21] hover:bg-[#a80b1a] text-white text-xs font-bold shadow-md shadow-[#CC0E21]/15"
-              >
-                Guardar Cambios
-              </button>
-            )}
           </div>
         </div>
       </div>
