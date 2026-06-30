@@ -98,7 +98,7 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
       }
     }
 
-    if (activeTab === 'entrenamientos') {
+    if (activeTab === 'entrenamientos' || activeTab === 'profile' || activeTab === 'stats') {
       loadTrainingHistory();
     }
   }, [currentPlayer.id, activeTab]);
@@ -676,10 +676,14 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
 
         {/* Tab 1: Datos Generales */}
         {activeTab === 'profile' && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-fadeIn">
             <div className="md:col-span-2 space-y-6">
+              {/* Información Personal y Federativa */}
               <div className="p-6 bg-slate-900/40 border border-slate-800/80 rounded-2xl space-y-4">
-                <h3 className="text-sm font-bold text-slate-200 uppercase tracking-wider border-b border-slate-850 pb-2">Información del Jugador</h3>
+                <h3 className="text-sm font-bold text-slate-200 uppercase tracking-wider border-b border-slate-850 pb-2 flex items-center gap-2">
+                  <User className="h-4 w-4 text-[#CC0E21]" />
+                  Resumen / Datos del Jugador
+                </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                   <div>
                     <span className="text-slate-500 font-bold block mb-0.5">Nombre Completo</span>
@@ -695,35 +699,113 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
                   </div>
                   <div>
                     <span className="text-slate-500 font-bold block mb-0.5">Fecha Nacimiento</span>
-                    <span className="text-slate-200 text-sm font-medium">{currentPlayer.fecha_nacimiento}</span>
+                    <span className="text-slate-200 text-sm font-medium">
+                      {currentPlayer.fecha_nacimiento ? `${currentPlayer.fecha_nacimiento} (${getAge(currentPlayer.fecha_nacimiento)} años)` : '-'}
+                    </span>
                   </div>
                   <div>
                     <span className="text-slate-500 font-bold block mb-0.5">Posición Principal</span>
                     <span className="text-slate-200 text-sm font-medium">{currentPlayer.demarcacion}</span>
                   </div>
                   <div>
-                    <span className="text-slate-500 font-bold block mb-0.5">Posición Secundaria</span>
-                    <span className="text-slate-200 text-sm font-medium">{currentPlayer.posicion_secundaria || 'Ninguna'}</span>
+                    <span className="text-slate-500 font-bold block mb-0.5">Estado Físico / Médico</span>
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded border inline-block ${
+                      currentPlayer.estado === 'Disponible' ? 'bg-green-950/20 text-green-400 border-green-900/30' :
+                      currentPlayer.estado === 'Lesionado' ? 'bg-red-950/20 text-red-400 border-red-900/30' :
+                      'bg-slate-850/40 text-slate-400 border-slate-700/50'
+                    }`}>
+                      {currentPlayer.estado}
+                    </span>
                   </div>
                 </div>
               </div>
+
+              {/* Conclusiones Generales del Jugador */}
+              <div className="p-6 bg-slate-900/40 border border-slate-800/80 rounded-2xl space-y-3">
+                <h3 className="text-sm font-bold text-slate-200 uppercase tracking-wider border-b border-slate-850 pb-2 flex items-center gap-2">
+                  <ClipboardList className="h-4 w-4 text-amber-400" />
+                  Conclusiones Generales del Jugador
+                </h3>
+                <textarea
+                  value={currentPlayer.rol_abp || ''}
+                  disabled={!isEditMode}
+                  onChange={async (e) => {
+                    const text = e.target.value;
+                    // Store locally first
+                    setCurrentPlayer(prev => ({ ...prev, rol_abp: text }));
+                  }}
+                  onBlur={async () => {
+                    if (isEditMode) {
+                      await updatePlayer(currentPlayer.id, { rol_abp: currentPlayer.rol_abp });
+                    }
+                  }}
+                  placeholder="Escribe aquí las conclusiones, observaciones generales, fortalezas y plan de mejora de este jugador..."
+                  className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-3.5 py-3 text-xs text-slate-200 outline-none focus:border-[#CC0E21] h-32 resize-none"
+                />
+                <span className="text-[10px] text-slate-500 block leading-tight">
+                  * Este texto se guarda automáticamente al salir del campo. Escribe conclusiones sobre su evolución táctica y física.
+                </span>
+              </div>
             </div>
             
+            {/* Columna Derecha: Resumen de Rendimiento y Stats Acumuladas */}
             <div className="space-y-6">
               <div className="p-6 bg-slate-900/40 border border-slate-800/80 rounded-2xl space-y-4">
-                <h3 className="text-sm font-bold text-slate-200 uppercase tracking-wider border-b border-slate-850 pb-2">Antropometría y Físico</h3>
-                <div className="grid grid-cols-2 gap-4 text-xs">
+                <h3 className="text-sm font-bold text-slate-200 uppercase tracking-wider border-b border-slate-850 pb-2 flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4 text-emerald-400" />
+                  Estadísticas Consolidadas
+                </h3>
+                <div className="space-y-3 text-xs">
+                  {/* Entrenamientos */}
+                  <div className="p-3 bg-slate-950/40 rounded-xl border border-slate-850 space-y-1.5">
+                    <span className="text-slate-400 font-bold block text-[10px] uppercase">Entrenamientos</span>
+                    <div className="flex justify-between items-center text-sm font-black text-slate-200">
+                      <span>Asistencia: {trainingStats.attendancePct}%</span>
+                      <span className="text-xs text-slate-500 font-normal">({trainingStats.attended} de {trainingStats.total})</span>
+                    </div>
+                    {trainingStats.avgValuation !== null && (
+                      <div className="text-[10px] text-amber-400 font-bold">
+                        Valoración media: {trainingStats.avgValuation} ★
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Partidos */}
+                  <div className="p-3 bg-slate-950/40 rounded-xl border border-slate-850 space-y-1.5">
+                    <span className="text-slate-400 font-bold block text-[10px] uppercase">Partidos Oficiales</span>
+                    {loadingStats ? (
+                      <div className="h-6 w-20 bg-slate-800 rounded animate-pulse" />
+                    ) : (
+                      <div className="space-y-1">
+                        <div className="flex justify-between items-center text-sm font-black text-slate-200">
+                          <span>Jugados: {statsSummary?.partidos || 0}</span>
+                          <span className="text-xs text-slate-500 font-normal">Minutos: {statsSummary?.minutos || 0}m</span>
+                        </div>
+                        <div className="flex justify-between text-[10px] text-slate-400">
+                          <span>Titularidades: {statsSummary?.titularidades || 0}</span>
+                          <span>Goles: {statsSummary?.goles || 0}</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Antropometría corta */}
+              <div className="p-6 bg-slate-900/40 border border-slate-800/80 rounded-2xl space-y-3">
+                <h3 className="text-sm font-bold text-slate-200 uppercase tracking-wider border-b border-slate-850 pb-2">Perfil Físico</h3>
+                <div className="grid grid-cols-2 gap-3 text-xs">
                   <div>
-                    <span className="text-slate-500 font-bold block mb-0.5">Altura</span>
-                    <span className="text-slate-200 text-sm font-medium">{currentPlayer.altura ? `${currentPlayer.altura} m` : 'No registrada'}</span>
+                    <span className="text-slate-550 block font-bold">Altura</span>
+                    <span className="text-slate-200 font-medium">{currentPlayer.altura ? `${currentPlayer.altura} m` : 'No registrada'}</span>
                   </div>
                   <div>
-                    <span className="text-slate-500 font-bold block mb-0.5">Peso</span>
-                    <span className="text-slate-200 text-sm font-medium">{currentPlayer.peso ? `${currentPlayer.peso} kg` : 'No registrado'}</span>
+                    <span className="text-slate-550 block font-bold">Peso</span>
+                    <span className="text-slate-200 font-medium">{currentPlayer.peso ? `${currentPlayer.peso} kg` : 'No registrado'}</span>
                   </div>
                   <div className="col-span-2">
-                    <span className="text-slate-500 font-bold block mb-0.5">Pierna Dominante</span>
-                    <span className="text-slate-200 text-sm font-medium">{currentPlayer.pierna_dominante}</span>
+                    <span className="text-slate-550 block font-bold">Pierna Dominante</span>
+                    <span className="text-slate-200 font-medium">{currentPlayer.pierna_dominante}</span>
                   </div>
                 </div>
               </div>
