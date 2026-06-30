@@ -1106,8 +1106,12 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
 
         {/* Tab 5: Estadísticas Acumuladas */}
         {activeTab === 'stats' && (
-          <div className="p-6 bg-slate-900/40 border border-slate-800/80 rounded-2xl">
-            <h3 className="text-base font-bold text-slate-100 mb-4">Estadísticas Acumuladas de Liga</h3>
+          <div className="p-6 bg-slate-900/40 border border-slate-800/80 rounded-2xl space-y-6">
+            <div>
+              <h3 className="text-base font-bold text-slate-100">Estadísticas Acumuladas de Liga</h3>
+              <p className="text-xs text-slate-450">Historial deportivo consolidado del jugador en partidos oficiales.</p>
+            </div>
+
             {loadingStats ? (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 animate-pulse">
                 {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
@@ -1115,50 +1119,70 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
                 ))}
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800/50">
-                  <span className="text-[10px] text-slate-500 font-bold uppercase block">Partidos Jugados</span>
-                  <span className="text-2xl font-black text-white">{statsSummary.partidos}</span>
+              <div className="space-y-6">
+                {/* Cuadrícula de estadísticas de Convocatorias y Minutos */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                  <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800/50">
+                    <span className="text-[10px] text-slate-500 font-bold uppercase block">Partidos Convocados</span>
+                    <span className="text-2xl font-black text-white">{statsSummary.partidos}</span>
+                  </div>
+                  <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800/50">
+                    <span className="text-[10px] text-slate-500 font-bold uppercase block">Titularidades</span>
+                    <span className="text-2xl font-black text-white">
+                      {statsSummary.titularidades}
+                      <span className="text-[11px] text-slate-500 font-normal ml-1.5">
+                        ({statsSummary.partidos > 0 ? Math.round((statsSummary.titularidades / statsSummary.partidos) * 100) : 0}%)
+                      </span>
+                    </span>
+                  </div>
+                  <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800/50">
+                    <span className="text-[10px] text-slate-500 font-bold uppercase block">Minutos Totales</span>
+                    <span className="text-2xl font-black text-white">
+                      {statsSummary.minutos}m
+                      <span className="text-[11px] text-slate-500 font-normal ml-1.5">
+                        ({statsSummary.partidos > 0 ? Math.round((statsSummary.minutos / (statsSummary.partidos * 90)) * 100) : 0}%)
+                      </span>
+                    </span>
+                  </div>
+                  <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800/50">
+                    <span className="text-[10px] text-slate-500 font-bold uppercase block">No Convocado</span>
+                    <span className="text-2xl font-black text-slate-400">
+                      0
+                      <span className="text-[11px] text-slate-500 font-normal ml-1.5">(0%)</span>
+                    </span>
+                  </div>
                 </div>
-                <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800/50">
-                  <span className="text-[10px] text-slate-500 font-bold uppercase block">Titularidades</span>
-                  <span className="text-2xl font-black text-white">{statsSummary.titularidades}</span>
-                </div>
-                <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800/50">
-                  <span className="text-[10px] text-slate-500 font-bold uppercase block">Minutos Totales</span>
-                  <span className="text-2xl font-black text-white">{statsSummary.minutos} m</span>
-                </div>
-                <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800/50">
-                  <span className="text-[10px] text-slate-500 font-bold uppercase block">Goles / Asistencias</span>
-                  <span className="text-2xl font-black text-green-400">
-                    {statsSummary.goles} / {statsSummary.asistencias}
-                  </span>
-                </div>
-                <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800/50">
-                  <span className="text-[10px] text-slate-500 font-bold uppercase block">T. Amarillas / Rojas</span>
-                  <span className="text-2xl font-black text-amber-500">
-                    {statsSummary.tarjetas_amarillas} / {statsSummary.tarjetas_rojas}
-                  </span>
-                </div>
-                <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800/50">
-                  <span className="text-[10px] text-slate-500 font-bold uppercase block">Recuperaciones</span>
-                  <span className="text-2xl font-black text-white">{statsSummary.recuperaciones}</span>
-                </div>
-                <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800/50">
-                  <span className="text-[10px] text-slate-500 font-bold uppercase block">Intercepciones</span>
-                  <span className="text-2xl font-black text-white">{statsSummary.intercepciones}</span>
-                </div>
-                <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800/50">
-                  <span className="text-[10px] text-slate-500 font-bold uppercase block">Efectividad Pases</span>
-                  <span className="text-xl font-bold text-slate-200">
-                    {statsSummary.pases_totales > 0 
-                      ? `${((statsSummary.pases_completados / statsSummary.pases_totales) * 100).toFixed(0)}%`
-                      : '-'
-                    }
-                  </span>
-                  <span className="text-[9px] text-slate-500 block leading-none">
-                    {statsSummary.pases_completados} de {statsSummary.pases_totales}
-                  </span>
+
+                {/* Cuadrícula de rendimiento futbolístico */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                  <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800/50">
+                    <span className="text-[10px] text-slate-500 font-bold uppercase block">Goles / Asistencias</span>
+                    <span className="text-2xl font-black text-green-400">
+                      {statsSummary.goles} / {statsSummary.asistencias}
+                    </span>
+                  </div>
+                  <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800/50">
+                    <span className="text-[10px] text-slate-500 font-bold uppercase block">T. Amarillas / Rojas</span>
+                    <span className="text-2xl font-black text-amber-500">
+                      {statsSummary.tarjetas_amarillas} / {statsSummary.tarjetas_rojas}
+                    </span>
+                  </div>
+                  <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800/50">
+                    <span className="text-[10px] text-slate-500 font-bold uppercase block">Recuperaciones</span>
+                    <span className="text-2xl font-black text-white">{statsSummary.recuperaciones}</span>
+                  </div>
+                  <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800/50">
+                    <span className="text-[10px] text-slate-500 font-bold uppercase block">Efectividad Pases</span>
+                    <span className="text-xl font-bold text-slate-200">
+                      {statsSummary.pases_totales > 0 
+                        ? `${((statsSummary.pases_completados / statsSummary.pases_totales) * 100).toFixed(0)}%`
+                        : '-'
+                      }
+                    </span>
+                    <span className="text-[9px] text-slate-550 block leading-none mt-0.5">
+                      {statsSummary.pases_completados} de {statsSummary.pases_totales}
+                    </span>
+                  </div>
                 </div>
               </div>
             )}
