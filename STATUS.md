@@ -1,14 +1,30 @@
 # Estado del Proyecto - Punto de Restauración Estable
 
-Documentación del estado del proyecto tras completar la mejora del Módulo ABP.
+Documentación del estado del proyecto tras completar las mejoras.
 
 ## 📌 Identificación de la Versión
-- **Último Commit**: `3784138` (feat: mejora modulo abp - jugadores al lado del campo)
-- **Etiqueta Git (Tag)**: `ABP_DRAG_DROP_V1`
-- **Fecha**: 2026-06-22
+- **Último Commit**: Bloque 1 Finalizado y Validado
+- **Fecha**: 2026-07-01
 - **Estado**: Estable y verificado funcionalmente.
 
-## 💻 Funcionalidades Verificadas (Módulo ABP)
+## 💻 Funcionalidades Verificadas (Bloque 1 - Plantilla 360º)
+1. **Posición Secundaria Unificada**:
+   - Selector `<Select>` unificado con las opciones de la posición principal en el formulario de jugador y edición inline.
+   - Compatibilidad hacia atrás incorporada que detecta y respeta valores de texto libre históricos agregando la opción `Otros: [Valor]`.
+2. **Visualización de Demarcaciones**:
+   - Mayor contraste y saturación en badges de posiciones en modo oscuro.
+   - Integración visual de la posición secundaria directamente en el listado general de plantilla.
+3. **Estadísticas Independientes**:
+   - Separación estricta de medias de rendimiento para Entrenamientos, Partidos Oficiales (Liga/Copa) y Partidos Amistosos.
+   - Selector estructurado para tipo de competición al registrar nuevas observaciones para evitar errores de tipeo.
+4. **Módulo de Reuniones (Hub 360º)**:
+   - Nueva pestaña "Reuniones" en el detalle de jugador con feed cronológico.
+   - Formulario de registro en modo edición con campos extensibles preparados para crecimiento (participantes, adjuntos, firmas, recordatorios).
+   - *(Pendiente de ejecución de script SQL `create_meetings_table.sql` para habilitar el guardado final).*
+5. **Agrupamiento en Pizarras**:
+   - Clasificación y ordenamiento automático por demarcaciones en las barras laterales de selección en el módulo ABP y Pizarra Táctica (Porteros, Laterales, Centrales, Centrocampistas, Mediapuntas, Extremos, Delanteros) ordenados por dorsal.
+
+## 💻 Funcionalidades Verificadas (Módulo ABP previo)
 1. **Distribución Visual en 3 Columnas**:
    - Pizarra táctica del campo a la izquierda.
    - Lista/Sidebar de jugadores fija al lado del campo en el centro.
@@ -30,5 +46,6 @@ Documentación del estado del proyecto tras completar la mejora del Módulo ABP.
    - Guardado correcto de posiciones x/y, roles asignados, jugadores y comentarios al presionar "Guardar Cambios".
 
 ## ☁️ Estado de los Servicios
-- **Base de Datos (Supabase)**: Conexión activa. La tabla `abp_player_roles` almacena correctamente la información posicionada.
-- **Despliegue (Vercel)**: Compilado correctamente y sincronizado a partir de la rama `main` en la etiqueta `ABP_DRAG_DROP_V1`.
+- **Base de Datos (Supabase)**: Conexión activa. La tabla `abp_player_roles` almacena correctamente la información posicionada. El script `scratch/create_meetings_table.sql` está listo para ser ejecutado en la fase de validación de base de datos.
+- **Despliegue (Vercel)**: Compilado correctamente y sincronizado.
+

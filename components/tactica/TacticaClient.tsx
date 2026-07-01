@@ -20,6 +20,57 @@ import { TacticalField, PositionNode } from './TacticalField';
 
 
 
+const groupPlayers = (playerList: Player[]) => {
+  const groups: Record<string, { label: string; list: Player[] }> = {
+    Portero: { label: '🧤 Porteros', list: [] },
+    Lateral: { label: '🛡️ Laterales', list: [] },
+    Central: { label: '🧱 Centrales', list: [] },
+    Centrocampista: { label: '⚙️ Centrocampistas', list: [] },
+    Mediapunta: { label: '🎯 Mediapuntas', list: [] },
+    Extremo: { label: '⚡ Extremos', list: [] },
+    Delantero: { label: '🎯 Delanteros', list: [] },
+    Otros: { label: '📋 Otros', list: [] }
+  };
+
+  playerList.forEach(p => {
+    const pos = p.demarcacion || '';
+    const posLower = pos.toLowerCase();
+
+    if (posLower.includes('portero')) {
+      groups.Portero.list.push(p);
+    } else if (posLower.includes('lateral')) {
+      groups.Lateral.list.push(p);
+    } else if (posLower.includes('central') || posLower === 'defensa') {
+      groups.Central.list.push(p);
+    } else if (posLower.includes('mediapunta') || posLower.includes('media punta')) {
+      groups.Mediapunta.list.push(p);
+    } else if (posLower.includes('extremo')) {
+      groups.Extremo.list.push(p);
+    } else if (posLower.includes('delantero')) {
+      groups.Delantero.list.push(p);
+    } else if (posLower.includes('centrocampista') || posLower.includes('pivote') || posLower.includes('interior')) {
+      groups.Centrocampista.list.push(p);
+    } else {
+      groups.Otros.list.push(p);
+    }
+  });
+
+  Object.keys(groups).forEach(k => {
+    groups[k].list.sort((a, b) => a.dorsal - b.dorsal);
+  });
+
+  return [
+    groups.Portero,
+    groups.Lateral,
+    groups.Central,
+    groups.Centrocampista,
+    groups.Mediapunta,
+    groups.Extremo,
+    groups.Delantero,
+    groups.Otros
+  ].filter(g => g.list.length > 0);
+};
+
 const POSITION_ROLES = ['POR', 'LD', 'LI', 'DFC', 'MCD', 'MC', 'MCO', 'ED', 'EI', 'DC'];
 
 const FORMATIONS: Record<string, { label: string; coords: Omit<PositionNode, 'player_id'>[] }> = {
@@ -894,42 +945,51 @@ export function TacticaClient() {
               Arrastra un jugador al campo o haz clic en su ficha para colocarlo en cualquier posición libre.
             </p>
 
-            <div className="space-y-1.5 overflow-y-auto flex-1 pr-1">
-              {players.map((p) => {
-                const isAssigned = getAssignedPlayerIds().includes(p.id);
-                return (
-                  <div
-                    key={p.id}
-                    draggable={!isAssigned}
-                    onDragStart={(e) => {
-                      if (!isAssigned) {
-                        e.dataTransfer.setData('text/plain', p.id);
-                        e.dataTransfer.effectAllowed = 'move';
-                      }
-                    }}
-                    onClick={() => handleRosterClick(p)}
-                    className={`flex items-center justify-between p-2 rounded-xl text-xs border transition-all cursor-grab select-none active:cursor-grabbing ${
-                      isAssigned
-                        ? 'bg-slate-900/20 border-slate-850/40 text-slate-500 opacity-60'
-                        : 'bg-slate-950/60 border-slate-850/60 text-slate-200 hover:border-slate-800 hover:bg-slate-950'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 truncate">
-                      <Avatar src={p.foto_url} name={p.nombre} size="sm" />
-                      <div className="truncate">
-                        <span className="block font-semibold truncate leading-none mb-0.5">{p.nombre}</span>
-                        <span className="text-[9px] text-slate-500 font-medium">#{p.dorsal} - {p.demarcacion}</span>
-                      </div>
-                    </div>
+            <div className="space-y-3 overflow-y-auto flex-1 pr-1">
+              {groupPlayers(players).map(group => (
+                <div key={group.label} className="space-y-1">
+                  <h4 className="text-[9px] font-bold text-slate-450 uppercase tracking-wider bg-slate-950 px-2 py-0.5 rounded border border-slate-900 sticky top-0 z-10">
+                    {group.label} ({group.list.length})
+                  </h4>
+                  <div className="space-y-1.5 pt-1">
+                    {group.list.map((p) => {
+                      const isAssigned = getAssignedPlayerIds().includes(p.id);
+                      return (
+                        <div
+                          key={p.id}
+                          draggable={!isAssigned}
+                          onDragStart={(e) => {
+                            if (!isAssigned) {
+                              e.dataTransfer.setData('text/plain', p.id);
+                              e.dataTransfer.effectAllowed = 'move';
+                            }
+                          }}
+                          onClick={() => handleRosterClick(p)}
+                          className={`flex items-center justify-between p-2 rounded-xl text-xs border transition-all cursor-grab select-none active:cursor-grabbing ${
+                            isAssigned
+                              ? 'bg-slate-900/20 border-slate-850/40 text-slate-500 opacity-60'
+                              : 'bg-slate-950/60 border-slate-850/60 text-slate-200 hover:border-slate-800 hover:bg-slate-950'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 truncate">
+                            <Avatar src={p.foto_url} name={p.nombre} size="sm" />
+                            <div className="truncate">
+                              <span className="block font-semibold truncate leading-none mb-0.5">{p.nombre}</span>
+                              <span className="text-[9px] text-slate-500 font-medium">#{p.dorsal} - {p.demarcacion}</span>
+                            </div>
+                          </div>
 
-                    {isAssigned && (
-                      <span className="text-[8px] bg-[#CC0E21]/10 text-[#CC0E21] px-1 py-0.2 rounded border border-[#CC0E21]/15 shrink-0">
-                        PUESTO
-                      </span>
-                    )}
+                          {isAssigned && (
+                            <span className="text-[8px] bg-[#CC0E21]/10 text-[#CC0E21] px-1 py-0.2 rounded border border-[#CC0E21]/15 shrink-0">
+                              PUESTO
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
-                );
-              })}
+                </div>
+              ))}
             </div>
           </div>
         </div>

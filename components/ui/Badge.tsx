@@ -9,15 +9,15 @@ export function Badge({ children, variant = 'default', className = '', ...props 
   const baseStyles = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold tracking-wide border';
   
   const variants = {
-    Portero: 'bg-blue-950/40 text-blue-300 border-blue-800/40',
-    Defensa: 'bg-amber-950/40 text-amber-300 border-amber-800/40',
-    Lateral: 'bg-orange-950/40 text-orange-300 border-orange-800/40',
-    Central: 'bg-yellow-950/40 text-yellow-300 border-yellow-800/40',
-    Centrocampista: 'bg-green-950/40 text-green-300 border-green-800/40',
-    Pivote: 'bg-teal-950/40 text-teal-300 border-teal-800/40',
-    Interior: 'bg-emerald-950/40 text-emerald-300 border-emerald-800/40',
-    Extremo: 'bg-indigo-950/40 text-indigo-300 border-indigo-800/40',
-    Delantero: 'bg-rose-950/40 text-rose-300 border-rose-800/40',
+    Portero: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+    Defensa: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+    Lateral: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
+    Central: 'bg-yellow-500/10 text-yellow-405 border-yellow-500/20',
+    Centrocampista: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+    Pivote: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
+    Interior: 'bg-teal-500/10 text-teal-400 border-teal-500/20',
+    Extremo: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
+    Delantero: 'bg-rose-500/10 text-rose-400 border-rose-500/20',
     default: 'bg-slate-800 text-slate-300 border-slate-700/60',
   };
 

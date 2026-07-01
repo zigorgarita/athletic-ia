@@ -198,6 +198,56 @@ const serializePlayDescripcion = (sistema_tactico: string, descripcion_texto: st
   return JSON.stringify({ sistema_tactico, descripcion_texto });
 };
 
+const groupPlayers = (playerList: Player[]) => {
+  const groups: Record<string, { label: string; list: Player[] }> = {
+    Portero: { label: '🧤 Porteros', list: [] },
+    Lateral: { label: '🛡️ Laterales', list: [] },
+    Central: { label: '🧱 Centrales', list: [] },
+    Centrocampista: { label: '⚙️ Centrocampistas', list: [] },
+    Mediapunta: { label: '🎯 Mediapuntas', list: [] },
+    Extremo: { label: '⚡ Extremos', list: [] },
+    Delantero: { label: '🎯 Delanteros', list: [] },
+    Otros: { label: '📋 Otros', list: [] }
+  };
+
+  playerList.forEach(p => {
+    const pos = p.demarcacion || '';
+    const posLower = pos.toLowerCase();
+
+    if (posLower.includes('portero')) {
+      groups.Portero.list.push(p);
+    } else if (posLower.includes('lateral')) {
+      groups.Lateral.list.push(p);
+    } else if (posLower.includes('central') || posLower === 'defensa') {
+      groups.Central.list.push(p);
+    } else if (posLower.includes('mediapunta') || posLower.includes('media punta')) {
+      groups.Mediapunta.list.push(p);
+    } else if (posLower.includes('extremo')) {
+      groups.Extremo.list.push(p);
+    } else if (posLower.includes('delantero')) {
+      groups.Delantero.list.push(p);
+    } else if (posLower.includes('centrocampista') || posLower.includes('pivote') || posLower.includes('interior')) {
+      groups.Centrocampista.list.push(p);
+    } else {
+      groups.Otros.list.push(p);
+    }
+  });
+
+  Object.keys(groups).forEach(k => {
+    groups[k].list.sort((a, b) => a.dorsal - b.dorsal);
+  });
+
+  return [
+    groups.Portero,
+    groups.Lateral,
+    groups.Central,
+    groups.Centrocampista,
+    groups.Mediapunta,
+    groups.Extremo,
+    groups.Delantero,
+    groups.Otros
+  ].filter(g => g.list.length > 0);
+};
 
 // Formación/Posición inicial por defecto según tipo de ABP
 const DEFAULT_POSITIONS_BY_TYPE: Record<ABPType, { role: string; x: number; y: number }[]> = {
@@ -2066,47 +2116,56 @@ export function ABPSection({ players }: ABPSectionProps) {
                   </div>
 
                   {/* Squad List */}
-                  <div className="space-y-1.5 max-h-[350px] overflow-y-auto pr-1">
+                  <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
                     {filteredSquad.length === 0 ? (
                       <p className="text-xs text-slate-550 italic text-center py-6">No hay jugadores disponibles.</p>
                     ) : (
-                      filteredSquad.map((player) => {
-                        const isAssigned = getAssignedPlayerIds().includes(player.id);
-                        return (
-                          <div
-                            key={player.id}
-                            draggable
-                            onDragStart={() => handleSidebarDragStart(player.id)}
-                            onDoubleClick={() => handlePlayerDoubleClick(player.id)}
-                            className={`flex items-center justify-between p-2 rounded-xl border text-xs transition-all cursor-grab active:cursor-grabbing select-none ${
-                              isAssigned
-                                ? 'bg-slate-900/30 border-slate-850/40 text-slate-500 opacity-60'
-                                : 'bg-slate-950/60 border-slate-850 text-slate-200 hover:border-slate-800 hover:bg-slate-900/30'
-                            }`}
-                            title="Doble clic para asignar al puesto seleccionado o al primero libre"
-                          >
-                            <div className="flex items-center gap-2 truncate">
-                              <Avatar src={player.foto_url} name={player.nombre} size="sm" />
-                              <div className="truncate text-left">
-                                <div className="flex items-center gap-1.5">
-                                  <span className="font-bold truncate leading-none mb-0.5 text-slate-250">
-                                    {player.nombre} {player.apellidos || ''}
-                                  </span>
-                                  <span className={`px-1 py-0.2 rounded text-[7px] font-black border uppercase tracking-wider ${getEstadoColor(player.estado)}`}>
-                                    {player.estado}
+                      groupPlayers(filteredSquad).map(group => (
+                        <div key={group.label} className="space-y-1">
+                          <h4 className="text-[9px] font-bold text-slate-400 uppercase tracking-wider bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-900 sticky top-0 z-10">
+                            {group.label} ({group.list.length})
+                          </h4>
+                          <div className="space-y-1.5 pt-1">
+                            {group.list.map((player) => {
+                              const isAssigned = getAssignedPlayerIds().includes(player.id);
+                              return (
+                                <div
+                                  key={player.id}
+                                  draggable
+                                  onDragStart={() => handleSidebarDragStart(player.id)}
+                                  onDoubleClick={() => handlePlayerDoubleClick(player.id)}
+                                  className={`flex items-center justify-between p-2 rounded-xl border text-xs transition-all cursor-grab active:cursor-grabbing select-none ${
+                                    isAssigned
+                                      ? 'bg-slate-900/30 border-slate-850/40 text-slate-500 opacity-60'
+                                      : 'bg-slate-950/60 border-slate-850 text-slate-200 hover:border-slate-800 hover:bg-slate-900/30'
+                                  }`}
+                                  title="Doble clic para asignar al puesto seleccionado o al primero libre"
+                                >
+                                  <div className="flex items-center gap-2 truncate">
+                                    <Avatar src={player.foto_url} name={player.nombre} size="sm" />
+                                    <div className="truncate text-left">
+                                      <div className="flex items-center gap-1.5">
+                                        <span className="font-bold truncate leading-none mb-0.5 text-slate-250">
+                                          {player.nombre} {player.apellidos || ''}
+                                        </span>
+                                        <span className={`px-1 py-0.2 rounded text-[7px] font-black border uppercase tracking-wider ${getEstadoColor(player.estado)}`}>
+                                          {player.estado}
+                                        </span>
+                                      </div>
+                                      <span className="text-[9px] text-slate-500 font-semibold">
+                                        #{player.dorsal} - {player.demarcacion}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <span className="text-[9px] text-slate-500 bg-slate-900 border border-slate-800/80 px-1.5 py-0.5 rounded uppercase font-bold">
+                                    {isAssigned ? 'Ocupado' : 'Asignar'}
                                   </span>
                                 </div>
-                                <span className="text-[9px] text-slate-500 font-semibold">
-                                  #{player.dorsal} - {player.demarcacion}
-                                </span>
-                              </div>
-                            </div>
-                            <span className="text-[9px] text-slate-500 bg-slate-900 border border-slate-800/80 px-1.5 py-0.5 rounded uppercase font-bold">
-                              {isAssigned ? 'Ocupado' : 'Asignar'}
-                            </span>
+                              );
+                            })}
                           </div>
-                        );
-                      })
+                        </div>
+                      ))
                     )}
                   </div>
                 </div>

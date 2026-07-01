@@ -76,6 +76,17 @@ interface FormValues {
   equipo: 'DH' | 'B';
 }
 
+const positionOptions = [
+  { value: 'Portero', label: 'Portero' },
+  { value: 'Lateral', label: 'Lateral' },
+  { value: 'Central', label: 'Central' },
+  { value: 'Defensa', label: 'Defensa' },
+  { value: 'Pivote', label: 'Pivote' },
+  { value: 'Interior', label: 'Interior' },
+  { value: 'Centrocampista', label: 'Centrocampista' },
+  { value: 'Extremo', label: 'Extremo' },
+  { value: 'Delantero', label: 'Delantero' },
+];
 
 interface PlayerFormProps {
   player?: Player | null;
@@ -91,6 +102,8 @@ export function PlayerForm({ player, onSubmit, onCancel, onDelete, isSubmitting 
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const [isPhotoRemoved, setIsPhotoRemoved] = useState(false);
+
+  const [secondaryPositionOptions, setSecondaryPositionOptions] = useState(positionOptions);
 
   const {
     register,
@@ -116,6 +129,7 @@ export function PlayerForm({ player, onSubmit, onCancel, onDelete, isSubmitting 
     },
   });
 
+
   useEffect(() => {
     if (player) {
       reset({
@@ -134,6 +148,20 @@ export function PlayerForm({ player, onSubmit, onCancel, onDelete, isSubmitting 
         equipo: player.equipo || 'DH',
       });
       setPhotoPreview(player.foto_url);
+
+      if (player.posicion_secundaria) {
+        const exists = positionOptions.some(opt => opt.value === player.posicion_secundaria);
+        if (!exists) {
+          setSecondaryPositionOptions([
+            ...positionOptions,
+            { value: player.posicion_secundaria, label: `Otros: ${player.posicion_secundaria}` }
+          ]);
+        } else {
+          setSecondaryPositionOptions(positionOptions);
+        }
+      } else {
+        setSecondaryPositionOptions(positionOptions);
+      }
     } else {
       reset({
         nombre: '',
@@ -151,6 +179,7 @@ export function PlayerForm({ player, onSubmit, onCancel, onDelete, isSubmitting 
         equipo: 'DH',
       });
       setPhotoPreview(null);
+      setSecondaryPositionOptions(positionOptions);
     }
     setPhotoFile(null);
     setIsPhotoRemoved(false);
@@ -223,17 +252,7 @@ export function PlayerForm({ player, onSubmit, onCancel, onDelete, isSubmitting 
     await onSubmit(formattedValues);
   };
 
-  const positionOptions = [
-    { value: 'Portero', label: 'Portero' },
-    { value: 'Lateral', label: 'Lateral' },
-    { value: 'Central', label: 'Central' },
-    { value: 'Defensa', label: 'Defensa' },
-    { value: 'Pivote', label: 'Pivote' },
-    { value: 'Interior', label: 'Interior' },
-    { value: 'Centrocampista', label: 'Centrocampista' },
-    { value: 'Extremo', label: 'Extremo' },
-    { value: 'Delantero', label: 'Delantero' },
-  ];
+
 
   const piernaOptions = [
     { value: 'Diestro', label: 'Diestro' },
@@ -321,8 +340,9 @@ export function PlayerForm({ player, onSubmit, onCancel, onDelete, isSubmitting 
           error={errors.demarcacion?.message?.toString()}
           {...register('demarcacion')}
         />
-        <Input
+        <Select
           label="P. Secundaria"
+          options={[{ value: '', label: 'Ninguna' }, ...secondaryPositionOptions]}
           error={errors.posicion_secundaria?.message?.toString()}
           {...register('posicion_secundaria')}
         />

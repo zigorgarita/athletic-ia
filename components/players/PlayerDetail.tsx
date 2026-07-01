@@ -14,11 +14,12 @@ import { usePlayerStats } from '@/hooks/usePlayerStats';
 import { useUpdatePlayer } from '@/hooks/useUpdatePlayer';
 import { useUploadPlayerPhoto } from '@/hooks/useUploadPlayerPhoto';
 import { usePlayerInjuries } from '@/hooks/usePlayerInjuries';
+import { usePlayerMeetings } from '@/hooks/usePlayerMeetings';
 import { compressImage } from '@/lib/image';
 import { 
   Award, ClipboardList, BarChart3, PlusCircle, 
   Calendar, Check, Star, Sparkles, User, AlertTriangle,
-  History, Trash2, Heart, Plus, ShieldAlert
+  History, Trash2, Heart, Plus, ShieldAlert, MessageSquare
 } from 'lucide-react';
 import { useEditMode } from '@/context/EditModeContext';
 
@@ -49,7 +50,7 @@ interface PlayerDetailProps {
 
 export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
   const [currentPlayer, setCurrentPlayer] = useState<Player>(player);
-  const [activeTab, setActiveTab] = useState<'profile' | 'deportivo' | 'valoraciones' | 'stats' | 'lesiones' | 'observations' | 'entrenamientos'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'deportivo' | 'valoraciones' | 'stats' | 'lesiones' | 'observations' | 'entrenamientos' | 'reuniones'>('profile');
   const { isEditMode } = useEditMode();
   
   // Training Attendance States
@@ -133,11 +134,42 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
   // Custom hooks
   const { evaluations, loading: loadingEvals, refetch: refetchEvals } = useEvaluations(currentPlayer.id);
   const { createEvaluation, loading: savingEval, error: evalSaveError } = useCreateEvaluation();
-  const { observaciones, loading: loadingObs, createObservacion } = useObservaciones(currentPlayer.id);
+  const { observaciones, loading: loadingObs, createObservacion, refetch: refetchObs } = useObservaciones(currentPlayer.id);
   const { summary: statsSummary, loading: loadingStats } = usePlayerStats(currentPlayer.id);
   const { updatePlayer } = useUpdatePlayer();
   const { uploadPhoto, loading: uploadingPhoto } = useUploadPlayerPhoto();
   const { injuries, loading: loadingInjuries, addInjury, updateInjury, deleteInjury } = usePlayerInjuries(currentPlayer.id);
+  const { meetings, loading: loadingMeetings, createMeeting, deleteMeeting, updateMeeting } = usePlayerMeetings(currentPlayer.id);
+
+  // Compute independent performance averages (360)
+  const performanceAverages = useMemo(() => {
+    // 1. Training average
+    const ratedEvals = trainingEvaluations.filter(e => e.valoracion_global !== null && e.valoracion_global !== undefined);
+    const avgTraining = ratedEvals.length > 0
+      ? Number((ratedEvals.reduce((sum, e) => sum + Number(e.valoracion_global), 0) / ratedEvals.length).toFixed(2))
+      : null;
+
+    // 2. Official Matches average (Competicion !== 'Amistoso')
+    const officialObs = observaciones.filter(o => o.competicion && o.competicion.toLowerCase() !== 'amistoso' && o.valoracion_global !== null);
+    const avgOfficial = officialObs.length > 0
+      ? Number((officialObs.reduce((sum, o) => sum + Number(o.valoracion_global), 0) / officialObs.length).toFixed(2))
+      : null;
+
+    // 3. Friendly Matches average (Competicion === 'Amistoso')
+    const friendlyObs = observaciones.filter(o => o.competicion && o.competicion.toLowerCase() === 'amistoso' && o.valoracion_global !== null);
+    const avgFriendly = friendlyObs.length > 0
+      ? Number((friendlyObs.reduce((sum, o) => sum + Number(o.valoracion_global), 0) / friendlyObs.length).toFixed(2))
+      : null;
+
+    return {
+      avgTraining,
+      avgOfficial,
+      avgFriendly,
+      officialCount: officialObs.length,
+      friendlyCount: friendlyObs.length,
+      trainingCount: ratedEvals.length
+    };
+  }, [trainingEvaluations, observaciones]);
 
   // State for ratings
   const [perfilEspecífico, setPerfilEspecífico] = useState<Record<string, number>>({});
@@ -145,6 +177,24 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
   const [evaluador, setEvaluador] = useState<string>('Entrenador');
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [showError, setShowError] = useState<string | null>(null);
+
+  // Meetings local state
+  const [showMeetingForm, setShowMeetingForm] = useState(false);
+  const [meetingError, setMeetingError] = useState<string | null>(null);
+  const [newMeeting, setNewMeeting] = useState({
+    fecha: new Date().toISOString().split('T')[0],
+    solicitada_por: 'Staff' as 'Jugador' | 'Staff',
+    motivo: '',
+    desarrollo: '',
+    resolucion: '',
+    estado: 'Pendiente' as 'Pendiente' | 'En seguimiento' | 'Resuelta',
+    participantes: [] as string[],
+    adjuntos: [] as any[],
+    firma_url: '',
+    seguimiento_notas: '',
+    recordatorio_fecha: '',
+    metadata: {} as Record<string, any>
+  });
 
   // Injuries tab local state
   const [showInjuryForm, setShowInjuryForm] = useState(false);
@@ -322,6 +372,60 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
       });
     } else {
       setObsError('Error al registrar la observación en Supabase');
+    }
+  };
+
+  // Handle Meeting submit
+  const handleMeetingSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setMeetingError(null);
+    if (!newMeeting.motivo) {
+      setMeetingError('El motivo de la reunión es obligatorio');
+      return;
+    }
+    const payload = {
+      player_id: currentPlayer.id,
+      fecha: newMeeting.fecha,
+      solicitada_por: newMeeting.solicitada_por,
+      motivo: newMeeting.motivo,
+      desarrollo: newMeeting.desarrollo || null,
+      resolucion: newMeeting.resolucion || null,
+      estado: newMeeting.estado,
+      participantes: newMeeting.participantes,
+      adjuntos: newMeeting.adjuntos,
+      firma_url: newMeeting.firma_url || null,
+      seguimiento_notas: newMeeting.seguimiento_notas || null,
+      recordatorio_fecha: newMeeting.recordatorio_fecha || null,
+      metadata: newMeeting.metadata || {}
+    };
+    const created = await createMeeting(payload);
+    if (created) {
+      setShowMeetingForm(false);
+      setNewMeeting({
+        fecha: new Date().toISOString().split('T')[0],
+        solicitada_por: 'Staff',
+        motivo: '',
+        desarrollo: '',
+        resolucion: '',
+        estado: 'Pendiente',
+        participantes: [],
+        adjuntos: [],
+        firma_url: '',
+        seguimiento_notas: '',
+        recordatorio_fecha: '',
+        metadata: {}
+      });
+    } else {
+      setMeetingError('Error al guardar la reunión en Supabase');
+    }
+  };
+
+  const handleDeleteMeeting = async (meetingId: string) => {
+    if (confirm('¿Estás seguro de que deseas eliminar esta reunión?')) {
+      const deleted = await deleteMeeting(meetingId);
+      if (!deleted) {
+        alert('Error al eliminar la reunión de la base de datos.');
+      }
     }
   };
 
@@ -547,15 +651,14 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
                   style={{ backgroundImage: `url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%2394a3b8' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E")`, backgroundPosition: 'right 0.35rem center', backgroundSize: '1rem', backgroundRepeat: 'no-repeat' }}
                 >
                   <option value="" className="bg-slate-950 text-slate-350">Ninguna</option>
-                  <option value="Portero" className="bg-slate-950 text-slate-200">Portero</option>
-                  <option value="Lateral" className="bg-slate-950 text-slate-200">Lateral</option>
-                  <option value="Central" className="bg-slate-950 text-slate-200">Central</option>
-                  <option value="Defensa" className="bg-slate-950 text-slate-200">Defensa</option>
-                  <option value="Pivote" className="bg-slate-950 text-slate-200">Pivote</option>
-                  <option value="Interior" className="bg-slate-950 text-slate-200">Interior</option>
-                  <option value="Centrocampista" className="bg-slate-950 text-slate-200">Centrocampista</option>
-                  <option value="Extremo" className="bg-slate-950 text-slate-200">Extremo</option>
-                  <option value="Delantero" className="bg-slate-950 text-slate-200">Delantero</option>
+                  {['Portero', 'Lateral', 'Central', 'Defensa', 'Pivote', 'Interior', 'Centrocampista', 'Extremo', 'Delantero'].map(pos => (
+                    <option key={pos} value={pos} className="bg-slate-950 text-slate-200">{pos}</option>
+                  ))}
+                  {currentPlayer.posicion_secundaria && !['Portero', 'Lateral', 'Central', 'Defensa', 'Pivote', 'Interior', 'Centrocampista', 'Extremo', 'Delantero'].includes(currentPlayer.posicion_secundaria) && (
+                    <option value={currentPlayer.posicion_secundaria} className="bg-slate-950 text-slate-200">
+                      Otros: {currentPlayer.posicion_secundaria}
+                    </option>
+                  )}
                 </select>
               </div>
             </div>
@@ -658,6 +761,22 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
         >
           <Calendar className="h-4 w-4" />
           Entrenamientos
+        </button>
+        <button
+          onClick={() => setActiveTab('reuniones')}
+          className={`flex items-center gap-2 px-5 py-3.5 border-b-2 text-sm font-semibold transition-all duration-200 ${
+            activeTab === 'reuniones'
+              ? 'border-[#CC0E21] text-[#CC0E21] bg-[#CC0E21]/5'
+              : 'border-transparent text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <MessageSquare className="h-4 w-4" />
+          Reuniones
+          {meetings.length > 0 && (
+            <span className="ml-1 bg-red-650 text-white text-[9px] px-1.5 py-0.5 rounded-full font-black">
+              {meetings.length}
+            </span>
+          )}
         </button>
       </div>
 
@@ -1107,6 +1226,48 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
         {/* Tab 5: Estadísticas Acumuladas */}
         {activeTab === 'stats' && (
           <div className="p-6 bg-slate-900/40 border border-slate-800/80 rounded-2xl space-y-6">
+            {/* Rendimiento y Valoraciones Medias 360 */}
+            <div className="space-y-3">
+              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Rendimiento y Valoraciones Medias (360º)</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800/50 flex flex-col justify-between">
+                  <div>
+                    <span className="text-[10px] text-slate-500 font-bold uppercase block">Media Entrenamientos</span>
+                    <span className="text-2xl font-black text-[#CC0E21]">
+                      {performanceAverages.avgTraining !== null ? `${performanceAverages.avgTraining} ★` : '-'}
+                    </span>
+                  </div>
+                  <span className="text-[9px] text-slate-500 mt-2 block">
+                    Calculado sobre {performanceAverages.trainingCount} valoraciones diarias
+                  </span>
+                </div>
+                <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800/50 flex flex-col justify-between">
+                  <div>
+                    <span className="text-[10px] text-slate-500 font-bold uppercase block">Media Partidos Oficiales</span>
+                    <span className="text-2xl font-black text-green-400">
+                      {performanceAverages.avgOfficial !== null ? `${performanceAverages.avgOfficial} ★` : '-'}
+                    </span>
+                  </div>
+                  <span className="text-[9px] text-slate-500 mt-2 block">
+                    Calculado sobre {performanceAverages.officialCount} observaciones de Liga/Copa
+                  </span>
+                </div>
+                <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800/50 flex flex-col justify-between">
+                  <div>
+                    <span className="text-[10px] text-slate-500 font-bold uppercase block">Media Partidos Amistosos</span>
+                    <span className="text-2xl font-black text-blue-400">
+                      {performanceAverages.avgFriendly !== null ? `${performanceAverages.avgFriendly} ★` : '-'}
+                    </span>
+                  </div>
+                  <span className="text-[9px] text-slate-500 mt-2 block">
+                    Calculado sobre {performanceAverages.friendlyCount} observaciones de Amistosos
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t border-slate-800/60 my-4" />
+
             <div>
               <h3 className="text-base font-bold text-slate-100">Estadísticas Acumuladas de Liga</h3>
               <p className="text-xs text-slate-450">Historial deportivo consolidado del jugador en partidos oficiales.</p>
@@ -1215,12 +1376,18 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
                     value={newObs.rival} 
                     onChange={e => setNewObs(prev => ({ ...prev, rival: e.target.value }))} 
                   />
-                  <Input 
-                    label="Competición" 
-                    placeholder="Ej: Liga / Copa" 
-                    value={newObs.competicion} 
-                    onChange={e => setNewObs(prev => ({ ...prev, competicion: e.target.value }))} 
-                  />
+                  <div>
+                    <label className="text-xs text-slate-400 font-bold block mb-1">Competición</label>
+                    <select
+                      value={newObs.competicion}
+                      onChange={e => setNewObs(prev => ({ ...prev, competicion: e.target.value }))}
+                      className="w-full bg-slate-950 border border-slate-800 text-xs px-3 py-2 rounded-xl text-slate-200 outline-none h-[38px] focus:border-[#CC0E21]"
+                    >
+                      <option value="Liga">Liga (Oficial)</option>
+                      <option value="Copa">Copa (Oficial)</option>
+                      <option value="Amistoso">Amistoso</option>
+                    </select>
+                  </div>
                   <Input 
                     label="Minutos Jugados" 
                     type="number" 
@@ -1460,6 +1627,218 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
                     </tbody>
                   </table>
                 </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Tab 8: Historial de Reuniones */}
+        {activeTab === 'reuniones' && (
+          <div className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h3 className="text-base font-bold text-slate-100 flex items-center gap-1.5">
+                <MessageSquare className="h-5 w-5 text-[#CC0E21]" />
+                Reuniones Individuales y Seguimiento
+              </h3>
+              {isEditMode && (
+                <Button onClick={() => setShowMeetingForm(!showMeetingForm)} variant={showMeetingForm ? 'secondary' : 'primary'} className="flex items-center gap-1 text-xs">
+                  <Plus className="h-3.5 w-3.5" />
+                  {showMeetingForm ? 'Ocultar Formulario' : 'Registrar Reunión'}
+                </Button>
+              )}
+            </div>
+
+            {showMeetingForm && (
+              <form onSubmit={handleMeetingSubmit} className="p-5 rounded-2xl bg-slate-900/40 border border-slate-800 space-y-4">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2 font-mono">Ficha de Nueva Reunión</h4>
+                {meetingError && (
+                  <div className="p-3 bg-red-950/25 border border-red-900/40 text-red-405 text-xs rounded-xl">
+                    {meetingError}
+                  </div>
+                )}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <Input 
+                    label="Fecha *" 
+                    type="date"
+                    value={newMeeting.fecha} 
+                    onChange={e => setNewMeeting(prev => ({ ...prev, fecha: e.target.value }))} 
+                  />
+                  <div>
+                    <label className="text-xs text-slate-450 font-bold block mb-1">Solicitada Por</label>
+                    <select
+                      value={newMeeting.solicitada_por}
+                      onChange={e => setNewMeeting(prev => ({ ...prev, solicitada_por: e.target.value as any }))}
+                      className="w-full bg-slate-950 border border-slate-800 text-xs px-3 py-2 rounded-xl text-slate-200 outline-none h-[38px]"
+                    >
+                      <option value="Staff">Staff Técnico</option>
+                      <option value="Jugador">Jugador</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-450 font-bold block mb-1">Estado</label>
+                    <select
+                      value={newMeeting.estado}
+                      onChange={e => setNewMeeting(prev => ({ ...prev, estado: e.target.value as any }))}
+                      className="w-full bg-slate-950 border border-slate-800 text-xs px-3 py-2 rounded-xl text-slate-200 outline-none h-[38px]"
+                    >
+                      <option value="Pendiente">Pendiente</option>
+                      <option value="En seguimiento">En seguimiento</option>
+                      <option value="Resuelta">Resuelta</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4">
+                  <Input 
+                    label="Motivo *" 
+                    placeholder="Ej: Revisión de rendimiento táctico, charla sobre minutos jugados, etc." 
+                    value={newMeeting.motivo} 
+                    onChange={e => setNewMeeting(prev => ({ ...prev, motivo: e.target.value }))} 
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs text-slate-450 font-bold block mb-1">Desarrollo de la Charla</label>
+                    <textarea 
+                      placeholder="Resumen de los temas tratados..."
+                      className="w-full h-24 px-3 py-2 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-200 outline-none focus:border-[#CC0E21]"
+                      value={newMeeting.desarrollo}
+                      onChange={e => setNewMeeting(prev => ({ ...prev, desarrollo: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-450 font-bold block mb-1">Resolución / Acuerdos</label>
+                    <textarea 
+                      placeholder="Conclusiones y compromisos alcanzados..."
+                      className="w-full h-24 px-3 py-2 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-200 outline-none focus:border-[#CC0E21]"
+                      value={newMeeting.resolucion}
+                      onChange={e => setNewMeeting(prev => ({ ...prev, resolucion: e.target.value }))}
+                    />
+                  </div>
+                </div>
+
+                {/* Campos de expansión futuros (Plegables o integrados) */}
+                <div className="border-t border-slate-850 pt-4 space-y-4">
+                  <h5 className="text-[10px] font-bold uppercase tracking-wider text-slate-500 font-mono">Campos de Seguimiento Adicional (Preparados para crecer)</h5>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <Input 
+                      label="Participantes (Separados por comas)" 
+                      placeholder="Ej: Aitor, Preparador físico"
+                      value={newMeeting.participantes.join(', ')}
+                      onChange={e => setNewMeeting(prev => ({ ...prev, participantes: e.target.value.split(',').map(s => s.trim()).filter(Boolean) }))}
+                    />
+                    <Input 
+                      label="Seguimiento / Próximos pasos" 
+                      placeholder="Ej: Revisar en 2 semanas"
+                      value={newMeeting.seguimiento_notas}
+                      onChange={e => setNewMeeting(prev => ({ ...prev, seguimiento_notas: e.target.value }))}
+                    />
+                    <Input 
+                      label="Fecha de Recordatorio" 
+                      type="date"
+                      value={newMeeting.recordatorio_fecha}
+                      onChange={e => setNewMeeting(prev => ({ ...prev, recordatorio_fecha: e.target.value }))}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2">
+                  <Button type="submit" className="px-5 py-2 text-xs font-bold">
+                    Guardar Reunión
+                  </Button>
+                </div>
+              </form>
+            )}
+
+            {loadingMeetings ? (
+              <div className="space-y-3">
+                <div className="h-16 bg-slate-800 rounded animate-pulse" />
+                <div className="h-16 bg-slate-800 rounded animate-pulse" />
+              </div>
+            ) : meetings.length === 0 ? (
+              <div className="p-8 border border-dashed border-slate-800 rounded-2xl text-center text-slate-500 text-sm">
+                No hay reuniones registradas para este jugador.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {meetings.map(meeting => (
+                  <div key={meeting.id} className="p-5 rounded-2xl bg-slate-900/30 border border-slate-800/80 space-y-4 relative group">
+                    <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b border-slate-850 pb-2.5">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-xs text-slate-500 font-semibold">{meeting.fecha}</span>
+                        <strong className="text-slate-100 text-sm">{meeting.motivo}</strong>
+                        <span className={`text-[10px] font-black px-2 py-0.5 rounded-lg border ${
+                          meeting.solicitada_por === 'Staff' 
+                            ? 'bg-[#CC0E21]/10 text-[#CC0E21] border-[#CC0E21]/20' 
+                            : 'bg-blue-950/20 text-blue-400 border-blue-900/30'
+                        }`}>
+                          Por: {meeting.solicitada_por}
+                        </span>
+                        {meeting.participantes && meeting.participantes.length > 0 && (
+                          <span className="text-[10px] text-slate-400">
+                            (Con: {meeting.participantes.join(', ')})
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <select
+                          value={meeting.estado}
+                          disabled={!isEditMode}
+                          onChange={async (e) => {
+                            await updateMeeting(meeting.id, { estado: e.target.value as any });
+                          }}
+                          className="bg-slate-950 border border-slate-850 text-[10px] px-2 py-0.5 rounded-lg text-slate-350 outline-none"
+                        >
+                          <option value="Pendiente">Pendiente</option>
+                          <option value="En seguimiento">En seguimiento</option>
+                          <option value="Resuelta">Resuelta</option>
+                        </select>
+                        {isEditMode && (
+                          <button 
+                            onClick={() => handleDeleteMeeting(meeting.id)} 
+                            className="text-red-500 hover:text-red-400 p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                      {meeting.desarrollo && (
+                        <div>
+                          <strong className="text-slate-500 block mb-0.5 uppercase tracking-wide text-[9px] font-bold">Desarrollo:</strong>
+                          <p className="text-slate-250 leading-relaxed bg-slate-950/30 p-3 rounded-xl border border-slate-850/40">{meeting.desarrollo}</p>
+                        </div>
+                      )}
+                      {meeting.resolucion && (
+                        <div>
+                          <strong className="text-slate-500 block mb-0.5 uppercase tracking-wide text-[9px] font-bold">Resolución / Acuerdos:</strong>
+                          <p className="text-slate-250 leading-relaxed bg-slate-950/30 p-3 rounded-xl border border-slate-850/40">{meeting.resolucion}</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Mostrar campos de expansión si existen */}
+                    {(meeting.seguimiento_notas || meeting.recordatorio_fecha) && (
+                      <div className="bg-slate-900/10 p-3 rounded-xl border border-slate-850/40 text-[11px] grid grid-cols-1 sm:grid-cols-2 gap-2 text-slate-400">
+                        {meeting.seguimiento_notas && (
+                          <div>
+                            <span className="font-bold text-slate-500 mr-1">Seguimiento:</span>
+                            {meeting.seguimiento_notas}
+                          </div>
+                        )}
+                        {meeting.recordatorio_fecha && (
+                          <div>
+                            <span className="font-bold text-slate-500 mr-1">Fecha Recordatorio:</span>
+                            {meeting.recordatorio_fecha}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             )}
           </div>

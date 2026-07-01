@@ -432,7 +432,14 @@ export function PlantillaClient() {
                       {player.nombre} <span className="text-slate-400 font-medium">{player.apellidos}</span>
                     </td>
                     <td className="px-4 py-3.5">
-                      <Badge variant={player.demarcacion}>{player.demarcacion}</Badge>
+                      <div className="flex flex-wrap gap-1 items-center">
+                        <Badge variant={player.demarcacion}>{player.demarcacion}</Badge>
+                        {player.posicion_secundaria && (
+                          <Badge variant={player.posicion_secundaria as any} className="opacity-70 text-[10px] px-2 py-0">
+                            {player.posicion_secundaria}
+                          </Badge>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3.5">
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
