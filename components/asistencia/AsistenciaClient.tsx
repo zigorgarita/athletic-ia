@@ -16,6 +16,7 @@ import { Badge } from '@/components/ui/Badge';
 import { StarRating } from '@/components/ui/StarRating';
 import { Player, PlanningSession, TrainingAttendance, TrainingEvaluation, AttendanceStatus } from '@/types';
 import { useTrainingAttendance } from '@/hooks/useTrainingAttendance';
+import { formatLocalYYYYMMDD } from '@/lib/dateUtils';
 
 const ABSENCE_REASONS = [
   'Lesión', 'Enfermedad', 'Estudios', 'Trabajo', 
@@ -42,7 +43,7 @@ export function AsistenciaClient() {
   const [activeTab, setActiveTab] = useState<'control' | 'resumen'>('control');
   const [players, setPlayers] = useState<Player[]>([]);
   const [sessions, setSessions] = useState<PlanningSession[]>([]);
-  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState<string>(formatLocalYYYYMMDD(new Date()));
   const [selectedSessionId, setSelectedSessionId] = useState<string>('');
   
   // Local states for attendance and evaluations

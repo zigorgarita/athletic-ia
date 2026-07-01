@@ -6,9 +6,12 @@ import {
   Calendar as CalendarIcon, Plus, Printer, RefreshCw, 
   BookOpen, X, Clock, MapPin, 
   Play, CheckCircle2,
-  Trash2, Share2, Info, Star
+  Trash2, Share2, Info, Star, ArrowUp, ArrowDown
 } from 'lucide-react';
 import { useEditMode } from '@/context/EditModeContext';
+import { parseLocalYYYYMMDD, getDaysOfWeek, getDaysOfMonthGrid } from '@/lib/dateUtils';
+import { PlanningTaskLibrary } from '@/types';
+import { BibliotecaTareasModal } from './BibliotecaTareasModal';
 
 // Mock material checklist interface
 interface MockChecklist {
@@ -75,6 +78,15 @@ interface MockPlayer {
   estado: 'Disponible' | 'Lesionado' | 'Duda' | 'Sancionado';
 }
 
+const CONCEPTOS_TACTICOS = {
+  'ATAQUE': ['Ataque Organizado', 'Ataque Rápido / Contraataque', 'Salida de Balón', 'Progresión en el Juego', 'Finalización'],
+  'DEFENSA': ['Defensa Organizada', 'Presión tras Pérdida', 'Presión Alta', 'Defensa de Centros', 'Basculaciones'],
+  'TRANSICIONES': ['Transición Ofensiva', 'Transición Defensiva', 'Reorganización Defensiva'],
+  'ABP': ['Córner Ofensivo', 'Córner Defensivo', 'Falta Ofensiva', 'Falta Defensiva', 'Penaltis', 'Saques de Banda'],
+  'CONDICIONAL': ['Fuerza', 'Resistencia', 'Velocidad', 'Recuperación'],
+  'MENTAL': ['Cohesión Grupal', 'Charla Táctica', 'Concentración']
+};
+
 // Mock interface type definitions are kept for state typing
 export function PlanificacionClient() {
   const { isEditMode, verifyWritePermission } = useEditMode();
@@ -84,59 +96,24 @@ export function PlanificacionClient() {
   
   // Nombres de días abreviados en español y cálculo de semana
   const [currentMonday, setCurrentMonday] = useState<Date>(() => {
-    const d = new Date('2026-06-26'); // Contexto de fecha base
+    const d = parseLocalYYYYMMDD('2026-06-26'); // Contexto de fecha base local
     const day = d.getDay();
     const diff = d.getDate() - day + (day === 0 ? -6 : 1);
     return new Date(d.setDate(diff));
   });
 
-  const getDaysOfWeek = (monday: Date) => {
-    const days = [];
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(monday);
-      d.setDate(monday.getDate() + i);
-      days.push(d.toISOString().split('T')[0]);
-    }
-    return days;
-  };
-
-  const getDaysOfMonthGrid = (date: Date) => {
-    const year = date.getFullYear();
-    const month = date.getMonth();
-    // First day of the month
-    const firstDay = new Date(year, month, 1);
-    // Last day of the month
-    const lastDay = new Date(year, month + 1, 0);
-
-    // Start on the Monday of the week containing firstDay
-    const firstDayOfWeek = firstDay.getDay();
-    const daysToSub = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1;
-    const startDate = new Date(firstDay);
-    startDate.setDate(firstDay.getDate() - daysToSub);
-
-    // End on the Sunday of the week containing lastDay
-    const lastDayOfWeek = lastDay.getDay();
-    const daysToAdd = lastDayOfWeek === 0 ? 0 : 7 - lastDayOfWeek;
-    const endDate = new Date(lastDay);
-    endDate.setDate(lastDay.getDate() + daysToAdd);
-
-    const days = [];
-    const curr = new Date(startDate);
-    while (curr <= endDate) {
-      days.push(curr.toISOString().split('T')[0]);
-      curr.setDate(curr.getDate() + 1);
-    }
-    return days;
-  };
-
   // Data states connected to Supabase
   const [sessions, setSessions] = useState<MockSession[]>([]);
   const [allTasksMap, setAllTasksMap] = useState<Record<string, MockTask[]>>({});
   const [players, setPlayers] = useState<MockPlayer[]>([]);
+  const [allConceptsMap, setAllConceptsMap] = useState<Record<string, { id: string; session_id: string; categoria: string; concepto: string }[]>>({});
+  const [sessionConcepts, setSessionConcepts] = useState<{ id?: string; session_id: string; categoria: string; concepto: string }[]>([]);
   
   const [selectedDate, setSelectedDate] = useState<string>('2026-06-26');
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'basicos' | 'tareas' | 'asistencia' | 'evaluacion'>('basicos');
+  const [isLibraryModalOpen, setIsLibraryModalOpen] = useState(false);
+  const [uploadingPdf, setUploadingPdf] = useState(false);
   
   // Form states
   const [sessionForm, setSessionForm] = useState<Partial<MockSession>>({});
@@ -200,14 +177,31 @@ export function PlanificacionClient() {
         observaciones?: string | null;
         responsable_staff?: string | null;
       }[] = [];
+      let dbConcepts: {
+        id: string;
+        session_id: string;
+        categoria: string;
+        concepto: string;
+      }[] = [];
+
       if (sessionIds.length > 0) {
-        const { data, error: tErr } = await supabase
-          .from('planning_tasks')
-          .select('*')
-          .in('planning_session_id', sessionIds)
-          .order('orden', { ascending: true });
-        if (tErr) throw tErr;
-        dbTasks = data || [];
+        const [tasksRes, conceptsRes] = await Promise.all([
+          supabase
+            .from('planning_tasks')
+            .select('*')
+            .in('planning_session_id', sessionIds)
+            .order('orden', { ascending: true }),
+          supabase
+            .from('planning_concepts')
+            .select('*')
+            .in('session_id', sessionIds)
+        ]);
+
+        if (tasksRes.error) throw tasksRes.error;
+        if (conceptsRes.error) throw conceptsRes.error;
+
+        dbTasks = tasksRes.data || [];
+        dbConcepts = conceptsRes.data || [];
       }
 
       // Group tasks by session_id
@@ -228,6 +222,15 @@ export function PlanificacionClient() {
           observaciones: task.observaciones || '',
           responsable_staff: task.responsable_staff || 'Primer Entrenador'
         });
+      });
+
+      // Group concepts by session_id
+      const conceptsMap: Record<string, { id: string; session_id: string; categoria: string; concepto: string }[]> = {};
+      dbConcepts.forEach(c => {
+        if (!conceptsMap[c.session_id]) {
+          conceptsMap[c.session_id] = [];
+        }
+        conceptsMap[c.session_id].push(c);
       });
 
       // Construct a complete list of all grid days
@@ -272,6 +275,7 @@ export function PlanificacionClient() {
 
       setSessions(fullPeriodSessions);
       setAllTasksMap(tasksMap);
+      setAllConceptsMap(conceptsMap);
     } catch (err) {
       console.error('Error fetching period data:', err);
       triggerToast('Error al conectar con Supabase');
@@ -328,6 +332,76 @@ export function PlanificacionClient() {
   };
 
 
+  const getPdfUrl = () => {
+    const obs = sessionForm.evaluacion_observaciones || '';
+    if (obs.includes('PDF:')) {
+      return obs.split('PDF:')[1].trim();
+    }
+    return '';
+  };
+
+  const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingPdf(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `session-${selectedDate}-${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
+      const filePath = `planning-pdfs/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('match-videos')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage.from('match-videos').getPublicUrl(filePath);
+      const publicUrl = data.publicUrl;
+
+      // Associate to sessionForm
+      const baseObs = sessionForm.evaluacion_observaciones?.replace(/PDF:[\s\S]*$/, '') || '';
+      setSessionForm({
+        ...sessionForm,
+        evaluacion_observaciones: `${baseObs.trim()}\nPDF: ${publicUrl}`.trim()
+      });
+      triggerToast('¡Archivo PDF subido correctamente!');
+    } catch (err) {
+      console.error('Error uploading PDF:', err);
+      triggerToast('Error al subir el archivo PDF a Supabase Storage.');
+    } finally {
+      setUploadingPdf(false);
+    }
+  };
+
+  const handleSelectLibraryTask = (libraryTask: PlanningTaskLibrary) => {
+    const newTask: MockTask = {
+      id: 'temp-task-lib-' + Date.now(),
+      nombre_tarea: libraryTask.nombre,
+      tipo_tarea: libraryTask.tipo_tarea,
+      minutos: libraryTask.minutos_defecto || 15,
+      jugadores: libraryTask.jugadores_defecto || 20,
+      espacio: libraryTask.espacio_defecto || '',
+      objetivo: libraryTask.objetivo || '',
+      descripcion: libraryTask.descripcion || '',
+      responsable_staff: 'Primer Entrenador'
+    };
+    setSessionTasks([...sessionTasks, newTask]);
+    setIsLibraryModalOpen(false);
+    triggerToast('¡Tarea importada desde la biblioteca!');
+  };
+
+  const handleMoveTask = (index: number, direction: 'up' | 'down') => {
+    const nextIndex = direction === 'up' ? index - 1 : index + 1;
+    if (nextIndex < 0 || nextIndex >= sessionTasks.length) return;
+
+    const updated = [...sessionTasks];
+    const temp = updated[index];
+    updated[index] = updated[nextIndex];
+    updated[nextIndex] = temp;
+    setSessionTasks(updated);
+  };
+
   // Open sidebar/drawer on day click
   const handleDayClick = (dateStr: string) => {
     setSelectedDate(dateStr);
@@ -336,6 +410,7 @@ export function PlanificacionClient() {
     if (existing) {
       setSessionForm({ ...existing });
       setSessionTasks(allTasksMap[existing.id] || []);
+      setSessionConcepts(allConceptsMap[existing.id] || []);
       if (!existing.id.startsWith('temp-')) {
         fetchSummonedPlayers(existing.id);
       } else {
@@ -356,6 +431,7 @@ export function PlanificacionClient() {
         ropa_convocatoria: 'Polo oficial y chándal.'
       });
       setSessionTasks([]);
+      setSessionConcepts([]);
       setSummonedPlayerIds([]);
     }
     setActiveTab('basicos');
@@ -499,13 +575,49 @@ export function PlanificacionClient() {
         };
       });
 
-      const { error: pErr } = await supabase.rpc('exec_secure_bulk_upsert', {
+       const { error: pErr } = await supabase.rpc('exec_secure_bulk_upsert', {
         target_table: 'planning_session_players',
         payloads: playerPayloads,
         conflict_columns: ['session_id', 'player_id'],
         staff_passkey: 'indautxu2026'
       });
       if (pErr) throw pErr;
+
+      // Overwrite/Clean up worked concepts
+      if (!isNew) {
+        const { data: existingConcepts } = await supabase
+          .from('planning_concepts')
+          .select('id, categoria, concepto')
+          .eq('session_id', sessionId);
+        
+        if (existingConcepts && existingConcepts.length > 0) {
+          for (const extConcept of existingConcepts) {
+            if (!sessionConcepts.some(c => c.id === extConcept.id || (c.categoria === extConcept.categoria && c.concepto === extConcept.concepto))) {
+              await supabase.rpc('exec_secure_delete', {
+                target_table: 'planning_concepts',
+                record_id: extConcept.id,
+                staff_passkey: 'indautxu2026'
+              });
+            }
+          }
+        }
+      }
+
+      if (sessionConcepts.length > 0) {
+        const conceptPayloads = sessionConcepts.map(c => ({
+          session_id: sessionId,
+          categoria: c.categoria,
+          concepto: c.concepto
+        }));
+
+        const { error: cErr } = await supabase.rpc('exec_secure_bulk_upsert', {
+          target_table: 'planning_concepts',
+          payloads: conceptPayloads,
+          conflict_columns: ['session_id', 'categoria', 'concepto'],
+          staff_passkey: 'indautxu2026'
+        });
+        if (cErr) throw cErr;
+      }
 
       triggerToast('¡Sesión guardada con éxito en Supabase!');
       setIsPanelOpen(false);
@@ -1014,13 +1126,17 @@ export function PlanificacionClient() {
 
                   {/* Contenidos globales trabajados cortos */}
                   {(() => {
-                    const sessionTasksList = allTasksMap[session.id] || [];
-                    if (sessionTasksList.length > 0) {
+                    const sessionConceptsList = allConceptsMap[session.id] || [];
+                    if (sessionConceptsList.length > 0) {
                       return (
-                        <div className="mt-1 space-y-0.5 max-h-[45px] overflow-hidden">
-                          {sessionTasksList.slice(0, 3).map((t, tidx) => (
-                            <div key={t.id || tidx} className="text-[8px] text-slate-400 truncate font-semibold leading-tight pl-1 border-l border-slate-800">
-                              {t.nombre_tarea}
+                        <div className="mt-1.5 space-y-0.5 max-h-[50px] overflow-hidden text-left">
+                          {sessionConceptsList.slice(0, 3).map((c, cidx) => (
+                            <div 
+                              key={c.id || cidx} 
+                              className="text-[7.5px] px-1.5 py-0.2 rounded bg-slate-900 border border-slate-800 text-slate-350 truncate font-bold leading-tight"
+                              title={`${c.categoria}: ${c.concepto}`}
+                            >
+                              • {c.concepto}
                             </div>
                           ))}
                         </div>
@@ -1050,6 +1166,18 @@ export function PlanificacionClient() {
                       <p>⏱️ Duración: {session.duracion_total} min</p>
                       <p>⚡ Carga de trabajo: <span className="font-bold text-slate-200">{session.carga}</span></p>
                       {session.campo_instalacion && <p>📍 Campo: {session.campo_instalacion}</p>}
+                      {allConceptsMap[session.id] && allConceptsMap[session.id].length > 0 && (
+                        <div className="pt-1.5 border-t border-slate-900 space-y-1 text-left">
+                          <p className="text-[9.5px] font-bold text-slate-550 uppercase tracking-wider">Conceptos:</p>
+                          <div className="flex flex-wrap gap-1">
+                            {allConceptsMap[session.id].map((c, cidx) => (
+                              <span key={c.id || cidx} className="text-[8px] bg-slate-900 text-slate-300 px-1.5 py-0.5 rounded border border-slate-800 font-medium">
+                                {c.concepto}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1149,8 +1277,9 @@ export function PlanificacionClient() {
                   <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Tipo de Día</label>
                   <select
                     value={sessionForm.tipo_sesion || 'Entrenamiento'}
+                    disabled={!isEditMode}
                     onChange={e => setSessionForm({...sessionForm, tipo_sesion: e.target.value as MockSession['tipo_sesion']})}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 outline-none focus:border-[#CC0E21]"
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 outline-none focus:border-[#CC0E21] disabled:opacity-60"
                   >
                     <option value="Entrenamiento">Entrenamiento</option>
                     <option value="Partido">Partido</option>
@@ -1166,8 +1295,9 @@ export function PlanificacionClient() {
                   <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Carga Teórica</label>
                   <select
                     value={sessionForm.carga || 'Media'}
+                    disabled={!isEditMode}
                     onChange={e => setSessionForm({...sessionForm, carga: e.target.value as MockSession['carga']})}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 outline-none focus:border-[#CC0E21]"
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 outline-none focus:border-[#CC0E21] disabled:opacity-60"
                   >
                     <option value="Baja">Baja</option>
                     <option value="Media">Media</option>
@@ -1189,8 +1319,9 @@ export function PlanificacionClient() {
                         <input
                           type="text"
                           value={sessionForm.hora_convocatoria || '18:00'}
+                          disabled={!isEditMode}
                           onChange={e => setSessionForm({...sessionForm, hora_convocatoria: e.target.value})}
-                          className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-100 outline-none focus:border-[#CC0E21]"
+                          className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-100 outline-none focus:border-[#CC0E21] disabled:opacity-60"
                         />
                       </div>
                     </div>
@@ -1202,8 +1333,9 @@ export function PlanificacionClient() {
                         <input
                           type="text"
                           value={sessionForm.hora_inicio || '18:30'}
+                          disabled={!isEditMode}
                           onChange={e => setSessionForm({...sessionForm, hora_inicio: e.target.value})}
-                          className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-100 outline-none focus:border-[#CC0E21]"
+                          className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-100 outline-none focus:border-[#CC0E21] disabled:opacity-60"
                         />
                       </div>
                     </div>
@@ -1217,8 +1349,9 @@ export function PlanificacionClient() {
                         type="text"
                         placeholder="Ej. Iparralde"
                         value={sessionForm.campo_instalacion || ''}
+                        disabled={!isEditMode}
                         onChange={e => setSessionForm({...sessionForm, campo_instalacion: e.target.value})}
-                        className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-100 outline-none focus:border-[#CC0E21]"
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-100 outline-none focus:border-[#CC0E21] disabled:opacity-60"
                       />
                     </div>
                   </div>
@@ -1230,8 +1363,9 @@ export function PlanificacionClient() {
                         type="text"
                         placeholder="Ej. Zaragoza Juvenil A"
                         value={sessionForm.rival || ''}
+                        disabled={!isEditMode}
                         onChange={e => setSessionForm({...sessionForm, rival: e.target.value})}
-                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 outline-none focus:border-[#CC0E21]"
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 outline-none focus:border-[#CC0E21] disabled:opacity-60"
                       />
                     </div>
                   )}
@@ -1242,8 +1376,9 @@ export function PlanificacionClient() {
                       type="text"
                       placeholder="Ej. Organización ofensiva..."
                       value={sessionForm.objetivo_principal || ''}
+                      disabled={!isEditMode}
                       onChange={e => setSessionForm({...sessionForm, objetivo_principal: e.target.value})}
-                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 outline-none focus:border-[#CC0E21]"
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 outline-none focus:border-[#CC0E21] disabled:opacity-60"
                     />
                   </div>
 
@@ -1251,14 +1386,53 @@ export function PlanificacionClient() {
                     <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Estado de Convocatoria</label>
                     <select
                       value={sessionForm.estado || 'Planificada'}
+                      disabled={!isEditMode}
                       onChange={e => setSessionForm({...sessionForm, estado: e.target.value as MockSession['estado']})}
-                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 outline-none focus:border-[#CC0E21]"
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 outline-none focus:border-[#CC0E21] disabled:opacity-60"
                     >
                       <option value="Borrador">Borrador (Oculto)</option>
                       <option value="Planificada">Planificada / Publicada</option>
                       <option value="Realizada">Realizada / Concluida</option>
                       <option value="Suspendida">Suspendida</option>
                     </select>
+                  </div>
+
+                  {/* Contenidos y Conceptos Trabajados */}
+                  <div className="pt-4 border-t border-slate-850 space-y-2.5">
+                    <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Conceptos Trabajados (Estadísticas)</label>
+                    <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-850 space-y-4">
+                      {Object.entries(CONCEPTOS_TACTICOS).map(([categoria, conceptos]) => (
+                        <div key={categoria} className="space-y-1.5">
+                          <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">{categoria}</span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {conceptos.map(concepto => {
+                              const isSelected = sessionConcepts.some(c => c.categoria === categoria && c.concepto === concepto);
+                              return (
+                                <button
+                                  key={concepto}
+                                  type="button"
+                                  disabled={!isEditMode}
+                                  onClick={() => {
+                                    if (isSelected) {
+                                      setSessionConcepts(sessionConcepts.filter(c => !(c.categoria === categoria && c.concepto === concepto)));
+                                    } else {
+                                      setSessionConcepts([...sessionConcepts, { session_id: sessionForm.id || '', categoria, concepto }]);
+                                    }
+                                  }}
+                                  className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all ${
+                                    isSelected
+                                      ? 'bg-[#CC0E21]/20 border-[#CC0E21]/45 text-[#CC0E21] font-black'
+                                      : 'bg-slate-950 border-slate-850 text-slate-400 hover:border-slate-800'
+                                  }`}
+                                >
+                                  {concepto}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </>
               )}
@@ -1278,29 +1452,31 @@ export function PlanificacionClient() {
                 <h4 className="text-xs font-extrabold text-slate-400 uppercase tracking-wider">Lista de Tareas ({sessionTasks.length})</h4>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => triggerToast('Mostrando Biblioteca Táctica (Simulado)...')}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-850 border border-slate-800 text-[11px] font-bold text-slate-200 transition-colors"
+                    disabled={!isEditMode}
+                    onClick={() => setIsLibraryModalOpen(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-850 border border-slate-800 text-[11px] font-bold text-slate-200 transition-colors disabled:opacity-50"
                   >
                     <BookOpen className="h-3.5 w-3.5 text-[#CC0E21]" />
                     Importar Biblioteca
                   </button>
                   <button
+                    disabled={!isEditMode}
                     onClick={() => {
                       const newTask: MockTask = {
-                        id: 't' + (sessionTasks.length + 1),
+                        id: 'temp-task-' + Date.now(),
                         nombre_tarea: 'Nuevo ejercicio táctico',
-                        tipo_tarea: 'Técnica',
+                        tipo_tarea: 'Táctica',
                         minutos: 15,
                         jugadores: 20,
                         espacio: 'Medio campo',
-                        objetivo: 'Mejora de pases',
-                        descripcion: 'Los jugadores realizan pases cortos alternando posiciones en triángulo.',
+                        objetivo: 'Objetivo del ejercicio',
+                        descripcion: 'Descripción del desarrollo del ejercicio.',
                         responsable_staff: 'Primer Entrenador'
                       };
                       setSessionTasks([...sessionTasks, newTask]);
-                      triggerToast('¡Ejercicio añadido manual!');
+                      triggerToast('¡Ejercicio añadido!');
                     }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#CC0E21]/15 hover:bg-[#CC0E21]/20 border border-[#CC0E21]/30 text-[11px] font-bold text-[#CC0E21] transition-colors"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#CC0E21]/15 hover:bg-[#CC0E21]/20 border border-[#CC0E21]/30 text-[11px] font-bold text-[#CC0E21] transition-colors disabled:opacity-50"
                   >
                     <Plus className="h-3.5 w-3.5" />
                     Añadir Tarea
@@ -1311,47 +1487,170 @@ export function PlanificacionClient() {
               {sessionTasks.length > 0 ? (
                 <div className="space-y-3.5">
                   {sessionTasks.map((task, idx) => (
-                    <div key={task.id} className="p-4 rounded-xl bg-slate-900/60 border border-slate-850 space-y-2.5 relative group">
+                    <div key={task.id} className="p-4 rounded-xl bg-slate-900/60 border border-slate-850 space-y-3 relative group">
                       <div className="flex items-start justify-between">
-                        <div className="space-y-0.5">
+                        <div className="space-y-0.5 text-left">
                           <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Paso {idx + 1} • {task.tipo_tarea}</span>
-                          <h5 className="text-xs font-black text-slate-200">{task.nombre_tarea}</h5>
+                          {!isEditMode && <h5 className="text-xs font-black text-slate-200">{task.nombre_tarea}</h5>}
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] font-bold text-[#CC0E21] bg-[#CC0E21]/10 px-2 py-0.5 rounded-lg border border-[#CC0E21]/20">
-                            {task.minutos} min
-                          </span>
-                          <button 
-                            onClick={() => {
-                              setSessionTasks(sessionTasks.filter(t => t.id !== task.id));
-                              triggerToast('Tarea eliminada.');
-                            }}
-                            className="p-1 rounded bg-slate-950 border border-slate-800 text-slate-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
+                        <div className="flex items-center gap-1.5">
+                          {isEditMode && (
+                            <>
+                              <button
+                                onClick={() => handleMoveTask(idx, 'up')}
+                                disabled={idx === 0}
+                                className="p-1 rounded bg-slate-950 border border-slate-800 text-slate-400 hover:text-slate-200 disabled:opacity-30"
+                                title="Mover arriba"
+                              >
+                                <ArrowUp className="h-3 w-3" />
+                              </button>
+                              <button
+                                onClick={() => handleMoveTask(idx, 'down')}
+                                disabled={idx === sessionTasks.length - 1}
+                                className="p-1 rounded bg-slate-950 border border-slate-800 text-slate-400 hover:text-slate-200 disabled:opacity-30"
+                                title="Mover abajo"
+                              >
+                                <ArrowDown className="h-3 w-3" />
+                              </button>
+                            </>
+                          )}
+                          {!isEditMode && (
+                            <span className="text-[10px] font-bold text-[#CC0E21] bg-[#CC0E21]/10 px-2 py-0.5 rounded-lg border border-[#CC0E21]/20">
+                              {task.minutos} min
+                            </span>
+                          )}
+                          {isEditMode && (
+                            <button 
+                              onClick={() => {
+                                setSessionTasks(sessionTasks.filter(t => t.id !== task.id));
+                                triggerToast('Tarea eliminada.');
+                              }}
+                              className="p-1 rounded bg-slate-950 border border-slate-800 text-slate-500 hover:text-red-400 transition-opacity"
+                              title="Eliminar tarea"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          )}
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-3 gap-2 text-[10px] text-slate-400 bg-slate-950/40 p-2 rounded-lg border border-slate-900">
-                        <div>Espacio: <span className="text-slate-200 font-bold">{task.espacio}</span></div>
-                        <div>Jugadores: <span className="text-slate-200 font-bold">{task.jugadores}</span></div>
-                        <div className="truncate">Staff: <span className="text-slate-200 font-bold">{task.responsable_staff}</span></div>
-                      </div>
+                      {isEditMode ? (
+                        <div className="space-y-3 pt-1 border-t border-slate-800/40">
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="space-y-1">
+                              <label className="text-[8px] font-bold text-slate-500 uppercase tracking-wider block text-left">Nombre de Tarea</label>
+                              <input
+                                type="text"
+                                value={task.nombre_tarea}
+                                onChange={e => {
+                                  setSessionTasks(sessionTasks.map(t => t.id === task.id ? { ...t, nombre_tarea: e.target.value } : t));
+                                }}
+                                className="w-full bg-slate-950 border border-slate-850 focus:border-[#CC0E21]/50 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[8px] font-bold text-slate-500 uppercase tracking-wider block text-left">Tipo de Tarea</label>
+                              <select
+                                value={task.tipo_tarea}
+                                onChange={e => {
+                                  setSessionTasks(sessionTasks.map(t => t.id === task.id ? { ...t, tipo_tarea: e.target.value } : t));
+                                }}
+                                className="w-full bg-slate-950 border border-slate-850 focus:border-[#CC0E21]/50 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none"
+                              >
+                                <option value="Calentamiento">Calentamiento</option>
+                                <option value="Rondo">Rondo</option>
+                                <option value="Posesión">Posesión</option>
+                                <option value="Finalización">Finalización</option>
+                                <option value="ABP">ABP</option>
+                                <option value="Técnica">Técnica</option>
+                                <option value="Táctica">Táctica</option>
+                                <option value="Físico">Físico</option>
+                                <option value="Partido condicionado">Partido condicionado</option>
+                              </select>
+                            </div>
+                          </div>
 
-                      <p className="text-[11px] text-slate-350 leading-relaxed font-medium">
-                        {task.descripcion}
-                      </p>
+                          <div className="grid grid-cols-4 gap-2">
+                            <div className="space-y-1">
+                              <label className="text-[8px] font-bold text-slate-500 uppercase tracking-wider block text-left">Minutos</label>
+                              <input
+                                type="number"
+                                value={task.minutos}
+                                onChange={e => {
+                                  setSessionTasks(sessionTasks.map(t => t.id === task.id ? { ...t, minutos: Number(e.target.value) || 0 } : t));
+                                }}
+                                className="w-full bg-slate-950 border border-slate-850 focus:border-[#CC0E21]/50 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[8px] font-bold text-slate-500 uppercase tracking-wider block text-left">Jugadores</label>
+                              <input
+                                type="number"
+                                value={task.jugadores}
+                                onChange={e => {
+                                  setSessionTasks(sessionTasks.map(t => t.id === task.id ? { ...t, jugadores: Number(e.target.value) || 0 } : t));
+                                }}
+                                className="w-full bg-slate-950 border border-slate-850 focus:border-[#CC0E21]/50 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[8px] font-bold text-slate-500 uppercase tracking-wider block text-left">Espacio</label>
+                              <input
+                                type="text"
+                                value={task.espacio}
+                                onChange={e => {
+                                  setSessionTasks(sessionTasks.map(t => t.id === task.id ? { ...t, espacio: e.target.value } : t));
+                                }}
+                                className="w-full bg-slate-950 border border-slate-850 focus:border-[#CC0E21]/50 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[8px] font-bold text-slate-500 uppercase tracking-wider block text-left">Staff</label>
+                              <input
+                                type="text"
+                                value={task.responsable_staff}
+                                onChange={e => {
+                                  setSessionTasks(sessionTasks.map(t => t.id === task.id ? { ...t, responsable_staff: e.target.value } : t));
+                                }}
+                                className="w-full bg-slate-950 border border-slate-850 focus:border-[#CC0E21]/50 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none"
+                              />
+                            </div>
+                          </div>
 
-                      <div className="flex justify-end gap-1.5 pt-1">
-                        <button
-                          onClick={() => triggerToast(`"${task.nombre_tarea}" guardada en la biblioteca.`)}
-                          className="flex items-center gap-1 text-[9px] px-2 py-1 rounded bg-slate-950 border border-slate-800 text-slate-400 hover:text-slate-200 font-bold transition-all"
-                        >
-                          <BookOpen className="h-3 w-3" />
-                          Guardar en Biblioteca
-                        </button>
-                      </div>
+                          <div className="space-y-1">
+                            <label className="text-[8px] font-bold text-slate-500 uppercase tracking-wider block text-left">Descripción / Desarrollo</label>
+                            <textarea
+                              value={task.descripcion}
+                              onChange={e => {
+                                setSessionTasks(sessionTasks.map(t => t.id === task.id ? { ...t, descripcion: e.target.value } : t));
+                              }}
+                              className="w-full min-h-[50px] bg-slate-950 border border-slate-850 focus:border-[#CC0E21]/50 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none"
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="grid grid-cols-3 gap-2 text-[10px] text-slate-400 bg-slate-950/40 p-2 rounded-lg border border-slate-900">
+                            <div className="text-left">Espacio: <span className="text-slate-200 font-bold">{task.espacio}</span></div>
+                            <div className="text-left">Jugadores: <span className="text-slate-200 font-bold">{task.jugadores}</span></div>
+                            <div className="truncate text-left">Staff: <span className="text-slate-200 font-bold">{task.responsable_staff}</span></div>
+                          </div>
+
+                          <p className="text-[11px] text-slate-350 leading-relaxed font-medium text-left">
+                            {task.descripcion}
+                          </p>
+
+                          <div className="flex justify-end gap-1.5 pt-1">
+                            <button
+                              onClick={() => triggerToast(`"${task.nombre_tarea}" guardada en la biblioteca.`)}
+                              className="flex items-center gap-1 text-[9px] px-2 py-1 rounded bg-slate-950 border border-slate-800 text-slate-400 hover:text-slate-200 font-bold transition-all"
+                            >
+                              <BookOpen className="h-3 w-3" />
+                              Guardar en Biblioteca
+                            </button>
+                          </div>
+                        </>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -1363,27 +1662,79 @@ export function PlanificacionClient() {
 
               {/* Subida o asociación de PDF de la sesión */}
               <div className="pt-4 border-t border-slate-850 space-y-2.5">
-                <h4 className="text-xs font-extrabold text-slate-400 uppercase tracking-wider">Documentación de Sesión (PDF)</h4>
+                <h4 className="text-xs font-extrabold text-slate-400 uppercase tracking-wider text-left">Documentación de Sesión (PDF)</h4>
                 <div className="p-4 rounded-xl bg-slate-900/40 border border-slate-850 space-y-3">
-                  <div className="flex flex-col gap-2">
-                    <label className="text-[10px] font-bold text-slate-450 uppercase">Enlace PDF de la sesión o Tarea</label>
-                    <input
-                      type="text"
-                      placeholder="https://enlace.com/sesion.pdf"
-                      value={sessionForm.evaluacion_observaciones?.includes('PDF:') ? sessionForm.evaluacion_observaciones.split('PDF:')[1].trim() : ''}
-                      onChange={e => {
-                        const baseObs = sessionForm.evaluacion_observaciones?.replace(/PDF:.*$/, '') || '';
-                        setSessionForm({
-                          ...sessionForm,
-                          evaluacion_observaciones: `${baseObs.trim()}\nPDF: ${e.target.value}`.trim()
-                        });
-                      }}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none focus:border-[#CC0E21]"
-                    />
-                  </div>
-                  <div className="flex items-center gap-2 text-[10px] text-slate-500">
+                  {getPdfUrl() ? (
+                    <div className="flex items-center justify-between p-3 rounded-lg bg-slate-950 border border-slate-850">
+                      <button
+                        type="button"
+                        onClick={() => window.open(getPdfUrl(), '_blank')}
+                        className="flex items-center gap-2 text-xs font-bold text-slate-200 hover:text-white transition-colors"
+                      >
+                        <span className="text-base">📄</span>
+                        <span className="truncate max-w-[280px]">Abrir PDF de la Sesión</span>
+                      </button>
+                      {isEditMode && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const baseObs = sessionForm.evaluacion_observaciones?.replace(/PDF:[\s\S]*$/, '') || '';
+                            setSessionForm({
+                              ...sessionForm,
+                              evaluacion_observaciones: baseObs.trim()
+                            });
+                            triggerToast('Documento PDF desasociado.');
+                          }}
+                          className="text-[9px] font-bold text-red-400 hover:text-red-300"
+                        >
+                          Quitar
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-[10px] text-slate-500 italic text-left">
+                      No hay ningún documento PDF subido a esta sesión.
+                    </div>
+                  )}
+
+                  {isEditMode && (
+                    <div className="space-y-2">
+                      <div className="flex flex-col gap-1.5 text-left">
+                        <span className="text-[9px] font-bold text-slate-500 uppercase">Subir desde ordenador</span>
+                        <input
+                          type="file"
+                          accept=".pdf"
+                          disabled={uploadingPdf}
+                          onChange={handlePdfUpload}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-450 file:mr-3 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-[10px] file:font-extrabold file:bg-[#CC0E21]/20 file:text-[#CC0E21] hover:file:bg-[#CC0E21]/30 file:cursor-pointer"
+                        />
+                        {uploadingPdf && (
+                          <span className="text-[9px] text-amber-400 animate-pulse font-bold block text-left">Subiendo PDF de sesión a Supabase Storage...</span>
+                        )}
+                      </div>
+                      
+                      <div className="flex flex-col gap-1.5 pt-1 text-left">
+                        <span className="text-[9px] font-bold text-slate-500 uppercase">O pegar enlace manual</span>
+                        <input
+                          type="text"
+                          placeholder="https://enlace.com/sesion.pdf"
+                          value={getPdfUrl()}
+                          onChange={e => {
+                            const baseObs = sessionForm.evaluacion_observaciones?.replace(/PDF:[\s\S]*$/, '') || '';
+                            setSessionForm({
+                              ...sessionForm,
+                              evaluacion_observaciones: `${baseObs.trim()}\nPDF: ${e.target.value}`.trim()
+                            });
+                          }}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none focus:border-[#CC0E21]"
+                        />
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div className="flex items-center gap-2 text-[10px] text-slate-500 text-left">
                     <Info className="h-3.5 w-3.5 text-[#CC0E21]" />
-                    <span>Asocia el PDF de la sesión de entrenamiento aquí para compartirlo con el staff.</span>
+                    <span>Asocia el PDF de la sesión de entrenamiento aquí para poder consultarlo en cualquier momento.</span>
                   </div>
                 </div>
               </div>
@@ -1490,7 +1841,8 @@ export function PlanificacionClient() {
                     min="1"
                     max="10"
                     value={sessionForm.rpe_medio || 6}
-                    className="flex-1 accent-[#CC0E21] bg-slate-950 rounded-lg h-2 border border-slate-800"
+                    disabled={!isEditMode}
+                    className="flex-1 accent-[#CC0E21] bg-slate-950 rounded-lg h-2 border border-slate-800 disabled:opacity-50"
                     onChange={e => setSessionForm({...sessionForm, rpe_medio: Number(e.target.value)})}
                   />
                   <span className="text-xs font-black text-[#CC0E21] bg-[#CC0E21]/15 px-2.5 py-1 rounded-xl border border-[#CC0E21]/20 shrink-0">
@@ -1503,9 +1855,10 @@ export function PlanificacionClient() {
                 <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Conclusiones / Notas de la Evaluación</label>
                 <textarea
                   value={sessionForm.evaluacion_observaciones || ''}
+                  disabled={!isEditMode}
                   onChange={e => setSessionForm({...sessionForm, evaluacion_observaciones: e.target.value})}
                   placeholder="Detalla conclusiones de la sesión táctica..."
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none focus:border-[#CC0E21] h-32"
+                  className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none focus:border-[#CC0E21] h-32 disabled:opacity-60"
                 />
               </div>
             </div>
@@ -1557,6 +1910,13 @@ export function PlanificacionClient() {
           </div>
         </div>
       </div>
+      {isLibraryModalOpen && (
+        <BibliotecaTareasModal
+          isOpen={isLibraryModalOpen}
+          onClose={() => setIsLibraryModalOpen(false)}
+          onSelectTask={handleSelectLibraryTask}
+        />
+      )}
     </div>
   );
 }

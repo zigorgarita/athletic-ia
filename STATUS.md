@@ -3,9 +3,25 @@
 Documentación del estado del proyecto tras completar las mejoras.
 
 ## 📌 Identificación de la Versión
-- **Último Commit**: Bloque 1 Finalizado y Validado
+- **Último Commit**: Bloque 2 Finalizado y Validado
 - **Fecha**: 2026-07-01
-- **Estado**: Estable y verificado funcionalmente.
+- **Estado**: Estable, verificado funcionalmente y compilado con éxito.
+
+## 💻 Funcionalidades Verificadas (Bloque 2 - Planificación)
+1. **Unificación de Lógica de Fechas y Timezone**:
+   - Centralizado el cálculo de calendarios semanal y mensual en [dateUtils.ts](file:///c:/Users/zigor/Desktop/indautxu-26-27/lib/dateUtils.ts) operando localmente para evitar desplazamientos por diferencia de zona horaria (UTC/Local).
+2. **Editor Completo de Ejercicios**:
+   - Pestaña interactiva de Ejercicios en tiempo real que permite crear, editar minutos/jugadores/espacio/staff/descripción, eliminar y reordenar el listado de tareas de la sesión con flechas de ordenación física.
+   - Integrado el modal táctico real [BibliotecaTareasModal.tsx](file:///c:/Users/zigor/Desktop/indautxu-26-27/components/planificacion/BibliotecaTareasModal.tsx) para importar ejercicios permanentes.
+3. **Gestión e Integración de PDFs**:
+   - Carga directa de archivos PDF en Supabase Storage (bucket `match-videos`, subcarpeta `planning-pdfs`).
+   - Asociación permanente de la URL pública del PDF a la sesión dentro del campo `evaluacion_observaciones`.
+   - Visor/botón para abrir el documento directamente desde cualquier dispositivo.
+4. **Resumen de Conceptos en Calendario**:
+   - Registro estructurado de conceptos (Ataque, Defensa, Transiciones, ABP, Condicional, Mental) en la tabla `planning_concepts`.
+   - Visualización abreviada (máximo 3) en cada celda del calendario mensual y en su tooltip flotante.
+5. **Permisos de UI en Solo Lectura**:
+   - Desactivación de todos los campos interactivos de datos básicos, editor de tareas y evaluaciones cuando el Modo Edición está apagado.
 
 ## 💻 Funcionalidades Verificadas (Bloque 1 - Plantilla 360º)
 1. **Posición Secundaria Unificada**:

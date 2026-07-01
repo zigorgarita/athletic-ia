@@ -5,6 +5,7 @@ import * as zod from 'zod';
 import { Match } from '@/types';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { formatLocalYYYYMMDD } from '@/lib/dateUtils';
 
 const matchSchema = zod.object({
   jornada: zod.coerce
@@ -49,7 +50,7 @@ export function MatchForm({ match, onSubmit, onCancel, isSubmitting = false }: M
       : {
           jornada: 1,
           rival: '',
-          fecha: new Date().toISOString().split('T')[0],
+          fecha: formatLocalYYYYMMDD(new Date()),
           es_local: true,
           goles_favor: null,
           goles_contra: null,

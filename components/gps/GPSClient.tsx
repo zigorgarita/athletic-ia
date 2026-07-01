@@ -14,6 +14,7 @@ import {
   Activity, Upload, Calendar, ChevronRight, 
   Trash2, AlertCircle, ArrowUpDown, Award
 } from 'lucide-react';
+import { formatLocalYYYYMMDD } from '@/lib/dateUtils';
 
 interface ParsedCSV {
   headers: string[];
@@ -47,7 +48,7 @@ export function GPSClient() {
 
   // Import wizard states
   const [importStep, setImportStep] = useState<1 | 2 | 3 | 4>(1);
-  const [sessionDate, setSessionDate] = useState(new Date().toISOString().split('T')[0]);
+  const [sessionDate, setSessionDate] = useState(formatLocalYYYYMMDD(new Date()));
   const [sessionDesc, setSessionDesc] = useState('');
   const [csvContent, setCsvContent] = useState<ParsedCSV | null>(null);
   const [columnMapping, setColumnMapping] = useState<ColumnMapping>({
@@ -355,7 +356,7 @@ export function GPSClient() {
     setImportStep(1);
     setCsvContent(null);
     setSessionDesc('');
-    setSessionDate(new Date().toISOString().split('T')[0]);
+    setSessionDate(formatLocalYYYYMMDD(new Date()));
     setErrorMsg(null);
   }
 

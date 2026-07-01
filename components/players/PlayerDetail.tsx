@@ -16,6 +16,7 @@ import { useUploadPlayerPhoto } from '@/hooks/useUploadPlayerPhoto';
 import { usePlayerInjuries } from '@/hooks/usePlayerInjuries';
 import { usePlayerMeetings } from '@/hooks/usePlayerMeetings';
 import { compressImage } from '@/lib/image';
+import { formatLocalYYYYMMDD } from '@/lib/dateUtils';
 import { 
   Award, ClipboardList, BarChart3, PlusCircle, 
   Calendar, Check, Star, Sparkles, User, AlertTriangle,
@@ -182,7 +183,7 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
   const [showMeetingForm, setShowMeetingForm] = useState(false);
   const [meetingError, setMeetingError] = useState<string | null>(null);
   const [newMeeting, setNewMeeting] = useState({
-    fecha: new Date().toISOString().split('T')[0],
+    fecha: formatLocalYYYYMMDD(new Date()),
     solicitada_por: 'Staff' as 'Jugador' | 'Staff',
     motivo: '',
     desarrollo: '',
@@ -200,7 +201,7 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
   const [showInjuryForm, setShowInjuryForm] = useState(false);
   const [injuryError, setInjuryError] = useState<string | null>(null);
   const [newInjury, setNewInjury] = useState({
-    fecha_lesion: new Date().toISOString().split('T')[0],
+    fecha_lesion: formatLocalYYYYMMDD(new Date()),
     tipo_lesion: '',
     diagnostico: '',
     informado_por: 'Fisio' as PlayerInjury['informado_por'],
@@ -313,7 +314,7 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
 
     const payload: Omit<DetailedEvaluation, 'id' | 'created_at'> = {
       player_id: currentPlayer.id,
-      fecha_evaluacion: new Date().toISOString().split('T')[0],
+      fecha_evaluacion: formatLocalYYYYMMDD(new Date()),
       perfil_especifico: perfilEspecífico,
       valoraciones_generales: valoracionesGenerales,
       evaluado_por: evaluador,
@@ -354,7 +355,7 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
     }
     const payload = {
       player_id: currentPlayer.id,
-      fecha: new Date().toISOString().split('T')[0],
+      fecha: formatLocalYYYYMMDD(new Date()),
       ...newObs,
     };
     const created = await createObservacion(payload);
@@ -402,7 +403,7 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
     if (created) {
       setShowMeetingForm(false);
       setNewMeeting({
-        fecha: new Date().toISOString().split('T')[0],
+        fecha: formatLocalYYYYMMDD(new Date()),
         solicitada_por: 'Staff',
         motivo: '',
         desarrollo: '',
@@ -459,7 +460,7 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
       }
       setShowInjuryForm(false);
       setNewInjury({
-        fecha_lesion: new Date().toISOString().split('T')[0],
+        fecha_lesion: formatLocalYYYYMMDD(new Date()),
         tipo_lesion: '',
         diagnostico: '',
         informado_por: 'Fisio',
@@ -477,7 +478,7 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
     const isCleared = nextStatus === 'Alta médica';
     const updates: Partial<PlayerInjury> = { 
       estado: nextStatus,
-      fecha_real_recuperacion: isCleared ? new Date().toISOString().split('T')[0] : null
+      fecha_real_recuperacion: isCleared ? formatLocalYYYYMMDD(new Date()) : null
     };
     
     const updated = await updateInjury(injuryId, updates);
