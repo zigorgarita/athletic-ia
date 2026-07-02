@@ -298,6 +298,52 @@ export interface TacticalLineup {
   created_at: string;
 }
 
+export interface PositionNode {
+  id: number;
+  label: string;
+  x: number;
+  y: number;
+  player_id: string | null;
+  notas_entrenador?: string;
+  customName?: string;
+  customNumber?: string;
+}
+
+export interface TacticalSystem {
+  id: string;
+  nombre: string;
+  descripcion: string | null;
+  filosofia: string | null;
+  coordenadas_base: PositionNode[];
+  created_at: string;
+}
+
+export interface TacticalMatchup {
+  id: string;
+  system_own_id: string;
+  system_rival_id: string;
+  ventajas: string | null;
+  desventajas: string | null;
+  zona_conflicto: string | null;
+  duelo_clave: string | null;
+  tareas_lineas: string | null;
+  ai_context: string | null;
+  created_at: string;
+}
+
+export interface TacticalMatchPlan {
+  id: string;
+  match_id: string;
+  system_own_id: string | null;
+  system_rival_id: string | null;
+  matchup_id: string | null;
+  notas_entrenador: string | null;
+  conclusiones_post: string | null;
+  estado: 'borrador' | 'preparado' | 'cerrado';
+  created_at: string;
+  updated_at: string;
+}
+
 export interface MatchVideo {
   id: string;
   titulo: string;

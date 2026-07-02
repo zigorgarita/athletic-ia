@@ -1,242 +1,30 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { usePlayers } from '@/hooks/usePlayers';
-import { TacticalLineup, Match, Player } from '@/types';
+import { TacticalLineup, Match, Player, PositionNode } from '@/types';
 import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
-import { Select } from '@/components/ui/Select';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Avatar } from '@/components/ui/Avatar';
 import { 
-  Layout, Save, FolderOpen, RefreshCw, AlertCircle, 
-  CheckCircle, Users, Trash2, Copy, Plus, X, ShieldAlert,
-  Zap, Award, HelpCircle, User, Star, ArrowRight, BookOpen, Edit3,
-  ArrowRightLeft
+  Save, Copy, RefreshCw, AlertCircle, 
+  CheckCircle, Plus, X, ShieldAlert,
+  Zap, Award, HelpCircle, User, Edit3, BookOpen, Layout,
+  ArrowRight
 } from 'lucide-react';
 import { useEditMode } from '@/context/EditModeContext';
-import { TacticalField, PositionNode } from './TacticalField';
+import { useTacticalSystems } from '@/hooks/useTacticalSystems';
+import { TacticalField } from './TacticalField';
 
-
-
-const groupPlayers = (playerList: Player[]) => {
-  const groups: Record<string, { label: string; list: Player[] }> = {
-    Portero: { label: '🧤 Porteros', list: [] },
-    Lateral: { label: '🛡️ Laterales', list: [] },
-    Central: { label: '🧱 Centrales', list: [] },
-    Centrocampista: { label: '⚙️ Centrocampistas', list: [] },
-    Mediapunta: { label: '🎯 Mediapuntas', list: [] },
-    Extremo: { label: '⚡ Extremos', list: [] },
-    Delantero: { label: '🎯 Delanteros', list: [] },
-    Otros: { label: '📋 Otros', list: [] }
-  };
-
-  playerList.forEach(p => {
-    const pos = p.demarcacion || '';
-    const posLower = pos.toLowerCase();
-
-    if (posLower.includes('portero')) {
-      groups.Portero.list.push(p);
-    } else if (posLower.includes('lateral')) {
-      groups.Lateral.list.push(p);
-    } else if (posLower.includes('central') || posLower === 'defensa') {
-      groups.Central.list.push(p);
-    } else if (posLower.includes('mediapunta') || posLower.includes('media punta')) {
-      groups.Mediapunta.list.push(p);
-    } else if (posLower.includes('extremo')) {
-      groups.Extremo.list.push(p);
-    } else if (posLower.includes('delantero')) {
-      groups.Delantero.list.push(p);
-    } else if (posLower.includes('centrocampista') || posLower.includes('pivote') || posLower.includes('interior')) {
-      groups.Centrocampista.list.push(p);
-    } else {
-      groups.Otros.list.push(p);
-    }
-  });
-
-  Object.keys(groups).forEach(k => {
-    groups[k].list.sort((a, b) => a.dorsal - b.dorsal);
-  });
-
-  return [
-    groups.Portero,
-    groups.Lateral,
-    groups.Central,
-    groups.Centrocampista,
-    groups.Mediapunta,
-    groups.Extremo,
-    groups.Delantero,
-    groups.Otros
-  ].filter(g => g.list.length > 0);
-};
+// Subcomponents
+import { FormationSelector } from './systems/FormationSelector';
+import { SystemCard } from './systems/SystemCard';
+import { PlayerAssignmentSidebar } from './shared/PlayerAssignmentSidebar';
+import { LineupManager } from './shared/LineupManager';
+import { MatchPlanSelector } from './analysis/MatchPlanSelector';
 
 const POSITION_ROLES = ['POR', 'LD', 'LI', 'DFC', 'MCD', 'MC', 'MCO', 'ED', 'EI', 'DC'];
-
-const FORMATIONS: Record<string, { label: string; coords: Omit<PositionNode, 'player_id'>[] }> = {
-  '1-4-2-3-1': {
-    label: '1-4-2-3-1',
-    coords: [
-      { id: 1, label: 'POR', x: 50, y: 88, notas_entrenador: '' },
-      { id: 2, label: 'LD', x: 15, y: 68, notas_entrenador: '' },
-      { id: 3, label: 'DFC', x: 38, y: 74, notas_entrenador: '' },
-      { id: 4, label: 'DFC', x: 62, y: 74, notas_entrenador: '' },
-      { id: 5, label: 'LI', x: 85, y: 68, notas_entrenador: '' },
-      { id: 6, label: 'MCD', x: 36, y: 58, notas_entrenador: '' },
-      { id: 7, label: 'MCD', x: 64, y: 58, notas_entrenador: '' },
-      { id: 8, label: 'MCO', x: 50, y: 40, notas_entrenador: '' },
-      { id: 9, label: 'ED', x: 18, y: 30, notas_entrenador: '' },
-      { id: 10, label: 'EI', x: 82, y: 30, notas_entrenador: '' },
-      { id: 11, label: 'DC', x: 50, y: 16, notas_entrenador: '' },
-    ]
-  },
-  '1-4-3-3': {
-    label: '1-4-3-3',
-    coords: [
-      { id: 1, label: 'POR', x: 50, y: 88, notas_entrenador: '' },
-      { id: 2, label: 'LD', x: 15, y: 68, notas_entrenador: '' },
-      { id: 3, label: 'DFC', x: 38, y: 74, notas_entrenador: '' },
-      { id: 4, label: 'DFC', x: 62, y: 74, notas_entrenador: '' },
-      { id: 5, label: 'LI', x: 85, y: 68, notas_entrenador: '' },
-      { id: 6, label: 'MCD', x: 50, y: 55, notas_entrenador: '' },
-      { id: 7, label: 'MC', x: 30, y: 44, notas_entrenador: '' },
-      { id: 8, label: 'MC', x: 70, y: 44, notas_entrenador: '' },
-      { id: 9, label: 'ED', x: 18, y: 22, notas_entrenador: '' },
-      { id: 10, label: 'EI', x: 82, y: 22, notas_entrenador: '' },
-      { id: 11, label: 'DC', x: 50, y: 15, notas_entrenador: '' },
-    ]
-  },
-  '1-4-4-2': {
-    label: '1-4-4-2',
-    coords: [
-      { id: 1, label: 'POR', x: 50, y: 88, notas_entrenador: '' },
-      { id: 2, label: 'LD', x: 15, y: 68, notas_entrenador: '' },
-      { id: 3, label: 'DFC', x: 38, y: 74, notas_entrenador: '' },
-      { id: 4, label: 'DFC', x: 62, y: 74, notas_entrenador: '' },
-      { id: 5, label: 'LI', x: 85, y: 68, notas_entrenador: '' },
-      { id: 6, label: 'MC', x: 36, y: 50, notas_entrenador: '' },
-      { id: 7, label: 'MC', x: 64, y: 50, notas_entrenador: '' },
-      { id: 8, label: 'ED', x: 15, y: 40, notas_entrenador: '' },
-      { id: 9, label: 'EI', x: 85, y: 40, notas_entrenador: '' },
-      { id: 10, label: 'DC', x: 38, y: 18, notas_entrenador: '' },
-      { id: 11, label: 'DC', x: 62, y: 18, notas_entrenador: '' },
-    ]
-  },
-  '1-3-5-2': {
-    label: '1-3-5-2',
-    coords: [
-      { id: 1, label: 'POR', x: 50, y: 88, notas_entrenador: '' },
-      { id: 2, label: 'DFC', x: 25, y: 74, notas_entrenador: '' },
-      { id: 3, label: 'DFC', x: 50, y: 77, notas_entrenador: '' },
-      { id: 4, label: 'DFC', x: 75, y: 74, notas_entrenador: '' },
-      { id: 5, label: 'MCD', x: 36, y: 58, notas_entrenador: '' },
-      { id: 6, label: 'MCD', x: 64, y: 58, notas_entrenador: '' },
-      { id: 7, label: 'LD', x: 15, y: 45, notas_entrenador: '' },
-      { id: 8, label: 'LI', x: 85, y: 45, notas_entrenador: '' },
-      { id: 9, label: 'MCO', x: 50, y: 40, notas_entrenador: '' },
-      { id: 10, label: 'DC', x: 38, y: 18, notas_entrenador: '' },
-      { id: 11, label: 'DC', x: 62, y: 18, notas_entrenador: '' },
-    ]
-  },
-  '1-5-3-2': {
-    label: '1-5-3-2',
-    coords: [
-      { id: 1, label: 'POR', x: 50, y: 88, notas_entrenador: '' },
-      { id: 2, label: 'LD', x: 12, y: 68, notas_entrenador: '' },
-      { id: 3, label: 'DFC', x: 30, y: 75, notas_entrenador: '' },
-      { id: 4, label: 'DFC', x: 50, y: 77, notas_entrenador: '' },
-      { id: 5, label: 'DFC', x: 70, y: 75, notas_entrenador: '' },
-      { id: 6, label: 'LI', x: 88, y: 68, notas_entrenador: '' },
-      { id: 7, label: 'MC', x: 35, y: 50, notas_entrenador: '' },
-      { id: 8, label: 'MC', x: 50, y: 54, notas_entrenador: '' },
-      { id: 9, label: 'MC', x: 65, y: 50, notas_entrenador: '' },
-      { id: 10, label: 'DC', x: 38, y: 22, notas_entrenador: '' },
-      { id: 11, label: 'DC', x: 62, y: 22, notas_entrenador: '' },
-    ]
-  },
-  'Personalizado': {
-    label: 'Personalizado',
-    coords: [
-      { id: 1, label: 'POR', x: 50, y: 88, notas_entrenador: '' },
-      { id: 2, label: 'LD', x: 15, y: 68, notas_entrenador: '' },
-      { id: 3, label: 'DFC', x: 38, y: 74, notas_entrenador: '' },
-      { id: 4, label: 'DFC', x: 62, y: 74, notas_entrenador: '' },
-      { id: 5, label: 'LI', x: 85, y: 68, notas_entrenador: '' },
-      { id: 6, label: 'MCD', x: 50, y: 55, notas_entrenador: '' },
-      { id: 7, label: 'MC', x: 30, y: 44, notas_entrenador: '' },
-      { id: 8, label: 'MC', x: 70, y: 44, notas_entrenador: '' },
-      { id: 9, label: 'ED', x: 18, y: 22, notas_entrenador: '' },
-      { id: 10, label: 'EI', x: 82, y: 22, notas_entrenador: '' },
-      { id: 11, label: 'DC', x: 50, y: 15, notas_entrenador: '' },
-    ]
-  }
-};
-
-// Tactical Database for IA recommendations according to combinations
-const TACTICAL_DATABASE: Record<string, Record<string, {
-  ventajas: string;
-  desventajas: string;
-  zonaConflicto: string;
-  dueloClave: string;
-  tareasLineas: string;
-  orientaciones: Record<string, string>;
-}>> = {
-  '1-4-2-3-1': {
-    '1-4-3-3': {
-      ventajas: 'Superioridad táctica en la mediapunta: nuestro mediapunta central (MCO) flotará libre a la espalda de sus dos interiores, forzando a su único pivote defensivo a salir de zona. Extremos que ensanchan su última línea.',
-      desventajas: 'Riesgo de emparejamiento desfavorable en bandas si sus extremos rápidos atacan el espacio exterior libre antes de las coberturas de nuestro doble pivote.',
-      zonaConflicto: 'La zona de la mediapunta interior (carril central entre línea de volantes rival y su defensa).',
-      dueloClave: 'Nuestro MCO contra el MCD organizador rival (fijación táctica).',
-      tareasLineas: 'Portería: Salida en corto y apoyo a centrales.\nDefensa: Coberturas laterales rápidas.\nMedios: Doble pivote sostiene y MCO distribuye.\nDelantera: Fijar a centrales y diagonales al espacio.',
-      orientaciones: {
-        'POR': 'Cobertura constante del espacio libre detrás del bloque de centrales.',
-        'LD': 'Atento al extremo zurdo rápido del rival; no conceder el perfil interior.',
-        'LI': 'Asegurar repliegue rápido y vigilancias del extremo diestro.',
-        'DFC': 'Ganar duelos aéreos con su Delantero Centro; achicar en bloque medio.',
-        'MCD': 'Sostén táctico, equilibrar coberturas en bandas si el lateral salta.',
-        'MC': 'Distribución fluida de primer contacto, ocupar la corona en área rival.',
-        'MCO': 'Recibir entre líneas, girar rápido y alimentar pasillos de extremos.',
-        'ED': 'Aislar al lateral izquierdo rival en 1x1 por fuera.',
-        'EI': 'Diagonales de fuera hacia dentro hacia zona de finalización.',
-        'DC': 'Fijar a centrales, provocar desmarques de ruptura y descarga de espaldas.'
-      }
-    },
-    '1-4-4-2': {
-      ventajas: 'Superioridad numérica de 3 vs 2 en zona de mediocampo gracias al triángulo invertido formado por el doble pivote y el mediapunta central.',
-      desventajas: 'Dificultad en basculación si sus dos delanteros fijan a nuestros dos centrales y sus laterales se proyectan con libertad.',
-      zonaConflicto: 'Espacio de construcción en zona media (interior central).',
-      dueloClave: 'Doble pivote propio frente a la línea de medios rival para dominar posesión.',
-      tareasLineas: 'Portería: Reiniciar juego con pivotes.\nDefensa: Anticipar juego directo a sus dos puntas.\nMedios: Controlar tiempos de juego y circular.\nDelantera: MCO explota el carril central.',
-      orientaciones: {
-        'POR': 'Apoyo activo en salida de balón.',
-        'DFC': 'Uno anticipa al delantero que desciende y otro cubre profundidad.',
-        'MCD': 'Mantener vigilancias estrechas al mediocampo rival.',
-        'MCO': 'Ocupar el espacio desierto a la espalda de su doble pivote.',
-        'DC': 'Estirar al rival buscando balones en profundidad a la espalda de centrales.'
-      }
-    }
-  },
-  '1-4-3-3': {
-    '1-4-4-2': {
-      ventajas: 'Ocupación de espacios en amplitud. Extremos que aíslan a laterales, permitiendo crear superioridades en mediocampo de 3 contra 2 volantes.',
-      desventajas: 'Sufrimiento en transiciones rápidas si el pivote propio queda superado por su doble delantero en zona de rebote.',
-      zonaConflicto: 'La franja de tres cuartos exterior y el pasillo interior de transición.',
-      dueloClave: 'Extremos propios vs Laterales rivales (desequilibrio individual).',
-      tareasLineas: 'Portería: Actuar como jugador libre en construcción.\nDefensa: Progresión combinada por bandas.\nMedios: Rotaciones dinámicas para liberar carriles.\nDelantera: Extremos con libertad ofensiva.',
-      orientaciones: {
-        'POR': 'Distribución rápida en transiciones ofensivas.',
-        'LD': 'Proyección ofensiva profunda doblando al extremo.',
-        'LI': 'Asegurar equilibrio defensivo si el LD sube.',
-        'DFC': 'Controlar el juego directo hacia sus dos delanteros centro.',
-        'MCD': 'Ancla del equipo, equilibrar coberturas.',
-        'MC': 'Ocupar espacios de interior y pisar área rival.',
-        'ED': 'Desborde en amplitud exterior.',
-        'EI': 'Diagonales para el disparo a pierna cambiada.',
-        'DC': 'Rematar centros laterales y fijar marca de centrales.'
-      }
-    }
-  }
-};
 
 const DEFAULT_RECOMMENDATIONS: Record<string, string> = {
   'POR': 'Portero: Voz de mando activa. Cobertura del área y juego con el pie ágil.',
@@ -254,6 +42,16 @@ const DEFAULT_RECOMMENDATIONS: Record<string, string> = {
 export function TacticaClient() {
   const { isEditMode } = useEditMode();
   const { players, loading: loadingPlayers } = usePlayers();
+  
+  // Tactical Systems and DB communication hook
+  const {
+    systems,
+    matchups,
+    loading: loadingSystems,
+    error: systemsError,
+    fetchMatchPlan,
+    saveMatchPlan
+  } = useTacticalSystems();
 
   // Selected lineup / ID for update
   const [currentLineupId, setCurrentLineupId] = useState<string | null>(null);
@@ -289,10 +87,21 @@ export function TacticaClient() {
   const [editNodeRole, setEditNodeRole] = useState('');
   const [editNodeNotes, setEditNodeNotes] = useState('');
 
-  // Initialize nodes based on selected formation
+  // Formations list from database systems
+  const formationsOptions = useMemo(() => {
+    return systems.map(s => ({ value: s.nombre, label: s.nombre }));
+  }, [systems]);
+
+  // Current selected system base description
+  const activeSystem = useMemo(() => {
+    return systems.find(s => s.nombre === selectedFormation) || null;
+  }, [systems, selectedFormation]);
+
+  // Initialize nodes based on selected own formation
   useEffect(() => {
-    if (!currentLineupId) {
-      const defaultCoords = FORMATIONS[selectedFormation]?.coords || [];
+    if (!currentLineupId && systems.length > 0) {
+      const activeSys = systems.find(s => s.nombre === selectedFormation);
+      const defaultCoords = activeSys?.coordenadas_base || [];
       setNodesPropio(
         defaultCoords.map((coord) => ({
           ...coord,
@@ -301,12 +110,13 @@ export function TacticaClient() {
         }))
       );
     }
-  }, [selectedFormation, currentLineupId]);
+  }, [selectedFormation, currentLineupId, systems]);
 
-  // Initialize rival nodes based on rival formation
+  // Initialize nodes based on selected rival formation
   useEffect(() => {
-    if (!currentLineupId) {
-      const defaultCoords = FORMATIONS[rivalFormation]?.coords || [];
+    if (!currentLineupId && systems.length > 0) {
+      const activeSys = systems.find(s => s.nombre === rivalFormation);
+      const defaultCoords = activeSys?.coordenadas_base || [];
       setNodesRival(
         defaultCoords.map((coord) => ({
           ...coord,
@@ -315,7 +125,372 @@ export function TacticaClient() {
         }))
       );
     }
-  }, [rivalFormation, currentLineupId]);
+  }, [rivalFormation, currentLineupId, systems]);
+
+  // Sync date/match selection details and proposals
+  useEffect(() => {
+    if (systems.length === 0 || matchups.length === 0) return;
+
+    const ownSys = systems.find(s => s.nombre === selectedFormation);
+    const rivalSys = systems.find(s => s.nombre === rivalFormation);
+
+    if (!ownSys || !rivalSys) return;
+
+    const databaseMatch = matchups.find(
+      m => m.system_own_id === ownSys.id && m.system_rival_id === rivalSys.id
+    );
+
+    if (databaseMatch) {
+      setVentajas(databaseMatch.ventajas || '');
+      setDesventajas(databaseMatch.desventajas || '');
+      setZonaConflicto(databaseMatch.zona_conflicto || '');
+      setDueloClave(databaseMatch.duelo_clave || '');
+      setTareasLineas(databaseMatch.tareas_lineas || '');
+    } else {
+      setVentajas(`Ventajas teóricas de jugar con ${selectedFormation} contra un rival posicionado en ${rivalFormation}. Superioridad local en salida de balón y ocupación racional del carril medio.`);
+      setDesventajas(`Vulnerabilidad del dibujo ${selectedFormation} ante repliegues fallidos o transiciones rápidas por el perfil exterior si el rival ${rivalFormation} explota las bandas.`);
+      setZonaConflicto(`Carriles intermedios entre la línea de volantes rivales y la defensa del bloque bajo.`);
+      setDueloClave(`Duelo por la posesión entre la base de construcción central y los interiores rivales.`);
+      setTareasLineas(`Defensa: Línea de 4 basculando rápido.\nMedios: Asegurar circulación fluida.\nDelantera: Fijar centrales y generar pasillos exteriores.`);
+    }
+  }, [selectedFormation, rivalFormation, systems, matchups]);
+
+  useEffect(() => {
+    loadSavedData();
+  }, []);
+
+  async function loadSavedData() {
+    setLoadingLineups(true);
+    try {
+      const [lineupsRes, matchesRes] = await Promise.all([
+        supabase.from('tactical_lineups').select('*').order('created_at', { ascending: false }),
+        supabase.from('matches').select('*').order('jornada', { ascending: true })
+      ]);
+
+      if (lineupsRes.error) throw lineupsRes.error;
+      if (matchesRes.error) throw matchesRes.error;
+
+      setSavedLineups(lineupsRes.data || []);
+      setMatches(matchesRes.data || []);
+    } catch (err) {
+      console.error('Error loading tactical lineups:', err);
+    } finally {
+      setLoadingLineups(false);
+    }
+  }
+
+  // --- Change Formation and Maintain assigned players ---
+  const handleFormationChange = (formationName: string) => {
+    setSelectedFormation(formationName);
+    const activeSys = systems.find(s => s.nombre === formationName);
+    const defaultCoords = activeSys?.coordenadas_base || [];
+    setNodesPropio(prev => {
+      return defaultCoords.map(coord => {
+        const existingNode = prev.find(n => n.id === coord.id);
+        return {
+          ...coord,
+          player_id: existingNode ? existingNode.player_id : null,
+          notas_entrenador: existingNode?.notas_entrenador || '',
+          customName: existingNode?.customName,
+          customNumber: existingNode?.customNumber
+        };
+      });
+    });
+  };
+
+  const handleRivalFormationChange = (formationName: string) => {
+    setRivalFormation(formationName);
+    const activeSys = systems.find(s => s.nombre === formationName);
+    const defaultCoords = activeSys?.coordenadas_base || [];
+    setNodesRival(prev => {
+      return defaultCoords.map(coord => {
+        const existingNode = prev.find(n => n.id === coord.id);
+        return {
+          ...coord,
+          player_id: null,
+          notas_entrenador: existingNode?.notas_entrenador || '',
+          customName: existingNode?.customName,
+          customNumber: existingNode?.customNumber
+        };
+      });
+    });
+  };
+
+  const handleSwapPizarras = () => {
+    const tempNodes = [...nodesPropio];
+    const tempForm = selectedFormation;
+
+    setNodesPropio(nodesRival);
+    setNodesRival(tempNodes);
+
+    setSelectedFormation(rivalFormation);
+    setRivalFormation(tempForm);
+
+    setSuccessMsg('Intercambiadas las pizarras tácticas de ambos campos.');
+  };
+
+  const handleCopyPropioToRival = () => {
+    setNodesRival(nodesPropio.map(n => ({
+      ...n,
+      player_id: null,
+      customName: n.customName || players.find(p => p.id === n.player_id)?.nombre || undefined,
+      customNumber: n.customNumber || players.find(p => p.id === n.player_id)?.dorsal.toString() || undefined
+    })));
+    setRivalFormation(selectedFormation);
+    setSuccessMsg('Copiada la alineación de nuestro equipo al rival.');
+  };
+
+  const handleCopyRivalToPropio = () => {
+    setNodesPropio(nodesRival.map(n => ({
+      ...n,
+      player_id: null,
+      customName: n.customName,
+      customNumber: n.customNumber
+    })));
+    setSelectedFormation(rivalFormation);
+    setSuccessMsg('Copiada la alineación del rival a nuestro equipo.');
+  };
+
+  const formatNodeForDb = (n: PositionNode) => ({
+    id: n.id,
+    label: n.label,
+    x: parseFloat(n.x.toFixed(1)),
+    y: parseFloat(n.y.toFixed(1)),
+    player_id: n.player_id,
+    notas_entrenador: n.notas_entrenador || '',
+    customName: n.customName || undefined,
+    customNumber: n.customNumber || undefined
+  });
+
+  // --- Save Tactical Lineup ---
+  async function handleSaveLineup() {
+    if (!lineupName.trim()) {
+      setErrorMsg('Debes introducir un nombre para la alineación.');
+      return;
+    }
+    setIsSaving(true);
+    setErrorMsg(null);
+    setSuccessMsg(null);
+
+    try {
+      const payload = {
+        nombre_sistema: selectedFormation,
+        nombre_pizarra: lineupName,
+        sistema_propio: selectedFormation,
+        sistema_rival: rivalFormation,
+        notes: lineupNotes || null,
+        posiciones: {
+          propio: nodesPropio.map(formatNodeForDb),
+          rival: nodesRival.map(formatNodeForDb)
+        },
+        match_id: selectedMatchId || null,
+        ventajas: ventajas || null,
+        desventajas: desventajas || null,
+        zona_conflicto: zonaConflicto || null,
+        duelo_clave: dueloClave || null,
+        orientaciones_individuales: tareasLineas || null
+      };
+
+      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
+      let error;
+      if (currentLineupId) {
+        const res = await supabase.rpc('exec_secure_upsert', {
+          target_table: 'tactical_lineups',
+          payload: { ...payload, id: currentLineupId },
+          conflict_columns: ['id'],
+          staff_passkey: passkey
+        });
+        error = res.error;
+      } else {
+        const res = await supabase.rpc('exec_secure_upsert', {
+          target_table: 'tactical_lineups',
+          payload: payload,
+          conflict_columns: null,
+          staff_passkey: passkey
+        });
+        error = res.error;
+      }
+
+      if (error) throw error;
+
+      // Save Plan táctico of the Match if connected
+      if (selectedMatchId) {
+        const ownSys = systems.find(s => s.nombre === selectedFormation);
+        const rivalSys = systems.find(s => s.nombre === rivalFormation);
+        const databaseMatch = matchups.find(
+          m => ownSys && rivalSys && m.system_own_id === ownSys.id && m.system_rival_id === rivalSys.id
+        );
+
+        await saveMatchPlan({
+          match_id: selectedMatchId,
+          system_own_id: ownSys?.id || null,
+          system_rival_id: rivalSys?.id || null,
+          matchup_id: databaseMatch?.id || null,
+          notas_entrenador: lineupNotes || null,
+          conclusiones_post: null,
+          estado: 'borrador'
+        });
+      }
+
+      setSuccessMsg('Alineación táctica y análisis de comparador guardados con éxito.');
+      loadSavedData();
+    } catch (err: unknown) {
+      const error = err as Error;
+      console.error('Error saving lineup:', error);
+      setErrorMsg(error.message || 'Error al guardar la alineación.');
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  // --- Load Saved Lineup ---
+  const handleLoadLineup = async (lineup: TacticalLineup) => {
+    setCurrentLineupId(lineup.id);
+    setSelectedFormation(lineup.sistema_propio || lineup.nombre_sistema || '1-4-2-3-1');
+    setLineupName(lineup.nombre_pizarra || lineup.nombre_sistema);
+    setLineupNotes(lineup.notas || '');
+    setSelectedMatchId(lineup.match_id || '');
+
+    // Load analysis fields
+    setRivalFormation(lineup.sistema_rival || '1-4-3-3');
+    setVentajas(lineup.ventajas || '');
+    setDesventajas(lineup.desventajas || '');
+    setZonaConflicto(lineup.zona_conflicto || '');
+    setDueloClave(lineup.duelo_clave || '');
+    setTareasLineas(lineup.orientaciones_individuales || '');
+    
+    // Load position nodes with backward compatibility
+    if (lineup.posiciones && typeof lineup.posiciones === 'object') {
+      const posObj = lineup.posiciones as { propio?: PositionNode[]; rival?: PositionNode[] };
+      if (posObj.propio && posObj.rival) {
+        setNodesPropio((posObj.propio as PositionNode[]).map((p) => ({
+          id: p.id,
+          label: p.label,
+          x: p.x,
+          y: p.y,
+          player_id: p.player_id,
+          notas_entrenador: p.notas_entrenador || '',
+          customName: p.customName,
+          customNumber: p.customNumber
+        })));
+        setNodesRival((posObj.rival as PositionNode[]).map((p) => ({
+          id: p.id,
+          label: p.label,
+          x: p.x,
+          y: p.y,
+          player_id: p.player_id,
+          notas_entrenador: p.notas_entrenador || '',
+          customName: p.customName,
+          customNumber: p.customNumber
+        })));
+      } else if (Array.isArray(lineup.posiciones)) {
+        setNodesPropio((lineup.posiciones as PositionNode[]).map((p) => ({
+          id: p.id,
+          label: p.label,
+          x: p.x,
+          y: p.y,
+          player_id: p.player_id,
+          notas_entrenador: p.notas_entrenador || ''
+        })));
+        const activeSys = systems.find(s => s.nombre === (lineup.sistema_rival || '1-4-3-3'));
+        const defaultRivalCoords = activeSys?.coordenadas_base || [];
+        setNodesRival(defaultRivalCoords.map(coord => ({
+          ...coord,
+          player_id: null,
+          notas_entrenador: ''
+        })));
+      }
+    }
+    setSuccessMsg(`Cargada la pizarra: "${lineup.nombre_pizarra || lineup.nombre_sistema}"`);
+
+    // Load match plan override details if match exists
+    if (lineup.match_id) {
+      const plan = await fetchMatchPlan(lineup.match_id);
+      if (plan && plan.notas_entrenador) {
+        setLineupNotes(plan.notas_entrenador);
+      }
+    }
+  };
+
+  const handleDuplicateLineup = () => {
+    if (!lineupName) {
+      setErrorMsg('Primero carga o diseña una alineación para duplicar.');
+      return;
+    }
+    setCurrentLineupId(null);
+    setLineupName(`Copia de ${lineupName}`);
+    setSuccessMsg('Pizarra duplicada localmente. Haz clic en Guardar para persistirla.');
+  };
+
+  const handleResetBoard = () => {
+    if (confirm('¿Deseas restablecer la posición y vaciar todos los jugadores?')) {
+      const ownSys = systems.find(s => s.nombre === selectedFormation);
+      const defaultCoords = ownSys?.coordenadas_base || [];
+      setNodesPropio(
+        defaultCoords.map((coord) => ({
+          ...coord,
+          player_id: null,
+          notas_entrenador: ''
+        }))
+      );
+      const rivalSys = systems.find(s => s.nombre === rivalFormation);
+      const defaultRivalCoords = rivalSys?.coordenadas_base || [];
+      setNodesRival(
+        defaultRivalCoords.map((coord) => ({
+          ...coord,
+          player_id: null,
+          notas_entrenador: ''
+        }))
+      );
+      setSuccessMsg('Se ha restablecido la pizarra.');
+    }
+  };
+
+  async function handleDeleteLineup(id: string, e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!confirm('¿Seguro que deseas eliminar esta pizarra táctica?')) return;
+    try {
+      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
+      const { error } = await supabase.rpc('exec_secure_delete', {
+        target_table: 'tactical_lineups',
+        record_id: id,
+        staff_passkey: passkey
+      });
+      if (error) throw error;
+      if (currentLineupId === id) {
+        setCurrentLineupId(null);
+        setLineupName('');
+        setLineupNotes('');
+        setSelectedMatchId('');
+        setVentajas('');
+        setDesventajas('');
+        setZonaConflicto('');
+        setDueloClave('');
+        setTareasLineas('');
+      }
+      loadSavedData();
+      setSuccessMsg('Pizarra eliminada con éxito.');
+    } catch (err) {
+      console.error('Error deleting lineup:', err);
+    }
+  }
+
+  const getAssignedPlayerIds = () => nodesPropio.map(n => n.player_id).filter(id => !!id) as string[];
+
+  const handleRosterClick = (player: Player) => {
+    if (!isEditMode) return;
+    const isAssigned = getAssignedPlayerIds().includes(player.id);
+    if (isAssigned) {
+      setNodesPropio(prev => prev.map(n => n.player_id === player.id ? { ...n, player_id: null } : n));
+    } else {
+      const emptyNode = nodesPropio.find(n => !n.player_id);
+      if (emptyNode) {
+        setNodesPropio(prev => prev.map(n => n.id === emptyNode.id ? { ...n, player_id: player.id } : n));
+      } else {
+        alert('El campo está completo. Quita o sustituye un jugador.');
+      }
+    }
+  };
 
   // Helper to open node editor
   const handleOpenNodeEditor = (team: 'propio' | 'rival', node: PositionNode) => {
@@ -358,342 +533,16 @@ export function TacticaClient() {
     setSuccessMsg('Ficha de posición actualizada correctamente.');
   };
 
-  // Load tactical proposals when systems change
-  useEffect(() => {
-    // Generate AI recommendations based on own vs rival system
-    const databaseMatch = TACTICAL_DATABASE[selectedFormation]?.[rivalFormation];
-    if (databaseMatch) {
-      setVentajas(databaseMatch.ventajas);
-      setDesventajas(databaseMatch.desventajas);
-      setZonaConflicto(databaseMatch.zonaConflicto);
-      setDueloClave(databaseMatch.dueloClave);
-      setTareasLineas(databaseMatch.tareasLineas);
-    } else {
-      // Default proposals
-      setVentajas(`Ventajas teóricas de jugar con ${selectedFormation} contra un rival posicionado en ${rivalFormation}. Superioridad local en salida de balón y ocupación racional del carril medio.`);
-      setDesventajas(`Vulnerabilidad del dibujo ${selectedFormation} ante repliegues fallidos o transiciones rápidas por el perfil exterior si el rival ${rivalFormation} explota las bandas.`);
-      setZonaConflicto(`Carriles intermedios entre la línea de volantes rivales y la defensa del bloque bajo.`);
-      setDueloClave(`Duelo por la posesión entre la base de construcción central y los interiores rivales.`);
-      setTareasLineas(`Defensa: Línea de 4 basculando rápido.\nMedios: Asegurar circulación fluida.\nDelantera: Fijar centrales y generar pasillos exteriores.`);
-    }
-  }, [selectedFormation, rivalFormation]);
-
-  useEffect(() => {
-    loadSavedData();
-  }, []);
-
-  async function loadSavedData() {
-    setLoadingLineups(true);
-    try {
-      const [lineupsRes, matchesRes] = await Promise.all([
-        supabase.from('tactical_lineups').select('*').order('created_at', { ascending: false }),
-        supabase.from('matches').select('*').order('jornada', { ascending: true })
-      ]);
-
-      if (lineupsRes.error) throw lineupsRes.error;
-      if (matchesRes.error) throw matchesRes.error;
-
-      setSavedLineups(lineupsRes.data || []);
-      setMatches(matchesRes.data || []);
-    } catch (err) {
-      console.error('Error loading tactical lineups:', err);
-    } finally {
-      setLoadingLineups(false);
-    }
-  }
-
-  // --- Change Formation and Maintain assigned players ---
-  const handleFormationChange = (formationKey: string) => {
-    setSelectedFormation(formationKey);
-    const defaultCoords = FORMATIONS[formationKey]?.coords || [];
-    setNodesPropio(prev => {
-      return defaultCoords.map(coord => {
-        const existingNode = prev.find(n => n.id === coord.id);
-        return {
-          ...coord,
-          player_id: existingNode ? existingNode.player_id : null,
-          notas_entrenador: existingNode?.notas_entrenador || '',
-          customName: existingNode?.customName,
-          customNumber: existingNode?.customNumber
-        };
-      });
-    });
-  };
-
-  const handleRivalFormationChange = (formationKey: string) => {
-    setRivalFormation(formationKey);
-    const defaultCoords = FORMATIONS[formationKey]?.coords || [];
-    setNodesRival(prev => {
-      return defaultCoords.map(coord => {
-        const existingNode = prev.find(n => n.id === coord.id);
-        return {
-          ...coord,
-          player_id: null,
-          notas_entrenador: existingNode?.notas_entrenador || '',
-          customName: existingNode?.customName,
-          customNumber: existingNode?.customNumber
-        };
-      });
-    });
-  };
-
-  const handleSwapPizarras = () => {
-    const tempNodes = [...nodesPropio];
-    const tempForm = selectedFormation;
-
-    setNodesPropio(nodesRival);
-    setNodesRival(tempNodes);
-
-    setSelectedFormation(rivalFormation);
-    setRivalFormation(tempForm);
-
-    setSuccessMsg('Intercambiadas las pizarras tácticas de ambos campos.');
-  };
-
-  const handleCopyPropioToRival = () => {
-    setNodesRival(nodesPropio.map(n => ({
-      ...n,
-      player_id: null, // Clear roster player reference for rival
-      customName: n.customName || players.find(p => p.id === n.player_id)?.nombre || undefined,
-      customNumber: n.customNumber || players.find(p => p.id === n.player_id)?.dorsal.toString() || undefined
-    })));
-    setRivalFormation(selectedFormation);
-    setSuccessMsg('Copiada la alineación de nuestro equipo al rival.');
-  };
-
-  const handleCopyRivalToPropio = () => {
-    setNodesPropio(nodesRival.map(n => ({
-      ...n,
-      player_id: null,
-      customName: n.customName,
-      customNumber: n.customNumber
-    })));
-    setSelectedFormation(rivalFormation);
-    setSuccessMsg('Copiada la alineación del rival a nuestro equipo.');
-  };
-
-  // Helper to extract clean coordinate info
-  const formatNodeForDb = (n: PositionNode) => ({
-    id: n.id,
-    label: n.label,
-    x: parseFloat(n.x.toFixed(1)),
-    y: parseFloat(n.y.toFixed(1)),
-    player_id: n.player_id,
-    notas_entrenador: n.notas_entrenador || '',
-    customName: n.customName || undefined,
-    customNumber: n.customNumber || undefined
-  });
-
-  // --- Save Tactical Lineup ---
-  async function handleSaveLineup() {
-    if (!lineupName.trim()) {
-      setErrorMsg('Debes introducir un nombre para la alineación.');
-      return;
-    }
-    setIsSaving(true);
-    setErrorMsg(null);
-    setSuccessMsg(null);
-
-    try {
-      const payload = {
-        nombre_sistema: selectedFormation,
-        nombre_pizarra: lineupName,
-        sistema_propio: selectedFormation,
-        sistema_rival: rivalFormation,
-        notas: lineupNotes || null,
-        posiciones: {
-          propio: nodesPropio.map(formatNodeForDb),
-          rival: nodesRival.map(formatNodeForDb)
-        },
-        match_id: selectedMatchId || null,
-        ventajas: ventajas || null,
-        desventajas: desventajas || null,
-        zona_conflicto: zonaConflicto || null,
-        duelo_clave: dueloClave || null,
-        orientaciones_individuales: tareasLineas || null
-      };
-
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
-      let error;
-      if (currentLineupId) {
-        const res = await supabase.rpc('exec_secure_upsert', {
-          target_table: 'tactical_lineups',
-          payload: { ...payload, id: currentLineupId },
-          conflict_columns: ['id'],
-          staff_passkey: passkey
-        });
-        error = res.error;
-      } else {
-        const res = await supabase.rpc('exec_secure_upsert', {
-          target_table: 'tactical_lineups',
-          payload: payload,
-          conflict_columns: null,
-          staff_passkey: passkey
-        });
-        error = res.error;
-      }
-
-      if (error) throw error;
-
-      setSuccessMsg('Alineación táctica y análisis de comparador guardados con éxito.');
-      loadSavedData();
-    } catch (err: unknown) {
-      const error = err as Error;
-      console.error('Error saving lineup:', error);
-      setErrorMsg(error.message || 'Error al guardar la alineación.');
-    } finally {
-      setIsSaving(false);
-    }
-  }
-
-  // --- Load Saved Lineup ---
-  const handleLoadLineup = (lineup: TacticalLineup) => {
-    setCurrentLineupId(lineup.id);
-    setSelectedFormation(lineup.sistema_propio || lineup.nombre_sistema || '1-4-2-3-1');
-    setLineupName(lineup.nombre_pizarra || lineup.nombre_sistema);
-    setLineupNotes(lineup.notas || '');
-    setSelectedMatchId(lineup.match_id || '');
-
-    // Load analysis fields
-    setRivalFormation(lineup.sistema_rival || '1-4-3-3');
-    setVentajas(lineup.ventajas || '');
-    setDesventajas(lineup.desventajas || '');
-    setZonaConflicto(lineup.zona_conflicto || '');
-    setDueloClave(lineup.duelo_clave || '');
-    setTareasLineas(lineup.orientaciones_individuales || '');
-    
-    // Load position nodes with backward compatibility
-    if (lineup.posiciones && typeof lineup.posiciones === 'object') {
-      const posObj = lineup.posiciones as { propio?: PositionNode[]; rival?: PositionNode[] };
-      if (posObj.propio && posObj.rival) {
-        setNodesPropio((posObj.propio as PositionNode[]).map((p) => ({
-          id: p.id,
-          label: p.label,
-          x: p.x,
-          y: p.y,
-          player_id: p.player_id,
-          notas_entrenador: p.notas_entrenador || '',
-          customName: p.customName,
-          customNumber: p.customNumber
-        })));
-        setNodesRival((posObj.rival as PositionNode[]).map((p) => ({
-          id: p.id,
-          label: p.label,
-          x: p.x,
-          y: p.y,
-          player_id: p.player_id,
-          notas_entrenador: p.notas_entrenador || '',
-          customName: p.customName,
-          customNumber: p.customNumber
-        })));
-      } else if (Array.isArray(lineup.posiciones)) {
-        // Format legacy array
-        setNodesPropio((lineup.posiciones as PositionNode[]).map((p) => ({
-          id: p.id,
-          label: p.label,
-          x: p.x,
-          y: p.y,
-          player_id: p.player_id,
-          notas_entrenador: p.notas_entrenador || ''
-        })));
-        // Initialize default rival nodes
-        const defaultRivalCoords = FORMATIONS[lineup.sistema_rival || '1-4-3-3']?.coords || [];
-        setNodesRival(defaultRivalCoords.map(coord => ({
-          ...coord,
-          player_id: null,
-          notas_entrenador: ''
-        })));
-      }
-    }
-    setSuccessMsg(`Cargada la pizarra: "${lineup.nombre_pizarra || lineup.nombre_sistema}"`);
-  };
-
-  const handleDuplicateLineup = () => {
-    if (!lineupName) {
-      setErrorMsg('Primero carga o diseña una alineación para duplicar.');
-      return;
-    }
-    setCurrentLineupId(null); // Clear ID to force insert on save
-    setLineupName(`Copia de ${lineupName}`);
-    setSuccessMsg('Pizarra duplicada localmente. Haz clic en Guardar para persistirla.');
-  };
-
-  const handleResetBoard = () => {
-    if (confirm('¿Deseas restablecer la posición y vaciar todos los jugadores?')) {
-      const defaultCoords = FORMATIONS[selectedFormation]?.coords || [];
-      setNodesPropio(
-        defaultCoords.map((coord) => ({
-          ...coord,
-          player_id: null,
-          notas_entrenador: ''
-        }))
-      );
-      const defaultRivalCoords = FORMATIONS[rivalFormation]?.coords || [];
-      setNodesRival(
-        defaultRivalCoords.map((coord) => ({
-          ...coord,
-          player_id: null,
-          notas_entrenador: ''
-        }))
-      );
-      setSuccessMsg('Se ha restablecido la pizarra.');
-    }
-  };
-
-  async function handleDeleteLineup(id: string, e: React.MouseEvent) {
-    e.stopPropagation();
-    if (!confirm('¿Seguro que deseas eliminar esta pizarra táctica?')) return;
-    try {
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
-      const { error } = await supabase.rpc('exec_secure_delete', {
-        target_table: 'tactical_lineups',
-        record_id: id,
-        staff_passkey: passkey
-      });
-      if (error) throw error;
-      if (currentLineupId === id) {
-        setCurrentLineupId(null);
-        setLineupName('');
-        setLineupNotes('');
-        setSelectedMatchId('');
-        setVentajas('');
-        setDesventajas('');
-        setZonaConflicto('');
-        setDueloClave('');
-        setTareasLineas('');
-      }
-      loadSavedData();
-      setSuccessMsg('Pizarra eliminada con éxito.');
-    } catch (err) {
-      console.error('Error deleting lineup:', err);
-    }
-  }
-
-  const getAssignedPlayerIds = () => nodesPropio.map(n => n.player_id).filter(id => !!id);
-
-  const handleRosterClick = (player: Player) => {
-    if (!isEditMode) return;
-    const isAssigned = getAssignedPlayerIds().includes(player.id);
-    if (isAssigned) {
-      setNodesPropio(prev => prev.map(n => n.player_id === player.id ? { ...n, player_id: null } : n));
-    } else {
-      const emptyNode = nodesPropio.find(n => !n.player_id);
-      if (emptyNode) {
-        setNodesPropio(prev => prev.map(n => n.id === emptyNode.id ? { ...n, player_id: player.id } : n));
-      } else {
-        alert('El campo está completo. Quita o sustituye un jugador.');
-      }
-    }
-  };
-
-  if (loadingPlayers) {
+  if (loadingPlayers || loadingSystems) {
     return (
       <div className="space-y-6">
-        <Skeleton className="h-12 w-full" />
-        <Skeleton className="h-96 w-full" />
+        <Skeleton className="h-12 w-full animate-pulse" />
+        <Skeleton className="h-96 w-full animate-pulse" />
       </div>
     );
   }
+
+  const finalError = errorMsg || systemsError;
 
   return (
     <div className="space-y-6">
@@ -744,27 +593,13 @@ export function TacticaClient() {
         </div>
       </div>
 
-        <div className="p-4 bg-slate-900/40 border border-slate-800/80 rounded-2xl">
-        <label className="block text-slate-400 text-xs font-bold mb-3 uppercase tracking-wider">Sistema de Juego Propio</label>
-        <div className="flex items-center gap-2 flex-wrap">
-          {Object.keys(FORMATIONS).map(formationKey => {
-            const isActive = selectedFormation === formationKey;
-            return (
-              <button
-                key={formationKey}
-                onClick={() => handleFormationChange(formationKey)}
-                className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all ${
-                  isActive 
-                    ? 'bg-[#CC0E21]/10 border-[#CC0E21]/30 text-[#CC0E21] shadow-md shadow-red-500/5' 
-                    : 'bg-slate-950/80 border-slate-850 text-slate-400 hover:border-slate-800 hover:text-slate-200'
-                }`}
-              >
-                {formationKey}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+      {/* Own Formation Selector */}
+      <FormationSelector
+        label="Sistema de Juego Propio"
+        systems={systems}
+        selectedFormation={selectedFormation}
+        onSelect={handleFormationChange}
+      />
 
       {/* Success and Error Banners */}
       {successMsg && (
@@ -778,11 +613,11 @@ export function TacticaClient() {
           </button>
         </div>
       )}
-      {errorMsg && (
+      {finalError && (
         <div className="p-3.5 bg-red-500/10 border border-red-500/20 text-red-400 rounded-2xl text-xs flex items-center justify-between">
           <div className="flex items-center gap-2">
             <AlertCircle className="h-4 w-4 shrink-0" />
-            <span>{errorMsg}</span>
+            <span>{finalError}</span>
           </div>
           <button onClick={() => setErrorMsg(null)} className="text-red-500 hover:text-red-400">
             <X className="h-4 w-4" />
@@ -795,92 +630,30 @@ export function TacticaClient() {
         
         {/* Left column (3/12) */}
         <div className="lg:col-span-3 space-y-6">
-          <div className="p-5 bg-slate-900/40 border border-slate-800/80 rounded-2xl space-y-4">
-            <h3 className="text-xs font-bold text-slate-300 uppercase tracking-widest flex items-center gap-1.5">
-              <Star className="h-3.5 w-3.5 text-[#CC0E21]" /> Plan del Partido
-            </h3>
+          <MatchPlanSelector
+            lineupName={lineupName}
+            onLineupNameChange={setLineupName}
+            selectedMatchId={selectedMatchId}
+            onMatchIdChange={setSelectedMatchId}
+            rivalFormation={rivalFormation}
+            onRivalFormationChange={handleRivalFormationChange}
+            formationsOptions={formationsOptions}
+            matches={matches}
+            lineupNotes={lineupNotes}
+            onLineupNotesChange={setLineupNotes}
+          />
 
-            <Input
-              label="Nombre de Alineación"
-              type="text"
-              placeholder="Ej. Plan A - Presión Alta"
-              value={lineupName}
-              onChange={(e) => setLineupName(e.target.value)}
-            />
+          <LineupManager
+            savedLineups={savedLineups}
+            loadingLineups={loadingLineups}
+            currentLineupId={currentLineupId}
+            matches={matches}
+            onLoad={handleLoadLineup}
+            onDelete={handleDeleteLineup}
+          />
 
-            <Select
-              label="Vincular a Partido"
-              value={selectedMatchId}
-              onChange={(e) => setSelectedMatchId(e.target.value)}
-              options={[
-                { value: '', label: '-- Sin vincular --' },
-                ...matches.map(m => ({ value: m.id, label: `Jornada ${m.jornada} vs ${m.rival}` }))
-              ]}
-            />
-
-            <Select
-              label="Sistema Rival"
-              value={rivalFormation}
-              onChange={(e) => handleRivalFormationChange(e.target.value)}
-              options={Object.keys(FORMATIONS).map(f => ({ value: f, label: FORMATIONS[f].label }))}
-            />
-
-            <div>
-              <label className="block text-slate-400 text-xs font-bold mb-1.5">Notas Generales</label>
-              <textarea
-                value={lineupNotes}
-                onChange={(e) => setLineupNotes(e.target.value)}
-                placeholder="Notas rápidas..."
-                className="w-full min-h-[80px] bg-slate-950/80 border border-slate-850 focus:border-[#CC0E21]/50 rounded-xl px-3 py-2 text-xs text-slate-200 placeholder-slate-600 focus:outline-none transition-colors"
-              />
-            </div>
-          </div>
-
-          {/* Saved boards list */}
-          <div className="p-5 bg-slate-900/40 border border-slate-800/80 rounded-2xl space-y-4">
-            <h3 className="text-xs font-bold text-slate-300 uppercase tracking-widest flex items-center gap-1.5">
-              <FolderOpen className="h-3.5 w-3.5 text-blue-500" /> Pizarras Guardadas
-            </h3>
-
-            {loadingLineups ? (
-              <Skeleton className="h-16 w-full" />
-            ) : savedLineups.length === 0 ? (
-              <p className="text-xs text-slate-500 italic p-2 text-center">No hay alineaciones guardadas.</p>
-            ) : (
-              <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1">
-                {savedLineups.map((lineup) => {
-                  const match = matches.find(m => m.id === lineup.match_id);
-                  return (
-                    <div
-                      key={lineup.id}
-                      onClick={() => handleLoadLineup(lineup)}
-                      className={`flex items-center justify-between p-2.5 bg-slate-950/40 hover:bg-slate-850/50 border rounded-2xl text-xs cursor-pointer transition-all duration-200 ${
-                        currentLineupId === lineup.id ? 'border-[#CC0E21]/40 bg-[#CC0E21]/5' : 'border-slate-850'
-                      }`}
-                    >
-                      <div className="truncate mr-2 flex-1">
-                        <span className="font-bold text-slate-200 block truncate">{lineup.nombre_pizarra || lineup.nombre_sistema}</span>
-                        <span className="text-[10px] text-slate-450 block truncate">
-                          {lineup.sistema_propio || lineup.nombre_sistema} vs {lineup.sistema_rival || '1-4-3-3'}
-                        </span>
-                        {match && (
-                          <span className="inline-block mt-0.5 text-[8px] bg-slate-900 px-1 py-0.2 rounded text-slate-400">
-                            Jor. {match.jornada}
-                          </span>
-                        )}
-                      </div>
-                      <button
-                        onClick={(e) => handleDeleteLineup(lineup.id, e)}
-                        className="p-1 hover:bg-red-500/20 hover:text-red-400 text-slate-500 rounded transition-colors"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+          {/* Description of current selected own system */}
+          <SystemCard system={activeSystem} />
         </div>
 
         {/* Center column: Soccer fields (6/12) */}
@@ -902,7 +675,7 @@ export function TacticaClient() {
                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl bg-slate-950 hover:bg-slate-850 text-slate-300 hover:text-white border border-slate-800 transition-all"
                 title="Intercambia las dos pizarras tácticas"
               >
-                <RefreshCw className="h-3.5 w-3.5 text-orange-400 animate-spin-hover" />
+                <RefreshCw className="h-3.5 w-3.5 text-orange-400" />
                 Intercambiar campos
               </button>
               <button
@@ -910,7 +683,7 @@ export function TacticaClient() {
                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl bg-slate-950 hover:bg-slate-850 text-slate-300 hover:text-white border border-slate-800 transition-all"
                 title="Copia el dibujo propio al del rival"
               >
-                <ArrowRightLeft className="h-3.5 w-3.5 text-blue-400" />
+                <ArrowRight className="h-3.5 w-3.5 text-blue-400" />
                 Copiar a Rival
               </button>
               <button
@@ -918,7 +691,7 @@ export function TacticaClient() {
                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl bg-slate-950 hover:bg-slate-850 text-slate-300 hover:text-white border border-slate-800 transition-all"
                 title="Copia el dibujo del rival al propio"
               >
-                <ArrowRightLeft className="h-3.5 w-3.5 text-emerald-450" />
+                <ArrowRight className="h-3.5 w-3.5 text-emerald-450" />
                 Copiar a Propio
               </button>
             </div>
@@ -936,62 +709,12 @@ export function TacticaClient() {
 
         {/* Right column: Roster sidebar (3/12) */}
         <div className="lg:col-span-3">
-          <div className="p-5 bg-slate-900/40 border border-slate-800/80 rounded-2xl flex flex-col max-h-[600px] overflow-hidden">
-            <h3 className="text-xs font-bold text-slate-300 uppercase tracking-widest mb-2 flex items-center gap-1.5">
-              <Users className="h-3.5 w-3.5 text-[#CC0E21]" /> Plantilla
-            </h3>
-            
-            <p className="text-[10px] text-slate-500 mb-3 leading-tight">
-              Arrastra un jugador al campo o haz clic en su ficha para colocarlo en cualquier posición libre.
-            </p>
-
-            <div className="space-y-3 overflow-y-auto flex-1 pr-1">
-              {groupPlayers(players).map(group => (
-                <div key={group.label} className="space-y-1">
-                  <h4 className="text-[9px] font-bold text-slate-450 uppercase tracking-wider bg-slate-950 px-2 py-0.5 rounded border border-slate-900 sticky top-0 z-10">
-                    {group.label} ({group.list.length})
-                  </h4>
-                  <div className="space-y-1.5 pt-1">
-                    {group.list.map((p) => {
-                      const isAssigned = getAssignedPlayerIds().includes(p.id);
-                      return (
-                        <div
-                          key={p.id}
-                          draggable={!isAssigned}
-                          onDragStart={(e) => {
-                            if (!isAssigned) {
-                              e.dataTransfer.setData('text/plain', p.id);
-                              e.dataTransfer.effectAllowed = 'move';
-                            }
-                          }}
-                          onClick={() => handleRosterClick(p)}
-                          className={`flex items-center justify-between p-2 rounded-xl text-xs border transition-all cursor-grab select-none active:cursor-grabbing ${
-                            isAssigned
-                              ? 'bg-slate-900/20 border-slate-850/40 text-slate-500 opacity-60'
-                              : 'bg-slate-950/60 border-slate-850/60 text-slate-200 hover:border-slate-800 hover:bg-slate-950'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2 truncate">
-                            <Avatar src={p.foto_url} name={p.nombre} size="sm" />
-                            <div className="truncate">
-                              <span className="block font-semibold truncate leading-none mb-0.5">{p.nombre}</span>
-                              <span className="text-[9px] text-slate-500 font-medium">#{p.dorsal} - {p.demarcacion}</span>
-                            </div>
-                          </div>
-
-                          {isAssigned && (
-                            <span className="text-[8px] bg-[#CC0E21]/10 text-[#CC0E21] px-1 py-0.2 rounded border border-[#CC0E21]/15 shrink-0">
-                              PUESTO
-                            </span>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+          <PlayerAssignmentSidebar
+            players={players}
+            assignedPlayerIds={getAssignedPlayerIds()}
+            isEditMode={isEditMode}
+            onPlayerClick={handleRosterClick}
+          />
         </div>
       </div>
 
@@ -1095,7 +818,12 @@ export function TacticaClient() {
             if (!assignedPlayer) return null;
 
             // Extract preset instructions for this position from tactical db
-            const presetInstructions = TACTICAL_DATABASE[selectedFormation]?.[rivalFormation]?.orientaciones?.[node.label] || 
+            const ownSys = systems.find(s => s.nombre === selectedFormation);
+            const rivalSys = systems.find(s => s.nombre === rivalFormation);
+            const match = matchups.find(
+              m => ownSys && rivalSys && m.system_own_id === ownSys.id && m.system_rival_id === rivalSys.id
+            );
+            const presetInstructions = match?.ai_context || 
                                        DEFAULT_RECOMMENDATIONS[node.label] || 
                                        `Recomendación de posición para ${node.label}.`;
 
