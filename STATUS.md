@@ -3,9 +3,11 @@
 Documentación del estado del proyecto tras completar las mejoras.
 
 ## 📌 Identificación de la Versión
-- **Último Commit**: Bloque 3 Finalizado y Validado
+- **Último Commit**: `1c9478e` — Bloque 3 cerrado: Control de Asistencia validado y desplegado
 - **Fecha**: 2026-07-02
-- **Estado**: Estable, verificado funcionalmente y compilado con éxito.
+- **Rama**: `main` → `github.com/zigorgarita/athletic-ia`
+- **Producción**: https://athletic-ia.vercel.app
+- **Estado**: Estable. Sin tareas pendientes. Listo para el Bloque 4.
 
 ## 💻 Funcionalidades Verificadas (Bloque 3 - Asistencia)
 1. **Control de Presencia por Sesión**:
@@ -88,6 +90,16 @@ Documentación del estado del proyecto tras completar las mejoras.
 5. **Persistencia (Supabase)**:
    - Guardado correcto de posiciones x/y, roles asignados, jugadores y comentarios al presionar "Guardar Cambios".
 
+## 🗺️ Hoja de Ruta
+
+| Bloque | Módulo | Estado |
+|---|---|---|
+| Bloque 1 | Plantilla 360º | ✅ Cerrado |
+| Bloque 2 | Planificación | ✅ Cerrado |
+| Bloque 3 | Asistencia | ✅ Cerrado — sin pendientes |
+| **Bloque 4** | **Evaluaciones de Rendimiento** | **🔄 En curso** |
+| Bloque 5 | Liga / Centro de Partidos | ⏳ Pendiente |
+
 ## ☁️ Estado de los Servicios
-- **Base de Datos (Supabase)**: Conexión activa. Tablas `training_attendance` y `training_evaluations` operativas con RLS y RPC `exec_secure_bulk_upsert`. Constraint `absence_reason` actualizado con los 11 motivos válidos. El script `scratch/create_meetings_table.sql` está listo para ser ejecutado en la fase de validación del módulo de reuniones.
-- **Despliegue (Vercel)**: Compilado correctamente (23 páginas estáticas) y sincronizado.
+- **Base de Datos (Supabase)**: Conexión activa. Tablas `training_attendance`, `training_evaluations` y `detailed_evaluations` operativas. Constraint `absence_reason` con 11 motivos confirmado (SQL ejecutado manualmente el 2026-07-02). RPC `exec_secure_bulk_upsert` funcional. Tabla `detailed_evaluations` con 28 columnas y datos reales.
+- **Despliegue (Vercel)**: `dpl_x4oyueGH4CzW8Jshk4FKbK5wB5Gx` — 20 rutas compiladas, producción activa en https://athletic-ia.vercel.app

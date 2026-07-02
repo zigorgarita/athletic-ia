@@ -1,6 +1,7 @@
-# Walkthrough — Cierre Bloque 3: Asistencia
+# Walkthrough — Cierre Bloque 3: Asistencia ✅ CERRADO DEFINITIVAMENTE
 
-## Resumen
+> **Estado**: Bloque 3 cerrado el 2026-07-02. SQL de constraint ejecutado y confirmado. Sin pendientes.
+
 
 Este walkthrough documenta el cierre oficial del **Bloque 3 – Control de Asistencia** de la aplicación Indautxu DH 2026-27.
 
@@ -89,10 +90,32 @@ Este walkthrough documenta el cierre oficial del **Bloque 3 – Control de Asist
 
 ## Estado de Bloques
 
-| Bloque | Módulo | Estado |
-|---|---|---|
-| Bloque 1 | Plantilla 360º | ✅ Cerrado (2026-06-30) |
-| Bloque 2 | Planificación | ✅ Cerrado (2026-07-01) |
-| **Bloque 3** | **Asistencia** | **✅ Cerrado (2026-07-02)** |
-| Bloque 4 | Evaluaciones | 🔄 Pendiente |
-| Bloque 5 | Liga / Centro de Partidos | 🔄 Pendiente |
+| Bloque | Módulo | Estado | Fecha cierre |
+|---|---|---|---|
+| Bloque 1 | Plantilla 360º | ✅ Cerrado | 2026-06-30 |
+| Bloque 2 | Planificación | ✅ Cerrado | 2026-07-01 |
+| **Bloque 3** | **Asistencia** | **✅ Cerrado — sin pendientes** | **2026-07-02** |
+| Bloque 4 | Evaluaciones de Rendimiento | 🔄 En curso | — |
+| Bloque 5 | Liga / Centro de Partidos | ⏳ Pendiente | — |
+
+---
+
+## Contexto Bloque 4 — Evaluaciones de Rendimiento
+
+### Estado de partida
+El módulo de Evaluaciones ya dispone de estructura básica funcional:
+
+| Elemento | Estado |
+|---|---|
+| Tabla `detailed_evaluations` | ✅ Existente en Supabase (28 columnas, datos reales) |
+| `EvaluacionesClient.tsx` | ✅ Existente — Ranking + Historial por jugador |
+| `EvaluationCard.tsx` | ✅ Existente |
+| `EvaluationChart.tsx` | ✅ Existente (dinámico, sin SSR) |
+| `EvaluationForm.tsx` | ✅ Existente |
+| `RankingTable.tsx` | ✅ Existente |
+| `useEvaluations.ts` | ✅ Existente |
+| `useCreateEvaluation.ts` | ✅ Existente (usa RPC `exec_secure_upsert`) |
+
+### Estructura de la tabla `detailed_evaluations`
+20 métricas numéricas (escala 1-5): `velocidad`, `aceleracion`, `fuerza`, `resistencia`, `juego_aereo`, `marcaje`, `entrada_defensiva`, `posicionamiento_defensivo`, `trabajo_defensivo`, `pase_corto`, `pase_largo`, `control_orientado`, `regate`, `centros`, `finalizacion`, `disparo_lejano`, `trabajo_ofensivo`, `vision_juego`, `inteligencia_tactica`, `liderazgo`.
+Campos adicionales: `metricas` (JSON), `valoraciones_generales` (JSON), `perfil_especifico` (JSON), `evaluado_por`, `valoracion_global`.
