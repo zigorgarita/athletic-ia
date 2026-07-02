@@ -20,8 +20,8 @@ import { formatLocalYYYYMMDD } from '@/lib/dateUtils';
 
 const ABSENCE_REASONS = [
   'Lesión', 'Enfermedad', 'Estudios', 'Trabajo', 
-  'Viaje', 'Decisión técnica', 'Motivo personal', 
-  'Sin justificar', 'Otro'
+  'Permiso', 'Selección', 'Viaje', 'Decisión técnica', 
+  'Motivo personal', 'Sin justificar', 'Otro'
 ];
 
 const METRICAS_EVAL = [
@@ -51,10 +51,44 @@ export function AsistenciaClient() {
   const [evaluationMap, setEvaluationMap] = useState<Record<string, Partial<TrainingEvaluation>>>({});
   const [expandedEvaluations, setExpandedEvaluations] = useState<Record<string, boolean>>({});
 
+  // Historical data for squad summary
+  const [allAttendance, setAllAttendance] = useState<TrainingAttendance[]>([]);
+  const [allEvaluations, setAllEvaluations] = useState<TrainingEvaluation[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
+  // Search, filter and sorting states for the summary table
+  const [searchTerm, setSearchTerm] = useState('');
+  const [demarcationFilter, setDemarcationFilter] = useState('Todas');
+  const [attendanceRangeFilter, setAttendanceRangeFilter] = useState('Todos');
+  const [sortField, setSortField] = useState<'nombre' | 'total' | 'attended' | 'pct' | 'avgValuation'>('nombre');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+
   // UI state
   const [loadingData, setLoadingData] = useState(true);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [showError, setShowError] = useState<string | null>(null);
+
+  const loadHistory = React.useCallback(async () => {
+    try {
+      setLoadingHistory(true);
+      const { data: attData, error: attErr } = await supabase
+        .from('training_attendance')
+        .select('*');
+      if (attErr) throw attErr;
+
+      const { data: evalData, error: evalErr } = await supabase
+        .from('training_evaluations')
+        .select('*');
+      if (evalErr) throw evalErr;
+
+      setAllAttendance(attData || []);
+      setAllEvaluations(evalData || []);
+    } catch (err: any) {
+      console.error('Error loading historical attendance/evaluations:', err);
+    } finally {
+      setLoadingHistory(false);
+    }
+  }, []);
 
   // Load initial players and sessions
   useEffect(() => {
@@ -76,6 +110,9 @@ export function AsistenciaClient() {
           .order('fecha', { ascending: false });
         if (sErr) throw sErr;
         setSessions(sessionsData || []);
+
+        // Load history
+        await loadHistory();
       } catch (err: any) {
         console.error('Error loading initial attendance data:', err);
         setShowError(err.message || 'Error al conectar con Supabase.');
@@ -84,7 +121,131 @@ export function AsistenciaClient() {
       }
     }
     loadInitialData();
-  }, []);
+  }, [loadHistory]);
+
+  const sessionDatesMap = useMemo(() => {
+    const m: Record<string, string> = {};
+    sessions.forEach(s => {
+      m[s.id] = s.fecha;
+    });
+    return m;
+  }, [sessions]);
+
+  // Aggregate stats per player
+  const playerStats = useMemo(() => {
+    return players.map(player => {
+      const pAtts = allAttendance.filter(a => a.player_id === player.id);
+      const pEvals = allEvaluations.filter(e => e.player_id === player.id);
+
+      const total = pAtts.length;
+      const attended = pAtts.filter(a => a.attendance_status === 'Asiste').length;
+      
+      const lesionados = pAtts.filter(a => a.attendance_status === 'Lesionado').length;
+      const bajas = pAtts.filter(a => a.attendance_status === 'Baja temporal').length;
+      const denominator = total - lesionados - bajas;
+      const pct = denominator > 0 ? Math.round((attended / denominator) * 100) : 0;
+
+      // Average evaluation: only training evaluations where valoracion_global is not null
+      const ratedEvals = pEvals.filter(e => e.valoracion_global !== null && e.valoracion_global !== undefined);
+      const avgValuation = ratedEvals.length > 0
+        ? Number((ratedEvals.reduce((sum, e) => sum + Number(e.valoracion_global), 0) / ratedEvals.length).toFixed(1))
+        : null;
+
+      // Last absence reason: sort all attendance records for this player by date descending
+      const sortedAtts = [...pAtts].sort((a, b) => {
+        const dateA = sessionDatesMap[a.session_id] || '';
+        const dateB = sessionDatesMap[b.session_id] || '';
+        return dateB.localeCompare(dateA);
+      });
+
+      const lastAbsence = sortedAtts.find(a => a.attendance_status !== 'Asiste');
+      const lastAbsenceReason = lastAbsence 
+        ? (lastAbsence.absence_reason || lastAbsence.attendance_status || null)
+        : null;
+
+      return {
+        player,
+        total,
+        attended,
+        pct,
+        avgValuation,
+        lastAbsenceReason
+      };
+    });
+  }, [players, allAttendance, allEvaluations, sessionDatesMap]);
+
+  const filteredAndSortedPlayerStats = useMemo(() => {
+    let result = [...playerStats];
+
+    // Filter by search term
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      result = result.filter(item => 
+        item.player.nombre.toLowerCase().includes(term) || 
+        item.player.apellidos.toLowerCase().includes(term)
+      );
+    }
+
+    // Filter by demarcation
+    if (demarcationFilter !== 'Todas') {
+      result = result.filter(item => item.player.demarcacion === demarcationFilter);
+    }
+
+    // Filter by attendance range
+    if (attendanceRangeFilter !== 'Todos') {
+      if (attendanceRangeFilter === 'Alto') {
+        result = result.filter(item => item.pct >= 90);
+      } else if (attendanceRangeFilter === 'Medio') {
+        result = result.filter(item => item.pct >= 75 && item.pct < 90);
+      } else if (attendanceRangeFilter === 'Bajo') {
+        result = result.filter(item => item.pct < 75);
+      }
+    }
+
+    // Sort
+    result.sort((a, b) => {
+      let valA: any;
+      let valB: any;
+
+      if (sortField === 'nombre') {
+        valA = `${a.player.nombre} ${a.player.apellidos}`.toLowerCase();
+        valB = `${b.player.nombre} ${b.player.apellidos}`.toLowerCase();
+      } else {
+        valA = a[sortField];
+        valB = b[sortField];
+      }
+
+      if (valA === null || valA === undefined) return sortDirection === 'asc' ? 1 : -1;
+      if (valB === null || valB === undefined) return sortDirection === 'asc' ? -1 : 1;
+
+      if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
+      if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return result;
+  }, [playerStats, searchTerm, demarcationFilter, attendanceRangeFilter, sortField, sortDirection]);
+
+  const handleSort = (field: typeof sortField) => {
+    if (sortField === field) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('desc');
+    }
+  };
+
+  const getAttendancePctColor = (pct: number) => {
+    if (pct >= 90) return 'bg-green-950/20 text-green-400 border-green-900/30';
+    if (pct >= 75) return 'bg-amber-950/20 text-[#DCAE1D] border-amber-900/30';
+    return 'bg-red-950/20 text-red-400 border-red-900/30';
+  };
+
+  const getAttendancePctIndicator = (pct: number) => {
+    if (pct >= 90) return '🟢';
+    if (pct >= 75) return '🟡';
+    return '🔴';
+  };
 
   // Sync date/session selection if session_id passed in URL
   useEffect(() => {
@@ -371,6 +532,7 @@ export function AsistenciaClient() {
     const success = await saveAttendanceAndEvaluations(attendancePayload, evaluationPayload);
     if (success) {
       setSaveSuccess(true);
+      await loadHistory();
       setTimeout(() => setSaveSuccess(false), 4000);
     } else {
       setShowError('Fallo al guardar en Supabase. Verifica la conexión o políticas.');
@@ -714,6 +876,173 @@ export function AsistenciaClient() {
               </div>
             </div>
           )}
+
+          {/* TABLA RESUMEN DE PLANTILLA */}
+          <div className="mt-8 pt-6 border-t border-slate-800 space-y-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-bold text-slate-100 flex items-center gap-2">
+                  <Users className="h-5 w-5 text-[#CC0E21]" />
+                  Resumen Acumulado de la Plantilla
+                </h2>
+                <p className="text-xs text-slate-400 mt-1">
+                  Análisis de asistencia y valoración media exclusiva de entrenamientos durante toda la temporada.
+                </p>
+              </div>
+            </div>
+
+            {/* Controles de Búsqueda y Filtros */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-slate-950/40 p-4 rounded-2xl border border-slate-800/60">
+              {/* Buscar */}
+              <div>
+                <label className="text-[10px] text-slate-550 font-bold uppercase mb-1.5 block">Buscar Jugador</label>
+                <input
+                  type="text"
+                  placeholder="Nombre o apellido..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full px-3 py-2 text-xs rounded-xl bg-slate-900/60 border border-slate-800 text-slate-200 outline-none focus:border-[#CC0E21]"
+                />
+              </div>
+
+              {/* Filtrar por Posición */}
+              <div>
+                <label className="text-[10px] text-slate-550 font-bold uppercase mb-1.5 block">Posición principal</label>
+                <select
+                  value={demarcationFilter}
+                  onChange={(e) => setDemarcationFilter(e.target.value)}
+                  className="w-full px-3 py-2 text-xs rounded-xl bg-slate-900/60 border border-slate-800 text-slate-200 outline-none focus:border-[#CC0E21] cursor-pointer"
+                >
+                  <option value="Todas">Todas las posiciones</option>
+                  <option value="Portero">Portero</option>
+                  <option value="Defensa">Defensa</option>
+                  <option value="Centrocampista">Centrocampista</option>
+                  <option value="Delantero">Delantero</option>
+                </select>
+              </div>
+
+              {/* Filtrar por Asistencia */}
+              <div>
+                <label className="text-[10px] text-slate-550 font-bold uppercase mb-1.5 block">Porcentaje Asistencia</label>
+                <select
+                  value={attendanceRangeFilter}
+                  onChange={(e) => setAttendanceRangeFilter(e.target.value)}
+                  className="w-full px-3 py-2 text-xs rounded-xl bg-slate-900/60 border border-slate-800 text-slate-200 outline-none focus:border-[#CC0E21] cursor-pointer"
+                >
+                  <option value="Todos">Todos los rangos</option>
+                  <option value="Alto">🟢 Excelente (90% o superior)</option>
+                  <option value="Medio">🟡 Regular (75% - 89%)</option>
+                  <option value="Bajo">🔴 Crítico (Menos del 75%)</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Tabla Resumen */}
+            <div className="overflow-x-auto rounded-2xl border border-slate-800/80 bg-slate-900/20 shadow-xl">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-800 bg-slate-900/60 text-slate-400 text-[10px] font-black uppercase tracking-wider select-none">
+                    <th className="px-4 py-4 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('nombre')}>
+                      <div className="flex items-center gap-1">
+                        Jugador
+                        {sortField === 'nombre' && (sortDirection === 'asc' ? ' ▲' : ' ▼')}
+                      </div>
+                    </th>
+                    <th className="px-4 py-4 text-center cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('total')}>
+                      <div className="flex items-center justify-center gap-1">
+                        Sesiones
+                        {sortField === 'total' && (sortDirection === 'asc' ? ' ▲' : ' ▼')}
+                      </div>
+                    </th>
+                    <th className="px-4 py-4 text-center cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('attended')}>
+                      <div className="flex items-center justify-center gap-1">
+                        Asistencias
+                        {sortField === 'attended' && (sortDirection === 'asc' ? ' ▲' : ' ▼')}
+                      </div>
+                    </th>
+                    <th className="px-4 py-4 text-center cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('pct')}>
+                      <div className="flex items-center justify-center gap-1">
+                        % Asistencia
+                        {sortField === 'pct' && (sortDirection === 'asc' ? ' ▲' : ' ▼')}
+                      </div>
+                    </th>
+                    <th className="px-4 py-4 text-center cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('avgValuation')}>
+                      <div className="flex items-center justify-center gap-1">
+                        Val. Media (Entrenamiento)
+                        {sortField === 'avgValuation' && (sortDirection === 'asc' ? ' ▲' : ' ▼')}
+                      </div>
+                    </th>
+                    <th className="px-4 py-4">Última ausencia (Motivo)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60 text-xs">
+                  {filteredAndSortedPlayerStats.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
+                        No se encontraron jugadores que coincidan con los filtros.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredAndSortedPlayerStats.map(({ player, total, attended, pct, avgValuation, lastAbsenceReason }) => (
+                      <tr key={player.id} className="hover:bg-slate-800/20 transition-colors duration-150">
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2.5">
+                            <Avatar src={player.foto_url} name={player.nombre} size="sm" className="border border-slate-700/60 shrink-0" />
+                            <div>
+                              <span className="font-bold text-slate-100 block">
+                                {player.nombre} <span className="text-slate-400 font-medium">{player.apellidos}</span>
+                              </span>
+                              <span className="text-[10px] text-slate-550 font-bold block">
+                                #{player.dorsal} • {player.demarcacion}
+                              </span>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-center font-bold text-slate-300">
+                          {total}
+                        </td>
+                        <td className="px-4 py-3 text-center font-bold text-green-400">
+                          {attended}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <span className={`text-[11px] font-black px-2 py-0.5 rounded-full border ${getAttendancePctColor(pct)}`}>
+                            {getAttendancePctIndicator(pct)} {pct}%
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          {avgValuation !== null ? (
+                            <span className="text-amber-400 font-extrabold flex items-center justify-center gap-1 text-[11px]">
+                              <Star className="h-3.5 w-3.5 fill-amber-400 shrink-0 text-amber-400" />
+                              {avgValuation}
+                            </span>
+                          ) : (
+                            <span className="text-slate-600">-</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          {lastAbsenceReason ? (
+                            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-lg border ${
+                              lastAbsenceReason === 'Lesión' || lastAbsenceReason === 'Lesionado' ? 'bg-red-950/20 text-red-400 border-red-950/40' :
+                              lastAbsenceReason === 'Enfermedad' ? 'bg-blue-950/20 text-blue-400 border-blue-950/40' :
+                              lastAbsenceReason === 'Estudios' ? 'bg-indigo-950/20 text-indigo-400 border-indigo-950/40' :
+                              lastAbsenceReason === 'Trabajo' ? 'bg-amber-950/20 text-[#DCAE1D] border-amber-950/40' :
+                              lastAbsenceReason === 'Permiso' ? 'bg-purple-950/20 text-purple-400 border-purple-950/40' :
+                              lastAbsenceReason === 'Selección' ? 'bg-teal-950/20 text-teal-400 border-teal-950/40' :
+                              'bg-slate-800 text-slate-350 border-slate-700/50'
+                            }`}>
+                              {lastAbsenceReason}
+                            </span>
+                          ) : (
+                            <span className="text-slate-600">Ninguna</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       ) : (
         /* Tab 2: Resumen Semanal */

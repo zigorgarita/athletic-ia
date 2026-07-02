@@ -3,9 +3,36 @@
 Documentación del estado del proyecto tras completar las mejoras.
 
 ## 📌 Identificación de la Versión
-- **Último Commit**: Bloque 2 Finalizado y Validado
-- **Fecha**: 2026-07-01
+- **Último Commit**: Bloque 3 Finalizado y Validado
+- **Fecha**: 2026-07-02
 - **Estado**: Estable, verificado funcionalmente y compilado con éxito.
+
+## 💻 Funcionalidades Verificadas (Bloque 3 - Asistencia)
+1. **Control de Presencia por Sesión**:
+   - Selección de sesiones planificadas existentes por fecha.
+   - Cambio de estado por jugador: Asiste, No asiste, Lesionado, Duda, Sancionado, Baja temporal.
+   - Estado inicial inteligente: jugadores con estado "Lesionado" o "Duda" en ficha se pre-cargan automáticamente.
+2. **Motivos de Ausencia**:
+   - 11 motivos disponibles: Lesión, Enfermedad, Estudios, Trabajo, Permiso, Selección, Viaje, Decisión técnica, Motivo personal, Sin justificar, Otro.
+   - Campo obligatorio cuando el estado es "No asiste".
+   - Constraint actualizado en Supabase para incluir Permiso y Selección.
+3. **Valoraciones de Entrenamiento**:
+   - 6 métricas evaluables (Actitud, Intensidad, Comprensión Táctica, Ejecución Técnica, Compromiso Defensivo, Compromiso Ofensivo).
+   - Media global calculada automáticamente.
+   - Se guardan solo para jugadores con estado "Asiste".
+4. **Persistencia Segura (Supabase + RPC)**:
+   - Guardado via RPC `exec_secure_bulk_upsert` con passkey de staff.
+   - Upsert idempotente: re-guardar la misma sesión actualiza los registros existentes.
+   - Backups de nombre y dorsal preservados en histórico.
+   - Test RPC exitoso: `exec_secure_bulk_upsert` en `training_evaluations` retorna `true`.
+5. **Resumen de Plantilla (Pestaña "Resumen Semanal")**:
+   - Tabla de estadísticas históricas de asistencia por jugador.
+   - % de asistencia (excluyendo Lesionados y Bajas temporales del denominador).
+   - Media de valoración global por jugador.
+   - Filtros por búsqueda de nombre, demarcación y rango de asistencia.
+   - Ordenación por nombre, total, asistencias o valoración.
+6. **UI en Solo Lectura**:
+   - Todos los controles de asistencia y evaluación respetan el modo de solo lectura global.
 
 ## 💻 Funcionalidades Verificadas (Bloque 2 - Planificación)
 1. **Unificación de Lógica de Fechas y Timezone**:
@@ -62,6 +89,5 @@ Documentación del estado del proyecto tras completar las mejoras.
    - Guardado correcto de posiciones x/y, roles asignados, jugadores y comentarios al presionar "Guardar Cambios".
 
 ## ☁️ Estado de los Servicios
-- **Base de Datos (Supabase)**: Conexión activa. La tabla `abp_player_roles` almacena correctamente la información posicionada. El script `scratch/create_meetings_table.sql` está listo para ser ejecutado en la fase de validación de base de datos.
-- **Despliegue (Vercel)**: Compilado correctamente y sincronizado.
-
+- **Base de Datos (Supabase)**: Conexión activa. Tablas `training_attendance` y `training_evaluations` operativas con RLS y RPC `exec_secure_bulk_upsert`. Constraint `absence_reason` actualizado con los 11 motivos válidos. El script `scratch/create_meetings_table.sql` está listo para ser ejecutado en la fase de validación del módulo de reuniones.
+- **Despliegue (Vercel)**: Compilado correctamente (23 páginas estáticas) y sincronizado.
