@@ -9,8 +9,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { Avatar } from '@/components/ui/Avatar';
 import { 
   Save, Copy, RefreshCw, AlertCircle, 
-  CheckCircle, Plus, X, ShieldAlert,
-  Zap, Award, HelpCircle, User, Edit3, BookOpen, Layout,
+  CheckCircle, Plus, X, User, Edit3, Layout,
   ArrowRight
 } from 'lucide-react';
 import { useEditMode } from '@/context/EditModeContext';
@@ -23,6 +22,7 @@ import { SystemCard } from './systems/SystemCard';
 import { PlayerAssignmentSidebar } from './shared/PlayerAssignmentSidebar';
 import { LineupManager } from './shared/LineupManager';
 import { MatchPlanSelector } from './analysis/MatchPlanSelector';
+import { TacticalAnalysisPanel } from './analysis/TacticalAnalysisPanel';
 
 const POSITION_ROLES = ['POR', 'LD', 'LI', 'DFC', 'MCD', 'MC', 'MCO', 'ED', 'EI', 'DC'];
 
@@ -96,6 +96,15 @@ export function TacticaClient() {
   const activeSystem = useMemo(() => {
     return systems.find(s => s.nombre === selectedFormation) || null;
   }, [systems, selectedFormation]);
+
+  // Compute zone highlighting based on the input text of the conflict zone
+  const highlightedConflictZone = useMemo(() => {
+    const text = (zonaConflicto || '').toLowerCase();
+    if (text.includes('central')) return 'central';
+    if (text.includes('interior') || text.includes('mediapunta')) return 'interior';
+    if (text.includes('exterior') || text.includes('banda') || text.includes('lateral')) return 'exterior';
+    return null;
+  }, [zonaConflicto]);
 
   // Initialize nodes based on selected own formation
   useEffect(() => {
@@ -626,10 +635,10 @@ export function TacticaClient() {
       )}
 
       {/* Main Pitch and configuration Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
         
-        {/* Left column (3/12) */}
-        <div className="lg:col-span-3 space-y-6">
+        {/* Left column (3/12 on large screens) */}
+        <div className="xl:col-span-3 space-y-6">
           <MatchPlanSelector
             lineupName={lineupName}
             onLineupNameChange={setLineupName}
@@ -656,8 +665,8 @@ export function TacticaClient() {
           <SystemCard system={activeSystem} />
         </div>
 
-        {/* Center column: Soccer fields (6/12) */}
-        <div className="lg:col-span-6 flex flex-col items-center gap-6">
+        {/* Center column: Soccer fields side-by-side on large screens (6/12 on large screens) */}
+        <div className="xl:col-span-6 flex flex-col lg:flex-row items-center gap-6 justify-center">
           <TacticalField
             team="propio"
             nodes={nodesPropio}
@@ -665,34 +674,38 @@ export function TacticaClient() {
             isEditMode={isEditMode}
             onNodesChange={setNodesPropio}
             onNodeClick={(node) => handleOpenNodeEditor('propio', node)}
+            highlightedZone={highlightedConflictZone}
           />
 
-          {/* UTILITIES TOOLBAR */}
+          {/* UTILITIES TOOLBAR (Stacked differently on desktop vs mobile) */}
           {isEditMode && (
-            <div className="flex items-center gap-3 p-2 bg-slate-900/50 rounded-2xl border border-slate-800/80 w-full max-w-[480px] justify-around">
+            <div className="flex flex-row lg:flex-col items-center gap-3 p-3 bg-slate-900/50 rounded-2xl border border-slate-800/80 w-full max-w-[480px] lg:w-auto justify-around shrink-0">
               <button
                 onClick={handleSwapPizarras}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl bg-slate-950 hover:bg-slate-850 text-slate-300 hover:text-white border border-slate-800 transition-all"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold rounded-xl bg-slate-950 hover:bg-slate-850 text-slate-350 hover:text-white border border-slate-800 transition-all lg:w-full lg:justify-center"
                 title="Intercambia las dos pizarras tácticas"
               >
                 <RefreshCw className="h-3.5 w-3.5 text-orange-400" />
-                Intercambiar campos
+                <span className="lg:hidden">Intercambiar campos</span>
+                <span className="hidden lg:inline">Intercambiar</span>
               </button>
               <button
                 onClick={handleCopyPropioToRival}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl bg-slate-950 hover:bg-slate-850 text-slate-300 hover:text-white border border-slate-800 transition-all"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold rounded-xl bg-slate-950 hover:bg-slate-850 text-slate-350 hover:text-white border border-slate-800 transition-all lg:w-full lg:justify-center"
                 title="Copia el dibujo propio al del rival"
               >
                 <ArrowRight className="h-3.5 w-3.5 text-blue-400" />
-                Copiar a Rival
+                <span className="lg:hidden">Copiar a Rival</span>
+                <span className="hidden lg:inline">Copiar a Rival</span>
               </button>
               <button
                 onClick={handleCopyRivalToPropio}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl bg-slate-950 hover:bg-slate-850 text-slate-300 hover:text-white border border-slate-800 transition-all"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold rounded-xl bg-slate-950 hover:bg-slate-850 text-slate-350 hover:text-white border border-slate-800 transition-all lg:w-full lg:justify-center"
                 title="Copia el dibujo del rival al propio"
               >
                 <ArrowRight className="h-3.5 w-3.5 text-emerald-450" />
-                Copiar a Propio
+                <span className="lg:hidden">Copiar a Propio</span>
+                <span className="hidden lg:inline">Copiar a Propio</span>
               </button>
             </div>
           )}
@@ -704,11 +717,12 @@ export function TacticaClient() {
             isEditMode={isEditMode}
             onNodesChange={setNodesRival}
             onNodeClick={(node) => handleOpenNodeEditor('rival', node)}
+            highlightedZone={highlightedConflictZone}
           />
         </div>
 
-        {/* Right column: Roster sidebar (3/12) */}
-        <div className="lg:col-span-3">
+        {/* Right column: Roster sidebar (3/12 on large screens) */}
+        <div className="xl:col-span-3">
           <PlayerAssignmentSidebar
             players={players}
             assignedPlayerIds={getAssignedPlayerIds()}
@@ -719,89 +733,20 @@ export function TacticaClient() {
       </div>
 
       {/* Comparador Táctico Section */}
-      <div className="p-6 bg-slate-900/40 border border-slate-800/80 rounded-3xl space-y-6 mt-6">
-        <div className="flex items-center justify-between pb-3 border-b border-slate-800/60">
-          <div className="flex items-center gap-2">
-            <BookOpen className="h-5 w-5 text-[#CC0E21]" />
-            <h3 className="text-sm font-bold text-slate-200 uppercase tracking-widest">
-              Comparador Táctico (Análisis Estratégico)
-            </h3>
-          </div>
-          <div className="text-[10px] text-slate-400 font-bold bg-slate-950 border border-slate-850/60 px-3 py-1 rounded-xl">
-            {selectedFormation} <ArrowRight className="inline-block h-3.5 w-3.5 mx-1 text-slate-500" /> {rivalFormation}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-4">
-            <div className="bg-slate-950/30 border border-slate-850/60 p-4.5 rounded-2xl space-y-2">
-              <label className="text-xs font-bold text-[#CC0E21] flex items-center gap-1.5">
-                <Zap className="h-3.5 w-3.5 text-[#CC0E21]" /> Ventajas del Sistema
-              </label>
-              <textarea
-                value={ventajas}
-                onChange={(e) => setVentajas(e.target.value)}
-                placeholder="Añade o edita ventajas del sistema..."
-                className="w-full min-h-[100px] bg-slate-950/80 border border-slate-850 focus:border-[#CC0E21]/50 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none transition-colors"
-              />
-            </div>
-
-            <div className="bg-slate-950/30 border border-slate-850/60 p-4.5 rounded-2xl space-y-2">
-              <label className="text-xs font-bold text-red-400 flex items-center gap-1.5">
-                <ShieldAlert className="h-3.5 w-3.5 text-red-400" /> Desventajas / Riesgos
-              </label>
-              <textarea
-                value={desventajas}
-                onChange={(e) => setDesventajas(e.target.value)}
-                placeholder="Añade o edita desventajas/riesgos..."
-                className="w-full min-h-[100px] bg-slate-950/80 border border-slate-850 focus:border-red-500/50 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none transition-colors"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="bg-slate-950/30 border border-slate-850/60 p-4 rounded-2xl space-y-2">
-                <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
-                  <HelpCircle className="h-3.5 w-3.5 text-slate-500" /> Zona de Conflicto Clave
-                </label>
-                <input
-                  type="text"
-                  value={zonaConflicto}
-                  onChange={(e) => setZonaConflicto(e.target.value)}
-                  placeholder="Zona de conflicto clave..."
-                  className="w-full bg-slate-950/80 border border-slate-850 focus:border-[#CC0E21]/50 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none transition-colors"
-                />
-              </div>
-
-              <div className="bg-slate-950/30 border border-slate-850/60 p-4 rounded-2xl space-y-2">
-                <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
-                  <Award className="h-3.5 w-3.5 text-yellow-500" /> Duelo Táctico Principal
-                </label>
-                <input
-                  type="text"
-                  value={dueloClave}
-                  onChange={(e) => setDueloClave(e.target.value)}
-                  placeholder="Duelo táctico principal..."
-                  className="w-full bg-slate-950/80 border border-slate-850 focus:border-[#CC0E21]/50 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none transition-colors"
-                />
-              </div>
-            </div>
-
-            <div className="bg-slate-950/30 border border-slate-850/60 p-4.5 rounded-2xl space-y-2">
-              <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
-                <Layout className="h-3.5 w-3.5 text-blue-400" /> Tareas por Líneas
-              </label>
-              <textarea
-                value={tareasLineas}
-                onChange={(e) => setTareasLineas(e.target.value)}
-                placeholder="Añade o edita tareas por líneas..."
-                className="w-full min-h-[100px] bg-slate-950/80 border border-slate-850 focus:border-[#CC0E21]/50 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none transition-colors"
-              />
-            </div>
-          </div>
-        </div>
-      </div>
+      <TacticalAnalysisPanel
+        selectedFormation={selectedFormation}
+        rivalFormation={rivalFormation}
+        ventajas={ventajas}
+        onVentajasChange={setVentajas}
+        desventajas={desventajas}
+        onDesventajasChange={setDesventajas}
+        zonaConflicto={zonaConflicto}
+        onZonaConflictoChange={setZonaConflicto}
+        dueloClave={dueloClave}
+        onDueloClaveChange={setDueloClave}
+        tareasLineas={tareasLineas}
+        onTareasLineasChange={setTareasLineas}
+      />
 
       {/* Orientaciones Individuales y Notas del Entrenador */}
       <div className="p-6 bg-slate-900/40 border border-slate-800/80 rounded-3xl space-y-6 mt-6">

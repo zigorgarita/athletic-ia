@@ -23,6 +23,7 @@ interface TacticalFieldProps {
   isEditMode: boolean;
   onNodesChange: (newNodes: PositionNode[]) => void;
   onNodeClick: (node: PositionNode) => void;
+  highlightedZone?: 'central' | 'interior' | 'exterior' | null;
 }
 
 const POSITION_ROLES = ['POR', 'LD', 'LI', 'DFC', 'MCD', 'MC', 'MCO', 'ED', 'EI', 'DC'];
@@ -34,6 +35,7 @@ export function TacticalField({
   isEditMode,
   onNodesChange,
   onNodeClick,
+  highlightedZone = null,
 }: TacticalFieldProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -70,7 +72,9 @@ export function TacticalField({
             return {
               ...n,
               x: Math.max(4, Math.min(96, initialX + deltaX)),
-              y: Math.max(4, Math.min(96, initialY + deltaY)),
+              y: team === 'rival' 
+                ? Math.max(4, Math.min(96, initialY - deltaY)) // Inverted Y-drag for rival
+                : Math.max(4, Math.min(96, initialY + deltaY)),
             };
           }
           return n;
@@ -162,8 +166,8 @@ export function TacticalField({
   return (
     <div className="w-full flex flex-col items-center">
       <div className="w-full max-w-[480px] text-center mb-2 flex justify-between items-center px-4 bg-slate-900/50 py-1.5 rounded-xl border border-slate-800/60">
-        <span className="text-xs font-black uppercase tracking-wider text-slate-300">
-          {team === 'propio' ? 'Nuestro Equipo (DH)' : 'Equipo Rival'}
+        <span className="text-xs font-black uppercase tracking-wider text-slate-350">
+          {team === 'propio' ? 'Nuestro Equipo (DH)' : 'Equipo Rival (Frente)'}
         </span>
       </div>
 
@@ -176,8 +180,26 @@ export function TacticalField({
           }
         }}
       >
-        {/* SVG Pitch Lines */}
+        {/* SVG Pitch Lines and Zones */}
         <svg viewBox="0 0 400 600" className="absolute inset-0 w-full h-full pointer-events-none opacity-20">
+          {/* Highlight tactical zones */}
+          {highlightedZone === 'central' && (
+            <rect x="160" y="15" width="80" height="570" fill="red" fillOpacity="0.2" stroke="red" strokeWidth="1" strokeDasharray="3,3" />
+          )}
+          {highlightedZone === 'interior' && (
+            <>
+              <rect x="80" y="15" width="80" height="570" fill="yellow" fillOpacity="0.15" stroke="yellow" strokeWidth="1" strokeDasharray="3,3" />
+              <rect x="240" y="15" width="80" height="570" fill="yellow" fillOpacity="0.15" stroke="yellow" strokeWidth="1" strokeDasharray="3,3" />
+            </>
+          )}
+          {highlightedZone === 'exterior' && (
+            <>
+              <rect x="15" y="15" width="65" height="570" fill="blue" fillOpacity="0.15" stroke="blue" strokeWidth="1" strokeDasharray="3,3" />
+              <rect x="320" y="15" width="65" height="570" fill="blue" fillOpacity="0.15" stroke="blue" strokeWidth="1" strokeDasharray="3,3" />
+            </>
+          )}
+
+          {/* Core field lines */}
           <rect x="15" y="15" width="370" height="570" fill="none" stroke="#fff" strokeWidth="2" />
           <line x1="15" y1="300" x2="385" y2="300" stroke="#fff" strokeWidth="2" />
           <circle cx="200" cy="300" r="50" fill="none" stroke="#fff" strokeWidth="2" />
@@ -206,12 +228,15 @@ export function TacticalField({
             ? assignedPlayer.dorsal
             : (node.customNumber || '');
 
+          // Calculate Y visual position (inverted for rival)
+          const visualY = team === 'rival' ? (100 - node.y) : node.y;
+
           return (
             <div
               key={node.id}
               style={{
                 left: `${node.x}%`,
-                top: `${node.y}%`,
+                top: `${visualY}%`,
                 transform: 'translate(-50%, -50%)',
               }}
               className="absolute z-10 flex flex-col items-center cursor-pointer group"
