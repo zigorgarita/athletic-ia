@@ -344,6 +344,21 @@ export interface TacticalMatchPlan {
   updated_at: string;
 }
 
+export interface TacticalRoleCard {
+  id: string;
+  matchup_id: string | null;
+  match_plan_id: string | null;
+  linea: 'Portería' | 'Defensa' | 'Mediocampo' | 'Delantera';
+  posicion_label: string;
+  fase_ofensiva: string | null;
+  fase_defensiva: string | null;
+  transiciones: string | null;
+  instrucciones_especificas: string | null;
+  referencia_visual: string | null;
+  ai_context: string | null;
+  created_at: string;
+}
+
 export interface MatchVideo {
   id: string;
   titulo: string;

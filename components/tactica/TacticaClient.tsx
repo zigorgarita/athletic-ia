@@ -1,19 +1,19 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { usePlayers } from '@/hooks/usePlayers';
-import { TacticalLineup, Match, Player, PositionNode } from '@/types';
+import { TacticalLineup, Match, Player, PositionNode, TacticalRoleCard } from '@/types';
 import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { Avatar } from '@/components/ui/Avatar';
 import { 
   Save, Copy, RefreshCw, AlertCircle, 
-  CheckCircle, Plus, X, User, Edit3, Layout,
+  CheckCircle, Plus, X, Layout,
   ArrowRight
 } from 'lucide-react';
 import { useEditMode } from '@/context/EditModeContext';
 import { useTacticalSystems } from '@/hooks/useTacticalSystems';
+import { useTacticalRoleCards } from '@/hooks/useTacticalRoleCards';
 import { TacticalField } from './TacticalField';
 
 // Subcomponents
@@ -24,20 +24,11 @@ import { LineupManager } from './shared/LineupManager';
 import { MatchPlanSelector } from './analysis/MatchPlanSelector';
 import { TacticalAnalysisPanel } from './analysis/TacticalAnalysisPanel';
 
-const POSITION_ROLES = ['POR', 'LD', 'LI', 'DFC', 'MCD', 'MC', 'MCO', 'ED', 'EI', 'DC'];
+// Subblock 4C Components
+import { RoleCardDrawer } from './roles/RoleCardDrawer';
+import { BriefingView } from './roles/BriefingView';
 
-const DEFAULT_RECOMMENDATIONS: Record<string, string> = {
-  'POR': 'Portero: Voz de mando activa. Cobertura del área y juego con el pie ágil.',
-  'LD': 'Lateral Derecho: Progresar en amplitud y doblar por fuera al extremo.',
-  'LI': 'Lateral Izquierdo: Mantener vigilancias rápidas y asegurar repliegue.',
-  'DFC': 'Central: Anticipar juego directo, coberturas limpias y salida aseada.',
-  'MCD': 'Mediocentro Defensivo: Sostén defensivo, ganar segundas jugadas y equilibrar basculaciones.',
-  'MC': 'Mediocentro: Conexión dinámica entre líneas, distribución y pisar área rival.',
-  'MCO': 'Mediapunta: Recibir entre líneas, giros rápidos para habilitar puntas.',
-  'ED': 'Extremo Derecho: Aislar al lateral rival en 1x1 exterior, diagonal al área en centros opuestos.',
-  'EI': 'Extremo Izquierdo: Desborde exterior, diagonales de fuera hacia dentro.',
-  'DC': 'Delantero Centro: Fijar centrales rivales, juego de espaldas y desmarques de ruptura.'
-};
+const POSITION_ROLES = ['POR', 'LD', 'LI', 'DFC', 'MCD', 'MC', 'MCO', 'ED', 'EI', 'DC'];
 
 export function TacticaClient() {
   const { isEditMode } = useEditMode();
@@ -52,6 +43,13 @@ export function TacticaClient() {
     fetchMatchPlan,
     saveMatchPlan
   } = useTacticalSystems();
+
+  // Subblock 4C Role Cards hook
+  const {
+    fetchRoleCards,
+    saveRoleCard,
+    error: roleCardsError
+  } = useTacticalRoleCards();
 
   // Selected lineup / ID for update
   const [currentLineupId, setCurrentLineupId] = useState<string | null>(null);
@@ -72,6 +70,12 @@ export function TacticaClient() {
   const [dueloClave, setDueloClave] = useState<string>('');
   const [tareasLineas, setTareasLineas] = useState<string>('');
 
+  // Subblock 4C Role Cards states
+  const [roleCards, setRoleCards] = useState<TacticalRoleCard[]>([]);
+  const [selectedRoleNode, setSelectedRoleNode] = useState<PositionNode | null>(null);
+  const [isRoleDrawerOpen, setIsRoleDrawerOpen] = useState(false);
+  const [isSavingRoleCard, setIsSavingRoleCard] = useState(false);
+
   // Database Load states
   const [savedLineups, setSavedLineups] = useState<TacticalLineup[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
@@ -80,8 +84,8 @@ export function TacticaClient() {
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Modal node editor states
-  const [editingNode, setEditingNode] = useState<{ team: 'propio' | 'rival'; node: PositionNode } | null>(null);
+  // Modal node editor states (for rival team only now)
+  const [editingNode, setEditingNode] = useState<{ team: 'rival'; node: PositionNode } | null>(null);
   const [editNodeName, setEditNodeName] = useState('');
   const [editNodeNumber, setEditNodeNumber] = useState('');
   const [editNodeRole, setEditNodeRole] = useState('');
@@ -105,6 +109,15 @@ export function TacticaClient() {
     if (text.includes('exterior') || text.includes('banda') || text.includes('lateral')) return 'exterior';
     return null;
   }, [zonaConflicto]);
+
+  // Dynamic helper to search current matchup ID
+  const activeMatchup = useMemo(() => {
+    if (systems.length === 0 || matchups.length === 0) return null;
+    const ownSys = systems.find(s => s.nombre === selectedFormation);
+    const rivalSys = systems.find(s => s.nombre === rivalFormation);
+    if (!ownSys || !rivalSys) return null;
+    return matchups.find(m => m.system_own_id === ownSys.id && m.system_rival_id === rivalSys.id) || null;
+  }, [selectedFormation, rivalFormation, systems, matchups]);
 
   // Initialize nodes based on selected own formation
   useEffect(() => {
@@ -138,31 +151,39 @@ export function TacticaClient() {
 
   // Sync date/match selection details and proposals
   useEffect(() => {
-    if (systems.length === 0 || matchups.length === 0) return;
-
-    const ownSys = systems.find(s => s.nombre === selectedFormation);
-    const rivalSys = systems.find(s => s.nombre === rivalFormation);
-
-    if (!ownSys || !rivalSys) return;
-
-    const databaseMatch = matchups.find(
-      m => m.system_own_id === ownSys.id && m.system_rival_id === rivalSys.id
-    );
-
-    if (databaseMatch) {
-      setVentajas(databaseMatch.ventajas || '');
-      setDesventajas(databaseMatch.desventajas || '');
-      setZonaConflicto(databaseMatch.zona_conflicto || '');
-      setDueloClave(databaseMatch.duelo_clave || '');
-      setTareasLineas(databaseMatch.tareas_lineas || '');
-    } else {
+    if (!activeMatchup) {
       setVentajas(`Ventajas teóricas de jugar con ${selectedFormation} contra un rival posicionado en ${rivalFormation}. Superioridad local en salida de balón y ocupación racional del carril medio.`);
       setDesventajas(`Vulnerabilidad del dibujo ${selectedFormation} ante repliegues fallidos o transiciones rápidas por el perfil exterior si el rival ${rivalFormation} explota las bandas.`);
       setZonaConflicto(`Carriles intermedios entre la línea de volantes rivales y la defensa del bloque bajo.`);
       setDueloClave(`Duelo por la posesión entre la base de construcción central y los interiores rivales.`);
       setTareasLineas(`Defensa: Línea de 4 basculando rápido.\nMedios: Asegurar circulación fluida.\nDelantera: Fijar centrales y generar pasillos exteriores.`);
+    } else {
+      setVentajas(activeMatchup.ventajas || '');
+      setDesventajas(activeMatchup.desventajas || '');
+      setZonaConflicto(activeMatchup.zona_conflicto || '');
+      setDueloClave(activeMatchup.duelo_clave || '');
+      setTareasLineas(activeMatchup.tareas_lineas || '');
     }
-  }, [selectedFormation, rivalFormation, systems, matchups]);
+  }, [selectedFormation, rivalFormation, activeMatchup]);
+
+  // Load tactical role cards for active systems
+  const loadRoleCardsData = useCallback(async () => {
+    if (systems.length === 0) return;
+    
+    // Obtain match plan override if match linked
+    let planId = null;
+    if (selectedMatchId) {
+      const plan = await fetchMatchPlan(selectedMatchId);
+      if (plan) planId = plan.id;
+    }
+
+    const cards = await fetchRoleCards(activeMatchup?.id || null, planId);
+    setRoleCards(cards);
+  }, [systems, selectedMatchId, activeMatchup, fetchRoleCards, fetchMatchPlan]);
+
+  useEffect(() => {
+    loadRoleCardsData();
+  }, [selectedFormation, rivalFormation, selectedMatchId, loadRoleCardsData]);
 
   useEffect(() => {
     loadSavedData();
@@ -502,22 +523,67 @@ export function TacticaClient() {
   };
 
   // Helper to open node editor
-  const handleOpenNodeEditor = (team: 'propio' | 'rival', node: PositionNode) => {
-    const assignedPlayer = team === 'propio' ? players.find(p => p.id === node.player_id) : null;
-    
-    setEditingNode({ team, node });
-    setEditNodeName(node.customName || (assignedPlayer ? assignedPlayer.nombre : ''));
-    setEditNodeNumber(node.customNumber || (assignedPlayer ? assignedPlayer.dorsal.toString() : ''));
-    setEditNodeRole(node.label);
-    setEditNodeNotes(node.notas_entrenador || '');
+  const handleOpenNodeEditor = async (team: 'propio' | 'rival', node: PositionNode) => {
+    if (team === 'propio') {
+      // Open Slide-over Drawer for our position node (Subblock 4C)
+      setSelectedRoleNode(node);
+      setIsRoleDrawerOpen(true);
+    } else {
+      // Keep old modal editor for rival nodes
+      setEditingNode({ team: 'rival', node });
+      setEditNodeName(node.customName || '');
+      setEditNodeNumber(node.customNumber || '');
+      setEditNodeRole(node.label);
+      setEditNodeNotes(node.notas_entrenador || '');
+    }
   };
 
-  // Helper to save node custom details
+  // Save tactical position role card (fase ofensiva, defensiva, transiciones)
+  const handleSaveRoleCardDetails = async (updatedCard: Partial<TacticalRoleCard>) => {
+    if (!selectedRoleNode) return;
+    setIsSavingRoleCard(true);
+    try {
+      let planId = null;
+      if (selectedMatchId) {
+        const plan = await fetchMatchPlan(selectedMatchId);
+        if (plan) planId = plan.id;
+      }
+
+      const activeCard = roleCards.find(c => c.posicion_label === selectedRoleNode.label);
+
+      const payload = {
+        matchup_id: activeMatchup?.id || null,
+        match_plan_id: planId,
+        posicion_label: selectedRoleNode.label,
+        linea: updatedCard.linea || activeCard?.linea || 'Portería' as const,
+        fase_ofensiva: updatedCard.fase_ofensiva !== undefined ? updatedCard.fase_ofensiva : (activeCard?.fase_ofensiva || null),
+        fase_defensiva: updatedCard.fase_defensiva !== undefined ? updatedCard.fase_defensiva : (activeCard?.fase_defensiva || null),
+        transiciones: updatedCard.transiciones !== undefined ? updatedCard.transiciones : (activeCard?.transiciones || null),
+        instrucciones_especificas: updatedCard.instrucciones_especificas !== undefined ? updatedCard.instrucciones_especificas : (activeCard?.instrucciones_especificas || null),
+        referencia_visual: updatedCard.referencia_visual !== undefined ? updatedCard.referencia_visual : (activeCard?.referencia_visual || null),
+        ai_context: updatedCard.ai_context !== undefined ? updatedCard.ai_context : (activeCard?.ai_context || null),
+      };
+
+      const success = await saveRoleCard(payload);
+      if (success) {
+        setSuccessMsg(`Ficha de rol para la posición ${selectedRoleNode.label} guardada con éxito.`);
+        loadRoleCardsData();
+      } else {
+        setErrorMsg('Error al guardar la ficha de rol.');
+      }
+    } catch (err) {
+      console.error('Error saving role card detail:', err);
+    } finally {
+      setIsSavingRoleCard(false);
+    }
+  };
+
+  // Helper to save rival node custom details (traditional modal)
   const handleSaveNodeDetails = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingNode) return;
 
-    const { team, node } = editingNode;
+    const { node } = editingNode;
     const updater = (prev: PositionNode[]) =>
       prev.map((n) => {
         if (n.id === node.id) {
@@ -532,14 +598,9 @@ export function TacticaClient() {
         return n;
       });
 
-    if (team === 'propio') {
-      setNodesPropio(updater);
-    } else {
-      setNodesRival(updater);
-    }
-
+    setNodesRival(updater);
     setEditingNode(null);
-    setSuccessMsg('Ficha de posición actualizada correctamente.');
+    setSuccessMsg('Ficha del jugador rival actualizada correctamente.');
   };
 
   if (loadingPlayers || loadingSystems) {
@@ -551,7 +612,9 @@ export function TacticaClient() {
     );
   }
 
-  const finalError = errorMsg || systemsError;
+  const finalError = errorMsg || systemsError || roleCardsError;
+  const activeRoleCard = selectedRoleNode ? (roleCards.find(c => c.posicion_label === selectedRoleNode.label) || null) : null;
+  const assignedPlayerToDrawer = selectedRoleNode ? (players.find(p => p.id === selectedRoleNode.player_id) || null) : null;
 
   return (
     <div className="space-y-6">
@@ -748,82 +811,35 @@ export function TacticaClient() {
         onTareasLineasChange={setTareasLineas}
       />
 
-      {/* Orientaciones Individuales y Notas del Entrenador */}
-      <div className="p-6 bg-slate-900/40 border border-slate-800/80 rounded-3xl space-y-6 mt-6">
-        <div className="flex items-center gap-2 pb-3 border-b border-slate-800/60">
-          <User className="h-5 w-5 text-[#CC0E21]" />
-          <h3 className="text-sm font-bold text-slate-200 uppercase tracking-widest">
-            Orientaciones Individuales y Notas del Entrenador
-          </h3>
-        </div>
+      {/* Briefing Táctico agrupado por Línea y Posición (Subblock 4C) */}
+      <BriefingView
+        nodesPropio={nodesPropio}
+        players={players}
+        roleCards={roleCards}
+      />
 
-        <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2">
-          {nodesPropio.map(node => {
-            const assignedPlayer = players.find(p => p.id === node.player_id);
-            if (!assignedPlayer) return null;
+      {/* Side-Drawer overlay panel for role details editing */}
+      <RoleCardDrawer
+        isOpen={isRoleDrawerOpen}
+        onClose={() => {
+          setIsRoleDrawerOpen(false);
+          setSelectedRoleNode(null);
+        }}
+        node={selectedRoleNode}
+        assignedPlayer={assignedPlayerToDrawer}
+        roleCard={activeRoleCard}
+        isEditMode={isEditMode}
+        onSave={handleSaveRoleCardDetails}
+        isSaving={isSavingRoleCard}
+      />
 
-            // Extract preset instructions for this position from tactical db
-            const ownSys = systems.find(s => s.nombre === selectedFormation);
-            const rivalSys = systems.find(s => s.nombre === rivalFormation);
-            const match = matchups.find(
-              m => ownSys && rivalSys && m.system_own_id === ownSys.id && m.system_rival_id === rivalSys.id
-            );
-            const presetInstructions = match?.ai_context || 
-                                       DEFAULT_RECOMMENDATIONS[node.label] || 
-                                       `Recomendación de posición para ${node.label}.`;
-
-            return (
-              <div key={node.id} className="p-4 bg-slate-950/40 border border-slate-850 rounded-2xl grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Avatar src={assignedPlayer.foto_url} name={assignedPlayer.nombre} size="sm" />
-                    <div>
-                      <span className="font-bold text-slate-100 text-xs block">{assignedPlayer.nombre}</span>
-                      <span className="text-[9px] font-bold text-[#CC0E21] bg-[#CC0E21]/10 px-1.5 py-0.2 rounded">
-                        Posición: {node.label}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="p-2.5 bg-slate-900/40 border border-slate-850/60 rounded-xl text-[11px] text-slate-350 italic space-y-1">
-                    <span className="font-bold text-[9px] uppercase tracking-wide text-slate-500 block">Propuesta IA:</span>
-                    <span>{presetInstructions}</span>
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
-                    <Edit3 className="h-3 w-3 text-slate-500" /> Notas del Entrenador
-                  </label>
-                  <textarea
-                    value={node.notas_entrenador || ''}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setNodesPropio(prev => prev.map(n => n.id === node.id ? { ...n, notas_entrenador: val } : n));
-                    }}
-                    placeholder={`Escribe notas tácticas específicas para ${assignedPlayer.nombre.split(' ')[0]}...`}
-                    className="w-full min-h-[70px] bg-slate-950/80 border border-slate-850 focus:border-[#CC0E21]/50 rounded-xl px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none transition-colors"
-                  />
-                </div>
-              </div>
-            );
-          })}
-
-          {nodesPropio.filter(n => !!n.player_id).length === 0 && (
-            <p className="text-xs text-slate-500 italic p-4 text-center">
-              Asigna jugadores de la plantilla en el campo para configurar sus notas y orientaciones.
-            </p>
-          )}
-        </div>
-      </div>
-
-      {/* Modal para Editar Ficha / Posición */}
+      {/* Modal para Editar Ficha / Posición Rival */}
       {editingNode && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
           <div className="w-full max-w-md p-6 bg-slate-900 border border-slate-800 rounded-3xl space-y-4 shadow-2xl">
             <div className="flex items-center justify-between pb-2 border-b border-slate-800">
               <h3 className="text-sm font-bold text-slate-200 uppercase tracking-wider">
-                Editar Ficha ({editingNode.team === 'propio' ? 'Nuestro Equipo' : 'Rival'})
+                Editar Ficha ({editingNode.team === 'rival' ? 'Rival' : 'Nuestro Equipo'})
               </h3>
               <button
                 onClick={() => setEditingNode(null)}
@@ -836,7 +852,7 @@ export function TacticaClient() {
             <form onSubmit={handleSaveNodeDetails} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-400 mb-1.5">
-                  Nombre del Jugador
+                  Nombre del Jugador Rival
                 </label>
                 <input
                   type="text"
@@ -849,7 +865,7 @@ export function TacticaClient() {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-400 mb-1.5">
-                  Dorsal
+                  Dorsal Rival
                 </label>
                 <input
                   type="text"
@@ -877,7 +893,7 @@ export function TacticaClient() {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-400 mb-1.5">
-                  Notas Tácticas
+                  Notas Tácticas Rival
                 </label>
                 <textarea
                   value={editNodeNotes}
