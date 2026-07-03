@@ -613,3 +613,150 @@ export interface MatchDocument {
   created_at: string;
 }
 
+// --- BIBLIOTECA DE CONOCIMIENTO TÁCTICO ---
+
+export const KNOWLEDGE_CATEGORIES = [
+  'Sistema de juego',
+  'Modelo de juego',
+  'Principio ofensivo',
+  'Principio defensivo',
+  'ABP / Estrategia',
+  'Transición ofensiva',
+  'Transición defensiva',
+  'Salida de balón',
+  'Presión',
+  'Rol por posición',
+  'Ejercicio',
+  'Sesión tipo',
+  'Análisis rival',
+  'Principios generales'
+] as const;
+export type KnowledgeCategory = typeof KNOWLEDGE_CATEGORIES[number];
+
+export const KNOWLEDGE_PHASES = [
+  'Ataque organizado',
+  'Ataque rápido / Contraataque',
+  'Defensa organizada',
+  'Presión tras pérdida',
+  'Transición O→D',
+  'Transición D→O',
+  'ABP ofensiva',
+  'ABP defensiva',
+  'Global'
+] as const;
+export type KnowledgePhase = typeof KNOWLEDGE_PHASES[number];
+
+export const KNOWLEDGE_LINK_TYPES = [
+  'planning_session',
+  'planning_task',
+  'planning_task_library',
+  'tactical_system',
+  'tactical_matchup',
+  'tactical_match_plan',
+  'tactical_role_card',
+  'match',
+  'abp_play',
+  'player',
+  'gps_session',
+  'match_video_clip'
+] as const;
+export type KnowledgeLinkType = typeof KNOWLEDGE_LINK_TYPES[number];
+
+export interface KnowledgeEntry {
+  id: string;
+  titulo: string;
+  categoria: KnowledgeCategory;
+  fase_juego: KnowledgePhase | null;
+  sistema_asociado: string | null;
+  posicion_asociada: string | null;
+  principio_clave: string | null;
+  descripcion: string;
+  instrucciones_linea: Record<string, string> | null;
+  variantes: string | null;
+  consignas: string[] | null;
+  metadata: Record<string, any>;
+  creado_por: string;
+  temporada: string;
+  activo: boolean;
+  created_at: string;
+  updated_at: string;
+  // Relaciones cargadas opcionalmente
+  media?: KnowledgeMedia[];
+  tags?: KnowledgeTag[];
+  links?: KnowledgeLink[];
+}
+
+export interface KnowledgeMedia {
+  id: string;
+  knowledge_entry_id: string;
+  tipo_media: 'video' | 'pdf' | 'imagen' | 'enlace';
+  titulo: string | null;
+  url: string;
+  tipo_origen: 'Enlace' | 'Archivo';
+  descripcion: string | null;
+  orden: number;
+  metadata: Record<string, any>;
+  created_at: string;
+}
+
+export interface KnowledgeLink {
+  id: string;
+  knowledge_entry_id: string;
+  linked_entity_type: KnowledgeLinkType;
+  linked_entity_id: string;
+  relacion: string;
+  notas: string | null;
+  created_at: string;
+}
+
+export interface KnowledgeTag {
+  id: string;
+  knowledge_entry_id: string;
+  tag: string;
+  created_at: string;
+}
+
+export interface KnowledgeQueryContext {
+  sistema?: string;
+  fase?: string;
+  posicion?: string;
+  categoria?: string;
+  tags?: string[];
+  matchId?: string;
+  limit?: number;
+}
+
+// --- ASISTENTE IA ---
+
+export interface AIMessage {
+  id: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  timestamp: string;
+  actionType?: string; // 'analyze_matchup' | 'suggest_roles' | 'suggest_session' | etc.
+  suggestedActions?: AIAction[];
+}
+
+export interface AIAction {
+  type: 'apply_to_matchup' | 'apply_to_role_card' | 'save_to_library' | 'create_session' | 'copy';
+  label: string;
+  data: Record<string, any>;
+}
+
+export interface TacticalAIContext {
+  systemOwn: string;
+  systemRival: string;
+  matchupId: string | null;
+  matchId: string | null;
+  matchRival?: string | null;
+  assignedPlayerIds: string[];
+  assignedPositions?: { label: string; playerId: string | null }[];
+  roleCards: TacticalRoleCard[];
+  ventajas: string;
+  desventajas: string;
+  zonaConflicto: string;
+  dueloClave: string;
+  tareasLineas: string;
+}
+
+

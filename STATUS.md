@@ -97,9 +97,9 @@ Documentación del estado del proyecto tras completar las mejoras.
 | Bloque 1 | Plantilla 360º | ✅ Cerrado |
 | Bloque 2 | Planificación | ✅ Cerrado |
 | Bloque 3 | Asistencia | ✅ Cerrado — sin pendientes |
-| **Bloque 4** | **Evaluaciones de Rendimiento** | **🔄 En curso** |
+| **Bloque 4** | **Evaluaciones, Biblioteca Táctica + IA** | **✅ Cerrado (Subbloques 4A, 4B, 4C, 4D implementados y compilados)** |
 | Bloque 5 | Liga / Centro de Partidos | ⏳ Pendiente |
 
 ## ☁️ Estado de los Servicios
-- **Base de Datos (Supabase)**: Conexión activa. Tablas `training_attendance`, `training_evaluations` y `detailed_evaluations` operativas. Constraint `absence_reason` con 11 motivos confirmado (SQL ejecutado manualmente el 2026-07-02). RPC `exec_secure_bulk_upsert` funcional. Tabla `detailed_evaluations` con 28 columnas y datos reales.
-- **Despliegue (Vercel)**: `dpl_x4oyueGH4CzW8Jshk4FKbK5wB5Gx` — 20 rutas compiladas, producción activa en https://athletic-ia.vercel.app
+- **Base de Datos (Supabase)**: Conexión activa. Tablas `training_attendance`, `training_evaluations` y `detailed_evaluations` operativas. Nuevas tablas de la biblioteca (`knowledge_entries`, `knowledge_media`, `knowledge_links`, `knowledge_tags`) y bucket `indautxu-assets` configurados en scripts listos para ejecutar.
+- **Despliegue (Vercel)**: Producción activa en https://athletic-ia.vercel.app (Modificaciones locales listas para despliegue tras validación funcional).

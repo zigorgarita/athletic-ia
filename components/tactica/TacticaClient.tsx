@@ -28,6 +28,10 @@ import { TacticalAnalysisPanel } from './analysis/TacticalAnalysisPanel';
 import { RoleCardDrawer } from './roles/RoleCardDrawer';
 import { BriefingView } from './roles/BriefingView';
 
+// Subblock 4D Components (Biblioteca de Conocimiento + Asistente IA)
+import { KnowledgePanel } from './knowledge/KnowledgePanel';
+import { TacticalAIPanel } from './ai/TacticalAIPanel';
+
 const POSITION_ROLES = ['POR', 'LD', 'LI', 'DFC', 'MCD', 'MC', 'MCO', 'ED', 'EI', 'DC'];
 
 export function TacticaClient() {
@@ -95,6 +99,37 @@ export function TacticaClient() {
   const formationsOptions = useMemo(() => {
     return systems.map(s => ({ value: s.nombre, label: s.nombre }));
   }, [systems]);
+
+  // Subblock 4D: Mapear jugadores asignados para contexto IA
+  const assignedPlayerIds = useMemo(() => {
+    return nodesPropio
+      .map(n => n.player_id)
+      .filter((id): id is string => id !== null);
+  }, [nodesPropio]);
+
+  const assignedPositions = useMemo(() => {
+    return nodesPropio.map(n => ({
+      label: n.label,
+      playerId: n.player_id
+    }));
+  }, [nodesPropio]);
+
+  // Escuchar evento personalizado de la IA para aplicar análisis táctico
+  useEffect(() => {
+    const handleApplyAIAnalysis = (e: Event) => {
+      const data = (e as CustomEvent).detail;
+      if (data.ventajas) setVentajas(prev => prev ? `${prev}\n${data.ventajas}` : data.ventajas);
+      if (data.desventajas) setDesventajas(prev => prev ? `${prev}\n${data.desventajas}` : data.desventajas);
+      if (data.zona_conflicto) setZonaConflicto(prev => prev ? `${prev}\n${data.zona_conflicto}` : data.zona_conflicto);
+      if (data.duelo_clave) setDueloClave(prev => prev ? `${prev}\n${data.duelo_clave}` : data.duelo_clave);
+      if (data.tareas_lineas) setTareasLineas(prev => prev ? `${prev}\n${data.tareas_lineas}` : data.tareas_lineas);
+    };
+
+    window.addEventListener('apply-ai-matchup-analysis', handleApplyAIAnalysis);
+    return () => {
+      window.removeEventListener('apply-ai-matchup-analysis', handleApplyAIAnalysis);
+    };
+  }, []);
 
   // Current selected system base description
   const activeSystem = useMemo(() => {
@@ -816,6 +851,36 @@ export function TacticaClient() {
         nodesPropio={nodesPropio}
         players={players}
         roleCards={roleCards}
+      />
+
+      {/* Base de Conocimiento Táctico (Subblock 4D) */}
+      <KnowledgePanel
+        systemOwn={selectedFormation}
+        systemRival={rivalFormation}
+        matchupId={activeMatchup?.id || null}
+        matchId={selectedMatchId || null}
+        onImportToAnalysis={({ ventajas: v, desventajas: d, tareas: t }) => {
+          if (v) setVentajas(prev => prev ? `${prev}\n${v}` : v);
+          if (d) setDesventajas(prev => prev ? `${prev}\n${d}` : d);
+          if (t) setTareasLineas(prev => prev ? `${prev}\n${t}` : t);
+        }}
+      />
+
+      {/* Asistente Inteligente IA (Subblock 4D) */}
+      <TacticalAIPanel
+        systemOwn={selectedFormation}
+        systemRival={rivalFormation}
+        matchupId={activeMatchup?.id || null}
+        matchId={selectedMatchId || null}
+        matchRival={matches.find(m => m.id === selectedMatchId)?.rival || null}
+        assignedPlayerIds={assignedPlayerIds}
+        assignedPositions={assignedPositions}
+        roleCards={roleCards}
+        ventajas={ventajas}
+        desventajas={desventajas}
+        zonaConflicto={zonaConflicto}
+        dueloClave={dueloClave}
+        tareasLineas={tareasLineas}
       />
 
       {/* Side-Drawer overlay panel for role details editing */}
