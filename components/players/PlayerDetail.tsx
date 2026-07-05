@@ -52,7 +52,7 @@ interface PlayerDetailProps {
 
 export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
   const [currentPlayer, setCurrentPlayer] = useState<Player>(player);
-  const [activeTab, setActiveTab] = useState<'deportivo' | 'valoraciones' | 'stats' | 'lesiones' | 'observations' | 'entrenamientos' | 'reuniones'>('deportivo');
+  const [activeTab, setActiveTab] = useState<'personal' | 'resumen' | 'rendimiento' | 'tactica' | 'fisico' | 'multimedia' | 'ia'>('personal');
   const { isEditMode } = useEditMode();
   
   // Training Attendance States
@@ -101,7 +101,7 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
       }
     }
 
-    if (activeTab === 'entrenamientos' || activeTab === 'stats') {
+    if (activeTab === 'rendimiento' || activeTab === 'resumen') {
       loadTrainingHistory();
     }
   }, [currentPlayer.id, activeTab]);
@@ -530,43 +530,91 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
         &larr; Volver a la Plantilla
       </button>
 
-      {/* Componente del Perfil del Jugador (Fuente Única) */}
-      <PlayerProfileViewer player={currentPlayer} />
+      {/* Cabecera Ultra Compacta (Contexto) */}
+      <div className="flex items-center gap-4 bg-slate-900/60 p-4 rounded-2xl border border-slate-800/80">
+        <Avatar src={currentPlayer.foto_url || undefined} name={`${currentPlayer.nombre} ${currentPlayer.apellidos}`} size="md" className="w-12 h-12 border-2 border-slate-700" />
+        <div>
+          <h2 className="text-lg font-bold text-white leading-tight">
+            <span className="text-[#CC0E21] mr-1.5 font-black">#{currentPlayer.dorsal}</span>
+            {currentPlayer.nombre} {currentPlayer.apellidos}
+          </h2>
+          <div className="flex items-center gap-2 text-xs text-slate-400 mt-0.5">
+            <span className="font-semibold text-slate-300">{currentPlayer.demarcacion}</span>
+            <span>&bull;</span>
+            <span>{currentPlayer.equipo || 'Indautxu Juvenil A'}</span>
+          </div>
+        </div>
+        <div className="ml-auto">
+          {currentPlayer.estado && (
+            <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full border ${
+              currentPlayer.estado === 'Disponible' ? 'bg-green-950/20 text-green-400 border-green-900/30' :
+              currentPlayer.estado === 'Lesionado' ? 'bg-red-950/20 text-red-400 border-red-900/30' :
+              currentPlayer.estado === 'Duda' ? 'bg-amber-950/20 text-amber-400 border-amber-900/30' :
+              currentPlayer.estado === 'Sancionado' ? 'bg-orange-950/20 text-orange-400 border-orange-900/30' :
+              'bg-slate-850/40 text-slate-400 border-slate-700/50'
+            }`}>
+              {currentPlayer.estado}
+            </span>
+          )}
+        </div>
+      </div>
 
       {/* Tabs */}
       <div className="flex overflow-x-auto border-b border-slate-800 scrollbar-none whitespace-nowrap">
         <button
-          onClick={() => setActiveTab('deportivo')}
+          onClick={() => setActiveTab('personal')}
           className={`flex items-center gap-2 px-5 py-3.5 border-b-2 text-sm font-semibold transition-all duration-200 ${
-            activeTab === 'deportivo'
+            activeTab === 'personal'
               ? 'border-[#CC0E21] text-[#CC0E21] bg-[#CC0E21]/5'
               : 'border-transparent text-slate-400 hover:text-slate-200'
           }`}
         >
-          <Sparkles className="h-4 w-4" />
-          Perfil Deportivo
+          <User className="h-4 w-4" />
+          Personal
         </button>
         <button
-          onClick={() => setActiveTab('valoraciones')}
+          onClick={() => setActiveTab('resumen')}
           className={`flex items-center gap-2 px-5 py-3.5 border-b-2 text-sm font-semibold transition-all duration-200 ${
-            activeTab === 'valoraciones'
+            activeTab === 'resumen'
+              ? 'border-[#CC0E21] text-[#CC0E21] bg-[#CC0E21]/5'
+              : 'border-transparent text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <BarChart3 className="h-4 w-4" />
+          Resumen
+        </button>
+        <button
+          onClick={() => setActiveTab('rendimiento')}
+          className={`flex items-center gap-2 px-5 py-3.5 border-b-2 text-sm font-semibold transition-all duration-200 ${
+            activeTab === 'rendimiento'
               ? 'border-[#CC0E21] text-[#CC0E21] bg-[#CC0E21]/5'
               : 'border-transparent text-slate-400 hover:text-slate-200'
           }`}
         >
           <Award className="h-4 w-4" />
-          Valoraciones
+          Rendimiento
         </button>
         <button
-          onClick={() => setActiveTab('lesiones')}
+          onClick={() => setActiveTab('tactica')}
           className={`flex items-center gap-2 px-5 py-3.5 border-b-2 text-sm font-semibold transition-all duration-200 ${
-            activeTab === 'lesiones'
+            activeTab === 'tactica'
               ? 'border-[#CC0E21] text-[#CC0E21] bg-[#CC0E21]/5'
               : 'border-transparent text-slate-400 hover:text-slate-200'
           }`}
         >
-          <ShieldAlert className="h-4 w-4" />
-          Lesiones
+          <Sparkles className="h-4 w-4" />
+          Táctica
+        </button>
+        <button
+          onClick={() => setActiveTab('fisico')}
+          className={`flex items-center gap-2 px-5 py-3.5 border-b-2 text-sm font-semibold transition-all duration-200 ${
+            activeTab === 'fisico'
+              ? 'border-[#CC0E21] text-[#CC0E21] bg-[#CC0E21]/5'
+              : 'border-transparent text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <Heart className="h-4 w-4" />
+          Físico
           {injuries.filter(i => i.estado === 'Activa' || i.estado === 'Recaída').length > 0 && (
             <span className="ml-1 bg-red-600 text-white text-[9px] px-1.5 py-0.5 rounded-full font-black">
               {injuries.filter(i => i.estado === 'Activa' || i.estado === 'Recaída').length}
@@ -574,53 +622,26 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
           )}
         </button>
         <button
-          onClick={() => setActiveTab('stats')}
+          onClick={() => setActiveTab('multimedia')}
           className={`flex items-center gap-2 px-5 py-3.5 border-b-2 text-sm font-semibold transition-all duration-200 ${
-            activeTab === 'stats'
+            activeTab === 'multimedia'
               ? 'border-[#CC0E21] text-[#CC0E21] bg-[#CC0E21]/5'
               : 'border-transparent text-slate-400 hover:text-slate-200'
           }`}
         >
-          <BarChart3 className="h-4 w-4" />
-          Estadísticas
+          <User className="h-4 w-4" />
+          Multimedia
         </button>
         <button
-          onClick={() => setActiveTab('observations')}
+          onClick={() => setActiveTab('ia')}
           className={`flex items-center gap-2 px-5 py-3.5 border-b-2 text-sm font-semibold transition-all duration-200 ${
-            activeTab === 'observations'
+            activeTab === 'ia'
               ? 'border-[#CC0E21] text-[#CC0E21] bg-[#CC0E21]/5'
               : 'border-transparent text-slate-400 hover:text-slate-200'
           }`}
         >
-          <ClipboardList className="h-4 w-4" />
-          Observaciones
-        </button>
-        <button
-          onClick={() => setActiveTab('entrenamientos')}
-          className={`flex items-center gap-2 px-5 py-3.5 border-b-2 text-sm font-semibold transition-all duration-200 ${
-            activeTab === 'entrenamientos'
-              ? 'border-[#CC0E21] text-[#CC0E21] bg-[#CC0E21]/5'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <Calendar className="h-4 w-4" />
-          Entrenamientos
-        </button>
-        <button
-          onClick={() => setActiveTab('reuniones')}
-          className={`flex items-center gap-2 px-5 py-3.5 border-b-2 text-sm font-semibold transition-all duration-200 ${
-            activeTab === 'reuniones'
-              ? 'border-[#CC0E21] text-[#CC0E21] bg-[#CC0E21]/5'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <MessageSquare className="h-4 w-4" />
-          Reuniones
-          {meetings.length > 0 && (
-            <span className="ml-1 bg-red-650 text-white text-[9px] px-1.5 py-0.5 rounded-full font-black">
-              {meetings.length}
-            </span>
-          )}
+          <Sparkles className="h-4 w-4" />
+          IA
         </button>
       </div>
 
@@ -637,10 +658,103 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
           </div>
         )}
 
+        {/* Tab 1: Personal */}
+        {activeTab === 'personal' && (
+          <div className="space-y-6 animate-fadeIn">
+            <div className="p-6 bg-slate-900/40 border border-slate-800/80 rounded-2xl space-y-4">
+              <h3 className="text-sm font-bold text-slate-200 uppercase tracking-wider">Información Personal</h3>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div><span className="text-slate-500">Fecha Nacimiento:</span> <span className="text-white">{currentPlayer.fecha_nacimiento}</span></div>
+                <div><span className="text-slate-500">Edad:</span> <span className="text-white">{getAge(currentPlayer.fecha_nacimiento)}</span></div>
+                <div><span className="text-slate-500">Nacionalidad:</span> <span className="text-white">{currentPlayer.nacionalidad || '-'}</span></div>
+                <div><span className="text-slate-500">Pierna Dominante:</span> <span className="text-white">{currentPlayer.pierna_dominante}</span></div>
+              </div>
+            </div>
+            {isEditMode && (
+              <div className="flex justify-end mt-4">
+                <Button variant="secondary" className="text-xs" onClick={() => alert('Edición de datos personales habilitada desde la Plantilla')}>
+                  Gestionar Datos Personales
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
 
+        {/* Tab 2: Resumen */}
+        {activeTab === 'resumen' && (
+          <div className="space-y-6 animate-fadeIn">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Rendimiento Global */}
+              <div className="p-6 bg-slate-900/40 border border-slate-800/80 rounded-2xl flex flex-col justify-center items-center text-center">
+                <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">Valoración Global Vigente</h3>
+                <div className="text-5xl font-black text-amber-400 flex items-center gap-2">
+                  <Star className="h-10 w-10 fill-amber-400" />
+                  {computedGlobalRating}
+                </div>
+                {currentPlayer.rol_abp && (
+                  <p className="mt-4 text-xs text-slate-300">
+                    <strong className="text-slate-500 block mb-1">Rol Táctico Principal</strong>
+                    {currentPlayer.rol_abp.substring(0, 100)}{currentPlayer.rol_abp.length > 100 ? '...' : ''}
+                  </p>
+                )}
+              </div>
+              
+              {/* Entrenamientos */}
+              <div className="p-6 bg-slate-900/40 border border-slate-800/80 rounded-2xl space-y-4">
+                <h3 className="text-sm font-bold text-slate-200 uppercase tracking-wider border-b border-slate-850 pb-2 flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-blue-400" />
+                  Entrenamientos
+                </h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-slate-400">Asistencia Total</span>
+                    <span className="font-bold text-slate-200">{trainingStats.attendancePct}%</span>
+                  </div>
+                  <div className="w-full bg-slate-800 rounded-full h-1.5 mb-4">
+                    <div className="bg-blue-500 h-1.5 rounded-full" style={{ width: `${trainingStats.attendancePct}%` }}></div>
+                  </div>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-slate-500">Sesiones Atendidas</span>
+                    <span className="text-slate-300">{trainingStats.attended} de {trainingStats.total}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs pt-2 border-t border-slate-800/50">
+                    <span className="text-slate-500">Valoración Media</span>
+                    <span className="text-amber-400 font-bold">{trainingStats.avgValuation || '-'} ★</span>
+                  </div>
+                </div>
+              </div>
 
-        {/* Tab 2: Perfil Deportivo */}
-        {activeTab === 'deportivo' && (
+              {/* Competición */}
+              <div className="p-6 bg-slate-900/40 border border-slate-800/80 rounded-2xl space-y-4">
+                <h3 className="text-sm font-bold text-slate-200 uppercase tracking-wider border-b border-slate-850 pb-2 flex items-center gap-2">
+                  <Award className="h-4 w-4 text-emerald-400" />
+                  Competición (Liga)
+                </h3>
+                <div className="space-y-3 text-xs">
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-400">Partidos Jugados</span>
+                    <span className="font-bold text-white text-sm">{statsSummary?.partidos || 0}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-400">Titularidades</span>
+                    <span className="font-bold text-white">{statsSummary?.titularidades || 0}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-400">Minutos Totales</span>
+                    <span className="font-bold text-white">{statsSummary?.minutos || 0}m</span>
+                  </div>
+                  <div className="flex justify-between items-center pt-2 border-t border-slate-800/50">
+                    <span className="text-slate-400">Goles / Asistencias</span>
+                    <span className="font-bold text-green-400">{statsSummary?.goles || 0} / {statsSummary?.asistencias || 0}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Tab 3: Táctica (Antes: Deportivo) */}
+        {activeTab === 'tactica' && (
           <div className="space-y-6">
             
             {/* Conclusiones Generales del Jugador */}
@@ -730,8 +844,8 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
           </div>
         )}
 
-        {/* Tab 3: Valoraciones Generales */}
-        {activeTab === 'valoraciones' && (
+        {/* Tab 4: Rendimiento - Valoraciones Generales */}
+        {activeTab === 'rendimiento' && (
           <div className="space-y-6">
             <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 bg-slate-900/60 p-5 rounded-2xl border border-slate-800/80">
               <div>
@@ -798,8 +912,8 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
           </div>
         )}
 
-        {/* Tab 4: Historial de Lesiones */}
-        {activeTab === 'lesiones' && (
+        {/* Tab 5: Físico (Historial de Lesiones) */}
+        {activeTab === 'fisico' && (
           <div className="space-y-6">
             <div className="flex justify-between items-center">
               <h3 className="text-base font-bold text-slate-100 flex items-center gap-1.5">
@@ -959,7 +1073,7 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
         )}
 
         {/* Tab 5: Estadísticas Acumuladas */}
-        {activeTab === 'stats' && (
+        {activeTab === 'rendimiento' && (
           <div className="p-6 bg-slate-900/40 border border-slate-800/80 rounded-2xl space-y-6">
             {/* Rendimiento y Valoraciones Medias 360 */}
             <div className="space-y-3">
@@ -1085,8 +1199,8 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
           </div>
         )}
 
-        {/* Tab 6: Observaciones de Partidos */}
-        {activeTab === 'observations' && (
+        {/* Tab 6: Rendimiento - Observaciones de Partidos */}
+        {activeTab === 'rendimiento' && (
           <div className="space-y-6">
             <div className="flex justify-between items-center">
               <h3 className="text-base font-bold text-slate-100">Histórico de Observaciones</h3>
@@ -1240,8 +1354,8 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
           </div>
         )}
 
-        {/* Tab 7: Historial de Entrenamientos */}
-        {activeTab === 'entrenamientos' && (
+        {/* Tab 7: Rendimiento - Historial de Entrenamientos */}
+        {activeTab === 'rendimiento' && (
           <div className="space-y-6">
             <h3 className="text-base font-bold text-slate-100 flex items-center gap-1.5">
               <Calendar className="h-5 w-5 text-[#CC0E21]" />
@@ -1367,8 +1481,8 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
           </div>
         )}
 
-        {/* Tab 8: Historial de Reuniones */}
-        {activeTab === 'reuniones' && (
+        {/* Tab 8: Rendimiento - Historial de Reuniones */}
+        {activeTab === 'rendimiento' && (
           <div className="space-y-6">
             <div className="flex justify-between items-center">
               <h3 className="text-base font-bold text-slate-100 flex items-center gap-1.5">
@@ -1576,6 +1690,24 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Tab 10: Multimedia */}
+        {activeTab === 'multimedia' && (
+          <div className="p-12 text-center bg-slate-900/40 border border-slate-800/80 rounded-2xl animate-fadeIn">
+            <User className="h-12 w-12 text-slate-600 mx-auto mb-4" />
+            <h3 className="text-lg font-bold text-slate-300">Galería Multimedia (Próximamente)</h3>
+            <p className="text-sm text-slate-500 mt-2">Este módulo almacenará vídeos, cortes de partidos e informes visuales del jugador.</p>
+          </div>
+        )}
+
+        {/* Tab 11: IA */}
+        {activeTab === 'ia' && (
+          <div className="p-12 text-center bg-slate-900/40 border border-slate-800/80 rounded-2xl animate-fadeIn">
+            <Sparkles className="h-12 w-12 text-[#CC0E21] mx-auto mb-4" />
+            <h3 className="text-lg font-bold text-slate-300">Asistente IA del Jugador (Próximamente)</h3>
+            <p className="text-sm text-slate-500 mt-2">Chat conversacional inteligente enfocado en el rendimiento y la evaluación de este jugador.</p>
           </div>
         )}
       </div>
