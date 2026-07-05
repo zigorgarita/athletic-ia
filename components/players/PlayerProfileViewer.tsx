@@ -2,7 +2,7 @@ import React from 'react';
 import { Player } from '@/types';
 import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
-import { Calendar, Ruler, Weight, User, MapPin, Target, Shield, Heart } from 'lucide-react';
+import { Calendar, Ruler, User, MapPin, Target, Shield } from 'lucide-react';
 
 interface PlayerProfileViewerProps {
   player: Player;
