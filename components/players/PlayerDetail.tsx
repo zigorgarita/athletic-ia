@@ -23,6 +23,7 @@ import {
   History, Trash2, Heart, Plus, ShieldAlert, MessageSquare
 } from 'lucide-react';
 import { useEditMode } from '@/context/EditModeContext';
+import { PlayerProfileViewer } from '@/components/players/PlayerProfileViewer';
 
 const METRICAS_ESPECIFICAS: Record<string, string[]> = {
   Portero: ['Juego aéreo', 'Blocaje', 'Reflejos', 'Juego con pies', 'Salida', 'Comunicación', 'Colocación'],
@@ -51,7 +52,7 @@ interface PlayerDetailProps {
 
 export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
   const [currentPlayer, setCurrentPlayer] = useState<Player>(player);
-  const [activeTab, setActiveTab] = useState<'profile' | 'deportivo' | 'valoraciones' | 'stats' | 'lesiones' | 'observations' | 'entrenamientos' | 'reuniones'>('profile');
+  const [activeTab, setActiveTab] = useState<'deportivo' | 'valoraciones' | 'stats' | 'lesiones' | 'observations' | 'entrenamientos' | 'reuniones'>('deportivo');
   const { isEditMode } = useEditMode();
   
   // Training Attendance States
@@ -100,7 +101,7 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
       }
     }
 
-    if (activeTab === 'entrenamientos' || activeTab === 'profile' || activeTab === 'stats') {
+    if (activeTab === 'entrenamientos' || activeTab === 'stats') {
       loadTrainingHistory();
     }
   }, [currentPlayer.id, activeTab]);
@@ -529,169 +530,11 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
         &larr; Volver a la Plantilla
       </button>
 
-      {/* Tarjeta de Encabezado Principal */}
-      <div className="p-6 rounded-3xl bg-slate-900/40 border border-slate-800/80 backdrop-blur-xl flex flex-col md:flex-row gap-6 items-center md:items-start relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-64 h-64 rounded-full bg-[#CC0E21]/5 blur-[80px] pointer-events-none" />
-        
-        {/* Foto de Perfil Grande */}
-        <div className="relative group cursor-pointer h-32 w-32 rounded-full overflow-hidden border-4 border-slate-850 shadow-2xl transition-all duration-300 hover:border-[#CC0E21]/40">
-          <input
-            type="file"
-            accept="image/*"
-            disabled={uploadingPhoto || !isEditMode}
-            onChange={async (e) => {
-              const file = e.target.files?.[0];
-              if (file) {
-                const compressed = await compressImage(file);
-                const url = await uploadPhoto(compressed, currentPlayer.nombre);
-                if (url) {
-                  const updated = await updatePlayer(currentPlayer.id, { foto_url: url });
-                  if (updated) {
-                    setCurrentPlayer(updated);
-                  }
-                }
-              }
-            }}
-            className={`absolute inset-0 opacity-0 z-30 ${isEditMode ? 'cursor-pointer' : 'cursor-default'}`}
-            title={isEditMode ? "Cambiar foto" : "Solo lectura"}
-          />
-          <Avatar src={currentPlayer.foto_url} name={currentPlayer.nombre} size="xl" className="h-full w-full object-cover" />
-          {!currentPlayer.foto_url && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/20 group-hover:bg-slate-950/40 transition-colors duration-200">
-              <span className="absolute bottom-2 text-[8px] text-[#CC0E21] font-extrabold uppercase tracking-wider bg-slate-950/90 px-2 py-0.5 rounded-full border border-[#CC0E21]/30">
-                {uploadingPhoto ? 'Subiendo...' : 'Añadir foto'}
-              </span>
-            </div>
-          )}
-          {currentPlayer.foto_url && (
-            <div className="absolute inset-0 flex items-center justify-center bg-slate-950/60 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-              <span className="text-[8px] text-white font-extrabold uppercase tracking-wider bg-slate-900/80 px-2 py-0.5 rounded-full border border-slate-700/50">
-                {uploadingPhoto ? 'Subiendo...' : 'Cambiar foto'}
-              </span>
-            </div>
-          )}
-          <div className="absolute bottom-1 right-1 bg-[#CC0E21] text-white font-black h-6 w-6 rounded-lg flex items-center justify-center text-[10px] shadow-lg z-20">
-            #{currentPlayer.dorsal}
-          </div>
-        </div>
-
-        {/* Información General */}
-        <div className="flex-1 space-y-3 text-center md:text-left">
-          <div className="flex flex-col md:flex-row md:items-center gap-2.5 justify-center md:justify-start">
-            <h1 className="text-3xl font-extrabold tracking-tight text-white">
-              {currentPlayer.nombre} {currentPlayer.apellidos}
-            </h1>
-            <div className="relative self-center md:self-auto">
-              <select
-                value={currentPlayer.demarcacion}
-                disabled={!isEditMode}
-                onChange={async (e) => {
-                  const newPos = e.target.value as any;
-                  const updated = await updatePlayer(currentPlayer.id, { demarcacion: newPos });
-                  if (updated) {
-                    setCurrentPlayer(updated);
-                  }
-                }}
-                className={`bg-slate-900/80 hover:bg-slate-800 text-[#CC0E21] border border-[#CC0E21]/20 rounded-xl px-3 py-1 text-xs outline-none focus:border-[#CC0E21] cursor-pointer font-bold transition-all duration-200 shadow-md shadow-[#CC0E21]/5 appearance-none pr-8 ${!isEditMode ? 'opacity-70 cursor-not-allowed' : ''}`}
-                style={{ backgroundImage: `url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%23CC0E21' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E")`, backgroundPosition: 'right 0.5rem center', backgroundSize: '1.25rem', backgroundRepeat: 'no-repeat' }}
-              >
-                <option value="Portero" className="bg-slate-950 text-slate-200">Portero</option>
-                <option value="Lateral" className="bg-slate-950 text-slate-200">Lateral</option>
-                <option value="Central" className="bg-slate-950 text-slate-200">Central</option>
-                <option value="Defensa" className="bg-slate-950 text-slate-200">Defensa</option>
-                <option value="Pivote" className="bg-slate-950 text-slate-200">Pivote</option>
-                <option value="Interior" className="bg-slate-950 text-slate-200">Interior</option>
-                <option value="Centrocampista" className="bg-slate-950 text-slate-200">Centrocampista</option>
-                <option value="Extremo" className="bg-slate-950 text-slate-200">Extremo</option>
-                <option value="Delantero" className="bg-slate-950 text-slate-200">Delantero</option>
-              </select>
-            </div>
-            {currentPlayer.estado && (
-              <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border self-center md:self-auto ${
-                currentPlayer.estado === 'Disponible' ? 'bg-green-950/20 text-green-400 border-green-900/30' :
-                currentPlayer.estado === 'Lesionado' ? 'bg-red-950/20 text-red-400 border-red-900/30' :
-                currentPlayer.estado === 'Duda' ? 'bg-amber-950/20 text-amber-400 border-amber-900/30' :
-                currentPlayer.estado === 'Sancionado' ? 'bg-orange-950/20 text-orange-400 border-orange-900/30' :
-                'bg-slate-850/40 text-slate-400 border-slate-700/50'
-              }`}>
-                {currentPlayer.estado}
-              </span>
-            )}
-          </div>
-
-          {/* Fila de Datos Secundarios */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-left max-w-2xl bg-slate-950/40 p-4 rounded-2xl border border-slate-800/50">
-            <div>
-              <span className="text-[10px] uppercase text-slate-500 font-bold block">Edad</span>
-              <span className="text-sm font-semibold text-slate-200">{getAge(currentPlayer.fecha_nacimiento)} años</span>
-            </div>
-            <div>
-              <span className="text-[10px] uppercase text-slate-500 font-bold block">Estatura / Peso</span>
-              <span className="text-sm font-semibold text-slate-200">
-                {currentPlayer.altura ? `${currentPlayer.altura}m` : '-'} / {currentPlayer.peso ? `${currentPlayer.peso}kg` : '-'}
-              </span>
-            </div>
-            <div>
-              <span className="text-[10px] uppercase text-slate-500 font-bold block">Pierna Dominante</span>
-              <span className="text-sm font-semibold text-slate-200">{currentPlayer.pierna_dominante}</span>
-            </div>
-            <div>
-              <span className="text-[10px] uppercase text-slate-500 font-bold block mb-1">Posición Sec.</span>
-              <div className="relative">
-                <select
-                  value={currentPlayer.posicion_secundaria || ''}
-                  disabled={!isEditMode}
-                  onChange={async (e) => {
-                    const newPos = e.target.value || null;
-                    const updated = await updatePlayer(currentPlayer.id, { posicion_secundaria: newPos });
-                    if (updated) {
-                      setCurrentPlayer(updated);
-                    }
-                  }}
-                  className={`bg-slate-900/40 hover:bg-slate-800/60 text-slate-200 border border-slate-700/30 rounded-lg px-2 py-0.5 text-xs outline-none focus:border-[#CC0E21] cursor-pointer font-semibold appearance-none pr-6 w-full ${!isEditMode ? 'opacity-70 cursor-not-allowed' : ''}`}
-                  style={{ backgroundImage: `url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%2394a3b8' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E")`, backgroundPosition: 'right 0.35rem center', backgroundSize: '1rem', backgroundRepeat: 'no-repeat' }}
-                >
-                  <option value="" className="bg-slate-950 text-slate-350">Ninguna</option>
-                  {['Portero', 'Lateral', 'Central', 'Defensa', 'Pivote', 'Interior', 'Centrocampista', 'Extremo', 'Delantero'].map(pos => (
-                    <option key={pos} value={pos} className="bg-slate-950 text-slate-200">{pos}</option>
-                  ))}
-                  {currentPlayer.posicion_secundaria && !['Portero', 'Lateral', 'Central', 'Defensa', 'Pivote', 'Interior', 'Centrocampista', 'Extremo', 'Delantero'].includes(currentPlayer.posicion_secundaria) && (
-                    <option value={currentPlayer.posicion_secundaria} className="bg-slate-950 text-slate-200">
-                      Otros: {currentPlayer.posicion_secundaria}
-                    </option>
-                  )}
-                </select>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap gap-4 text-xs text-slate-400 pt-1 justify-center md:justify-start items-center">
-            {currentPlayer.rol_abp && (
-              <span><strong className="text-slate-300">Rol ABP:</strong> {currentPlayer.rol_abp}</span>
-            )}
-            <span>
-              <strong className="text-slate-300">Valoración Global Vigente:</strong> 
-              <span className="text-amber-400 font-extrabold ml-1.5 flex items-center gap-0.5 inline-flex">
-                <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" /> {computedGlobalRating}
-              </span>
-            </span>
-          </div>
-        </div>
-      </div>
+      {/* Componente del Perfil del Jugador (Fuente Única) */}
+      <PlayerProfileViewer player={currentPlayer} />
 
       {/* Tabs */}
       <div className="flex overflow-x-auto border-b border-slate-800 scrollbar-none whitespace-nowrap">
-        <button
-          onClick={() => setActiveTab('profile')}
-          className={`flex items-center gap-2 px-5 py-3.5 border-b-2 text-sm font-semibold transition-all duration-200 ${
-            activeTab === 'profile'
-              ? 'border-[#CC0E21] text-[#CC0E21] bg-[#CC0E21]/5'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <User className="h-4 w-4" />
-          Datos Generales
-        </button>
         <button
           onClick={() => setActiveTab('deportivo')}
           className={`flex items-center gap-2 px-5 py-3.5 border-b-2 text-sm font-semibold transition-all duration-200 ${
@@ -794,148 +637,39 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
           </div>
         )}
 
-        {/* Tab 1: Datos Generales */}
-        {activeTab === 'profile' && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-fadeIn">
-            <div className="md:col-span-2 space-y-6">
-              {/* Información Personal y Federativa */}
-              <div className="p-6 bg-slate-900/40 border border-slate-800/80 rounded-2xl space-y-4">
-                <h3 className="text-sm font-bold text-slate-200 uppercase tracking-wider border-b border-slate-850 pb-2 flex items-center gap-2">
-                  <User className="h-4 w-4 text-[#CC0E21]" />
-                  Resumen / Datos del Jugador
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                  <div>
-                    <span className="text-slate-500 font-bold block mb-0.5">Nombre Completo</span>
-                    <span className="text-slate-200 text-sm font-medium">{currentPlayer.nombre} {currentPlayer.apellidos}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 font-bold block mb-0.5">Equipo</span>
-                    <span className="text-slate-200 text-sm font-medium">Juvenil {currentPlayer.equipo}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 font-bold block mb-0.5">Dorsal</span>
-                    <span className="text-slate-200 text-sm font-medium">#{currentPlayer.dorsal}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 font-bold block mb-0.5">Fecha Nacimiento</span>
-                    <span className="text-slate-200 text-sm font-medium">
-                      {currentPlayer.fecha_nacimiento ? `${currentPlayer.fecha_nacimiento} (${getAge(currentPlayer.fecha_nacimiento)} años)` : '-'}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 font-bold block mb-0.5">Posición Principal</span>
-                    <span className="text-slate-200 text-sm font-medium">{currentPlayer.demarcacion}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 font-bold block mb-0.5">Estado Físico / Médico</span>
-                    <span className={`text-xs font-bold px-2 py-0.5 rounded border inline-block ${
-                      currentPlayer.estado === 'Disponible' ? 'bg-green-950/20 text-green-400 border-green-900/30' :
-                      currentPlayer.estado === 'Lesionado' ? 'bg-red-950/20 text-red-400 border-red-900/30' :
-                      'bg-slate-850/40 text-slate-400 border-slate-700/50'
-                    }`}>
-                      {currentPlayer.estado}
-                    </span>
-                  </div>
-                </div>
-              </div>
 
-              {/* Conclusiones Generales del Jugador */}
-              <div className="p-6 bg-slate-900/40 border border-slate-800/80 rounded-2xl space-y-3">
-                <h3 className="text-sm font-bold text-slate-200 uppercase tracking-wider border-b border-slate-850 pb-2 flex items-center gap-2">
-                  <ClipboardList className="h-4 w-4 text-amber-400" />
-                  Conclusiones Generales del Jugador
-                </h3>
-                <textarea
-                  value={currentPlayer.rol_abp || ''}
-                  disabled={!isEditMode}
-                  onChange={async (e) => {
-                    const text = e.target.value;
-                    // Store locally first
-                    setCurrentPlayer(prev => ({ ...prev, rol_abp: text }));
-                  }}
-                  onBlur={async () => {
-                    if (isEditMode) {
-                      await updatePlayer(currentPlayer.id, { rol_abp: currentPlayer.rol_abp });
-                    }
-                  }}
-                  placeholder="Escribe aquí las conclusiones, observaciones generales, fortalezas y plan de mejora de este jugador..."
-                  className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-3.5 py-3 text-xs text-slate-200 outline-none focus:border-[#CC0E21] h-32 resize-none"
-                />
-                <span className="text-[10px] text-slate-500 block leading-tight">
-                  * Este texto se guarda automáticamente al salir del campo. Escribe conclusiones sobre su evolución táctica y física.
-                </span>
-              </div>
-            </div>
-            
-            {/* Columna Derecha: Resumen de Rendimiento y Stats Acumuladas */}
-            <div className="space-y-6">
-              <div className="p-6 bg-slate-900/40 border border-slate-800/80 rounded-2xl space-y-4">
-                <h3 className="text-sm font-bold text-slate-200 uppercase tracking-wider border-b border-slate-850 pb-2 flex items-center gap-2">
-                  <BarChart3 className="h-4 w-4 text-emerald-400" />
-                  Estadísticas Consolidadas
-                </h3>
-                <div className="space-y-3 text-xs">
-                  {/* Entrenamientos */}
-                  <div className="p-3 bg-slate-950/40 rounded-xl border border-slate-850 space-y-1.5">
-                    <span className="text-slate-400 font-bold block text-[10px] uppercase">Entrenamientos</span>
-                    <div className="flex justify-between items-center text-sm font-black text-slate-200">
-                      <span>Asistencia: {trainingStats.attendancePct}%</span>
-                      <span className="text-xs text-slate-500 font-normal">({trainingStats.attended} de {trainingStats.total})</span>
-                    </div>
-                    {trainingStats.avgValuation !== null && (
-                      <div className="text-[10px] text-amber-400 font-bold">
-                        Valoración media: {trainingStats.avgValuation} ★
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Partidos */}
-                  <div className="p-3 bg-slate-950/40 rounded-xl border border-slate-850 space-y-1.5">
-                    <span className="text-slate-400 font-bold block text-[10px] uppercase">Partidos Oficiales</span>
-                    {loadingStats ? (
-                      <div className="h-6 w-20 bg-slate-800 rounded animate-pulse" />
-                    ) : (
-                      <div className="space-y-1">
-                        <div className="flex justify-between items-center text-sm font-black text-slate-200">
-                          <span>Jugados: {statsSummary?.partidos || 0}</span>
-                          <span className="text-xs text-slate-500 font-normal">Minutos: {statsSummary?.minutos || 0}m</span>
-                        </div>
-                        <div className="flex justify-between text-[10px] text-slate-400">
-                          <span>Titularidades: {statsSummary?.titularidades || 0}</span>
-                          <span>Goles: {statsSummary?.goles || 0}</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Antropometría corta */}
-              <div className="p-6 bg-slate-900/40 border border-slate-800/80 rounded-2xl space-y-3">
-                <h3 className="text-sm font-bold text-slate-200 uppercase tracking-wider border-b border-slate-850 pb-2">Perfil Físico</h3>
-                <div className="grid grid-cols-2 gap-3 text-xs">
-                  <div>
-                    <span className="text-slate-550 block font-bold">Altura</span>
-                    <span className="text-slate-200 font-medium">{currentPlayer.altura ? `${currentPlayer.altura} m` : 'No registrada'}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-550 block font-bold">Peso</span>
-                    <span className="text-slate-200 font-medium">{currentPlayer.peso ? `${currentPlayer.peso} kg` : 'No registrado'}</span>
-                  </div>
-                  <div className="col-span-2">
-                    <span className="text-slate-550 block font-bold">Pierna Dominante</span>
-                    <span className="text-slate-200 font-medium">{currentPlayer.pierna_dominante}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Tab 2: Perfil Deportivo */}
         {activeTab === 'deportivo' && (
           <div className="space-y-6">
+            
+            {/* Conclusiones Generales del Jugador */}
+            <div className="p-6 bg-slate-900/40 border border-slate-800/80 rounded-2xl space-y-3">
+              <h3 className="text-sm font-bold text-slate-200 uppercase tracking-wider border-b border-slate-850 pb-2 flex items-center gap-2">
+                <ClipboardList className="h-4 w-4 text-amber-400" />
+                Conclusiones Generales / Rol Táctico
+              </h3>
+              <textarea
+                value={currentPlayer.rol_abp || ''}
+                disabled={!isEditMode}
+                onChange={async (e) => {
+                  const text = e.target.value;
+                  // Store locally first
+                  setCurrentPlayer(prev => ({ ...prev, rol_abp: text }));
+                }}
+                onBlur={async () => {
+                  if (isEditMode) {
+                    await updatePlayer(currentPlayer.id, { rol_abp: currentPlayer.rol_abp });
+                  }
+                }}
+                placeholder="Escribe aquí las conclusiones, observaciones generales, fortalezas y plan de mejora de este jugador..."
+                className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-3.5 py-3 text-xs text-slate-200 outline-none focus:border-[#CC0E21] h-32 resize-none"
+              />
+              <span className="text-[10px] text-slate-500 block leading-tight">
+                * Este texto se guarda automáticamente al salir del campo. Escribe conclusiones sobre su evolución táctica y física.
+              </span>
+            </div>
+
             <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 bg-slate-900/60 p-5 rounded-2xl border border-slate-800/80">
               <div>
                 <h3 className="text-base font-bold text-slate-100 flex items-center gap-1.5">

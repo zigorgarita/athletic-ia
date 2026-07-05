@@ -55,7 +55,10 @@ const playerSchema = zod.object({
   estado: zod.enum(['Disponible', 'Lesionado', 'Duda', 'Sancionado', 'Baja temporal']),
   rol_abp: zod.string().nullable().optional(),
   foto_url: zod.string().nullable().optional(),
-  equipo: zod.enum(['DH', 'B']),
+  nacionalidad: zod.string().optional().default('España'),
+  equipo: zod.string().optional().default('Indautxu Juvenil A'),
+  categoria: zod.string().optional().default('Juvenil'),
+  temporada: zod.string().optional().default('2026/2027'),
 });
 
 type PlayerFormData = zod.infer<typeof playerSchema>;
@@ -73,7 +76,10 @@ interface FormValues {
   estado: EstadoJugador;
   rol_abp: string;
   foto_url?: string | null;
-  equipo: 'DH' | 'B';
+  nacionalidad?: string;
+  equipo?: string;
+  categoria?: string;
+  temporada?: string;
 }
 
 const positionOptions = [
@@ -125,7 +131,10 @@ export function PlayerForm({ player, onSubmit, onCancel, onDelete, isSubmitting 
       estado: 'Disponible',
       rol_abp: '',
       foto_url: null,
-      equipo: 'DH',
+      nacionalidad: 'España',
+      equipo: 'Indautxu Juvenil A',
+      categoria: 'Juvenil',
+      temporada: '2026/2027',
     },
   });
 
@@ -145,7 +154,10 @@ export function PlayerForm({ player, onSubmit, onCancel, onDelete, isSubmitting 
         estado: player.estado || 'Disponible',
         rol_abp: player.rol_abp || '',
         foto_url: player.foto_url,
-        equipo: player.equipo || 'DH',
+        nacionalidad: player.nacionalidad || 'España',
+        equipo: player.equipo || 'Indautxu Juvenil A',
+        categoria: player.categoria || 'Juvenil',
+        temporada: player.temporada || '2026/2027',
       });
       setPhotoPreview(player.foto_url);
 
@@ -176,7 +188,10 @@ export function PlayerForm({ player, onSubmit, onCancel, onDelete, isSubmitting 
         estado: 'Disponible',
         rol_abp: '',
         foto_url: null,
-        equipo: 'DH',
+        nacionalidad: 'España',
+        equipo: 'Indautxu Juvenil A',
+        categoria: 'Juvenil',
+        temporada: '2026/2027',
       });
       setPhotoPreview(null);
       setSecondaryPositionOptions(positionOptions);
@@ -246,6 +261,10 @@ export function PlayerForm({ player, onSubmit, onCancel, onDelete, isSubmitting 
       peso: values.peso === '' ? null : Number(values.peso),
       posicion_secundaria: values.posicion_secundaria === '' ? null : values.posicion_secundaria,
       rol_abp: values.rol_abp === '' ? null : values.rol_abp,
+      nacionalidad: values.nacionalidad || 'España',
+      equipo: values.equipo || 'Indautxu Juvenil A',
+      categoria: values.categoria || 'Juvenil',
+      temporada: values.temporada || '2026/2027',
       foto_url: finalFotoUrl
     };
 
@@ -269,8 +288,9 @@ export function PlayerForm({ player, onSubmit, onCancel, onDelete, isSubmitting 
   ];
 
   const equipoOptions = [
-    { value: 'DH', label: 'DH' },
-    { value: 'B', label: 'B' },
+    { value: 'Indautxu Juvenil A', label: 'Indautxu Juvenil A' },
+    { value: 'Indautxu Juvenil B', label: 'Indautxu Juvenil B' },
+    { value: 'Indautxu Cadete A', label: 'Indautxu Cadete A' },
   ];
 
   return (
@@ -373,18 +393,18 @@ export function PlayerForm({ player, onSubmit, onCancel, onDelete, isSubmitting 
         />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Select
           label="Pierna Dominante"
           options={piernaOptions}
           error={errors.pierna_dominante?.message?.toString()}
           {...register('pierna_dominante')}
         />
-        <Select
-          label="Estado Semanal"
-          options={estadoOptions}
-          error={errors.estado?.message?.toString()}
-          {...register('estado')}
+        <Input
+          label="Nacionalidad"
+          placeholder="Ej: España"
+          error={errors.nacionalidad?.message?.toString()}
+          {...register('nacionalidad')}
         />
         <Select
           label="Equipo"
@@ -392,14 +412,34 @@ export function PlayerForm({ player, onSubmit, onCancel, onDelete, isSubmitting 
           error={errors.equipo?.message?.toString()}
           {...register('equipo')}
         />
+        <Input
+          label="Categoría"
+          placeholder="Ej: Juvenil"
+          error={errors.categoria?.message?.toString()}
+          {...register('categoria')}
+        />
       </div>
 
-      <Input
-        label="Rol ABP"
-        placeholder="Ej: Servidor, Rematador en segundo palo"
-        error={errors.rol_abp?.message?.toString()}
-        {...register('rol_abp')}
-      />
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Select
+          label="Estado Semanal"
+          options={estadoOptions}
+          error={errors.estado?.message?.toString()}
+          {...register('estado')}
+        />
+        <Input
+          label="Temporada"
+          placeholder="Ej: 2026/2027"
+          error={errors.temporada?.message?.toString()}
+          {...register('temporada')}
+        />
+        <Input
+          label="Rol ABP"
+          placeholder="Ej: Servidor, Rematador en segundo palo"
+          error={errors.rol_abp?.message?.toString()}
+          {...register('rol_abp')}
+        />
+      </div>
 
       {/* Botonera dinámica */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-slate-800 mt-4">

@@ -32,7 +32,11 @@ export interface Player {
   estado: EstadoJugador;
   rol_abp: string | null;
   foto_url: string | null;
-  equipo: 'DH' | 'B';
+  nacionalidad?: string;
+  equipo?: string;
+  categoria?: string;
+  temporada?: string;
+  metadata_personal?: Record<string, any>;
   created_at: string;
   updated_at: string;
 }
