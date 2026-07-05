@@ -412,111 +412,266 @@ export function PlantillaClient() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60 text-xs">
-              {sortedPlayers.map((player) => {
-                const latestValuation = valuationsCache[player.id];
-                const lastEvalDate = lastEvaluationDates[player.id];
-                const injuryText = injuriesCache[player.id];
+              {(() => {
+                const POSITION_GROUPS = [
+                  { title: '1. Porteros', match: (d: string) => d === 'Portero' },
+                  { title: '2. Laterales', match: (d: string) => d === 'Lateral' },
+                  { title: '3. Centrales', match: (d: string) => d === 'Central' || d === 'Defensa' },
+                  { title: '4. Mediocentros / Pivotes', match: (d: string) => d === 'Pivote' || d === 'Centrocampista' },
+                  { title: '5. Mediapuntas', match: (d: string) => d === 'Interior' },
+                  { title: '6. Extremos', match: (d: string) => d === 'Extremo' },
+                  { title: '7. Delanteros', match: (d: string) => d === 'Delantero' }
+                ];
+
+                const renderedPlayerIds = new Set<string>();
+
                 return (
-                  <tr 
-                    key={player.id} 
-                    onClick={() => setActivePlayerForDetail(player)}
-                    className="hover:bg-slate-800/30 transition-colors duration-150 cursor-pointer group"
-                  >
-                    <td className="px-4 py-3.5 text-center">
-                      <Avatar src={player.foto_url} name={player.nombre} size="sm" className="border border-slate-700/60 mx-auto" />
-                    </td>
-                    <td className="px-3 py-3.5 font-black text-sm text-slate-300">
-                      #{player.dorsal}
-                    </td>
-                    <td className="px-4 py-3.5 font-bold text-slate-100 group-hover:text-[#CC0E21] transition-colors">
-                      {player.nombre} <span className="text-slate-400 font-medium">{player.apellidos}</span>
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <div className="flex flex-wrap gap-1 items-center">
-                        <Badge variant={player.demarcacion}>{player.demarcacion}</Badge>
-                        {player.posicion_secundaria && (
-                          <Badge variant={player.posicion_secundaria as any} className="opacity-70 text-[10px] px-2 py-0">
-                            {player.posicion_secundaria}
-                          </Badge>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                        player.equipo === 'DH' 
-                          ? 'bg-red-950/10 text-[#CC0E21] border-[#CC0E21]/20' 
-                          : 'bg-blue-950/20 text-blue-400 border-blue-900/30'
-                      }`}>
-                        {player.equipo}
-                      </span>
-                    </td>
-                    <td className="px-3 py-3.5 text-center text-slate-300">
-                      {getAge(player.fecha_nacimiento)}
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                        player.estado === 'Disponible' ? 'bg-green-950/20 text-green-400 border-green-900/30' :
-                        player.estado === 'Lesionado' ? 'bg-red-950/20 text-red-400 border-red-900/30' :
-                        player.estado === 'Duda' ? 'bg-amber-950/20 text-amber-400 border-amber-900/30' :
-                        player.estado === 'Sancionado' ? 'bg-orange-950/20 text-orange-400 border-orange-900/30' :
-                        'bg-slate-800 text-slate-350 border-slate-700/40'
-                      }`}>
-                        {player.estado}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3.5 font-bold">
-                      {latestValuation ? (
-                        <span className="text-amber-400 flex items-center gap-1">
-                          <Star className="h-3.5 w-3.5 fill-amber-500 text-amber-500" /> {latestValuation}
-                        </span>
-                      ) : (
-                        <span className="text-slate-500">-</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3.5 text-slate-400 max-w-[180px] truncate">
-                      {injuryText ? (
-                        <span className={injuryText.startsWith('Alta:') ? 'text-slate-500 line-through text-[11px]' : 'text-red-400 font-medium'}>
-                          {injuryText.startsWith('Alta:') ? injuryText.replace('Alta:', '') : injuryText}
-                        </span>
-                      ) : (
-                        <span className="text-slate-650">-</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3.5 text-slate-400">
-                      {lastEvalDate || '-'}
-                    </td>
-                    <td className="px-6 py-3.5" onClick={e => e.stopPropagation()}>
-                      <div className="flex justify-center gap-2">
-                        <button 
-                          onClick={() => setActivePlayerForDetail(player)} 
-                          className="h-8 w-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-colors duration-150"
-                          title="Ver ficha"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </button>
-                        {isEditMode && (
-                          <>
-                            <button 
-                              onClick={(e) => handleOpenEditModal(e, player)} 
-                              className="h-8 w-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-[#CC0E21] hover:bg-slate-800/50 transition-colors duration-150"
-                              title="Editar"
-                            >
-                              <Edit2 className="h-4 w-4" />
-                            </button>
-                            <button 
-                              onClick={(e) => handleDelete(e, player.id)} 
-                              className="h-8 w-8 flex items-center justify-center rounded-lg text-red-500 hover:text-red-400 hover:bg-red-950/20 border border-transparent hover:border-red-900/30 transition-colors duration-150"
-                              title="Eliminar"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
+                  <>
+                    {POSITION_GROUPS.map((group) => {
+                      const groupPlayers = sortedPlayers.filter(p => group.match(p.demarcacion));
+                      if (groupPlayers.length === 0) return null;
+
+                      groupPlayers.forEach(p => renderedPlayerIds.add(p.id));
+
+                      return (
+                        <React.Fragment key={group.title}>
+                          {/* Encabezado de la Posición */}
+                          <tr className="bg-slate-950/65 border-y border-slate-800/70 select-none">
+                            <td colSpan={10} className="px-4 py-2 text-[10px] font-black uppercase tracking-widest text-[#CC0E21]">
+                              {group.title} ({groupPlayers.length})
+                            </td>
+                          </tr>
+                          {groupPlayers.map((player) => {
+                            const latestValuation = valuationsCache[player.id];
+                            const lastEvalDate = lastEvaluationDates[player.id];
+                            const injuryText = injuriesCache[player.id];
+                            return (
+                              <tr 
+                                key={player.id} 
+                                onClick={() => setActivePlayerForDetail(player)}
+                                className="hover:bg-slate-800/30 transition-colors duration-150 cursor-pointer group"
+                              >
+                                <td className="px-4 py-3.5 text-center">
+                                  <Avatar src={player.foto_url} name={player.nombre} size="sm" className="border border-slate-700/60 mx-auto" />
+                                </td>
+                                <td className="px-3 py-3.5 font-black text-sm text-slate-300">
+                                  #{player.dorsal}
+                                </td>
+                                <td className="px-4 py-3.5 font-bold text-slate-100 group-hover:text-[#CC0E21] transition-colors">
+                                  {player.nombre} <span className="text-slate-400 font-medium">{player.apellidos}</span>
+                                </td>
+                                <td className="px-4 py-3.5">
+                                  <div className="flex flex-wrap gap-1 items-center">
+                                    <Badge variant={player.demarcacion}>{player.demarcacion}</Badge>
+                                    {player.posicion_secundaria && player.posicion_secundaria !== player.demarcacion && (
+                                      <Badge variant={player.posicion_secundaria as any} className="opacity-70 text-[10px] px-2 py-0">
+                                        {player.posicion_secundaria}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="px-4 py-3.5">
+                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                                    player.equipo === 'DH' 
+                                      ? 'bg-red-950/10 text-[#CC0E21] border-[#CC0E21]/20' 
+                                      : 'bg-blue-950/20 text-blue-400 border-blue-900/30'
+                                  }`}>
+                                    {player.equipo}
+                                  </span>
+                                </td>
+                                <td className="px-3 py-3.5 text-center text-slate-300">
+                                  {getAge(player.fecha_nacimiento)}
+                                </td>
+                                <td className="px-4 py-3.5">
+                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                                    player.estado === 'Disponible' ? 'bg-green-950/20 text-green-400 border-green-900/30' :
+                                    player.estado === 'Lesionado' ? 'bg-red-950/20 text-red-400 border-red-900/30' :
+                                    player.estado === 'Duda' ? 'bg-amber-950/20 text-amber-400 border-amber-900/30' :
+                                    player.estado === 'Sancionado' ? 'bg-orange-950/20 text-orange-400 border-orange-900/30' :
+                                    'bg-slate-800 text-slate-350 border-slate-700/40'
+                                  }`}>
+                                    {player.estado}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-3.5 font-bold">
+                                  {latestValuation ? (
+                                    <span className="text-amber-400 flex items-center gap-1">
+                                      <Star className="h-3.5 w-3.5 fill-amber-500 text-amber-500" /> {latestValuation}
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-500">-</span>
+                                  )}
+                                </td>
+                                <td className="px-4 py-3.5 text-slate-400 max-w-[180px] truncate">
+                                  {injuryText ? (
+                                    <span className={injuryText.startsWith('Alta:') ? 'text-slate-500 line-through text-[11px]' : 'text-red-400 font-medium'}>
+                                      {injuryText.startsWith('Alta:') ? injuryText.replace('Alta:', '') : injuryText}
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-650">-</span>
+                                  )}
+                                </td>
+                                <td className="px-4 py-3.5 text-slate-400">
+                                  {lastEvalDate || '-'}
+                                </td>
+                                <td className="px-6 py-3.5" onClick={e => e.stopPropagation()}>
+                                  <div className="flex justify-center gap-2">
+                                    <button 
+                                      onClick={() => setActivePlayerForDetail(player)} 
+                                      className="h-8 w-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-colors duration-150"
+                                      title="Ver ficha"
+                                    >
+                                      <Eye className="h-4 w-4" />
+                                    </button>
+                                    {isEditMode && (
+                                      <>
+                                        <button 
+                                          onClick={(e) => handleOpenEditModal(e, player)} 
+                                          className="h-8 w-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-[#CC0E21] hover:bg-slate-800/50 transition-colors duration-150"
+                                          title="Editar"
+                                        >
+                                          <Edit2 className="h-4 w-4" />
+                                        </button>
+                                        <button 
+                                          onClick={(e) => handleDelete(e, player.id)} 
+                                          className="h-8 w-8 flex items-center justify-center rounded-lg text-red-500 hover:text-red-400 hover:bg-red-950/20 border border-transparent hover:border-red-900/30 transition-colors duration-150"
+                                          title="Eliminar"
+                                        >
+                                          <Trash2 className="h-4 w-4" />
+                                        </button>
+                                      </>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </React.Fragment>
+                      );
+                    })}
+
+                    {/* Otros / Sin grupo (por si acaso hubiera alguna posición no mapeada) */}
+                    {(() => {
+                      const unmatchedPlayers = sortedPlayers.filter(p => !renderedPlayerIds.has(p.id));
+                      if (unmatchedPlayers.length === 0) return null;
+                      return (
+                        <React.Fragment key="Otros">
+                          <tr className="bg-slate-950/65 border-y border-slate-800/70 select-none">
+                            <td colSpan={10} className="px-4 py-2 text-[10px] font-black uppercase tracking-widest text-[#CC0E21]">
+                              Otros / Sin Asignar ({unmatchedPlayers.length})
+                            </td>
+                          </tr>
+                          {unmatchedPlayers.map((player) => {
+                            const latestValuation = valuationsCache[player.id];
+                            const lastEvalDate = lastEvaluationDates[player.id];
+                            const injuryText = injuriesCache[player.id];
+                            return (
+                              <tr 
+                                key={player.id} 
+                                onClick={() => setActivePlayerForDetail(player)}
+                                className="hover:bg-slate-800/30 transition-colors duration-150 cursor-pointer group"
+                              >
+                                <td className="px-4 py-3.5 text-center">
+                                  <Avatar src={player.foto_url} name={player.nombre} size="sm" className="border border-slate-700/60 mx-auto" />
+                                </td>
+                                <td className="px-3 py-3.5 font-black text-sm text-slate-300">
+                                  #{player.dorsal}
+                                </td>
+                                <td className="px-4 py-3.5 font-bold text-slate-100 group-hover:text-[#CC0E21] transition-colors">
+                                  {player.nombre} <span className="text-slate-400 font-medium">{player.apellidos}</span>
+                                </td>
+                                <td className="px-4 py-3.5">
+                                  <div className="flex flex-wrap gap-1 items-center">
+                                    <Badge variant={player.demarcacion}>{player.demarcacion}</Badge>
+                                    {player.posicion_secundaria && player.posicion_secundaria !== player.demarcacion && (
+                                      <Badge variant={player.posicion_secundaria as any} className="opacity-70 text-[10px] px-2 py-0">
+                                        {player.posicion_secundaria}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="px-4 py-3.5">
+                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                                    player.equipo === 'DH' 
+                                      ? 'bg-red-950/10 text-[#CC0E21] border-[#CC0E21]/20' 
+                                      : 'bg-blue-950/20 text-blue-400 border-blue-900/30'
+                                  }`}>
+                                    {player.equipo}
+                                  </span>
+                                </td>
+                                <td className="px-3 py-3.5 text-center text-slate-300">
+                                  {getAge(player.fecha_nacimiento)}
+                                </td>
+                                <td className="px-4 py-3.5">
+                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                                    player.estado === 'Disponible' ? 'bg-green-950/20 text-green-400 border-green-900/30' :
+                                    player.estado === 'Lesionado' ? 'bg-red-950/20 text-red-400 border-red-900/30' :
+                                    player.estado === 'Duda' ? 'bg-amber-950/20 text-amber-400 border-amber-900/30' :
+                                    player.estado === 'Sancionado' ? 'bg-orange-950/20 text-orange-400 border-orange-900/30' :
+                                    'bg-slate-800 text-slate-350 border-slate-700/40'
+                                  }`}>
+                                    {player.estado}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-3.5 font-bold">
+                                  {latestValuation ? (
+                                    <span className="text-amber-400 flex items-center gap-1">
+                                      <Star className="h-3.5 w-3.5 fill-amber-500 text-amber-500" /> {latestValuation}
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-500">-</span>
+                                  )}
+                                </td>
+                                <td className="px-4 py-3.5 text-slate-400 max-w-[180px] truncate">
+                                  {injuryText ? (
+                                    <span className={injuryText.startsWith('Alta:') ? 'text-slate-500 line-through text-[11px]' : 'text-red-400 font-medium'}>
+                                      {injuryText.startsWith('Alta:') ? injuryText.replace('Alta:', '') : injuryText}
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-650">-</span>
+                                  )}
+                                </td>
+                                <td className="px-4 py-3.5 text-slate-400">
+                                  {lastEvalDate || '-'}
+                                </td>
+                                <td className="px-6 py-3.5" onClick={e => e.stopPropagation()}>
+                                  <div className="flex justify-center gap-2">
+                                    <button 
+                                      onClick={() => setActivePlayerForDetail(player)} 
+                                      className="h-8 w-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-colors duration-150"
+                                      title="Ver ficha"
+                                    >
+                                      <Eye className="h-4 w-4" />
+                                    </button>
+                                    {isEditMode && (
+                                      <>
+                                        <button 
+                                          onClick={(e) => handleOpenEditModal(e, player)} 
+                                          className="h-8 w-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-[#CC0E21] hover:bg-slate-800/50 transition-colors duration-150"
+                                          title="Editar"
+                                        >
+                                          <Edit2 className="h-4 w-4" />
+                                        </button>
+                                        <button 
+                                          onClick={(e) => handleDelete(e, player.id)} 
+                                          className="h-8 w-8 flex items-center justify-center rounded-lg text-red-500 hover:text-red-400 hover:bg-red-950/20 border border-transparent hover:border-red-900/30 transition-colors duration-150"
+                                          title="Eliminar"
+                                        >
+                                          <Trash2 className="h-4 w-4" />
+                                        </button>
+                                      </>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </React.Fragment>
+                      );
+                    })()}
+                  </>
                 );
-              })}
+              })()}
             </tbody>
           </table>
         </div>
