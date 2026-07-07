@@ -468,6 +468,7 @@ export function PlanificacionClient() {
         evaluacion_completada?: boolean;
         evaluacion_duracion_real?: number | null;
         evaluacion_observaciones?: string | null;
+        rival?: string | null;
       } = {
         fecha: sessionForm.fecha,
         tipo_sesion: sessionForm.tipo_sesion,
@@ -480,7 +481,8 @@ export function PlanificacionClient() {
         estado: sessionForm.estado || 'Planificada',
         hora_convocatoria: sessionForm.hora_convocatoria || null,
         observaciones_convocatoria: sessionForm.ropa_convocatoria || null,
-        checklist_material: (sessionForm.checklist_material as Record<string, unknown>) || {}
+        checklist_material: (sessionForm.checklist_material as Record<string, unknown>) || {},
+        rival: sessionForm.rival || null
       };
 
       sessionPayload.evaluacion_completada = sessionForm.evaluacion_completada || false;
