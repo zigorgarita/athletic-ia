@@ -710,10 +710,8 @@ export function PlanificacionClient() {
     }
   };
 
-  // Weekly Dashboard calculations
-  const totalVolume = sessions.reduce((acc, s) => acc + (s.duracion_total || 0), 0);
-  const activeSessionsCount = sessions.filter(s => s.tipo_sesion !== 'Libre').length;
   
+
   // Squad breakdown
   const availableCount = players.filter(p => p.estado === 'Disponible').length;
   const injuredCount = players.filter(p => p.estado === 'Lesionado').length;
@@ -743,11 +741,13 @@ export function PlanificacionClient() {
       {/* CABECERA SUPERIOR - CUADERNO DE ENTRENADOR V3 */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 items-stretch">
         {/* Widget del Microciclo y Datos Físicos */}
-        <div className="xl:col-span-4 p-6 rounded-2xl bg-slate-900/30 border border-slate-800/60 flex flex-col justify-between space-y-5">
+        <div className="xl:col-span-6 p-6 rounded-2xl bg-slate-900/30 border border-slate-800/60 flex flex-col justify-between space-y-5">
           <div className="flex justify-between items-start">
             <div>
               <span className="text-[9px] font-black tracking-widest text-slate-500 uppercase">PLANIFICACIÓN</span>
-              <h1 className="text-xl font-black tracking-tight text-slate-100 mt-0.5">MICROCICLO 32</h1>
+              <h1 className="text-xl font-black tracking-tight text-slate-100 mt-0.5">
+                MICROCICLO {Math.max(1, Math.round((currentMonday.getTime() - new Date(2026, 6, 27).getTime()) / (1000 * 60 * 60 * 24 * 7)) + 1)}
+              </h1>
             </div>
             <div className="flex bg-slate-950 border border-slate-855 p-1 rounded-xl gap-1 items-center">
               <button 
@@ -803,22 +803,8 @@ export function PlanificacionClient() {
           </div>
         </div>
 
-        {/* Banner del Objetivo Semanal */}
-        <div className="xl:col-span-4 p-6 rounded-2xl bg-slate-900/30 border border-slate-800/60 flex flex-col justify-between">
-          <div>
-            <span className="text-[9px] font-black tracking-widest text-[#CC0E21] uppercase">OBJETIVO SEMANAL</span>
-            <div className="mt-2 text-sm font-semibold text-slate-200 leading-relaxed">
-              Presión tras pérdida en bloque alto y transiciones rápidas verticales buscando finalizaciones en menos de 8 segundos.
-            </div>
-          </div>
-          <div className="text-[10px] text-slate-550 font-medium flex items-center gap-1 border-t border-slate-850 pt-3 mt-3">
-            <Clock className="h-3.5 w-3.5 text-slate-655" />
-            <span>Volumen planificado: {totalVolume} min | {activeSessionsCount} sesiones</span>
-          </div>
-        </div>
-
         {/* Widget Prominente: Partido de la Semana */}
-        <div className="xl:col-span-4 p-6 rounded-2xl bg-slate-900/30 border border-slate-800/60 flex flex-col justify-between relative overflow-hidden group">
+        <div className="xl:col-span-6 p-6 rounded-2xl bg-slate-900/30 border border-slate-800/60 flex flex-col justify-between relative overflow-hidden group">
           <div className="flex justify-between items-start z-10">
             <div>
               <span className="text-[9px] font-black tracking-widest text-emerald-400 bg-emerald-500/5 px-2 py-0.5 rounded border border-emerald-500/10 uppercase">
