@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS player_meetings (
     estado TEXT NOT NULL DEFAULT 'Pendiente' CHECK (estado IN ('Pendiente', 'En seguimiento', 'Resuelta')),
     
     -- Campos futuros integrados (Diseño preparado para crecer)
-    participantes TEXT[] DEFAULT '{}'::TEXT[],
+    participantes JSONB DEFAULT '[]'::jsonb,
     adjuntos JSONB DEFAULT '[]'::jsonb,
     firma_url TEXT,
     seguimiento_notas TEXT,

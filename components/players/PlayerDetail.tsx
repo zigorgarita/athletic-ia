@@ -52,7 +52,7 @@ interface PlayerDetailProps {
 
 export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
   const [currentPlayer, setCurrentPlayer] = useState<Player>(player);
-  const [activeTab, setActiveTab] = useState<'personal' | 'resumen' | 'rendimiento' | 'tactica' | 'fisico' | 'multimedia' | 'ia'>('personal');
+  const [activeTab, setActiveTab] = useState<'personal' | 'resumen' | 'rendimiento' | 'tactica' | 'fisico' | 'multimedia' | 'reuniones' | 'ia'>('personal');
   const { isEditMode } = useEditMode();
   
   // Training Attendance States
@@ -631,6 +631,17 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
         >
           <User className="h-4 w-4" />
           Multimedia
+        </button>
+        <button
+          onClick={() => setActiveTab('reuniones')}
+          className={`flex items-center gap-2 px-5 py-3.5 border-b-2 text-sm font-semibold transition-all duration-200 ${
+            activeTab === 'reuniones'
+              ? 'border-[#CC0E21] text-[#CC0E21] bg-[#CC0E21]/5'
+              : 'border-transparent text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <MessageSquare className="h-4 w-4" />
+          Reuniones
         </button>
         <button
           onClick={() => setActiveTab('ia')}
@@ -1481,8 +1492,8 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
           </div>
         )}
 
-        {/* Tab 8: Rendimiento - Historial de Reuniones */}
-        {activeTab === 'rendimiento' && (
+        {/* Tab 8: Reuniones - Historial de Reuniones */}
+        {activeTab === 'reuniones' && (
           <div className="space-y-6">
             <div className="flex justify-between items-center">
               <h3 className="text-base font-bold text-slate-100 flex items-center gap-1.5">
