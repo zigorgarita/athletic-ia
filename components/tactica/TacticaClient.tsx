@@ -763,8 +763,8 @@ export function TacticaClient() {
           <SystemCard system={activeSystem} />
         </div>
 
-        {/* Center column: Soccer fields side-by-side on large screens (6/12 on large screens) */}
-        <div className="xl:col-span-6 flex flex-col lg:flex-row items-center gap-6 justify-center">
+        {/* Center column: Soccer fields stacked vertically */}
+        <div className="xl:col-span-6 flex flex-col items-center gap-8 justify-center w-full">
           <TacticalField
             team="propio"
             nodes={nodesPropio}
@@ -775,35 +775,32 @@ export function TacticaClient() {
             highlightedZone={highlightedConflictZone}
           />
 
-          {/* UTILITIES TOOLBAR (Stacked differently on desktop vs mobile) */}
+          {/* UTILITIES TOOLBAR (Always horizontal) */}
           {isEditMode && (
-            <div className="flex flex-row lg:flex-col items-center gap-3 p-3 bg-slate-900/50 rounded-2xl border border-slate-800/80 w-full max-w-[480px] lg:w-auto justify-around shrink-0">
+            <div className="flex flex-row items-center gap-3 p-3 bg-slate-900/50 rounded-2xl border border-slate-800/80 w-full max-w-[700px] justify-around shrink-0">
               <button
                 onClick={handleSwapPizarras}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold rounded-xl bg-slate-950 hover:bg-slate-850 text-slate-350 hover:text-white border border-slate-800 transition-all lg:w-full lg:justify-center"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold rounded-xl bg-slate-950 hover:bg-slate-850 text-slate-350 hover:text-white border border-slate-800 transition-all w-full justify-center"
                 title="Intercambia las dos pizarras tácticas"
               >
                 <RefreshCw className="h-3.5 w-3.5 text-orange-400" />
-                <span className="lg:hidden">Intercambiar campos</span>
-                <span className="hidden lg:inline">Intercambiar</span>
+                <span>Intercambiar</span>
               </button>
               <button
                 onClick={handleCopyPropioToRival}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold rounded-xl bg-slate-950 hover:bg-slate-850 text-slate-350 hover:text-white border border-slate-800 transition-all lg:w-full lg:justify-center"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold rounded-xl bg-slate-950 hover:bg-slate-850 text-slate-350 hover:text-white border border-slate-800 transition-all w-full justify-center"
                 title="Copia el dibujo propio al del rival"
               >
                 <ArrowRight className="h-3.5 w-3.5 text-blue-400" />
-                <span className="lg:hidden">Copiar a Rival</span>
-                <span className="hidden lg:inline">Copiar a Rival</span>
+                <span>Copiar a Rival</span>
               </button>
               <button
                 onClick={handleCopyRivalToPropio}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold rounded-xl bg-slate-950 hover:bg-slate-850 text-slate-350 hover:text-white border border-slate-800 transition-all lg:w-full lg:justify-center"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold rounded-xl bg-slate-950 hover:bg-slate-850 text-slate-350 hover:text-white border border-slate-800 transition-all w-full justify-center"
                 title="Copia el dibujo del rival al propio"
               >
                 <ArrowRight className="h-3.5 w-3.5 text-emerald-450" />
-                <span className="lg:hidden">Copiar a Propio</span>
-                <span className="hidden lg:inline">Copiar a Propio</span>
+                <span>Copiar a Propio</span>
               </button>
             </div>
           )}

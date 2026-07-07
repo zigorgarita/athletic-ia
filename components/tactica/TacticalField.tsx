@@ -165,7 +165,7 @@ export function TacticalField({
 
   return (
     <div className="w-full flex flex-col items-center">
-      <div className="w-full max-w-[480px] text-center mb-2 flex justify-between items-center px-4 bg-slate-900/50 py-1.5 rounded-xl border border-slate-800/60">
+      <div className="w-full max-w-[700px] text-center mb-2 flex justify-between items-center px-4 bg-slate-900/50 py-1.5 rounded-xl border border-slate-800/60">
         <span className="text-xs font-black uppercase tracking-wider text-slate-350">
           {team === 'propio' ? 'Nuestro Equipo (DH)' : 'Equipo Rival (Frente)'}
         </span>
@@ -173,7 +173,7 @@ export function TacticalField({
 
       <div
         ref={containerRef}
-        className="relative w-full aspect-[2/3] max-w-[480px] bg-emerald-950/90 rounded-[2.5rem] border border-emerald-500/20 overflow-hidden shadow-2xl select-none"
+        className="relative w-full aspect-[2/3] max-w-[700px] bg-emerald-950/90 rounded-[2.5rem] border border-emerald-500/20 overflow-hidden shadow-2xl select-none"
         onDragOver={(e) => {
           if (isEditMode && team === 'propio') {
             e.preventDefault();
