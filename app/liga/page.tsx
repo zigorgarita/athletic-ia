@@ -1,6 +1,6 @@
 import React from 'react';
 import { Metadata } from 'next';
-import { LigaClient } from '@/components/liga/LigaClient';
+import { MatchCenterClient } from '@/components/liga/MatchCenterClient';
 
 export const metadata: Metadata = {
   title: 'Liga y Jornadas - indautxu_26_27',
@@ -8,5 +8,5 @@ export const metadata: Metadata = {
 };
 
 export default function Page() {
-  return <LigaClient />;
+  return <MatchCenterClient matchType="LIGA" />;
 }

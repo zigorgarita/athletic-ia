@@ -21,6 +21,7 @@ const navigation: NavItem[] = [
   { name: 'Pizarra Táctica', href: '/tactica', icon: Layout },
   { name: 'ABP', href: '/abp', icon: Shield },
   { name: 'Liga', href: '/liga', icon: Trophy },
+  { name: 'Amistosos', href: '/amistosos', icon: Trophy },
   { name: 'Dashboard', href: '/dashboard', icon: BarChart3 },
   { name: 'GPS', href: '/gps', icon: Activity },
   { name: 'Comparador', href: '/comparador', icon: ArrowRightLeft },

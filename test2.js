@@ -1,0 +1,1 @@
+fetch('https://jdkshextphguyyiwwtyt.supabase.co/rest/v1/planning_sessions?fecha=eq.2026-07-27&select=id,fecha,evaluacion_observaciones', { method: 'GET', headers: { 'apikey': 'sb_publishable_jAe-8URgFBKWfhp6bfkeNg_ToOiMaRn', 'Authorization': 'Bearer sb_publishable_jAe-8URgFBKWfhp6bfkeNg_ToOiMaRn', 'Content-Type': 'application/json' } }).then(r => r.json()).then(console.log);

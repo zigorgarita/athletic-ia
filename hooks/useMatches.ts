@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { Match, MatchPlayerStats } from '@/types';
 import { useEditMode } from '@/context/EditModeContext';
 
-export function useMatches() {
+export function useMatches(matchType: 'LIGA' | 'AMISTOSO' = 'LIGA') {
   const [matches, setMatches] = useState<Match[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -16,6 +16,7 @@ export function useMatches() {
       const { data, error: supabaseError } = await supabase
         .from('matches')
         .select('*')
+        .eq('tipo_partido', matchType)
         .order('jornada', { ascending: true });
 
       if (supabaseError) throw supabaseError;
@@ -35,7 +36,7 @@ export function useMatches() {
       const { data, error: supabaseError } = await supabase
         .rpc('exec_secure_upsert', {
           target_table: 'matches',
-          payload: matchData,
+          payload: { ...matchData, tipo_partido: matchType },
           conflict_columns: null,
           staff_passkey: passkey
         });

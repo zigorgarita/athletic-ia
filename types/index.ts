@@ -218,6 +218,7 @@ export interface Match {
   goles_contra: number | null;
   jugado: boolean;
   created_at: string;
+  tipo_partido?: 'LIGA' | 'AMISTOSO';
 }
 
 export interface MatchPlayerStats {

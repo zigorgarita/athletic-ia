@@ -13,7 +13,11 @@ import { Badge } from '@/components/ui/Badge';
 import { Trophy, Plus, Calendar, Edit, Trash2, ClipboardList } from 'lucide-react';
 import { useEditMode } from '@/context/EditModeContext';
 
-export function LigaClient() {
+interface MatchCenterClientProps {
+  matchType: 'LIGA' | 'AMISTOSO';
+}
+
+export function MatchCenterClient({ matchType }: MatchCenterClientProps) {
   const { isEditMode } = useEditMode();
   const {
     matches,
@@ -25,7 +29,7 @@ export function LigaClient() {
     fetchMatchPlayerStats,
     saveMatchPlayerStats,
     refetch,
-  } = useMatches();
+  } = useMatches(matchType);
 
   // Match Modal states
   const [isMatchModalOpen, setIsMatchModalOpen] = useState(false);
@@ -74,7 +78,7 @@ export function LigaClient() {
   };
 
   const handleDeleteMatch = async (id: string) => {
-    if (confirm('¿Estás seguro de que deseas eliminar este partido de liga? Todos los datos asociados y estadísticas de jugadores se perderán.')) {
+    if (confirm(`¿Estás seguro de que deseas eliminar este partido de ${matchType.toLowerCase()}? Todos los datos asociados y estadísticas de jugadores se perderán.`)) {
       const success = await deleteMatch(id);
       if (success) {
         refetch();
@@ -103,12 +107,12 @@ export function LigaClient() {
       {/* Cabecera */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex flex-col gap-1">
-          <h1 className="text-3xl font-extrabold tracking-tight text-slate-100 flex items-center gap-2">
-            <Trophy className="h-8 w-8 text-[#CC0E21]" />
-            Liga y Jornadas
-          </h1>
-          <p className="text-slate-400 text-sm">
-            Control de partidos, resultados de liga, convocatorias de jugadores y estadísticas.
+          <h2 className="text-xl font-bold tracking-tight text-slate-100 flex items-center gap-2">
+            <Trophy className="h-6 w-6 text-red-500" />
+            {matchType === 'LIGA' ? 'Liga y Jornadas' : 'Partidos Amistosos'}
+          </h2>
+          <p className="text-sm text-slate-400 mt-1">
+            Control de partidos, resultados, convocatorias y estadísticas.
           </p>
         </div>
         {isEditMode && (
@@ -137,8 +141,8 @@ export function LigaClient() {
           <Trophy className="h-12 w-12 text-slate-600" />
           <div>
             <h3 className="text-lg font-bold text-slate-200">No hay jornadas programadas</h3>
-            <p className="text-sm text-slate-400 max-w-sm mt-1">
-              Comienza programando los partidos de liga de tu equipo para registrar marcadores y estadísticas.
+            <p className="text-sm text-slate-400 max-w-md mx-auto mb-4">
+              Aún no hay partidos registrados. Haz clic en el botón de arriba para registrar el primer partido.
             </p>
           </div>
           {isEditMode && (
@@ -182,7 +186,7 @@ export function LigaClient() {
                       <span className="text-sm font-bold text-slate-100">
                         {match.es_local ? 'SD Indautxu' : match.rival}
                       </span>
-                      <span className="text-xs text-slate-500 font-bold">vs</span>
+                      <span className="text-xs font-bold text-slate-500">vs</span>
                       <span className="text-sm font-bold text-slate-100">
                         {match.es_local ? match.rival : 'SD Indautxu'}
                       </span>
