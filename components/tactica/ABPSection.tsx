@@ -12,7 +12,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { 
   Film, Plus, AlertCircle, Trash2, BookOpen, Layers, X, 
   Save, RefreshCw, Copy, Edit2, Search, UserCheck, 
-  PlusCircle, Check, ChevronDown, Folder, FolderOpen
+  PlusCircle, Check, ChevronDown, FolderOpen
 } from 'lucide-react';
 import { useEditMode } from '@/context/EditModeContext';
 
@@ -1073,8 +1073,8 @@ export function ABPSection({ players }: ABPSectionProps) {
             abp_play_id: selectedPlay.id,
             player_id: null,
             rol_asignado: 'Libre',
-            posicion_x: 50.0,
-            posicion_y: 50.0,
+            posicion_x: 45.0 + (Math.random() * 10), // Randomize slightly around center
+            posicion_y: 40.0 + (playRoles.length * 2), // Cascade downwards
             etiqueta: 'LIB',
             orden: playRoles.length + 1
           },
@@ -1538,14 +1538,23 @@ export function ABPSection({ players }: ABPSectionProps) {
         </div>
       )}
 
-      <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
+      <div className="flex flex-col gap-6">
         {/* ========================================================================= */}
-        {/* PANEL IZQUIERDO: SELECTOR DE JUGADAS ABP */}
+        {/* PANEL SUPERIOR: SELECTOR DE JUGADAS ABP */}
         {/* ========================================================================= */}
-        <div className="xl:col-span-1 space-y-4">
-          <div className="p-4 bg-slate-900/40 border border-slate-800/80 rounded-2xl space-y-3">
-            <div className="flex justify-between items-center">
-              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Selector de Jugadas</h3>
+        <div className="w-full space-y-4">
+          <div className="p-4 bg-slate-900/40 border border-slate-800/80 rounded-2xl">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
+              <div>
+                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                  <FolderOpen className="h-4 w-4 text-[#CC0E21]" />
+                  Selector de Jugadas
+                </h3>
+                <p className="text-[10px] text-slate-500 mt-1 max-w-sm">
+                  Organiza tus jugadas de estrategia tácticas (ABP). Cada una contiene su estructura de fichas, notas y vídeo táctico.
+                </p>
+              </div>
+              
               {isEditMode && (
                 <Button 
                   variant="primary" 
@@ -1556,34 +1565,25 @@ export function ABPSection({ players }: ABPSectionProps) {
                     setVideoFile(null);
                     setIsPlayModalOpen(true);
                   }}
-                  className="py-1 px-2.5 text-[10px] h-auto flex items-center gap-1 bg-[#CC0E21] hover:bg-red-500 text-white font-bold"
+                  className="py-1 px-2.5 text-[10px] h-auto flex items-center gap-1 bg-[#CC0E21] hover:bg-red-500 text-white font-bold shrink-0"
                 >
                   <Plus className="h-3.5 w-3.5" />
                   Nueva Jugada
                 </Button>
               )}
             </div>
-            <p className="text-[10px] text-slate-500">
-              Organiza tus jugadas de estrategia tácticas (ABP). Cada una contiene su estructura de fichas, notas y vídeo táctico.
-            </p>
 
             {/* Categorías de Filtro */}
-            <div className="space-y-1 pt-2 border-t border-slate-800/60 max-h-[220px] overflow-y-auto pr-1">
+            <div className="flex overflow-x-auto gap-2 pb-3 border-b border-slate-800/60 scrollbar-hide">
               <button
                 onClick={() => setActiveFilter('Todos')}
-                className={`w-full flex items-center justify-between px-3 py-1.5 rounded-xl text-[11px] transition-all duration-150 ${
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-[11px] whitespace-nowrap transition-all duration-150 ${
                   activeFilter === 'Todos' 
-                    ? 'bg-[#CC0E21]/10 text-[#CC0E21] font-bold border border-[#CC0E21]/15' 
-                    : 'text-slate-400 hover:bg-slate-800/30'
+                    ? 'bg-[#CC0E21] text-white font-bold' 
+                    : 'bg-slate-800/50 text-slate-400 hover:bg-slate-800'
                 }`}
               >
-                <div className="flex items-center gap-2">
-                  {activeFilter === 'Todos' ? <FolderOpen className="h-4 w-4 text-[#CC0E21]" /> : <Folder className="h-4 w-4 text-slate-500" />}
-                  <span>Todas las jugadas</span>
-                </div>
-                <span className="bg-slate-950/60 px-2 py-0.5 rounded-full border border-slate-850/80 text-[10px]">
-                  {plays.length}
-                </span>
+                Todas ({plays.length})
               </button>
               {ABP_TYPES.map(type => {
                 const count = plays.filter(p => p.tipo === type).length;
@@ -1592,80 +1592,59 @@ export function ABPSection({ players }: ABPSectionProps) {
                   <button
                     key={type}
                     onClick={() => setActiveFilter(type)}
-                    className={`w-full flex items-center justify-between px-3 py-1.5 rounded-xl text-[11px] transition-all duration-150 ${
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-[11px] whitespace-nowrap transition-all duration-150 ${
                       isActive 
-                        ? 'bg-[#CC0E21]/10 text-[#CC0E21] font-bold border border-[#CC0E21]/15' 
-                        : 'text-slate-400 hover:bg-slate-800/30'
+                        ? 'bg-[#CC0E21] text-white font-bold' 
+                        : 'bg-slate-800/50 text-slate-400 hover:bg-slate-800'
                     }`}
                   >
-                    <div className="flex items-center gap-2 truncate">
-                      {isActive ? <FolderOpen className="h-4 w-4 text-[#CC0E21]" /> : <Folder className="h-4 w-4 text-slate-500" />}
-                      <span className="truncate">{type}</span>
-                    </div>
-                    <span className={`px-2 py-0.5 rounded-full border text-[10px] shrink-0 ${
-                      isActive ? 'bg-[#CC0E21]/20 border-[#CC0E21]/30 text-[#CC0E21]' : 'bg-slate-950/60 border-slate-850/80 text-slate-500'
-                    }`}>
-                      {count}
-                    </span>
+                    {type} ({count})
                   </button>
                 );
               })}
             </div>
-          </div>
 
-          {/* Listado de Jugadas Filtradas */}
-          <div className="p-4 bg-slate-900/40 border border-slate-800/80 rounded-2xl flex flex-col max-h-[380px] overflow-y-auto">
-            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
-              <BookOpen className="h-4 w-4 text-[#CC0E21]" />
-              <span>
-                {activeFilter === 'Todos' ? 'Todas las jugadas' : activeFilter} ({filteredPlays.length})
-              </span>
-            </h3>
-            {loadingPlays ? (
-              <div className="space-y-2">
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-              </div>
-            ) : filteredPlays.length === 0 ? (
-              <p className="text-xs text-slate-500 italic text-center py-6">No hay jugadas registradas.</p>
-            ) : (
-              <div className="space-y-1.5">
-                {filteredPlays.map((play, index) => (
+            {/* Listado de Jugadas Filtradas */}
+            <div className="mt-4 flex gap-3 overflow-x-auto pb-2 scrollbar-hide snap-x">
+              {loadingPlays ? (
+                <div className="flex gap-3">
+                  <Skeleton className="h-16 w-48 rounded-xl shrink-0" />
+                  <Skeleton className="h-16 w-48 rounded-xl shrink-0" />
+                </div>
+              ) : filteredPlays.length === 0 ? (
+                <p className="text-xs text-slate-500 italic py-4">No hay jugadas registradas.</p>
+              ) : (
+                filteredPlays.map((play) => (
                   <div
                     key={play.id}
                     onClick={() => setSelectedPlay(play)}
-                    className={`group w-full flex items-center justify-between p-2.5 rounded-xl border text-xs cursor-pointer transition-all ${
+                    className={`group shrink-0 w-64 flex flex-col p-3 rounded-xl border text-xs cursor-pointer transition-all snap-start ${
                       selectedPlay?.id === play.id
-                        ? 'bg-[#CC0E21]/10 border-[#CC0E21]/30 text-[#CC0E21] font-bold'
-                        : 'bg-slate-950/40 border-slate-850 text-slate-350 hover:bg-slate-850/50 hover:border-slate-800'
+                        ? 'bg-[#CC0E21]/10 border-[#CC0E21]/50 text-slate-100 ring-1 ring-[#CC0E21]/30 shadow-lg shadow-[#CC0E21]/5'
+                        : 'bg-slate-950/60 border-slate-850 hover:bg-slate-850 hover:border-slate-800 text-slate-350'
                     }`}
                   >
-                    <div className="truncate mr-2 flex items-center gap-2">
-                      <span className="h-5 w-5 bg-slate-800 text-[10px] text-slate-300 font-bold rounded-md flex items-center justify-center shrink-0">
-                        {filteredPlays.length - index}
-                      </span>
-                      <div className="truncate">
-                        <span className="block truncate font-bold text-slate-200">{play.titulo}</span>
-                        <span className="text-[9px] text-slate-500 font-semibold">{play.tipo}</span>
-                      </div>
+                    <div className="flex justify-between items-start mb-1">
+                      <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">{play.tipo}</span>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleDeletePlay(play.id); }}
+                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-500/20 text-slate-500 hover:text-red-400 rounded transition-all"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
                     </div>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleDeletePlay(play.id); }}
-                      className="p-1.5 hover:bg-red-500/20 hover:text-red-400 rounded-lg text-slate-500 transition-colors opacity-0 group-hover:opacity-100"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
+                    <div className="font-extrabold text-sm truncate">{play.titulo}</div>
                   </div>
-                ))}
-              </div>
-            )}
+                ))
+              )}
+            </div>
           </div>
         </div>
 
         {/* ========================================================================= */}
         {/* DETALLE DE JUGADA Y PIZARRA TÁCTICA */}
         {/* ========================================================================= */}
-        <div className="xl:col-span-3 space-y-6">
+        <div className="w-full space-y-6">
           {selectedPlay ? (
             <div className="space-y-6">
               {/* CABECERA DETALLE DE JUGADA */}
