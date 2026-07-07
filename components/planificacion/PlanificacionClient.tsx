@@ -483,11 +483,9 @@ export function PlanificacionClient() {
         checklist_material: (sessionForm.checklist_material as Record<string, unknown>) || {}
       };
 
-      if (sessionForm.evaluacion_completada) {
-        sessionPayload.evaluacion_completada = true;
-        sessionPayload.evaluacion_duracion_real = sessionForm.evaluacion_duracion_real ? Number(sessionForm.evaluacion_duracion_real) : null;
-        sessionPayload.evaluacion_observaciones = sessionForm.evaluacion_observaciones || null;
-      }
+      sessionPayload.evaluacion_completada = sessionForm.evaluacion_completada || false;
+      sessionPayload.evaluacion_duracion_real = sessionForm.evaluacion_duracion_real ? Number(sessionForm.evaluacion_duracion_real) : null;
+      sessionPayload.evaluacion_observaciones = sessionForm.evaluacion_observaciones || null;
 
       const isNew = !sessionForm.id || sessionForm.id.startsWith('temp-');
       if (!isNew) {
