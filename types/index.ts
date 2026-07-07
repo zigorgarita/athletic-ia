@@ -596,6 +596,29 @@ export interface MatchStrategicAction {
   created_at: string;
 }
 
+export interface Rival {
+  id: string;
+  nombre: string;
+  escudo_url: string | null;
+  campo_nombre: string | null;
+  campo_dimensiones: string | null;
+  campo_superficie: string | null;
+  info_general: string | null;
+  estadisticas: Record<string, any> | null;
+  notas_entrenador: string | null;
+  created_at: string;
+}
+
+export interface RivalVideo {
+  id: string;
+  rival_id: string;
+  tipo: 'COMPLETO' | 'CORTE';
+  titulo: string;
+  url: string;
+  comentarios: string | null;
+  created_at: string;
+}
+
 export interface MatchCustomVideo {
   id: string;
   match_id: string;
