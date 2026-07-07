@@ -354,12 +354,12 @@ export function PlanificacionClient() {
       const filePath = `planning-pdfs/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
-        .from('planning-documents')
+        .from('indautxu-assets')
         .upload(filePath, file);
 
       if (uploadError) throw uploadError;
 
-      const { data } = supabase.storage.from('planning-documents').getPublicUrl(filePath);
+      const { data } = supabase.storage.from('indautxu-assets').getPublicUrl(filePath);
       const publicUrl = data.publicUrl;
 
       // Associate to sessionForm
