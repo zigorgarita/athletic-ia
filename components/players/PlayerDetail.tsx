@@ -614,7 +614,7 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
           }`}
         >
           <Heart className="h-4 w-4" />
-          Físico
+          Lesiones
           {injuries.filter(i => i.estado === 'Activa' || i.estado === 'Recaída').length > 0 && (
             <span className="ml-1 bg-red-600 text-white text-[9px] px-1.5 py-0.5 rounded-full font-black">
               {injuries.filter(i => i.estado === 'Activa' || i.estado === 'Recaída').length}
