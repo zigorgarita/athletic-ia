@@ -9,7 +9,7 @@ import {
   Trash2, Share2, Info, Star, ArrowUp, ArrowDown
 } from 'lucide-react';
 import { useEditMode } from '@/context/EditModeContext';
-import { parseLocalYYYYMMDD, getDaysOfWeek, getDaysOfMonthGrid } from '@/lib/dateUtils';
+import { getDaysOfWeek, getDaysOfMonthGrid } from '@/lib/dateUtils';
 import { PlanningTaskLibrary } from '@/types';
 import { BibliotecaTareasModal } from './BibliotecaTareasModal';
 
@@ -96,7 +96,7 @@ export function PlanificacionClient() {
   
   // Nombres de días abreviados en español y cálculo de semana
   const [currentMonday, setCurrentMonday] = useState<Date>(() => {
-    const d = parseLocalYYYYMMDD('2026-06-26'); // Contexto de fecha base local
+    const d = new Date(); // Contexto de fecha actual
     const day = d.getDay();
     const diff = d.getDate() - day + (day === 0 ? -6 : 1);
     return new Date(d.setDate(diff));
@@ -109,7 +109,10 @@ export function PlanificacionClient() {
   const [allConceptsMap, setAllConceptsMap] = useState<Record<string, { id: string; session_id: string; categoria: string; concepto: string }[]>>({});
   const [sessionConcepts, setSessionConcepts] = useState<{ id?: string; session_id: string; categoria: string; concepto: string }[]>([]);
   
-  const [selectedDate, setSelectedDate] = useState<string>('2026-06-26');
+  const [selectedDate, setSelectedDate] = useState<string>(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  });
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'basicos' | 'tareas' | 'asistencia' | 'evaluacion'>('basicos');
   const [isLibraryModalOpen, setIsLibraryModalOpen] = useState(false);
@@ -861,7 +864,7 @@ export function PlanificacionClient() {
               const config = getTypeConfig(session.tipo_sesion);
               const date = new Date(session.fecha);
               const dayName = ['DOM', 'LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB'][date.getDay()];
-              const isToday = session.fecha === '2026-06-26';
+              const isToday = session.fecha === `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}`;
               const matchDayTag = getMatchDayTag(session, sessions);
               const tasks = allTasksMap[session.id] || [];
 
