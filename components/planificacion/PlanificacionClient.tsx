@@ -827,12 +827,16 @@ export function PlanificacionClient() {
                   SDI
                 </div>
                 <span className="text-[10px] font-bold text-slate-600">VS</span>
-                <div className="h-7 w-7 rounded-full bg-slate-950 flex items-center justify-center font-bold text-white text-[10px] border border-slate-800">
-                  ZA
+                <div className="h-7 w-7 rounded-full bg-slate-950 flex items-center justify-center font-bold text-white text-[10px] border border-slate-800 uppercase">
+                  {matchSession?.rival ? matchSession.rival.substring(0, 2) : '??'}
                 </div>
                 <div>
-                  <h3 className="text-xs font-black text-slate-200">{matchSession?.rival || 'Zaragoza Juvenil A'}</h3>
-                  <p className="text-[8px] text-slate-500 font-extrabold uppercase tracking-wider">División de Honor</p>
+                  <h3 className="text-xs font-black text-slate-200">
+                    {matchSession ? (matchSession.rival || 'Rival por definir') : 'Sin partido oficial'}
+                  </h3>
+                  <p className="text-[8px] text-slate-500 font-extrabold uppercase tracking-wider">
+                    {matchSession ? 'División de Honor' : 'Semana de Descanso'}
+                  </p>
                 </div>
               </div>
             </div>
@@ -840,16 +844,16 @@ export function PlanificacionClient() {
             {matchSession && (
               <div className="text-right">
                 <span className="text-[9px] font-black text-[#CC0E21] bg-[#CC0E21]/5 border border-[#CC0E21]/15 px-2 py-0.5 rounded uppercase">
-                  FALTAN 2 DÍAS
+                  FALTAN DÍAS
                 </span>
               </div>
             )}
           </div>
 
           <div className="border-t border-slate-850 pt-2.5 mt-3 flex justify-between items-center text-[10px] font-semibold text-slate-400 z-10">
-            <span>📅 {matchSession?.fecha || '2026-06-27'}</span>
-            <span>⏰ {matchSession?.hora_inicio || '16:30'}h</span>
-            <span className="truncate max-w-[150px]">📍 {matchSession?.campo_instalacion || 'La Florida'}</span>
+            <span>📅 {matchSession ? matchSession.fecha : '---'}</span>
+            <span>⏰ {matchSession ? (matchSession.hora_inicio ? `${matchSession.hora_inicio}h` : '--:--') : '---'}</span>
+            <span className="truncate max-w-[150px]">📍 {matchSession ? (matchSession.campo_instalacion || 'Por definir') : '---'}</span>
           </div>
         </div>
       </div>
@@ -1056,7 +1060,7 @@ export function PlanificacionClient() {
                       </div>
                       <div className="flex items-center justify-center gap-1.5 py-0.5">
                         <span className="filter drop-shadow text-xs">🛡️</span>
-                        <span className="truncate font-black max-w-[85px] uppercase">{session.rival || 'Zaragoza Juv A'}</span>
+                        <span className="truncate font-black max-w-[85px] uppercase">{session.rival || 'Rival por definir'}</span>
                       </div>
                     </div>
 
@@ -1071,8 +1075,8 @@ export function PlanificacionClient() {
                         </span>
                       </div>
                       <div className="space-y-1.5 text-[10px] text-slate-400">
-                        <p className="font-bold text-slate-100 leading-snug">🛡️ Rival: <span className="text-white">{session.rival || 'Zaragoza Juv A'}</span></p>
-                        <p>📍 Campo: {session.campo_instalacion || 'Iparralde'}</p>
+                        <p className="font-bold text-slate-100 leading-snug">🛡️ Rival: <span className="text-white">{session.rival || 'Rival por definir'}</span></p>
+                        <p>📍 Campo: {session.campo_instalacion || 'Por definir'}</p>
                         <p>⏰ Hora Citación: {session.hora_convocatoria || '11:00'}h</p>
                         <p>👕 Ropa: {session.ropa_convocatoria || 'Oficial de juego'}</p>
                         <p>⚡ Carga: <span className="font-bold text-slate-200">{session.carga}</span></p>
@@ -1362,7 +1366,7 @@ export function PlanificacionClient() {
                       <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Rival</label>
                       <input
                         type="text"
-                        placeholder="Ej. Zaragoza Juvenil A"
+                        placeholder="Ej. Nombre del Rival"
                         value={sessionForm.rival || ''}
                         disabled={!isEditMode}
                         onChange={e => setSessionForm({...sessionForm, rival: e.target.value})}
