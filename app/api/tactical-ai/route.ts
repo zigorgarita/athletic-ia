@@ -281,8 +281,8 @@ function extractRoleCardsFromText(text: string, context: TacticalAIContext): Par
   console.log("--- INICIANDO EXTRACCIÓN DE FICHAS DE ROL ---");
   const cards: Partial<TacticalRoleCard>[] = [];
   
-  // Buscar cualquier etiqueta que contenga de 2 a 4 letras mayúsculas, e.g., [POR], [LD], [MCD], [CAD], etc.
-  const regex = /\[([A-Z]{2,4})\]\s*(?:Línea|Posición)?.*?:?\s*([\s\S]*?)(?=(?:\[[A-Z]{2,4}\]|\n\n[A-Z]|$))/gi;
+  // Buscar cualquier etiqueta que contenga de 2 a 4 letras mayúsculas, permitiendo texto extra dentro como [DFC 1] o [MCD Der]
+  const regex = /\[([A-Z]{2,4})[^\]]*\]\s*(?:Línea|Posición)?.*?:?\s*([\s\S]*?)(?=(?:\[[A-Z]{2,4}[^\]]*\]|\n\n[A-Z]|$))/gi;
   
   let match;
   while ((match = regex.exec(text)) !== null) {

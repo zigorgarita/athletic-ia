@@ -17,6 +17,9 @@ export function BriefingView({ nodesPropio, players, roleCards }: BriefingViewPr
   const DEF = nodesPropio.filter(n => ['LD', 'LI', 'DFC', 'CT', 'DCD', 'DCI', 'CAD', 'CAI'].includes(n.label));
   const MED = nodesPropio.filter(n => ['MCD', 'MC', 'MCO', 'MD', 'MI', 'MVD', 'MVI', 'PIV'].includes(n.label));
   const DEL = nodesPropio.filter(n => !['POR', 'LD', 'LI', 'DFC', 'CT', 'DCD', 'DCI', 'CAD', 'CAI', 'MCD', 'MC', 'MCO', 'MD', 'MI', 'MVD', 'MVI', 'PIV'].includes(n.label));
+  
+  // Track which cards have already been assigned to ensure duplicate positions get unique instructions
+  const usedCardIndexes = new Set<number>();
 
   const renderLineSection = (title: string, icon: string, lineNodes: PositionNode[]) => {
     if (lineNodes.length === 0) return null;
@@ -28,7 +31,19 @@ export function BriefingView({ nodesPropio, players, roleCards }: BriefingViewPr
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {lineNodes.map(node => {
             const assignedPlayer = players.find(p => p.id === node.player_id);
-            const card = roleCards.find(c => c.posicion_label === node.label) || null;
+            
+            // Find the first unused card for this position
+            const cardIndex = roleCards.findIndex((c, i) => c.posicion_label === node.label && !usedCardIndexes.has(i));
+            let card = null;
+            
+            if (cardIndex !== -1) {
+              card = roleCards[cardIndex];
+              usedCardIndexes.add(cardIndex);
+            } else {
+              // Fallback to the first available card for this position if we run out
+              card = roleCards.find(c => c.posicion_label === node.label) || null;
+            }
+            
             return (
               <RoleCardContent
                 key={node.id}
