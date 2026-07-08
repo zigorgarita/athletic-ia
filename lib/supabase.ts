@@ -38,19 +38,42 @@ export const supabase = new Proxy(originalClient, {
     }
     if (prop === 'storage') {
       const originalStorage = target.storage;
-      return {
-        ...originalStorage,
-        from(bucket: string) {
-          const originalBucket = originalStorage.from(bucket);
-          return {
-            ...originalBucket,
-            upload(path: string, file: any, options?: any) {
-              verifyWrite();
-              return originalBucket.upload(path, file, options);
-            }
-          };
+      return new Proxy(originalStorage, {
+        get(targetStorage, propStorage, receiverStorage) {
+          if (propStorage === 'from') {
+            return (bucket: string) => {
+              const originalBucket = targetStorage.from(bucket);
+              return new Proxy(originalBucket, {
+                get(targetBucket, propBucket, receiverBucket) {
+                  if (propBucket === 'upload') {
+                    return (path: string, file: any, options?: any) => {
+                      verifyWrite();
+                      return targetBucket.upload(path, file, options);
+                    };
+                  }
+                  if (propBucket === 'remove' || propBucket === 'empty' || propBucket === 'move' || propBucket === 'copy') {
+                    // Also protect other write operations in storage just in case
+                    return (...args: any[]) => {
+                      verifyWrite();
+                      return (targetBucket as any)[propBucket](...args);
+                    };
+                  }
+                  const val = Reflect.get(targetBucket, propBucket, receiverBucket);
+                  if (typeof val === 'function') {
+                    return val.bind(targetBucket);
+                  }
+                  return val;
+                }
+              });
+            };
+          }
+          const valStorage = Reflect.get(targetStorage, propStorage, receiverStorage);
+          if (typeof valStorage === 'function') {
+            return valStorage.bind(targetStorage);
+          }
+          return valStorage;
         }
-      };
+      });
     }
 
     // Bind functions to target to preserve `this` context binding
