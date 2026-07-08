@@ -186,7 +186,7 @@ export async function POST(request: Request) {
     const response = await provider.chat(messagesForAI);
 
     // 7. Parsear acciones sugeridas automáticamente
-    const suggestedActions = parseSuggestedActions(response.content, context);
+    const suggestedActions = parseSuggestedActions(response.content, context, actionType);
 
     return NextResponse.json({
       content: response.content,
@@ -207,11 +207,11 @@ export async function POST(request: Request) {
  * Parsea el texto generado por la IA en busca de directrices estructuradas
  * para sugerir botones de acción rápida en el cliente.
  */
-function parseSuggestedActions(content: string, context: TacticalAIContext): AIAction[] {
+function parseSuggestedActions(content: string, context: TacticalAIContext, actionType?: string): AIAction[] {
   const actions: AIAction[] = [];
 
   // 1. Detectar si la respuesta sugiere fichas de rol (role cards)
-  if (content.includes('Ficha de Rol') || content.includes('Rol por posición') || content.includes('[POR]') || content.includes('[LD]')) {
+  if (actionType === 'generate_line_tasks' || content.includes('Ficha de Rol') || content.includes('Rol por posición') || content.includes('[POR]') || content.includes('[LD]')) {
     actions.push({
       type: 'apply_to_role_card',
       label: '📋 Aplicar Fichas de Rol Sugeridas',
@@ -281,8 +281,8 @@ function extractRoleCardsFromText(text: string, context: TacticalAIContext): Par
   console.log("--- INICIANDO EXTRACCIÓN DE FICHAS DE ROL ---");
   const cards: Partial<TacticalRoleCard>[] = [];
   
-  // Buscar cualquier etiqueta que contenga de 2 a 4 letras mayúsculas, permitiendo texto extra dentro como [DFC 1] o [MCD Der]
-  const regex = /\[([A-Z]{2,4})[^\]]*\]\s*(?:Línea|Posición)?.*?:?\s*([\s\S]*?)(?=(?:\[[A-Z]{2,4}[^\]]*\]|\n\n[A-Z]|$))/gi;
+  // Buscar cualquier etiqueta que contenga de 2 a 4 letras mayúsculas, permitiendo texto extra dentro como [DFC 1] o [MCD Der] o (POR)
+  const regex = /(?:\[|\b|\()([A-Z]{2,4})(?:\]|\b|\))[^:\n]*?:?\s*([\s\S]*?)(?=(?:(?:\[|\b|\()([A-Z]{2,4})(?:\]|\b|\))[^:\n]*?:)|\n\n[A-Z]|$)/gi;
   
   let match;
   while ((match = regex.exec(text)) !== null) {
