@@ -10,7 +10,7 @@ export async function GET() {
     const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
     const data = await res.json();
     
-    return NextResponse.json({ models: data.models?.map((m: any) => m.name) || data });
+    return NextResponse.json({ models: data.models?.map((m: { name: string }) => m.name) || data });
   } catch (error) {
     return NextResponse.json({ error: String(error) });
   }
