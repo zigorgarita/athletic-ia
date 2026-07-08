@@ -278,6 +278,7 @@ function extractSection(text: string, sectionName: string): string {
 }
 
 function extractRoleCardsFromText(text: string, context: TacticalAIContext): Partial<TacticalRoleCard>[] {
+  console.log("--- INICIANDO EXTRACCIÓN DE FICHAS DE ROL ---");
   const cards: Partial<TacticalRoleCard>[] = [];
   
   // Buscar cualquier etiqueta que contenga de 2 a 4 letras mayúsculas, e.g., [POR], [LD], [MCD], [CAD], etc.
@@ -287,6 +288,8 @@ function extractRoleCardsFromText(text: string, context: TacticalAIContext): Par
   while ((match = regex.exec(text)) !== null) {
     const pos = match[1].toUpperCase();
     const content = match[2].trim();
+    
+    console.log(`> Detectada posición [${pos}]`);
       
     // Intentar dividir en secciones ofensivas, defensivas, etc. si el texto está estructurado
     const faseOfensiva = extractSubSection(content, 'ofensiva') || content.substring(0, 150);
@@ -311,6 +314,7 @@ function extractRoleCardsFromText(text: string, context: TacticalAIContext): Par
     });
   }
 
+  console.log(`--- EXTRACCIÓN COMPLETADA: ${cards.length} fichas encontradas ---`);
   return cards;
 }
 
