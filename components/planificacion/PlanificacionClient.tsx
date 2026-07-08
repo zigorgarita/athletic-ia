@@ -239,6 +239,9 @@ export function PlanificacionClient() {
       // Construct a complete list of all grid days
       const fullPeriodSessions: MockSession[] = days.map(day => {
         const existing = dbSessions?.find(s => s.fecha === day);
+        if (existing && existing.fecha === '2026-07-27') {
+          console.log('[DEBUG fetchWeekData] fetched 2026-07-27 from Supabase:', existing.evaluacion_observaciones);
+        }
         if (existing) {
           return {
             id: existing.id,
@@ -412,6 +415,7 @@ export function PlanificacionClient() {
     const existing = sessions.find(s => s.fecha === dateStr);
 
     if (existing) {
+      console.log('[DEBUG handleDayClick] loading existing into sessionForm:', existing.evaluacion_observaciones);
       setSessionForm({ ...existing });
       setSessionTasks(allTasksMap[existing.id] || []);
       setSessionConcepts(allConceptsMap[existing.id] || []);
@@ -624,6 +628,7 @@ export function PlanificacionClient() {
       }
 
       triggerToast('¡Sesión guardada con éxito en Supabase!');
+      console.log('[DEBUG handleSaveReal] payload sent:', sessionPayload.evaluacion_observaciones);
       setIsPanelOpen(false);
       fetchWeekData(currentMonday, viewMode);
     } catch (err) {
