@@ -6,7 +6,7 @@ export class GeminiProvider implements AIProvider {
 
   async chat(messages: AIMessage[], config?: Partial<AIProviderConfig>): Promise<AIResponse> {
     const apiKey = config?.apiKey || process.env.GEMINI_API_KEY || '';
-    const modelName = config?.model || process.env.AI_MODEL || 'gemini-2.0-flash';
+    const modelName = config?.model || process.env.AI_MODEL || 'gemini-2.5-flash';
 
     if (!apiKey) {
       throw new Error('GEMINI_API_KEY no está configurada.');
