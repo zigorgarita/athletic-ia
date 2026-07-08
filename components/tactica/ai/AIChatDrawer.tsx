@@ -5,22 +5,29 @@ import { useTacticalAI } from '@/hooks/useTacticalAI';
 import { TacticalAIContext } from '@/types';
 import { AIResponseCard } from './AIResponseCard';
 import { Send, X, Trash2, HelpCircle, Bot } from 'lucide-react';
+import { AIMessage } from '@/types';
 
 interface AIChatDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   context: TacticalAIContext;
+  messages: AIMessage[];
+  isThinking: boolean;
+  error: string | null;
+  sendMessage: (msg: string, ctx: TacticalAIContext) => Promise<void>;
+  clearConversation: () => void;
 }
 
-export function AIChatDrawer({ isOpen, onClose, context }: AIChatDrawerProps) {
-  const { 
-    messages, 
-    isThinking, 
-    error, 
-    sendMessage, 
-    clearConversation 
-  } = useTacticalAI();
-
+export function AIChatDrawer({ 
+  isOpen, 
+  onClose, 
+  context,
+  messages,
+  isThinking,
+  error,
+  sendMessage,
+  clearConversation
+}: AIChatDrawerProps) {
   const [inputMsg, setInputMsg] = useState('');
   const [notification, setNotification] = useState<string | null>(null);
   

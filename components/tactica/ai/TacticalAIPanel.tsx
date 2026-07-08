@@ -43,6 +43,10 @@ export function TacticalAIPanel({
   tareasLineas
 }: TacticalAIPanelProps) {
   const { 
+    messages,
+    isThinking,
+    error,
+    sendMessage,
     clearConversation,
     analyzeRival,
     analyzeOwnSystem,
@@ -256,6 +260,11 @@ export function TacticalAIPanel({
           isOpen={isChatOpen} 
           onClose={() => setIsChatOpen(false)} 
           context={getAIContext()}
+          messages={messages}
+          isThinking={isThinking}
+          error={error}
+          sendMessage={sendMessage}
+          clearConversation={clearConversation}
         />
       )}
     </div>
