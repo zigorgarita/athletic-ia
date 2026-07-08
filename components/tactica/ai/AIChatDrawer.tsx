@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { useTacticalAI } from '@/hooks/useTacticalAI';
 import { TacticalAIContext } from '@/types';
 import { AIResponseCard } from './AIResponseCard';
 import { Send, X, Trash2, HelpCircle, Bot } from 'lucide-react';
