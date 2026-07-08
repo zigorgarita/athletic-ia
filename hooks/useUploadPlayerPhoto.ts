@@ -39,7 +39,7 @@ export function useUploadPlayerPhoto() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [verifyWritePermission]);
 
   return { uploadPhoto, loading, error };
 }

@@ -85,7 +85,7 @@ export function useTrainingAttendance() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [verifyWritePermission]);
 
   return {
     fetchSessionAttendance,

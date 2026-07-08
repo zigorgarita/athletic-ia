@@ -48,7 +48,7 @@ export function useMatches(matchType: 'LIGA' | 'AMISTOSO' = 'LIGA') {
       setError(err.message || 'Error al crear la jornada');
       return null;
     }
-  }, []);
+  }, [verifyWritePermission]);
 
   const updateMatch = useCallback(async (id: string, matchData: Partial<Omit<Match, 'id' | 'created_at'>>): Promise<Match | null> => {
     setError(null);
@@ -70,7 +70,7 @@ export function useMatches(matchType: 'LIGA' | 'AMISTOSO' = 'LIGA') {
       setError(err.message || 'Error al actualizar la jornada');
       return null;
     }
-  }, []);
+  }, [verifyWritePermission]);
 
   const deleteMatch = useCallback(async (id: string): Promise<boolean> => {
     setError(null);
@@ -91,7 +91,7 @@ export function useMatches(matchType: 'LIGA' | 'AMISTOSO' = 'LIGA') {
       setError(err.message || 'Error al eliminar la jornada');
       return false;
     }
-  }, []);
+  }, [verifyWritePermission]);
 
   const fetchMatchPlayerStats = async (matchId: string): Promise<MatchPlayerStats[]> => {
     try {

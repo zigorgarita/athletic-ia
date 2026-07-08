@@ -32,7 +32,7 @@ export function useUpdateMatchVideo() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [verifyWritePermission]);
 
   return { updateVideo, loading, error };
 }

@@ -29,7 +29,7 @@ export function useDeletePlayer() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [verifyWritePermission]);
 
   return { deletePlayer, loading, error };
 }

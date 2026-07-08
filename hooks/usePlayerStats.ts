@@ -96,7 +96,7 @@ export function usePlayerStats(playerId: string | null) {
       setError(err.message || 'Error al actualizar las estadísticas');
       return false;
     }
-  }, [fetchStats]);
+  }, [fetchStats, verifyWritePermission]);
 
   useEffect(() => {
     if (playerId) {

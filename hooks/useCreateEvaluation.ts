@@ -33,7 +33,7 @@ export function useCreateEvaluation() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [verifyWritePermission]);
 
   return { createEvaluation, loading, error };
 }

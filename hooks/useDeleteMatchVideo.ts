@@ -28,7 +28,7 @@ export function useDeleteMatchVideo() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [verifyWritePermission]);
 
   return { deleteVideo, loading, error };
 }

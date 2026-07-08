@@ -33,7 +33,7 @@ export function useCreatePlayer() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [verifyWritePermission]);
 
   return { createPlayer, loading, error };
 }

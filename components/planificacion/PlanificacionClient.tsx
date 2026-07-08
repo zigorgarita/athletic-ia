@@ -362,11 +362,12 @@ export function PlanificacionClient() {
       const { data } = supabase.storage.from('indautxu-assets').getPublicUrl(filePath);
       const publicUrl = data.publicUrl;
 
-      // Associate to sessionForm
-      const baseObs = sessionForm.evaluacion_observaciones?.replace(/PDF:[\s\S]*$/, '') || '';
-      setSessionForm({
-        ...sessionForm,
-        evaluacion_observaciones: `${baseObs.trim()}\nPDF: ${publicUrl}`.trim()
+      setSessionForm(prev => {
+        const baseObs = prev.evaluacion_observaciones?.replace(/PDF:[\s\S]*$/, '') || '';
+        return {
+          ...prev,
+          evaluacion_observaciones: `${baseObs.trim()}\nPDF: ${publicUrl}`.trim()
+        };
       });
       triggerToast('¡Archivo PDF subido correctamente!');
     } catch (err) {
@@ -1229,9 +1230,14 @@ export function PlanificacionClient() {
             {isEditMode && (
               <button
                 onClick={handleSaveReal}
-                className="px-3.5 py-1.5 rounded-xl bg-[#CC0E21] hover:bg-[#a80b1a] text-white text-xs font-bold shadow-md shadow-[#CC0E21]/15 transition-all"
+                disabled={loading || uploadingPdf}
+                className={`px-3.5 py-1.5 rounded-xl text-white text-xs font-bold shadow-md transition-all ${
+                  loading || uploadingPdf 
+                    ? 'bg-slate-700 cursor-not-allowed opacity-70' 
+                    : 'bg-[#CC0E21] hover:bg-[#a80b1a] shadow-[#CC0E21]/15'
+                }`}
               >
-                Guardar Cambios
+                {loading ? 'Guardando...' : uploadingPdf ? 'Subiendo PDF...' : 'Guardar Cambios'}
               </button>
             )}
             <button 
@@ -1671,10 +1677,12 @@ export function PlanificacionClient() {
                         <button
                           type="button"
                           onClick={() => {
-                            const baseObs = sessionForm.evaluacion_observaciones?.replace(/PDF:[\s\S]*$/, '') || '';
-                            setSessionForm({
-                              ...sessionForm,
-                              evaluacion_observaciones: baseObs.trim()
+                            setSessionForm(prev => {
+                              const baseObs = prev.evaluacion_observaciones?.replace(/PDF:[\s\S]*$/, '') || '';
+                              return {
+                                ...prev,
+                                evaluacion_observaciones: baseObs.trim()
+                              };
                             });
                             triggerToast('Documento PDF desasociado.');
                           }}
@@ -1713,10 +1721,12 @@ export function PlanificacionClient() {
                           placeholder="https://enlace.com/sesion.pdf"
                           value={getPdfUrl()}
                           onChange={e => {
-                            const baseObs = sessionForm.evaluacion_observaciones?.replace(/PDF:[\s\S]*$/, '') || '';
-                            setSessionForm({
-                              ...sessionForm,
-                              evaluacion_observaciones: `${baseObs.trim()}\nPDF: ${e.target.value}`.trim()
+                            setSessionForm(prev => {
+                              const baseObs = prev.evaluacion_observaciones?.replace(/PDF:[\s\S]*$/, '') || '';
+                              return {
+                                ...prev,
+                                evaluacion_observaciones: `${baseObs.trim()}\nPDF: ${e.target.value}`.trim()
+                              };
                             });
                           }}
                           className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none focus:border-[#CC0E21]"
@@ -1847,11 +1857,20 @@ export function PlanificacionClient() {
               <div className="space-y-1.5">
                 <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Conclusiones / Notas de la Evaluación</label>
                 <textarea
-                  value={sessionForm.evaluacion_observaciones || ''}
+                  value={sessionForm.evaluacion_observaciones?.replace(/PDF:[\s\S]*$/, '').trim() || ''}
                   disabled={!isEditMode}
-                  onChange={e => setSessionForm({...sessionForm, evaluacion_observaciones: e.target.value})}
-                  placeholder="Detalla conclusiones de la sesión táctica..."
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none focus:border-[#CC0E21] h-32 disabled:opacity-60"
+                  onChange={e => {
+                    setSessionForm(prev => {
+                      const pdfMatch = prev.evaluacion_observaciones?.match(/(PDF:[\s\S]*$)/);
+                      const pdfStr = pdfMatch ? `\n${pdfMatch[1]}` : '';
+                      return {
+                        ...prev,
+                        evaluacion_observaciones: `${e.target.value.trim()}${pdfStr}`.trim()
+                      };
+                    });
+                  }}
+                  placeholder="Añade valoraciones, aspectos a mejorar o incidencias destacables de esta sesión..."
+                  className="w-full h-32 bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 outline-none focus:border-[#CC0E21] resize-none disabled:opacity-60"
                 />
               </div>
             </div>

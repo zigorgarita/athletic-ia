@@ -33,7 +33,7 @@ export function useUpdatePlayer() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [verifyWritePermission]);
 
   return { updatePlayer, loading, error };
 }
