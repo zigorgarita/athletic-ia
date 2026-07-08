@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useTacticalAI } from '@/hooks/useTacticalAI';
-import { TacticalAIContext, TacticalRoleCard } from '@/types';
+import { TacticalAIContext, TacticalRoleCard, PositionNode } from '@/types';
 import { AIChatDrawer } from './AIChatDrawer';
 import { 
   Bot, ShieldAlert, Cpu, Layers, Calendar, 
@@ -15,6 +15,7 @@ interface TacticalAIPanelProps {
   matchupId: string | null;
   matchId: string | null;
   matchRival?: string | null;
+  nodesPropio?: PositionNode[];
   assignedPlayerIds: string[];
   assignedPositions: { label: string; playerId: string | null }[];
   roleCards: TacticalRoleCard[];
@@ -31,6 +32,7 @@ export function TacticalAIPanel({
   matchupId,
   matchId,
   matchRival,
+  nodesPropio = [],
   assignedPlayerIds,
   assignedPositions,
   roleCards,
@@ -70,7 +72,8 @@ export function TacticalAIPanel({
       desventajas,
       zonaConflicto,
       dueloClave,
-      tareasLineas
+      tareasLineas,
+      systemNodes: nodesPropio.map(n => n.label)
     };
   };
 

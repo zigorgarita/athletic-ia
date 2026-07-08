@@ -14,9 +14,9 @@ interface BriefingViewProps {
 export function BriefingView({ nodesPropio, players, roleCards }: BriefingViewProps) {
   // Group nodes by tactical lines
   const POR = nodesPropio.filter(n => n.label === 'POR');
-  const DEF = nodesPropio.filter(n => ['LD', 'LI', 'DFC'].includes(n.label));
-  const MED = nodesPropio.filter(n => ['MCD', 'MC', 'MCO'].includes(n.label));
-  const DEL = nodesPropio.filter(n => !['POR', 'LD', 'LI', 'DFC', 'MCD', 'MC', 'MCO'].includes(n.label));
+  const DEF = nodesPropio.filter(n => ['LD', 'LI', 'DFC', 'CT', 'DCD', 'DCI', 'CAD', 'CAI'].includes(n.label));
+  const MED = nodesPropio.filter(n => ['MCD', 'MC', 'MCO', 'MD', 'MI', 'MVD', 'MVI', 'PIV'].includes(n.label));
+  const DEL = nodesPropio.filter(n => !['POR', 'LD', 'LI', 'DFC', 'CT', 'DCD', 'DCI', 'CAD', 'CAI', 'MCD', 'MC', 'MCO', 'MD', 'MI', 'MVD', 'MVI', 'PIV'].includes(n.label));
 
   const renderLineSection = (title: string, icon: string, lineNodes: PositionNode[]) => {
     if (lineNodes.length === 0) return null;

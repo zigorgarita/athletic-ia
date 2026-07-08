@@ -870,6 +870,7 @@ export function TacticaClient() {
         matchupId={activeMatchup?.id || null}
         matchId={selectedMatchId || null}
         matchRival={matches.find(m => m.id === selectedMatchId)?.rival || null}
+        nodesPropio={nodesPropio}
         assignedPlayerIds={assignedPlayerIds}
         assignedPositions={assignedPositions}
         roleCards={roleCards}

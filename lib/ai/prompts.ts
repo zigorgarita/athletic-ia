@@ -20,12 +20,13 @@ export interface PromptContext {
   systemRival: string;
   matchRival?: string | null;
   assignedPlayersList?: string;
+  systemNodes?: string[];
   roleCardsList?: string;
   matchupData?: string;
+  relevantKnowledge?: string;
   recentEvaluations?: string;
   recentTrainingAbsences?: string;
   recentGPSData?: string;
-  relevantKnowledge?: string;
 }
 
 export function buildContextString(ctx: PromptContext): string {
@@ -36,6 +37,8 @@ export function buildContextString(ctx: PromptContext): string {
 ${ctx.matchRival ? `- Rival del Partido: ${ctx.matchRival}` : ''}
 
 === PIZARRA Y ALINEACIÓN DE POSICIONES ===
+${ctx.systemNodes && ctx.systemNodes.length > 0 ? `Posiciones que conforman nuestro sistema ${ctx.systemOwn}:\n${ctx.systemNodes.join(', ')}` : ''}
+
 ${ctx.assignedPlayersList || 'No hay jugadores asignados a la pizarra todavía.'}
 
 === FICHAS DE ROL DE POSICIÓN CONFIGURADAS ===
@@ -117,9 +120,24 @@ Divide la charla en:
   generateLineTasks: (ctx: PromptContext) => `
 ${buildContextString(ctx)}
 
-TAREA: Genera las fichas de instrucciones específicas por líneas para el matchup actual.
-Crea una sección para cada línea con 3-4 puntos accionables que expliquen qué hacer en fase ofensiva, defensiva y transiciones. 
-Sé muy concreto y utiliza términos tácticos claros adecuados para juveniles de División de Honor.
+TAREA: Genera las fichas de instrucciones tácticas individuales para TODOS los puestos del sistema ${ctx.systemOwn}.
+El sistema actualmente desplegado en la pizarra contiene exactamente las siguientes posiciones: ${ctx.systemNodes ? ctx.systemNodes.join(', ') : 'No definidas'}.
+
+INSTRUCCIONES CRÍTICAS:
+1. GENERACIÓN COMPLETA: Debes generar obligatoriamente una sección para CADA UNA de las posiciones listadas arriba. Ninguna posición debe quedar sin instrucciones.
+2. FORMATO EXACTO: Cada sección debe comenzar con la etiqueta de la posición entre corchetes, exactamente como aparece en la lista (ejemplo: [POR], [DCD], [MVI], [CAD]).
+3. CONTEXTO TÁCTICO: Las instrucciones no deben ser genéricas. Deben estar altamente personalizadas basándose en:
+   - El sistema de juego propio (${ctx.systemOwn}) y su encaje contra el sistema rival (${ctx.systemRival}).
+   - La relación de la posición con sus compañeros de línea (ej. cómo escalona el MCD con los interiores o cómo saltan los centrales).
+   - El modelo de juego y principios tácticos del equipo (consulta la sección de Conocimiento Táctico de Referencia).
+   - Las características de los jugadores asignados a esa posición (consulta la sección de Alineación).
+4. ESTRUCTURA DE LA FICHA: Para cada posición, divide las instrucciones en estas 4 sub-secciones explícitas:
+   - **Fase Ofensiva**: Posicionamiento, alturas y roles con balón.
+   - **Fase Defensiva**: Altura del bloque, saltos de presión, vigilancias y coberturas.
+   - **Transiciones**: Qué hacer inmediatamente al robar o perder el balón.
+   - **Instrucción Específica**: Un detalle clave para el partido o el jugador (ej. un duelo individual o precaución).
+
+Genera únicamente las fichas de rol, asegurando que si hay 11 posiciones listadas, generes 11 fichas distintas y específicas.
 `,
 
   recommendExercises: (ctx: PromptContext) => `

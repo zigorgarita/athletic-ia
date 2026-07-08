@@ -67,7 +67,8 @@ export async function POST(request: Request) {
     const promptCtx: PromptContext = {
       systemOwn: context.systemOwn,
       systemRival: context.systemRival,
-      matchRival: context.matchRival || null
+      matchRival: context.matchRival || null,
+      systemNodes: context.systemNodes
     };
 
     // A) Cargar datos de jugadores asignados
@@ -278,36 +279,37 @@ function extractSection(text: string, sectionName: string): string {
 
 function extractRoleCardsFromText(text: string, context: TacticalAIContext): Partial<TacticalRoleCard>[] {
   const cards: Partial<TacticalRoleCard>[] = [];
-  const positions = ['POR', 'LD', 'DFC', 'LI', 'MCD', 'MC', 'MCO', 'ED', 'EI', 'DC'];
-
-  positions.forEach(pos => {
-    const regex = new RegExp(`\\[${pos}\\]\\s*(?:Línea)?.*?:?\\s*([\\s\\S]*?)(?=(?:\\[[A-Z]{2,3}\\]|\\n\\n[A-Z]|$))`, 'i');
-    const match = text.match(regex);
-    if (match) {
-      const content = match[1].trim();
+  
+  // Buscar cualquier etiqueta que contenga de 2 a 4 letras mayúsculas, e.g., [POR], [LD], [MCD], [CAD], etc.
+  const regex = /\[([A-Z]{2,4})\]\s*(?:Línea|Posición)?.*?:?\s*([\s\S]*?)(?=(?:\[[A-Z]{2,4}\]|\n\n[A-Z]|$))/gi;
+  
+  let match;
+  while ((match = regex.exec(text)) !== null) {
+    const pos = match[1].toUpperCase();
+    const content = match[2].trim();
       
-      // Intentar dividir en secciones ofensivas, defensivas, etc. si el texto está estructurado
-      const faseOfensiva = extractSubSection(content, 'ofensiva') || content.substring(0, 150);
-      const faseDefensiva = extractSubSection(content, 'defensiva') || content.substring(150, 300);
-      const transiciones = extractSubSection(content, 'transici') || '';
-      const instrucc = extractSubSection(content, 'especifica') || '';
+    // Intentar dividir en secciones ofensivas, defensivas, etc. si el texto está estructurado
+    const faseOfensiva = extractSubSection(content, 'ofensiva') || content.substring(0, 150);
+    const faseDefensiva = extractSubSection(content, 'defensiva') || content.substring(150, 300);
+    const transiciones = extractSubSection(content, 'transici') || '';
+    const instrucc = extractSubSection(content, 'especifica') || '';
 
-      const linea = pos === 'POR' ? 'Portería' : 
-                    ['LD', 'DFC', 'LI'].includes(pos) ? 'Defensa' : 
-                    ['MCD', 'MC', 'MCO'].includes(pos) ? 'Mediocampo' : 'Delantera';
+    let linea: 'Portería' | 'Defensa' | 'Mediocampo' | 'Delantera' = 'Mediocampo';
+    if (pos === 'POR') linea = 'Portería';
+    else if (['LD', 'LI', 'DFC', 'CT', 'DCD', 'DCI', 'CAD', 'CAI'].includes(pos)) linea = 'Defensa';
+    else if (['ED', 'EI', 'DC', 'SD', 'EXD', 'EXI'].includes(pos)) linea = 'Delantera';
 
-      cards.push({
-        matchup_id: context.matchupId || undefined,
-        match_plan_id: context.matchId || undefined,
-        linea,
-        posicion_label: pos,
-        fase_ofensiva: faseOfensiva,
-        fase_defensiva: faseDefensiva,
-        transiciones,
-        instrucciones_especificas: instrucc
-      });
-    }
-  });
+    cards.push({
+      matchup_id: context.matchupId || undefined,
+      match_plan_id: context.matchId || undefined,
+      linea,
+      posicion_label: pos,
+      fase_ofensiva: faseOfensiva,
+      fase_defensiva: faseDefensiva,
+      transiciones,
+      instrucciones_especificas: instrucc
+    });
+  }
 
   return cards;
 }

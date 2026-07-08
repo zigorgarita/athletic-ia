@@ -778,7 +778,8 @@ export interface TacticalAIContext {
   matchId: string | null;
   matchRival?: string | null;
   assignedPlayerIds: string[];
-  assignedPositions?: { label: string; playerId: string | null }[];
+  assignedPositions?: { label: string; playerId: string | null }[] | Record<string, string>;
+  systemNodes?: string[];
   roleCards: TacticalRoleCard[];
   ventajas: string;
   desventajas: string;
