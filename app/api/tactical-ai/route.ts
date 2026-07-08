@@ -292,10 +292,10 @@ function extractRoleCardsFromText(text: string, context: TacticalAIContext): Par
     console.log(`> Detectada posición [${pos}]`);
       
     // Intentar dividir en secciones ofensivas, defensivas, etc. si el texto está estructurado
-    const faseOfensiva = extractSubSection(content, 'ofensiva') || content.substring(0, 150);
-    const faseDefensiva = extractSubSection(content, 'defensiva') || content.substring(150, 300);
+    const faseOfensiva = extractSubSection(content, 'ofensiva', 'ataque') || content.substring(0, 150);
+    const faseDefensiva = extractSubSection(content, 'defensiva', 'defensa') || content.substring(150, 300);
     const transiciones = extractSubSection(content, 'transici') || '';
-    const instrucc = extractSubSection(content, 'especifica') || '';
+    const instrucc = extractSubSection(content, 'especifica', 'instrucci') || '';
 
     let linea: 'Portería' | 'Defensa' | 'Mediocampo' | 'Delantera' = 'Mediocampo';
     if (pos === 'POR') linea = 'Portería';
@@ -318,8 +318,10 @@ function extractRoleCardsFromText(text: string, context: TacticalAIContext): Par
   return cards;
 }
 
-function extractSubSection(text: string, key: string): string {
-  const regex = new RegExp(`(?:-|\\*\\*)\\s*Fase\\s+${key}\\s*(?:\\*\\*)?:?\\s*([\\s\\S]*?)(?=(?:-|\\*\\*|\\n|$))`, 'i');
+function extractSubSection(text: string, key: string, altKey?: string): string {
+  // Matchea: `- Fase Ofensiva:`, `* Fase Ofensiva:`, `**Fase Ofensiva**:`, `- Ataque:`, etc.
+  const keyword = altKey ? `(?:${key}|${altKey})` : key;
+  const regex = new RegExp(`(?:-|\\*\\*)\\s*(?:Fase\\s+)?${keyword}\\s*(?:\\*\\*)?:?\\s*([\\s\\S]*?)(?=(?:-|\\*\\*|\\n\\n|$))`, 'i');
   const match = text.match(regex);
   return match ? match[1].trim() : '';
 }

@@ -123,21 +123,17 @@ ${buildContextString(ctx)}
 TAREA: Genera las fichas de instrucciones tácticas individuales para TODOS los puestos del sistema ${ctx.systemOwn}.
 El sistema actualmente desplegado en la pizarra contiene exactamente las siguientes posiciones: ${ctx.systemNodes ? ctx.systemNodes.join(', ') : 'No definidas'}.
 
-INSTRUCCIONES CRÍTICAS:
-1. GENERACIÓN COMPLETA: Debes generar obligatoriamente una sección para CADA UNA de las posiciones listadas arriba. Ninguna posición debe quedar sin instrucciones.
-2. FORMATO EXACTO: Cada sección debe comenzar con la etiqueta de la posición entre corchetes, exactamente como aparece en la lista (ejemplo: [POR], [DCD], [MVI], [CAD]).
-3. CONTEXTO TÁCTICO: Las instrucciones no deben ser genéricas. Deben estar altamente personalizadas basándose en:
-   - El sistema de juego propio (${ctx.systemOwn}) y su encaje contra el sistema rival (${ctx.systemRival}).
-   - La relación de la posición con sus compañeros de línea (ej. cómo escalona el MCD con los interiores o cómo saltan los centrales).
-   - El modelo de juego y principios tácticos del equipo (consulta la sección de Conocimiento Táctico de Referencia).
-   - Las características de los jugadores asignados a esa posición (consulta la sección de Alineación).
-4. ESTRUCTURA DE LA FICHA: Para cada posición, divide las instrucciones en estas 4 sub-secciones explícitas:
-   - **Fase Ofensiva**: Posicionamiento, alturas y roles con balón.
-   - **Fase Defensiva**: Altura del bloque, saltos de presión, vigilancias y coberturas.
-   - **Transiciones**: Qué hacer inmediatamente al robar o perder el balón.
-   - **Instrucción Específica**: Un detalle clave para el partido o el jugador (ej. un duelo individual o precaución).
+INSTRUCCIONES CRÍTICAS, INCUMPLIRLAS RESULTARÁ EN ERROR DEL SISTEMA:
+1. GENERACIÓN COMPLETA SIN AGRUPAR: Debes generar OBLIGATORIAMENTE un bloque separado para CADA UNA de las posiciones listadas arriba. Si hay dos 'DFC' en la lista, debes generar dos bloques separados (ej: uno para el central derecho y otro para el izquierdo). ¡PROHIBIDO agrupar posiciones!
+2. FORMATO EXACTO DE ETIQUETA: Cada bloque debe comenzar única y exclusivamente con la etiqueta de la posición entre corchetes EXACTAMENTE igual a la lista, por ejemplo: [POR], [LD], [DFC], [MCD]. No añadas texto dentro del corchete (mal: [DFC Derecho], bien: [DFC]).
+3. CONTEXTO TÁCTICO: Personaliza basándote en el sistema propio (${ctx.systemOwn}) vs rival (${ctx.systemRival}).
+4. ESTRUCTURA DE LA FICHA: Para cada posición, divide las instrucciones usando exactamente estos 4 subtítulos con un guión al inicio:
+- Fase Ofensiva: (texto aquí)
+- Fase Defensiva: (texto aquí)
+- Transiciones: (texto aquí)
+- Instrucción Específica: (texto aquí)
 
-Genera únicamente las fichas de rol, asegurando que si hay 11 posiciones listadas, generes 11 fichas distintas y específicas.
+Genera las fichas sin texto introductorio ni conclusiones. Solo los bloques de cada posición.
 `,
 
   recommendExercises: (ctx: PromptContext) => `
