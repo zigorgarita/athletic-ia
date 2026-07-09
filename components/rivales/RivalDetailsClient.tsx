@@ -1,403 +1,285 @@
 'use client';
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useRivals } from '@/hooks/useRivals';
-import { Rival, RivalVideo } from '@/types';
+import { supabase } from '@/lib/supabase';
+import { useClubDetails } from '@/hooks/useClubDetails';
+import { GeneralTab } from '@/components/rivales/tabs/GeneralTab';
+import { PlayersTab } from '@/components/rivales/tabs/PlayersTab';
+import { StaffTab } from '@/components/rivales/tabs/StaffTab';
+import { PlayModelTab } from '@/components/rivales/tabs/PlayModelTab';
+import { ReportsTab } from '@/components/rivales/tabs/ReportsTab';
+import { VideosTab } from '@/components/rivales/tabs/VideosTab';
+import { DocumentsTab } from '@/components/rivales/tabs/DocumentsTab';
+import { AIScoutingTab } from '@/components/rivales/tabs/AIScoutingTab';
+import { HistoryTab } from '@/components/rivales/tabs/HistoryTab';
+import { StatsTab } from '@/components/rivales/tabs/StatsTab';
+import { CalendarTab } from '@/components/rivales/tabs/CalendarTab';
 import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { Target, ArrowLeft, Info, Film, Video, BarChart2, BookOpen, Save, MapPin, AlertCircle, Plus, Trash2 } from 'lucide-react';
-import { useEditMode } from '@/context/EditModeContext';
-import { Modal } from '@/components/ui/Modal';
+import {
+  Target, ArrowLeft, Info, Users, UserCheck, Crosshair, Brain,
+  FileText, Film, FolderOpen, History, BarChart2, CalendarDays,
+  Shield, MapPin, AlertCircle, ChevronRight,
+} from 'lucide-react';
 
-type TabType = 'INFO' | 'VIDEOS_COMPLETOS' | 'CORTES' | 'STATS' | 'NOTAS';
+// --- Tab definitions ---
+const TABS = [
+  { id: 'GENERAL',      label: 'Datos Generales',   icon: Info,          short: 'General' },
+  { id: 'PLANTILLA',    label: 'Plantilla',         icon: Users,         short: 'Plantilla' },
+  { id: 'STAFF',        label: 'Cuerpo Técnico',    icon: UserCheck,     short: 'Staff' },
+  { id: 'MODELO',       label: 'Modelo de Juego',   icon: Crosshair,     short: 'Modelo' },
+  { id: 'IA',           label: 'IA Scouting',       icon: Brain,         short: 'IA' },
+  { id: 'INFORME',      label: 'Informe del Míster', icon: FileText,     short: 'Informe' },
+  { id: 'VIDEOS',       label: 'Vídeos',            icon: Film,          short: 'Vídeos' },
+  { id: 'DOCUMENTOS',   label: 'Documentos',        icon: FolderOpen,    short: 'Docs' },
+  { id: 'HISTORIAL',    label: 'Historial',         icon: History,       short: 'Historial' },
+  { id: 'ESTADISTICAS', label: 'Estadísticas',      icon: BarChart2,     short: 'Stats' },
+  { id: 'CALENDARIO',   label: 'Calendario',        icon: CalendarDays,  short: 'Calendario' },
+] as const;
+
+type TabType = typeof TABS[number]['id'];
+
+// --- Placeholder content for each tab (to be replaced in later phases) ---
+function TabPlaceholder({ icon: Icon, label }: { icon: any; label: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-20 text-center">
+      <div className="p-4 bg-slate-800/50 rounded-2xl border border-slate-700/50 mb-4">
+        <Icon className="h-10 w-10 text-slate-500" />
+      </div>
+      <h3 className="text-lg font-bold text-slate-300">{label}</h3>
+      <p className="text-slate-500 text-sm mt-2 max-w-sm">
+        Este módulo se desarrollará en las siguientes fases. La estructura está lista y conectada a la base de datos.
+      </p>
+    </div>
+  );
+}
 
 export function RivalDetailsClient({ rivalId }: { rivalId: string }) {
   const router = useRouter();
-  const { isEditMode } = useEditMode();
-  const { getRival, updateRival, getRivalVideos, createRivalVideo, deleteRivalVideo } = useRivals();
-  
-  const [rival, setRival] = useState<Rival | null>(null);
-  const [videos, setVideos] = useState<RivalVideo[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<TabType>('INFO');
-  
-  const [isSaving, setIsSaving] = useState(false);
-  const [editForm, setEditForm] = useState<Partial<Rival>>({});
-
-  // Video Modal
-  const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
-  const [videoType, setVideoType] = useState<'COMPLETO' | 'CORTE'>('COMPLETO');
-  const [videoForm, setVideoForm] = useState({ titulo: '', url: '', comentarios: '' });
-  const [isSubmittingVideo, setIsSubmittingVideo] = useState(false);
-
-  useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      const r = await getRival(rivalId);
-      if (r) {
-        setRival(r);
-        setEditForm(r);
-        const v = await getRivalVideos(rivalId);
-        setVideos(v);
-      }
-      setLoading(false);
-    };
-    loadData();
-  }, [rivalId, getRival, getRivalVideos]);
-
-  const handleSaveInfo = async () => {
-    if (!rival) return;
-    setIsSaving(true);
-    const updated = await updateRival(rival.id, editForm);
-    if (updated) {
-      setRival(updated);
-    }
-    setIsSaving(false);
-  };
-
-  const handleCreateVideo = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!videoForm.titulo || !videoForm.url) return;
-    
-    setIsSubmittingVideo(true);
-    const newVideo = await createRivalVideo({
-      rival_id: rivalId,
-      tipo: videoType,
-      titulo: videoForm.titulo,
-      url: videoForm.url,
-      comentarios: videoForm.comentarios || null,
-    });
-    
-    setIsSubmittingVideo(false);
-    if (newVideo) {
-      setVideos([newVideo, ...videos]);
-      setIsVideoModalOpen(false);
-      setVideoForm({ titulo: '', url: '', comentarios: '' });
-    }
-  };
-
-  const handleDeleteVideo = async (id: string) => {
-    if (confirm('¿Eliminar este vídeo del scouting?')) {
-      const success = await deleteRivalVideo(id);
-      if (success) {
-        setVideos(videos.filter(v => v.id !== id));
-      }
-    }
-  };
+  const { club, season, completitud, loading, updateClub, updateSeason } = useClubDetails(rivalId, '2026-27');
+  const [activeTab, setActiveTab] = useState<TabType>('GENERAL');
 
   if (loading) {
     return (
-      <div className="p-4 md:p-8 space-y-8">
-        <Skeleton className="h-10 w-32 bg-slate-800" />
-        <Skeleton className="h-32 w-full bg-slate-800 rounded-3xl" />
+      <div className="p-4 md:p-8 space-y-6">
+        <Skeleton className="h-8 w-40 bg-slate-800" />
+        <Skeleton className="h-40 w-full bg-slate-800 rounded-3xl" />
+        <Skeleton className="h-12 w-full bg-slate-800 rounded-xl" />
         <Skeleton className="h-64 w-full bg-slate-800 rounded-3xl" />
       </div>
     );
   }
 
-  if (!rival) {
+  if (!club) {
     return (
       <div className="p-4 md:p-8 text-center text-slate-400">
         <AlertCircle className="h-12 w-12 mx-auto mb-4 text-slate-600" />
-        Rival no encontrado.
+        <p>Club no encontrado.</p>
         <div className="mt-4">
-          <Button onClick={() => router.push('/rivales')} variant="secondary">Volver</Button>
+          <Button onClick={() => router.push('/rivales')} variant="secondary">
+            Volver a Rivales
+          </Button>
         </div>
       </div>
     );
   }
 
-  const tabs = [
-    { id: 'INFO', label: 'Info & Campo', icon: Info },
-    { id: 'VIDEOS_COMPLETOS', label: 'Vídeos Completos', icon: Film },
-    { id: 'CORTES', label: 'Cortes Tácticos', icon: Video },
-    { id: 'STATS', label: 'Estadísticas', icon: BarChart2 },
-    { id: 'NOTAS', label: 'La Libreta del Míster', icon: BookOpen },
-  ] as const;
-
-  const completos = videos.filter(v => v.tipo === 'COMPLETO');
-  const cortes = videos.filter(v => v.tipo === 'CORTE');
-
-  const getYoutubeEmbedUrl = (url: string) => {
-    let videoId = '';
-    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
-    const match = url.match(regExp);
-    if (match && match[2].length === 11) {
-      videoId = match[2];
+  // Helper para el nivel de dificultad
+  const difficultyLevel = season?.nivel_dificultad || 0;
+  const getDifficultyColor = (level: number) => {
+    switch(level) {
+      case 1: return 'bg-emerald-500';
+      case 2: return 'bg-yellow-400';
+      case 3: return 'bg-amber-500';
+      case 4: return 'bg-orange-500';
+      case 5: return 'bg-red-600';
+      default: return 'bg-slate-700';
     }
-    return videoId ? `https://www.youtube.com/embed/${videoId}` : url;
   };
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6 pb-20 p-4 md:p-8">
-      {/* Botón Volver */}
-      <Link
-        href="/rivales"
-        className="inline-flex items-center gap-2 text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors bg-slate-900/50 px-3 py-1.5 rounded-lg border border-slate-800"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Volver a Rivales
-      </Link>
-
-      {/* Header Rival */}
-      <div className="bg-slate-900/50 border border-slate-800/80 rounded-3xl p-6 md:p-8 flex flex-col md:flex-row items-center md:items-start gap-6 relative overflow-hidden">
-        {/* Glow */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-[#CC0E21]/5 blur-[100px] pointer-events-none rounded-full" />
+    <div className="min-h-screen">
+      {/* Header con info del club */}
+      <div className="relative border-b border-slate-800/80 overflow-hidden">
+        {/* Fondo de fotografía del campo */}
+        {club.imagen_fondo_url ? (
+          <div 
+            className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-30 mix-blend-luminosity"
+            style={{ backgroundImage: `url(${club.imagen_fondo_url})` }}
+          />
+        ) : (
+          <div className="absolute inset-0 bg-gradient-to-br from-slate-900 to-slate-950 opacity-80" />
+        )}
         
-        <div className="h-24 w-24 shrink-0 bg-slate-950 rounded-2xl border border-slate-800 flex items-center justify-center overflow-hidden z-10 shadow-xl shadow-black/50">
-          {rival.escudo_url ? (
-            <img src={rival.escudo_url} alt={rival.nombre} className="h-20 w-20 object-contain" />
-          ) : (
-            <Target className="h-10 w-10 text-slate-600" />
-          )}
-        </div>
-        
-        <div className="flex-1 text-center md:text-left z-10">
-          <h1 className="text-3xl md:text-4xl font-black text-slate-100 tracking-tight">
-            {rival.nombre}
-          </h1>
-          <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 mt-3 text-slate-400">
-            <span className="flex items-center gap-1.5 text-sm bg-slate-950/50 px-3 py-1 rounded-full border border-slate-800">
-              <MapPin className="h-4 w-4 text-[#CC0E21]" />
-              {rival.campo_nombre || 'Sin definir'}
-            </span>
-            <span className="flex items-center gap-1.5 text-sm bg-slate-950/50 px-3 py-1 rounded-full border border-slate-800">
-              <span className="w-2 h-2 rounded-full bg-emerald-500" />
-              {rival.campo_superficie || 'Sin definir'}
-            </span>
-          </div>
-        </div>
-      </div>
+        {/* Overlay gradient para asegurar legibilidad */}
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/80 to-slate-950/30" />
+        <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/60 to-transparent" />
 
-      {/* Navegación Tabs */}
-      <div className="flex overflow-x-auto hide-scrollbar gap-2 pb-2">
-        {tabs.map((tab) => {
-          const Icon = tab.icon;
-          const isActive = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-bold whitespace-nowrap transition-all ${
-                isActive
-                  ? 'bg-slate-800 text-[#CC0E21] border border-[#CC0E21]/20 shadow-sm'
-                  : 'bg-slate-900/40 text-slate-400 hover:text-slate-200 hover:bg-slate-800 border border-slate-800/50'
-              }`}
-            >
-              <Icon className={`h-4 w-4 ${isActive ? 'text-[#CC0E21]' : ''}`} />
-              {tab.label}
-            </button>
-          );
-        })}
-      </div>
+        <div className="relative z-10 max-w-[1600px] mx-auto px-4 md:px-8 pt-4 pb-5">
+          {/* Breadcrumb */}
+          <Link
+            href="/rivales"
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-400 hover:text-[#CC0E21] transition-colors mb-6 bg-slate-950/50 px-3 py-1.5 rounded-full backdrop-blur-md border border-slate-800/50 w-fit"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            Volver a Rivales
+          </Link>
 
-      {/* Contenido Tabs */}
-      <div className="bg-slate-900/30 border border-slate-800/80 rounded-3xl p-6 min-h-[400px]">
-        {/* PESTAÑA INFO Y CAMPO */}
-        {activeTab === 'INFO' && (
-          <div className="space-y-6">
-            <h3 className="text-lg font-bold text-slate-200">Información General</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
-                    Dimensiones del Campo
-                  </label>
-                  <input
-                    type="text"
-                    value={editForm.campo_dimensiones || ''}
-                    onChange={(e) => setEditForm({...editForm, campo_dimensiones: e.target.value})}
-                    disabled={!isEditMode}
-                    placeholder="Ej: 100x65m"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-slate-200 disabled:opacity-50"
+          {/* Club identity */}
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+            <div className="flex items-center gap-5">
+              {/* Escudo */}
+              <div className="shrink-0 relative">
+                <div className="absolute inset-0 bg-white/5 rounded-2xl blur-xl" />
+                {club.escudo_url ? (
+                  <img
+                    src={club.escudo_url}
+                    alt={club.nombre}
+                    className="relative h-20 w-20 md:h-24 md:w-24 object-contain drop-shadow-2xl"
                   />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
-                    Superficie
-                  </label>
-                  <input
-                    type="text"
-                    value={editForm.campo_superficie || ''}
-                    onChange={(e) => setEditForm({...editForm, campo_superficie: e.target.value})}
-                    disabled={!isEditMode}
-                    placeholder="Ej: Hierba Artificial Última Generación"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-slate-200 disabled:opacity-50"
-                  />
+                ) : (
+                  <div className="relative h-20 w-20 md:h-24 md:w-24 rounded-2xl bg-slate-800/80 border border-slate-700/50 flex items-center justify-center backdrop-blur-sm">
+                    <Shield className="h-10 w-10 text-slate-500" />
+                  </div>
+                )}
+              </div>
+
+              {/* Name + meta */}
+              <div className="flex-1 min-w-0">
+                <h1 className="text-3xl md:text-4xl font-extrabold text-white tracking-tight truncate drop-shadow-md">
+                  {club.nombre}
+                </h1>
+                
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-2">
+                  {(club.ciudad || club.campo_nombre) && (
+                    <span className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-300">
+                      <MapPin className="h-4 w-4 text-slate-400" />
+                      {[club.ciudad, club.campo_nombre].filter(Boolean).join(' · ')}
+                    </span>
+                  )}
+                  {season && (
+                    <span className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-400 bg-slate-900/60 px-2 py-0.5 rounded border border-slate-800/50 backdrop-blur-sm">
+                      {season.temporada} · {season.grupo || 'Sin grupo'}
+                    </span>
+                  )}
                 </div>
               </div>
+            </div>
+
+            {/* Status section */}
+            <div className="flex items-center gap-6 bg-slate-950/60 p-4 rounded-2xl border border-slate-800/50 backdrop-blur-md">
+              {/* Scouting Status */}
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
-                  Apuntes Adicionales (Distancia, vestuarios, etc)
-                </label>
-                <textarea
-                  value={editForm.info_general || ''}
-                  onChange={(e) => setEditForm({...editForm, info_general: e.target.value})}
-                  disabled={!isEditMode}
-                  rows={4}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 disabled:opacity-50 resize-none"
-                  placeholder="Apuntes sobre la expedición o el campo..."
-                />
+                <div className="text-[10px] uppercase font-bold text-slate-500 mb-1.5 tracking-wider">Estado Scouting</div>
+                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border ${
+                  season?.estado_scouting === 'Completo' ? 'bg-emerald-950/50 text-emerald-400 border-emerald-900/30' :
+                  season?.estado_scouting === 'Parcial' ? 'bg-amber-950/50 text-amber-400 border-amber-900/30' :
+                  'bg-red-950/50 text-red-400 border-red-900/30'
+                }`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${
+                    season?.estado_scouting === 'Completo' ? 'bg-emerald-500' :
+                    season?.estado_scouting === 'Parcial' ? 'bg-amber-500' :
+                    'bg-red-500'
+                  } animate-pulse`} />
+                  {season?.estado_scouting || 'Sin analizar'}
+                </span>
               </div>
-            </div>
-            {isEditMode && (
-              <div className="flex justify-end pt-4 border-t border-slate-800/50">
-                <Button onClick={handleSaveInfo} variant="primary" loading={isSaving} className="flex items-center gap-2">
-                  <Save className="h-4 w-4" />
-                  Guardar Info
-                </Button>
+
+              {/* Dificultad */}
+              <div>
+                <div className="text-[10px] uppercase font-bold text-slate-500 mb-1.5 tracking-wider">Nivel Dificultad</div>
+                <div className="flex gap-1">
+                  {[1, 2, 3, 4, 5].map((level) => (
+                    <div 
+                      key={level} 
+                      className={`w-3 h-3 rounded-full border border-slate-800/50 ${level <= difficultyLevel ? getDifficultyColor(level) : 'bg-slate-800/50'} shadow-inner`}
+                    />
+                  ))}
+                </div>
               </div>
-            )}
-          </div>
-        )}
 
-        {/* PESTAÑA NOTAS (LA LIBRETA) */}
-        {activeTab === 'NOTAS' && (
-          <div className="space-y-4 flex flex-col h-full">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-slate-200 flex items-center gap-2">
-                <BookOpen className="h-5 w-5 text-amber-500" />
-                La Libreta del Míster
-              </h3>
-              {isEditMode && (
-                <Button onClick={handleSaveInfo} variant="primary" loading={isSaving}>
-                  Guardar Notas
-                </Button>
-              )}
-            </div>
-            <textarea
-              value={editForm.notas_entrenador || ''}
-              onChange={(e) => setEditForm({...editForm, notas_entrenador: e.target.value})}
-              disabled={!isEditMode}
-              className="w-full flex-1 min-h-[400px] bg-amber-50/5 border border-amber-900/30 rounded-xl p-6 text-slate-200 font-mono leading-relaxed focus:outline-none focus:border-amber-700/50 resize-none disabled:opacity-70 shadow-inner"
-              placeholder="Escribe aquí tu análisis táctico del rival. Puntos fuertes, debilidades, por dónde atacar, a quién marcar al hombre..."
-            />
-          </div>
-        )}
-
-        {/* PESTAÑA VÍDEOS / CORTES (Renderizado dinámico similar) */}
-        {(activeTab === 'VIDEOS_COMPLETOS' || activeTab === 'CORTES') && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-slate-200 flex items-center gap-2">
-                {activeTab === 'VIDEOS_COMPLETOS' ? <Film className="h-5 w-5 text-blue-500" /> : <Video className="h-5 w-5 text-purple-500" />}
-                {activeTab === 'VIDEOS_COMPLETOS' ? 'Partidos Completos' : 'Cortes Analíticos'}
-              </h3>
-              {isEditMode && (
-                <Button 
-                  onClick={() => {
-                    setVideoType(activeTab === 'VIDEOS_COMPLETOS' ? 'COMPLETO' : 'CORTE');
-                    setIsVideoModalOpen(true);
-                  }}
-                  variant="secondary"
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm"
-                >
-                  <Plus className="h-4 w-4" />
-                  Añadir
-                </Button>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {(activeTab === 'VIDEOS_COMPLETOS' ? completos : cortes).map(video => (
-                <div key={video.id} className="bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden flex flex-col group">
-                  <div className="aspect-video bg-black relative">
-                    <iframe
-                      src={getYoutubeEmbedUrl(video.url)}
-                      className="w-full h-full"
-                      allowFullScreen
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              {/* Completitud */}
+              <div>
+                <div className="text-[10px] uppercase font-bold text-slate-500 mb-1.5 tracking-wider">Ficha</div>
+                <div className="flex items-center gap-2">
+                  <div className="w-16 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-gradient-to-r from-[#CC0E21] to-red-500 rounded-full" 
+                      style={{ width: `${completitud}%` }} 
                     />
                   </div>
-                  <div className="p-4 flex-1 flex flex-col justify-between">
-                    <div>
-                      <h4 className="font-bold text-slate-200 line-clamp-1">{video.titulo}</h4>
-                      {video.comentarios && (
-                        <p className="text-xs text-slate-400 mt-2 line-clamp-2">{video.comentarios}</p>
-                      )}
-                    </div>
-                    {isEditMode && (
-                      <div className="mt-4 pt-3 border-t border-slate-800/50 flex justify-end">
-                        <button
-                          onClick={() => handleDeleteVideo(video.id)}
-                          className="text-slate-500 hover:text-red-400 transition-colors p-1"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    )}
-                  </div>
+                  <span className="text-xs font-bold text-slate-300 tabular-nums">{completitud}%</span>
                 </div>
-              ))}
-              {(activeTab === 'VIDEOS_COMPLETOS' ? completos : cortes).length === 0 && (
-                <div className="col-span-full py-12 text-center border border-dashed border-slate-700/50 rounded-2xl">
-                  <p className="text-slate-500">No hay vídeos subidos en esta categoría.</p>
-                </div>
-              )}
+              </div>
             </div>
           </div>
-        )}
+        </div>
 
-        {/* PESTAÑA STATS (placeholder por ahora) */}
-        {activeTab === 'STATS' && (
-          <div className="flex flex-col items-center justify-center py-20 text-center">
-            <BarChart2 className="h-16 w-16 text-slate-700 mb-4" />
-            <h3 className="text-xl font-bold text-slate-300">Estadísticas en Desarrollo</h3>
-            <p className="text-slate-500 mt-2 max-w-sm">
-              Esta sección servirá para integrar datos de proveedores externos en el futuro.
-            </p>
+        {/* Tabs */}
+        <div className="max-w-[1600px] mx-auto px-4 md:px-8">
+          <div className="flex overflow-x-auto no-scrollbar -mb-px">
+            {TABS.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`shrink-0 flex items-center gap-2 px-4 py-3 text-xs font-semibold border-b-2 transition-all whitespace-nowrap ${
+                    isActive
+                      ? 'border-[#CC0E21] text-[#CC0E21]'
+                      : 'border-transparent text-slate-500 hover:text-slate-300 hover:border-slate-700'
+                  }`}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">{tab.label}</span>
+                  <span className="sm:hidden">{tab.short}</span>
+                </button>
+              );
+            })}
           </div>
-        )}
+        </div>
       </div>
 
-      {/* Modal Añadir Video */}
-      <Modal
-        isOpen={isVideoModalOpen}
-        onClose={() => setIsVideoModalOpen(false)}
-        title={`Añadir ${videoType === 'COMPLETO' ? 'Partido Completo' : 'Corte de Vídeo'}`}
-      >
-        <form onSubmit={handleCreateVideo} className="space-y-4">
-          <div>
-            <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Título</label>
-            <input
-              type="text"
-              required
-              value={videoForm.titulo}
-              onChange={e => setVideoForm({...videoForm, titulo: e.target.value})}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-slate-200"
-              placeholder="Ej: Jornada 1 vs Eibar"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-bold text-slate-400 uppercase mb-1">URL (YouTube / Drive)</label>
-            <input
-              type="url"
-              required
-              value={videoForm.url}
-              onChange={e => setVideoForm({...videoForm, url: e.target.value})}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-slate-200"
-              placeholder="https://..."
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Comentarios (Opcional)</label>
-            <textarea
-              value={videoForm.comentarios}
-              onChange={e => setVideoForm({...videoForm, comentarios: e.target.value})}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-slate-200 resize-none"
-              rows={3}
-              placeholder="Apuntes sobre este vídeo..."
-            />
-          </div>
-          <div className="pt-4 flex justify-end gap-3 border-t border-slate-800">
-            <Button type="button" variant="ghost" onClick={() => setIsVideoModalOpen(false)}>Cancelar</Button>
-            <Button type="submit" variant="primary" loading={isSubmittingVideo}>Añadir Vídeo</Button>
-          </div>
-        </form>
-      </Modal>
-
+      {/* Tab Content */}
+      <div className="max-w-[1600px] mx-auto px-4 md:px-8 py-6">
+        {activeTab === 'GENERAL' && (
+          <GeneralTab club={club} onUpdate={updateClub} />
+        )}
+        {activeTab === 'PLANTILLA' && (
+          <PlayersTab season={season} />
+        )}
+        {activeTab === 'STAFF' && (
+          <StaffTab season={season} />
+        )}
+        {activeTab === 'MODELO' && (
+          <PlayModelTab season={season} />
+        )}
+        {activeTab === 'IA' && (
+          <AIScoutingTab season={season} />
+        )}
+        {activeTab === 'INFORME' && (
+          <ReportsTab season={season} />
+        )}
+        {activeTab === 'VIDEOS' && (
+          <VideosTab club={club} season={season} />
+        )}
+        {activeTab === 'DOCUMENTOS' && (
+          <DocumentsTab club={club} season={season} />
+        )}
+        {activeTab === 'HISTORIAL' && (
+          <HistoryTab club={club} season={season} />
+        )}
+        {activeTab === 'ESTADISTICAS' && (
+          <StatsTab season={season} onUpdate={updateSeason} />
+        )}
+        {activeTab === 'CALENDARIO' && (
+          <CalendarTab season={season} />
+        )}
+      </div>
     </div>
   );
 }

@@ -96,9 +96,10 @@ export function EditModeProvider({ children }: { children: React.ReactNode }) {
 
   // Clean up timer on unmount and register write permission checker
   useEffect(() => {
-    const { registerWritePermissionChecker } = require('@/lib/supabase');
-    registerWritePermissionChecker(() => {
-      verifyWritePermission();
+    import('@/lib/supabase').then(({ registerWritePermissionChecker }) => {
+      registerWritePermissionChecker(() => {
+        verifyWritePermission();
+      });
     });
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);

@@ -1,0 +1,332 @@
+'use client';
+import React, { useState, useMemo } from 'react';
+import { ClubSeason } from '@/hooks/useClubs';
+import { useClubPlayers, ClubPlayer } from '@/hooks/useClubPlayers';
+import { useEditMode } from '@/context/EditModeContext';
+import { Button } from '@/components/ui/Button';
+import { Modal } from '@/components/ui/Modal';
+import { Users, Plus, Trash2, User, Search, Filter } from 'lucide-react';
+
+interface PlayersTabProps {
+  season: ClubSeason | null;
+}
+
+const POSICIONES = [
+  'Portero',
+  'Lateral Derecho',
+  'Lateral Izquierdo',
+  'Defensa Central',
+  'Pivote',
+  'Medio Centro',
+  'Interior Derecho',
+  'Interior Izquierdo',
+  'Media Punta',
+  'Extremo Derecho',
+  'Extremo Izquierdo',
+  'Delantero Centro'
+];
+
+export function PlayersTab({ season }: PlayersTabProps) {
+  const { players, loading, savePlayer, deletePlayer } = useClubPlayers(season?.id);
+  const { isEditMode } = useEditMode();
+  
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterPos, setFilterPos] = useState('');
+  
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingPlayer, setEditingPlayer] = useState<Partial<ClubPlayer> | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const filteredPlayers = useMemo(() => {
+    return players.filter(p => {
+      const matchName = p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                       (p.dorsal?.toString() === searchTerm);
+      const matchPos = filterPos ? p.posicion === filterPos : true;
+      return matchName && matchPos;
+    });
+  }, [players, searchTerm, filterPos]);
+
+  // Agrupamos por línea para mejor visualización
+  const groupedPlayers = useMemo(() => {
+    const groups: Record<string, ClubPlayer[]> = {
+      'Porteros': [],
+      'Defensas': [],
+      'Centrocampistas': [],
+      'Delanteros': [],
+      'Sin Posición': []
+    };
+
+    filteredPlayers.forEach(p => {
+      const pos = p.posicion || '';
+      if (pos === 'Portero') groups['Porteros'].push(p);
+      else if (pos.includes('Lateral') || pos.includes('Central')) groups['Defensas'].push(p);
+      else if (pos.includes('Pivote') || pos.includes('Medio') || pos.includes('Interior') || pos === 'Media Punta') groups['Centrocampistas'].push(p);
+      else if (pos.includes('Extremo') || pos.includes('Delantero')) groups['Delanteros'].push(p);
+      else groups['Sin Posición'].push(p);
+    });
+
+    return groups;
+  }, [filteredPlayers]);
+
+  const handleOpenModal = (player?: ClubPlayer) => {
+    if (player) {
+      setEditingPlayer(player);
+    } else {
+      setEditingPlayer({
+        nombre: '',
+        posicion: 'Medio Centro',
+        pierna_dominante: 'Diestro',
+      });
+    }
+    setIsModalOpen(true);
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingPlayer || !editingPlayer.nombre) return;
+    
+    setIsSaving(true);
+    const success = await savePlayer(editingPlayer);
+    setIsSaving(false);
+    
+    if (success) {
+      setIsModalOpen(false);
+    }
+  };
+
+  const handleDelete = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (confirm('¿Estás seguro de que deseas eliminar este jugador de la plantilla?')) {
+      await deletePlayer(id);
+    }
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setEditingPlayer(prev => prev ? { ...prev, [name]: value } : null);
+  };
+
+  if (!season) {
+    return <div className="p-8 text-center text-slate-400">No hay datos de temporada disponibles.</div>;
+  }
+
+  const inputClass = "w-full bg-slate-950/50 border border-slate-800 rounded-xl px-4 py-2.5 text-slate-200 focus:outline-none focus:border-[#CC0E21]/50 focus:ring-1 focus:ring-[#CC0E21]/30 transition-all";
+  const labelClass = "block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5";
+
+  return (
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      
+      {/* Barra superior de herramientas */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-900/40 p-4 rounded-3xl border border-slate-800/80">
+        <div className="flex flex-1 gap-3 w-full sm:w-auto">
+          <div className="relative flex-1 max-w-xs">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+            <input 
+              type="text" 
+              placeholder="Buscar por nombre o dorsal..." 
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-4 py-2 text-sm text-slate-200 focus:outline-none focus:border-[#CC0E21]/50 transition-colors"
+            />
+          </div>
+          <div className="relative">
+            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+            <select
+              value={filterPos}
+              onChange={e => setFilterPos(e.target.value)}
+              className="appearance-none bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-8 py-2 text-sm text-slate-200 focus:outline-none focus:border-[#CC0E21]/50 transition-colors"
+            >
+              <option value="">Todas las posiciones</option>
+              {POSICIONES.map(pos => (
+                <option key={pos} value={pos}>{pos}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {isEditMode && (
+          <Button onClick={() => handleOpenModal()} variant="primary" className="shrink-0 flex items-center gap-2">
+            <Plus className="h-4 w-4" />
+            Nuevo Jugador
+          </Button>
+        )}
+      </div>
+
+      {loading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {[1, 2, 3, 4, 5, 6].map(i => (
+            <div key={i} className="h-32 bg-slate-800 animate-pulse rounded-2xl" />
+          ))}
+        </div>
+      ) : players.length === 0 ? (
+        <div className="text-center py-20 bg-slate-900/30 rounded-3xl border border-slate-800/50">
+          <Users className="h-12 w-12 text-slate-600 mx-auto mb-4" />
+          <h3 className="text-lg font-bold text-slate-300">Plantilla vacía</h3>
+          <p className="text-slate-500 text-sm mt-2">Aún no hay jugadores registrados para este rival.</p>
+          {isEditMode && (
+            <Button onClick={() => handleOpenModal()} variant="secondary" className="mt-6">
+              Añadir el primero
+            </Button>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-8">
+          {Object.entries(groupedPlayers).map(([groupName, groupPlayers]) => {
+            if (groupPlayers.length === 0) return null;
+            
+            return (
+              <div key={groupName} className="space-y-4">
+                <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                  <div className="h-px bg-slate-800 flex-1" />
+                  {groupName} <span className="text-slate-600 bg-slate-900 px-2 py-0.5 rounded-full text-[10px]">{groupPlayers.length}</span>
+                  <div className="h-px bg-slate-800 flex-1" />
+                </h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
+                  {groupPlayers.map(player => (
+                    <div 
+                      key={player.id}
+                      onClick={() => handleOpenModal(player)}
+                      className="group flex bg-slate-900/40 border border-slate-800/80 rounded-2xl overflow-hidden hover:border-[#CC0E21]/40 transition-all cursor-pointer hover:shadow-lg hover:shadow-[#CC0E21]/5"
+                    >
+                      {/* Dorsal / Foto */}
+                      <div className="w-20 bg-slate-950 flex flex-col items-center justify-center border-r border-slate-800/50 relative">
+                        {player.foto_url ? (
+                          <img src={player.foto_url} alt={player.nombre} className="absolute inset-0 w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
+                        ) : (
+                          <User className="h-8 w-8 text-slate-700" />
+                        )}
+                        {player.dorsal && (
+                          <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-slate-950 p-2 text-center">
+                            <span className="text-xl font-black text-white drop-shadow-md">{player.dorsal}</span>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Info principal */}
+                      <div className="p-4 flex-1 flex flex-col">
+                        <div className="flex justify-between items-start">
+                          <h4 className="font-bold text-slate-200 group-hover:text-[#CC0E21] transition-colors line-clamp-1">{player.nombre}</h4>
+                          {isEditMode && (
+                            <button onClick={(e) => handleDelete(player.id, e)} className="p-1 text-slate-600 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100">
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
+                        
+                        <div className="text-xs text-slate-400 mt-1">{player.posicion || 'Posición sin definir'}</div>
+                        
+                        <div className="mt-auto pt-3 flex gap-2">
+                          {player.pierna_dominante && (
+                            <span className="text-[10px] bg-slate-800/80 text-slate-300 px-2 py-0.5 rounded-full border border-slate-700/50">
+                              {player.pierna_dominante}
+                            </span>
+                          )}
+                          {(player.altura || player.peso) && (
+                            <span className="text-[10px] bg-slate-800/80 text-slate-300 px-2 py-0.5 rounded-full border border-slate-700/50">
+                              {[player.altura ? player.altura + 'm' : '', player.peso ? player.peso + 'kg' : ''].filter(Boolean).join(' - ')}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Modal Crear/Editar Jugador */}
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingPlayer?.id ? "Editar Jugador" : "Añadir Jugador"}>
+        {editingPlayer && (
+          <form onSubmit={handleSave} className="space-y-5">
+            <div className="grid grid-cols-4 gap-4">
+              <div className="col-span-3">
+                <label className={labelClass}>Nombre <span className="text-red-500">*</span></label>
+                <input required type="text" name="nombre" value={editingPlayer.nombre || ''} onChange={handleChange} className={inputClass} placeholder="Nombre completo o deportivo" />
+              </div>
+              <div className="col-span-1">
+                <label className={labelClass}>Dorsal</label>
+                <input type="number" name="dorsal" value={editingPlayer.dorsal || ''} onChange={handleChange} className={inputClass} placeholder="Ej: 9" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className={labelClass}>Posición Principal</label>
+                <select name="posicion" value={editingPlayer.posicion || ''} onChange={handleChange} className={inputClass}>
+                  <option value="">Seleccionar...</option>
+                  {POSICIONES.map(pos => <option key={pos} value={pos}>{pos}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={labelClass}>Pierna Dominante</label>
+                <select name="pierna_dominante" value={editingPlayer.pierna_dominante || ''} onChange={handleChange} className={inputClass}>
+                  <option value="">Seleccionar...</option>
+                  <option value="Diestro">Diestro</option>
+                  <option value="Zurdo">Zurdo</option>
+                  <option value="Ambidiestro">Ambidiestro</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+              <div className="col-span-2">
+                <label className={labelClass}>URL Fotografía</label>
+                <input type="url" name="foto_url" value={editingPlayer.foto_url || ''} onChange={handleChange} className={inputClass} placeholder="https://..." />
+              </div>
+              <div>
+                <label className={labelClass}>Nacimiento</label>
+                <input type="date" name="fecha_nacimiento" value={editingPlayer.fecha_nacimiento || ''} onChange={handleChange} className={inputClass} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className={labelClass}>Altura (m)</label>
+                <input type="number" step="0.01" name="altura" value={editingPlayer.altura || ''} onChange={handleChange} className={inputClass} placeholder="Ej: 1.85" />
+              </div>
+              <div>
+                <label className={labelClass}>Peso (kg)</label>
+                <input type="number" step="0.1" name="peso" value={editingPlayer.peso || ''} onChange={handleChange} className={inputClass} placeholder="Ej: 78.5" />
+              </div>
+            </div>
+
+            <div className="space-y-4 pt-2 border-t border-slate-800">
+              <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider">Scouting y Observaciones</h4>
+              
+              <div>
+                <label className={labelClass}>Características Principales</label>
+                <textarea name="caracteristicas" value={editingPlayer.caracteristicas || ''} onChange={handleChange} rows={2} className={inputClass} placeholder="Perfil general del jugador..." />
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className={labelClass}>Fortalezas</label>
+                  <textarea name="fortalezas" value={editingPlayer.fortalezas || ''} onChange={handleChange} rows={2} className={inputClass} placeholder="Puntos fuertes (Ej: Juego aéreo, velocidad...)" />
+                </div>
+                <div>
+                  <label className={labelClass}>Debilidades</label>
+                  <textarea name="debilidades" value={editingPlayer.debilidades || ''} onChange={handleChange} rows={2} className={inputClass} placeholder="Puntos débiles o áreas a explotar..." />
+                </div>
+              </div>
+              
+              <div>
+                <label className={labelClass}>Observaciones Adicionales</label>
+                <textarea name="observaciones" value={editingPlayer.observaciones || ''} onChange={handleChange} rows={2} className={inputClass} placeholder="Cualquier otro detalle de interés táctico..." />
+              </div>
+            </div>
+
+            <div className="pt-4 flex justify-end gap-3 border-t border-slate-800">
+              <Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)} disabled={isSaving}>Cancelar</Button>
+              <Button type="submit" variant="primary" loading={isSaving}>Guardar Jugador</Button>
+            </div>
+          </form>
+        )}
+      </Modal>
+
+    </div>
+  );
+}
