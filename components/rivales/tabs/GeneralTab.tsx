@@ -50,7 +50,7 @@ export function GeneralTab({ club, onUpdate }: GeneralTabProps) {
 
   const handleSave = async () => {
     setIsSaving(true);
-    await onUpdate(formData);
+    await onUpdate({ ...club, ...formData });
     setIsSaving(false);
   };
 
