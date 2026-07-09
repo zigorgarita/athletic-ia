@@ -228,10 +228,10 @@ export function RivalDetailsClient({ rivalId }: { rivalId: string }) {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`shrink-0 flex items-center gap-2 px-4 py-3 text-xs font-semibold border-b-2 transition-all whitespace-nowrap ${
+                  className={`shrink-0 flex items-center gap-2 px-5 py-2.5 text-sm font-bold rounded-xl transition-all whitespace-nowrap border-2 ${
                     isActive
-                      ? 'border-[#CC0E21] text-[#CC0E21]'
-                      : 'border-transparent text-slate-300 hover:text-white hover:border-slate-600'
+                      ? 'bg-[#CC0E21] text-white border-[#CC0E21] shadow-[0_0_15px_rgba(204,14,33,0.5)]'
+                      : 'bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white hover:border-slate-500'
                   }`}
                 >
                   <Icon className="h-3.5 w-3.5" />
