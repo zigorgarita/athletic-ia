@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 120">
+  <path d="M50 0 L100 20 L100 70 C100 100 50 120 50 120 C50 120 0 100 0 70 L0 20 Z" fill="#b30000" />
+  <path d="M50 5 L90 23 L90 68 C90 92 50 110 50 110 C50 110 10 92 10 68 L10 23 Z" fill="#002b5e" />
+  <text x="50" y="75" font-family="Arial, sans-serif" font-weight="bold" font-size="50" fill="#ffffff" text-anchor="middle">S</text>
+  <text x="50" y="95" font-family="Arial, sans-serif" font-size="12" fill="#ffffff" text-anchor="middle">SANTUTXU FC</text>
+</svg>
