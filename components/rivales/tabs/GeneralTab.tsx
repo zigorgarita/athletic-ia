@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Club } from '@/hooks/useClubs';
 import { Button } from '@/components/ui/Button';
 import { useEditMode } from '@/context/EditModeContext';
-import { Save, MapPin, Building, Globe, Map, Upload } from 'lucide-react';
+import { Save, MapPin, Building, Globe, Map, Upload, Shield, AlertCircle } from 'lucide-react';
 
 interface GeneralTabProps {
   club: Club;
@@ -13,6 +13,7 @@ interface GeneralTabProps {
 export function GeneralTab({ club, onUpdate }: GeneralTabProps) {
   const { isEditMode } = useEditMode();
   const [isSaving, setIsSaving] = useState(false);
+  const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
   const [formData, setFormData] = useState<Partial<Club>>({
     nombre_corto: club.nombre_corto || '',
     escudo_url: club.escudo_url || '',
@@ -50,8 +51,15 @@ export function GeneralTab({ club, onUpdate }: GeneralTabProps) {
 
   const handleSave = async () => {
     setIsSaving(true);
-    await onUpdate({ ...club, ...formData });
+    setToastMessage(null);
+    const success = await onUpdate({ ...club, ...formData });
     setIsSaving(false);
+    if (success) {
+      setToastMessage({ type: 'success', text: '¡Datos guardados con éxito!' });
+    } else {
+      setToastMessage({ type: 'error', text: 'Error al guardar los datos.' });
+    }
+    setTimeout(() => setToastMessage(null), 3000);
   };
 
   const inputClass = `w-full bg-slate-950/50 border border-slate-800 rounded-xl px-4 py-2.5 text-slate-200 focus:outline-none focus:border-[#CC0E21]/50 focus:ring-1 focus:ring-[#CC0E21]/30 transition-all ${!isEditMode && 'opacity-70 cursor-not-allowed'}`;
@@ -261,6 +269,26 @@ export function GeneralTab({ club, onUpdate }: GeneralTabProps) {
           ))}
         </div>
       </div>
+
+      {/* Botonera Guardar Inferior */}
+      {isEditMode && (
+        <div className="flex justify-end mt-8">
+          <Button onClick={handleSave} variant="primary" loading={isSaving} className="gap-2">
+            <Save className="h-4 w-4" />
+            Guardar Cambios
+          </Button>
+        </div>
+      )}
+      
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className={`fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg border backdrop-blur-md animate-in slide-in-from-bottom-5 ${
+          toastMessage.type === 'success' ? 'bg-emerald-950/80 border-emerald-900/50 text-emerald-400' : 'bg-red-950/80 border-red-900/50 text-red-400'
+        }`}>
+          {toastMessage.type === 'success' ? <Shield className="h-5 w-5" /> : <AlertCircle className="h-5 w-5" />}
+          <span className="font-medium text-sm">{toastMessage.text}</span>
+        </div>
+      )}
     </div>
   );
 }
