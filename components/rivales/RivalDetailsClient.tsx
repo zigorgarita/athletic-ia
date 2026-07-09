@@ -220,7 +220,7 @@ export function RivalDetailsClient({ rivalId }: { rivalId: string }) {
 
         {/* Tabs */}
         <div className="max-w-[1600px] mx-auto px-4 md:px-8 relative z-20 pointer-events-auto pb-4">
-          <div className="flex overflow-x-auto no-scrollbar gap-2 -mb-px">
+          <div className="flex flex-wrap gap-2 -mb-px">
             {TABS.map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
