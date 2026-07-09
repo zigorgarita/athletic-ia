@@ -231,7 +231,7 @@ export function RivalDetailsClient({ rivalId }: { rivalId: string }) {
                   className={`shrink-0 flex items-center gap-2 px-4 py-3 text-xs font-semibold border-b-2 transition-all whitespace-nowrap ${
                     isActive
                       ? 'border-[#CC0E21] text-[#CC0E21]'
-                      : 'border-transparent text-slate-500 hover:text-slate-300 hover:border-slate-700'
+                      : 'border-transparent text-slate-300 hover:text-white hover:border-slate-600'
                   }`}
                 >
                   <Icon className="h-3.5 w-3.5" />
