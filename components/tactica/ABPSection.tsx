@@ -12,9 +12,11 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { 
   Film, Plus, AlertCircle, Trash2, BookOpen, Layers, X, 
   Save, RefreshCw, Copy, Edit2, Search, UserCheck, 
-  PlusCircle, Check, ChevronDown, FolderOpen
+  PlusCircle, Check, ChevronDown, FolderOpen, FileDown
 } from 'lucide-react';
 import { useEditMode } from '@/context/EditModeContext';
+import { exportToPDF, buildABPFilename } from '@/lib/exportPdf';
+import { ABPFieldExport } from './ABPFieldExport';
 
 interface ABPSectionProps {
   players: Player[];
@@ -614,6 +616,7 @@ export function ABPSection({ players }: ABPSectionProps) {
   const [isDuplicating, setIsDuplicating] = useState(false);
   const [selectedTacticalSystem, setSelectedTacticalSystem] = useState<keyof typeof SISTEMAS_TACTICOS>('1-4-3-3');
   const [activeNodeId, setActiveNodeId] = useState<string | null>(null);
+  const [isPdfExporting, setIsPdfExporting] = useState(false);
 
   
   // Form states - Play Creation/Edition
@@ -725,6 +728,43 @@ export function ABPSection({ players }: ABPSectionProps) {
       setLoadingRoles(false);
     }
   }, [players, selectedPlay]);
+
+  const handleExportPDF = async () => {
+    if (!selectedPlay) return;
+    setIsPdfExporting(true);
+    try {
+      const { descripcion_texto } = parsePlayDescripcion(selectedPlay.descripcion);
+      const filename = buildABPFilename({
+        tipoABP: selectedPlay.tipo,
+        playName: selectedPlay.titulo || 'Jugada',
+      });
+
+      // Dynamically compile legend of abbreviations used
+      const isRealPosType = isRealPositionPlayType(selectedPlay.tipo);
+      const leyenda: Record<string, string> = {};
+      playRoles.forEach((role) => {
+        const label = role.etiqueta || (isRealPosType ? POSITION_ABBRS[role.rol_asignado] : ROLE_ABBRS[role.rol_asignado]);
+        if (label) {
+          leyenda[label] = role.rol_asignado;
+        }
+      });
+
+      await exportToPDF({
+        mode: 'abp',
+        fieldElementId: 'abp-field-export-container',
+        filename,
+        playName: selectedPlay.titulo || 'Jugada',
+        tipoABP: selectedPlay.tipo,
+        instrucciones: descripcion_texto || '',
+        leyenda,
+      });
+    } catch (err) {
+      console.error('[PDF Export] Error:', err);
+      setErrorMsg('Error al generar el PDF de ABP. Inténtalo de nuevo.');
+    } finally {
+      setIsPdfExporting(false);
+    }
+  };
 
   useEffect(() => {
     loadPlays();
@@ -1659,36 +1699,47 @@ export function ABPSection({ players }: ABPSectionProps) {
                   <h2 className="text-xl font-extrabold text-slate-100">{selectedPlay.titulo}</h2>
                 </div>
 
-                {isEditMode && (
-                  <div className="flex flex-wrap gap-2">
-                    <Button 
-                      variant="secondary"
-                      onClick={openEditModal}
-                      className="py-1.5 px-3 text-xs flex items-center gap-1.5 border border-slate-800"
-                    >
-                      <Edit2 className="h-3.5 w-3.5" />
-                      Editar Título/Info
-                    </Button>
-                    <Button 
-                      variant="secondary"
-                      onClick={handleDuplicatePlay}
-                      loading={isDuplicating}
-                      className="py-1.5 px-3 text-xs flex items-center gap-1.5 border border-slate-800"
-                    >
-                      <Copy className="h-3.5 w-3.5" />
-                      Duplicar
-                    </Button>
-                    <Button 
-                      variant="primary"
-                      onClick={handleSavePositions}
-                      loading={isSaving}
-                      className="py-1.5 px-4 text-xs flex items-center gap-1.5 bg-[#CC0E21] hover:bg-red-500 text-white font-bold"
-                    >
-                      <Save className="h-3.5 w-3.5" />
-                      Guardar Cambios
-                    </Button>
-                  </div>
-                )}
+                <div className="flex flex-wrap gap-2">
+                  {isEditMode && (
+                    <>
+                      <Button 
+                        variant="secondary"
+                        onClick={openEditModal}
+                        className="py-1.5 px-3 text-xs flex items-center gap-1.5 border border-slate-800"
+                      >
+                        <Edit2 className="h-3.5 w-3.5" />
+                        Editar Título/Info
+                      </Button>
+                      <Button 
+                        variant="secondary"
+                        onClick={handleDuplicatePlay}
+                        loading={isDuplicating}
+                        className="py-1.5 px-3 text-xs flex items-center gap-1.5 border border-slate-800"
+                      >
+                        <Copy className="h-3.5 w-3.5" />
+                        Duplicar
+                      </Button>
+                      <Button 
+                        variant="primary"
+                        onClick={handleSavePositions}
+                        loading={isSaving}
+                        className="py-1.5 px-4 text-xs flex items-center gap-1.5 bg-[#CC0E21] hover:bg-red-500 text-white font-bold"
+                      >
+                        <Save className="h-3.5 w-3.5" />
+                        Guardar Cambios
+                      </Button>
+                    </>
+                  )}
+                  <Button
+                    variant="secondary"
+                    onClick={handleExportPDF}
+                    loading={isPdfExporting}
+                    className="py-1.5 px-3 text-xs flex items-center gap-1.5 bg-slate-900/60 border border-slate-800 text-slate-200 hover:border-[#CC0E21]/50 font-bold"
+                  >
+                    <FileDown className="h-3.5 w-3.5 text-[#CC0E21]" />
+                    {isPdfExporting ? 'Generando...' : 'Exportar PDF'}
+                  </Button>
+                </div>
               </div>
 
               {/* PIZARRA TÁCTICA E INFORMACIÓN */}
@@ -2497,6 +2548,19 @@ export function ABPSection({ players }: ABPSectionProps) {
           </div>
         </form>
       </Modal>
+
+      {/* Hidden container for high-res PDF Export */}
+      {selectedPlay && (
+        <div className="fixed top-0 left-0 -z-50 opacity-0 pointer-events-none">
+          <div id="abp-field-export-container">
+            <ABPFieldExport
+              playRoles={playRoles}
+              playType={selectedPlay.tipo}
+              playZona={selectedPlay.zona}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
