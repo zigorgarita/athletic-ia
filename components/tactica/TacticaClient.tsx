@@ -90,6 +90,9 @@ export function TacticaClient() {
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  // Multi-lineup selector modal: shown when a match has >1 saved pizarra
+  const [matchLineupsModal, setMatchLineupsModal] = useState<TacticalLineup[] | null>(null);
+
   // Modal node editor states (for rival team only now)
   const [editingNode, setEditingNode] = useState<{ team: 'rival'; node: PositionNode } | null>(null);
   const [editNodeName, setEditNodeName] = useState('');
@@ -415,6 +418,50 @@ export function TacticaClient() {
       setIsSaving(false);
     }
   }
+
+  // --- Auto-load pizarra when a match is selected ---
+  const handleMatchIdChange = async (matchId: string) => {
+    setSelectedMatchId(matchId);
+
+    if (!matchId) {
+      // No match selected → keep current board, do not reset
+      return;
+    }
+
+    // Find all lineups linked to this match
+    const linked = savedLineups.filter(l => l.match_id === matchId);
+
+    if (linked.length === 0) {
+      // No existing pizarra → blank board for new lineup
+      // Only reset if we are not already editing this match
+      if (currentLineupId) {
+        const current = savedLineups.find(l => l.id === currentLineupId);
+        if (!current || current.match_id !== matchId) {
+          // Coming from a different context: reset board
+          isLoadingLineupRef.current = true;
+          setCurrentLineupId(null);
+          setLineupName('');
+          setLineupNotes('');
+          const ownSys = systems.find(s => s.nombre === selectedFormation);
+          setNodesPropio((ownSys?.coordenadas_base || []).map(c => ({ ...c, player_id: null, notas_entrenador: '' })));
+          const rivalSys = systems.find(s => s.nombre === rivalFormation);
+          setNodesRival((rivalSys?.coordenadas_base || []).map(c => ({ ...c, player_id: null, notas_entrenador: '' })));
+          setTimeout(() => { isLoadingLineupRef.current = false; }, 0);
+        }
+      }
+      setSuccessMsg('No hay pizarras guardadas para este partido. El tablero está listo para crear una nueva.');
+      return;
+    }
+
+    if (linked.length === 1) {
+      // Exactly one pizarra → load it automatically
+      await handleLoadLineup(linked[0]);
+      return;
+    }
+
+    // More than one pizarra → open selector modal
+    setMatchLineupsModal(linked);
+  };
 
   // --- Load Saved Lineup ---
   const handleLoadLineup = async (lineup: TacticalLineup) => {
@@ -760,7 +807,7 @@ export function TacticaClient() {
             lineupName={lineupName}
             onLineupNameChange={setLineupName}
             selectedMatchId={selectedMatchId}
-            onMatchIdChange={setSelectedMatchId}
+            onMatchIdChange={handleMatchIdChange}
             rivalFormation={rivalFormation}
             onRivalFormationChange={handleRivalFormationChange}
             formationsOptions={formationsOptions}
@@ -777,6 +824,39 @@ export function TacticaClient() {
             onLoad={handleLoadLineup}
             onDelete={handleDeleteLineup}
           />
+
+          {/* Multi-lineup selector modal */}
+          {matchLineupsModal && (
+            <div className="p-4 bg-slate-900/80 border border-[#CC0E21]/30 rounded-2xl space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-bold text-slate-200 uppercase tracking-widest">
+                  Varias pizarras para este partido
+                </p>
+                <button
+                  onClick={() => setMatchLineupsModal(null)}
+                  className="text-slate-500 hover:text-slate-300 transition-colors"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <p className="text-[11px] text-slate-400">Selecciona la pizarra que quieres abrir:</p>
+              <div className="space-y-1.5 max-h-[180px] overflow-y-auto pr-1">
+                {matchLineupsModal.map((l) => (
+                  <button
+                    key={l.id}
+                    onClick={async () => {
+                      setMatchLineupsModal(null);
+                      await handleLoadLineup(l);
+                    }}
+                    className="w-full text-left px-3 py-2 rounded-xl bg-slate-950/60 hover:bg-[#CC0E21]/10 border border-slate-800 hover:border-[#CC0E21]/40 transition-all text-xs"
+                  >
+                    <span className="font-semibold text-slate-200 block">{l.nombre_pizarra || l.nombre_sistema}</span>
+                    <span className="text-slate-500 text-[10px]">{l.sistema_propio} vs {l.sistema_rival}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Description of current selected own system */}
           <SystemCard system={activeSystem} />
