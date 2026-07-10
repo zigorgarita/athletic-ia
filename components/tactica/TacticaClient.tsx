@@ -9,11 +9,12 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { 
   Save, Copy, RefreshCw, AlertCircle, 
   CheckCircle, Plus, X, Layout,
-  ArrowRight
+  ArrowRight, FileDown
 } from 'lucide-react';
 import { useEditMode } from '@/context/EditModeContext';
 import { useTacticalSystems } from '@/hooks/useTacticalSystems';
 import { useTacticalRoleCards } from '@/hooks/useTacticalRoleCards';
+import { exportToPDF, buildTacticaFilename } from '@/lib/exportPdf';
 import { TacticalField } from './TacticalField';
 
 // Subcomponents
@@ -87,6 +88,7 @@ export function TacticaClient() {
   const [matches, setMatches] = useState<Match[]>([]);
   const [loadingLineups, setLoadingLineups] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isPdfExporting, setIsPdfExporting] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -419,6 +421,38 @@ export function TacticaClient() {
     }
   }
 
+  // --- Export PDF (Pizarra Táctica) ---
+  const handleExportPDF = async () => {
+    setIsPdfExporting(true);
+    try {
+      const match = matches.find(m => m.id === selectedMatchId);
+      const filename = buildTacticaFilename({
+        jornada: match?.jornada,
+        rival: match?.rival,
+        lineupName: lineupName || 'Pizarra',
+      });
+      const partido = match
+        ? `Jornada ${match.jornada} vs ${match.rival}`
+        : 'Sin partido vinculado';
+
+      await exportToPDF({
+        mode: 'tactica',
+        fieldElementId: 'tactical-field-propio-export',
+        filename,
+        lineupName: lineupName || 'Alineación',
+        partido,
+        sistemaPropio: selectedFormation,
+        sistemaRival: rivalFormation,
+        notas: lineupNotes,
+      });
+    } catch (err) {
+      console.error('[PDF Export] Error:', err);
+      setErrorMsg('Error al generar el PDF. Inténtalo de nuevo.');
+    } finally {
+      setIsPdfExporting(false);
+    }
+  };
+
   // --- Auto-load pizarra when a match is selected ---
   const handleMatchIdChange = async (matchId: string) => {
     setSelectedMatchId(matchId);
@@ -748,6 +782,18 @@ export function TacticaClient() {
               <Save className="h-3.5 w-3.5" /> {currentLineupId ? 'Actualizar' : 'Guardar'}
             </Button>
           )}
+          {/* Export PDF — always visible when there is a lineup loaded */}
+          {(lineupName || nodesPropio.some(n => n.player_id)) && (
+            <Button
+              variant="secondary"
+              onClick={handleExportPDF}
+              loading={isPdfExporting}
+              className="flex items-center gap-1.5 text-xs bg-slate-900/60 border-slate-700 text-slate-200 hover:border-[#CC0E21]/50"
+            >
+              <FileDown className="h-3.5 w-3.5 text-[#CC0E21]" />
+              {isPdfExporting ? 'Generando...' : 'Exportar PDF'}
+            </Button>
+          )}
           {currentLineupId && isEditMode && (
             <Button 
               variant="secondary" 
@@ -864,15 +910,18 @@ export function TacticaClient() {
 
         {/* Center column: Soccer fields stacked vertically */}
         <div className="xl:col-span-6 flex flex-col items-center gap-8 justify-center w-full">
-          <TacticalField
-            team="propio"
-            nodes={nodesPropio}
-            players={players}
-            isEditMode={isEditMode}
-            onNodesChange={setNodesPropio}
-            onNodeClick={(node) => handleOpenNodeEditor('propio', node)}
-            highlightedZone={highlightedConflictZone}
-          />
+          {/* Wrapper with export id — only the propio field is captured for PDF */}
+          <div id="tactical-field-propio-export">
+            <TacticalField
+              team="propio"
+              nodes={nodesPropio}
+              players={players}
+              isEditMode={isEditMode}
+              onNodesChange={setNodesPropio}
+              onNodeClick={(node) => handleOpenNodeEditor('propio', node)}
+              highlightedZone={highlightedConflictZone}
+            />
+          </div>
 
           {/* UTILITIES TOOLBAR (Always horizontal) */}
           {isEditMode && (
