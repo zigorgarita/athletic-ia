@@ -165,11 +165,18 @@ export async function exportToPDF(config: ExportConfig): Promise<void> {
     drawDivider(doc, cursorY);
     cursorY += 4;
 
-    // ── Field image — centered in the right 2/3 of the page ──
+    // ── Field image — centered in the page ──
+    const availableW = PAGE_W - 2 * MARGIN;
     const availableH = PAGE_H - cursorY - MARGIN;
-    const fieldAspect = canvas.width / canvas.height; // approx 2:3 → 0.667
-    const fieldH = Math.min(availableH, PAGE_H - cursorY - MARGIN);
-    const fieldW = fieldH * fieldAspect;
+    const fieldAspect = canvas.width / canvas.height; 
+    
+    let fieldW = availableW;
+    let fieldH = fieldW / fieldAspect;
+    
+    if (fieldH > availableH) {
+      fieldH = availableH;
+      fieldW = fieldH * fieldAspect;
+    }
 
     // Center the field image on the page
     const fieldX = (PAGE_W - fieldW) / 2;

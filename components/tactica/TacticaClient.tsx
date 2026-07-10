@@ -16,6 +16,7 @@ import { useTacticalSystems } from '@/hooks/useTacticalSystems';
 import { useTacticalRoleCards } from '@/hooks/useTacticalRoleCards';
 import { exportToPDF, buildTacticaFilename } from '@/lib/exportPdf';
 import { TacticalField } from './TacticalField';
+import { TacticalFieldExport } from './TacticalFieldExport';
 
 // Subcomponents
 import { FormationSelector } from './systems/FormationSelector';
@@ -437,7 +438,7 @@ export function TacticaClient() {
 
       await exportToPDF({
         mode: 'tactica',
-        fieldElementId: 'tactical-field-propio-export',
+        fieldElementId: 'tactical-field-export-container',
         filename,
         lineupName: lineupName || 'Alineación',
         partido,
@@ -910,18 +911,16 @@ export function TacticaClient() {
 
         {/* Center column: Soccer fields stacked vertically */}
         <div className="xl:col-span-6 flex flex-col items-center gap-8 justify-center w-full">
-          {/* Wrapper with export id — only the propio field is captured for PDF */}
-          <div id="tactical-field-propio-export">
-            <TacticalField
-              team="propio"
-              nodes={nodesPropio}
-              players={players}
-              isEditMode={isEditMode}
-              onNodesChange={setNodesPropio}
-              onNodeClick={(node) => handleOpenNodeEditor('propio', node)}
-              highlightedZone={highlightedConflictZone}
-            />
-          </div>
+          {/* Main Pitch: Our Team */}
+          <TacticalField
+            team="propio"
+            nodes={nodesPropio}
+            players={players}
+            isEditMode={isEditMode}
+            onNodesChange={setNodesPropio}
+            onNodeClick={(node) => handleOpenNodeEditor('propio', node)}
+            highlightedZone={highlightedConflictZone}
+          />
 
           {/* UTILITIES TOOLBAR (Always horizontal) */}
           {isEditMode && (
@@ -1135,6 +1134,16 @@ export function TacticaClient() {
           </div>
         </div>
       )}
+
+      {/* Hidden container for high-res PDF Export */}
+      <div className="fixed top-0 left-0 -z-50 opacity-0 pointer-events-none">
+        <div id="tactical-field-export-container">
+          <TacticalFieldExport
+            nodes={nodesPropio}
+            players={players}
+          />
+        </div>
+      </div>
     </div>
   );
 }
