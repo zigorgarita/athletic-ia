@@ -52,6 +52,8 @@ export interface PlayerInjury {
   fecha_prevista_recuperacion: string | null;
   fecha_real_recuperacion: string | null;
   observaciones: string | null;
+  zona_afectada?: string | null;
+  tratamiento?: string | null;
   created_at?: string;
   updated_at?: string;
 }

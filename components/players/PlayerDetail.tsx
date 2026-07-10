@@ -198,6 +198,9 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
     metadata: {} as Record<string, any>
   });
 
+  const [editingMeetingId, setEditingMeetingId] = useState<string | null>(null);
+  const [editingMeetingData, setEditingMeetingData] = useState<any | null>(null);
+
   // Injuries tab local state
   const [showInjuryForm, setShowInjuryForm] = useState(false);
   const [injuryError, setInjuryError] = useState<string | null>(null);
@@ -209,8 +212,13 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
     estado: 'Activa' as PlayerInjury['estado'],
     fecha_prevista_recuperacion: '',
     fecha_real_recuperacion: '',
-    observaciones: ''
+    observaciones: '',
+    zona_afectada: '',
+    tratamiento: ''
   });
+
+  const [editingInjuryId, setEditingInjuryId] = useState<string | null>(null);
+  const [editingInjuryData, setEditingInjuryData] = useState<any | null>(null);
 
   const playerPosition = currentPlayer.demarcacion;
   const specificMetricsList = useMemo(() => METRICAS_ESPECIFICAS[playerPosition] || METRICAS_ESPECIFICAS['Centrocampista'], [playerPosition]);
@@ -431,6 +439,35 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
     }
   };
 
+  const handleSaveMeetingEdit = async (meetingId: string) => {
+    if (!editingMeetingData) return;
+    if (!editingMeetingData.motivo) {
+      alert('El motivo de la reunión es obligatorio');
+      return;
+    }
+
+    const updates = {
+      player_id: currentPlayer.id,
+      fecha: editingMeetingData.fecha,
+      solicitada_por: editingMeetingData.solicitada_por,
+      motivo: editingMeetingData.motivo,
+      desarrollo: editingMeetingData.desarrollo || null,
+      resolucion: editingMeetingData.resolucion || null,
+      estado: editingMeetingData.estado,
+      participantes: editingMeetingData.participantes || [],
+      seguimiento_notas: editingMeetingData.seguimiento_notas || null,
+      recordatorio_fecha: editingMeetingData.recordatorio_fecha || null
+    };
+
+    const updated = await updateMeeting(meetingId, updates);
+    if (updated) {
+      setEditingMeetingId(null);
+      setEditingMeetingData(null);
+    } else {
+      alert('Error al guardar los cambios de la reunión');
+    }
+  };
+
   // Handle Injury submit
   const handleInjurySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -449,7 +486,9 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
       estado: newInjury.estado,
       fecha_prevista_recuperacion: newInjury.fecha_prevista_recuperacion || null,
       fecha_real_recuperacion: newInjury.fecha_real_recuperacion || null,
-      observaciones: newInjury.observaciones || null
+      observaciones: newInjury.observaciones || null,
+      // zona_afectada: newInjury.zona_afectada || null,
+      // tratamiento: newInjury.tratamiento || null
     };
 
     const saved = await addInjury(payload);
@@ -468,10 +507,60 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
         estado: 'Activa',
         fecha_prevista_recuperacion: '',
         fecha_real_recuperacion: '',
-        observaciones: ''
+        observaciones: '',
+        zona_afectada: '',
+        tratamiento: ''
       });
     } else {
       setInjuryError('Error al registrar la lesión en Supabase');
+    }
+  };
+
+  const handleSaveInjuryEdit = async (injuryId: string) => {
+    if (!editingInjuryData) return;
+    if (!editingInjuryData.tipo_lesion || !editingInjuryData.diagnostico) {
+      alert('El tipo de lesión y el diagnóstico son obligatorios');
+      return;
+    }
+
+    const updates = {
+      player_id: currentPlayer.id,
+      fecha_lesion: editingInjuryData.fecha_lesion,
+      tipo_lesion: editingInjuryData.tipo_lesion,
+      diagnostico: editingInjuryData.diagnostico,
+      informado_por: editingInjuryData.informado_por,
+      estado: editingInjuryData.estado,
+      // zona_afectada: editingInjuryData.zona_afectada || null,
+      // tratamiento: editingInjuryData.tratamiento || null,
+      fecha_prevista_recuperacion: editingInjuryData.fecha_prevista_recuperacion || null,
+      fecha_real_recuperacion: editingInjuryData.estado === 'Alta médica' ? (editingInjuryData.fecha_real_recuperacion || formatLocalYYYYMMDD(new Date())) : null,
+      observaciones: editingInjuryData.observaciones || null
+    };
+
+    const updated = await updateInjury(injuryId, updates);
+    if (updated) {
+      // Sync player state with injuries
+      const nextInjuries = injuries.map(inj => inj.id === injuryId ? { ...inj, ...updates } : inj);
+      const hasActiveInjuries = nextInjuries.some(inj => 
+        inj.estado === 'Activa' || inj.estado === 'Recaída' || inj.estado === 'En recuperación'
+      );
+
+      if (hasActiveInjuries) {
+        if (currentPlayer.estado !== 'Lesionado') {
+          const updatedPlayer = await updatePlayer(currentPlayer.id, { estado: 'Lesionado' });
+          if (updatedPlayer) setCurrentPlayer(updatedPlayer);
+        }
+      } else {
+        if (currentPlayer.estado === 'Lesionado') {
+          const updatedPlayer = await updatePlayer(currentPlayer.id, { estado: 'Disponible' });
+          if (updatedPlayer) setCurrentPlayer(updatedPlayer);
+        }
+      }
+
+      setEditingInjuryId(null);
+      setEditingInjuryData(null);
+    } else {
+      alert('Error al guardar los cambios de la lesión');
     }
   };
 
@@ -996,6 +1085,22 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
                     </select>
                   </div>
                 </div>
+                {/* 
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Input 
+                    label="Zona Afectada" 
+                    placeholder="Ej: Tobillo derecho, Muslo izquierdo" 
+                    value={newInjury.zona_afectada} 
+                    onChange={e => setNewInjury(prev => ({ ...prev, zona_afectada: e.target.value }))} 
+                  />
+                  <Input 
+                    label="Tratamiento" 
+                    placeholder="Ej: Fisioterapia, Reposo" 
+                    value={newInjury.tratamiento} 
+                    onChange={e => setNewInjury(prev => ({ ...prev, tratamiento: e.target.value }))} 
+                  />
+                </div>
+                */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Input 
                     label="Fecha Prevista Recuperación" 
@@ -1038,46 +1143,177 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
               </div>
             ) : (
               <div className="space-y-4">
-                {injuries.map(injury => (
-                  <div key={injury.id} className="p-5 rounded-2xl bg-slate-900/30 border border-slate-800/80 space-y-3 relative group">
-                    <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b border-slate-850 pb-2">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-xs text-slate-500 font-semibold">{injury.fecha_lesion}</span>
-                        <strong className="text-slate-100 text-xs">{injury.tipo_lesion}</strong>
-                        <Badge variant="default" className="text-[9px] bg-slate-800 text-slate-350">{injury.informado_por}</Badge>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <select
-                          value={injury.estado}
-                          disabled={!isEditMode}
-                          onChange={e => handleUpdateInjuryStatus(injury.id, e.target.value as any)}
-                          className="bg-slate-950 border border-slate-850 text-[10px] px-2 py-0.5 rounded-lg text-slate-300 outline-none"
-                        >
-                          <option value="Activa">Baja Activa</option>
-                          <option value="En recuperación">En recuperación</option>
-                          <option value="Alta médica">Alta Médica</option>
-                          <option value="Recaída">Recaída</option>
-                        </select>
-                        {isEditMode && (
-                          <button 
-                            onClick={() => handleDeleteInjury(injury.id)} 
-                            className="text-red-500 hover:text-red-400 p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                {injuries.map(injury => {
+                  const isEditing = injury.id === editingInjuryId;
+                  
+                  if (isEditing && editingInjuryData) {
+                    return (
+                      <div key={injury.id} className="p-5 rounded-2xl bg-slate-900/50 border border-[#CC0E21]/40 space-y-4">
+                        <div className="text-xs font-bold uppercase tracking-wider text-slate-400 font-mono">Editar Ficha de Lesión</div>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                          <Input 
+                            label="Fecha de Lesión *" 
+                            type="date"
+                            value={editingInjuryData.fecha_lesion} 
+                            onChange={e => setEditingInjuryData({ ...editingInjuryData, fecha_lesion: e.target.value })} 
+                          />
+                          <Input 
+                            label="Tipo de Lesión *" 
+                            placeholder="Ej: Esguince" 
+                            value={editingInjuryData.tipo_lesion} 
+                            onChange={e => setEditingInjuryData({ ...editingInjuryData, tipo_lesion: e.target.value })} 
+                          />
+                          <Input 
+                            label="Diagnóstico / Detalles *" 
+                            placeholder="Ej: Grado II" 
+                            value={editingInjuryData.diagnostico} 
+                            onChange={e => setEditingInjuryData({ ...editingInjuryData, diagnostico: e.target.value })} 
+                          />
+                        </div>
+                        {/* 
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <Input 
+                            label="Zona Afectada" 
+                            placeholder="Ej: Tobillo derecho" 
+                            value={editingInjuryData.zona_afectada || ''} 
+                            onChange={e => setEditingInjuryData({ ...editingInjuryData, zona_afectada: e.target.value })} 
+                          />
+                          <Input 
+                            label="Tratamiento" 
+                            placeholder="Ej: Fisioterapia" 
+                            value={editingInjuryData.tratamiento || ''} 
+                            onChange={e => setEditingInjuryData({ ...editingInjuryData, tratamiento: e.target.value })} 
+                          />
+                        </div>
+                        */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div>
+                            <label className="text-xs text-slate-450 font-bold block mb-1">Informado Por</label>
+                            <select
+                              value={editingInjuryData.informado_por}
+                              onChange={e => setEditingInjuryData({ ...editingInjuryData, informado_por: e.target.value as any })}
+                              className="w-full bg-slate-950 border border-slate-800 text-xs px-3 py-2 rounded-xl text-slate-200 outline-none"
+                            >
+                              <option value="Fisio">Fisioterapeuta</option>
+                              <option value="Preparador físico">Preparador Físico</option>
+                              <option value="Entrenador">Entrenador</option>
+                              <option value="Segundo entrenador">Segundo Entrenador</option>
+                              <option value="Jugador">Propio Jugador</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="text-xs text-slate-455 font-bold block mb-1">Estado de Lesión</label>
+                            <select
+                              value={editingInjuryData.estado}
+                              onChange={e => setEditingInjuryData({ ...editingInjuryData, estado: e.target.value as any })}
+                              className="w-full bg-slate-950 border border-slate-800 text-xs px-3 py-2 rounded-xl text-slate-200 outline-none"
+                            >
+                              <option value="Activa">Activa / De baja</option>
+                              <option value="En recuperación">En Readaptación</option>
+                              <option value="Alta médica">Alta Médica</option>
+                              <option value="Recaída">Recaída</option>
+                            </select>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <Input 
+                            label="Fecha Prevista Recuperación" 
+                            type="date"
+                            value={editingInjuryData.fecha_prevista_recuperacion || ''}
+                            onChange={e => setEditingInjuryData({ ...editingInjuryData, fecha_prevista_recuperacion: e.target.value || null })} 
+                          />
+                          <Input 
+                            label="Fecha Real Alta" 
+                            type="date"
+                            disabled={editingInjuryData.estado !== 'Alta médica'}
+                            value={editingInjuryData.fecha_real_recuperacion || ''}
+                            onChange={e => setEditingInjuryData({ ...editingInjuryData, fecha_real_recuperacion: e.target.value || null })} 
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-slate-450 font-bold block mb-1">Observaciones Médicas</label>
+                          <textarea 
+                            className="w-full h-20 px-3 py-2 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-200 outline-none focus:border-[#CC0E21]"
+                            value={editingInjuryData.observaciones || ''}
+                            onChange={e => setEditingInjuryData({ ...editingInjuryData, observaciones: e.target.value || null })}
+                          />
+                        </div>
+                        <div className="flex justify-end gap-2 text-xs">
+                          <Button 
+                            variant="secondary" 
+                            onClick={() => {
+                              setEditingInjuryId(null);
+                              setEditingInjuryData(null);
+                            }}
+                            className="px-4 py-2 font-bold"
                           >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        )}
+                            Cancelar
+                          </Button>
+                          <Button 
+                            onClick={() => handleSaveInjuryEdit(injury.id)} 
+                            className="px-4 py-2 font-bold"
+                          >
+                            Guardar cambios
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div key={injury.id} className="p-5 rounded-2xl bg-slate-900/30 border border-slate-800/80 space-y-3 relative group">
+                      <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b border-slate-850 pb-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-xs text-slate-500 font-semibold">{injury.fecha_lesion}</span>
+                          <strong className="text-slate-100 text-xs">{injury.tipo_lesion}</strong>
+                          <Badge variant="default" className="text-[9px] bg-slate-800 text-slate-350">{injury.informado_por}</Badge>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border ${
+                            injury.estado === 'Alta médica' ? 'bg-green-950/20 text-green-450 border-green-900/30' :
+                            injury.estado === 'Activa' ? 'bg-red-950/20 text-red-450 border-red-900/30' :
+                            'bg-amber-950/20 text-amber-455 border-amber-900/30'
+                          }`}>
+                            {injury.estado}
+                          </span>
+                          {isEditMode && (
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => {
+                                  setEditingInjuryId(injury.id);
+                                  setEditingInjuryData({ ...injury });
+                                }}
+                                className="text-slate-400 hover:text-white text-xs font-semibold px-2 py-1 rounded bg-slate-850 hover:bg-slate-800 transition-colors cursor-pointer"
+                              >
+                                Editar
+                              </button>
+                              <button 
+                                onClick={() => handleDeleteInjury(injury.id)} 
+                                className="text-red-500 hover:text-red-400 p-1 bg-slate-850 hover:bg-slate-800 rounded transition-colors cursor-pointer"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-xs space-y-1.5 text-slate-300">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <div><strong className="text-slate-500">Diagnóstico:</strong> {injury.diagnostico}</div>
+                          {/* {injury.zona_afectada && <div><strong className="text-slate-500">Zona Afectada:</strong> {injury.zona_afectada}</div>} */}
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {/* {injury.tratamiento && <div><strong className="text-slate-500">Tratamiento:</strong> {injury.tratamiento}</div>} */}
+                          {injury.observaciones && <div><strong className="text-slate-500">Observaciones:</strong> {injury.observaciones}</div>}
+                        </div>
+                        <div className="grid grid-cols-2 gap-4 text-[10px] text-slate-500 pt-1">
+                          <div>Prevista: {injury.fecha_prevista_recuperacion || 'No especificada'}</div>
+                          <div>Alta Real: {injury.fecha_real_recuperacion || 'Aún de baja'}</div>
+                        </div>
                       </div>
                     </div>
-                    <div className="text-xs space-y-1.5 text-slate-300">
-                      <div><strong className="text-slate-500">Diagnóstico:</strong> {injury.diagnostico}</div>
-                      {injury.observaciones && <div><strong className="text-slate-500">Observaciones:</strong> {injury.observaciones}</div>}
-                      <div className="grid grid-cols-2 gap-4 text-[10px] text-slate-500 pt-1">
-                        <div>Prevista: {injury.fecha_prevista_recuperacion || 'No especificada'}</div>
-                        <div>Alta Real: {injury.fecha_real_recuperacion || 'Aún de baja'}</div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -1622,83 +1858,202 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
               </div>
             ) : (
               <div className="space-y-4">
-                {meetings.map(meeting => (
-                  <div key={meeting.id} className="p-5 rounded-2xl bg-slate-900/30 border border-slate-800/80 space-y-4 relative group">
-                    <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b border-slate-850 pb-2.5">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-xs text-slate-500 font-semibold">{meeting.fecha}</span>
-                        <strong className="text-slate-100 text-sm">{meeting.motivo}</strong>
-                        <span className={`text-[10px] font-black px-2 py-0.5 rounded-lg border ${
-                          meeting.solicitada_por === 'Staff' 
-                            ? 'bg-[#CC0E21]/10 text-[#CC0E21] border-[#CC0E21]/20' 
-                            : 'bg-blue-950/20 text-blue-400 border-blue-900/30'
-                        }`}>
-                          Por: {meeting.solicitada_por}
-                        </span>
-                        {meeting.participantes && meeting.participantes.length > 0 && (
-                          <span className="text-[10px] text-slate-400">
-                            (Con: {meeting.participantes.join(', ')})
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <select
-                          value={meeting.estado}
-                          disabled={!isEditMode}
-                          onChange={async (e) => {
-                            await updateMeeting(meeting.id, { estado: e.target.value as any });
-                          }}
-                          className="bg-slate-950 border border-slate-850 text-[10px] px-2 py-0.5 rounded-lg text-slate-350 outline-none"
-                        >
-                          <option value="Pendiente">Pendiente</option>
-                          <option value="En seguimiento">En seguimiento</option>
-                          <option value="Resuelta">Resuelta</option>
-                        </select>
-                        {isEditMode && (
-                          <button 
-                            onClick={() => handleDeleteMeeting(meeting.id)} 
-                            className="text-red-500 hover:text-red-400 p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                {meetings.map(meeting => {
+                  const isEditing = meeting.id === editingMeetingId;
+                  
+                  if (isEditing && editingMeetingData) {
+                    return (
+                      <div key={meeting.id} className="p-5 rounded-2xl bg-slate-900/50 border border-[#CC0E21]/40 space-y-4">
+                        <div className="text-xs font-bold uppercase tracking-wider text-slate-400 font-mono">Editar Ficha de Reunión</div>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                          <Input 
+                            label="Fecha *" 
+                            type="date"
+                            value={editingMeetingData.fecha} 
+                            onChange={e => setEditingMeetingData({ ...editingMeetingData, fecha: e.target.value })} 
+                          />
+                          <div>
+                            <label className="text-xs text-slate-455 font-bold block mb-1">Solicitada Por</label>
+                            <select
+                              value={editingMeetingData.solicitada_por}
+                              onChange={e => setEditingMeetingData({ ...editingMeetingData, solicitada_por: e.target.value as any })}
+                              className="w-full bg-slate-950 border border-slate-800 text-xs px-3 py-2 rounded-xl text-slate-200 outline-none h-[38px]"
+                            >
+                              <option value="Staff">Staff Técnico</option>
+                              <option value="Jugador">Jugador</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="text-xs text-slate-455 font-bold block mb-1">Estado</label>
+                            <select
+                              value={editingMeetingData.estado}
+                              onChange={e => setEditingMeetingData({ ...editingMeetingData, estado: e.target.value as any })}
+                              className="w-full bg-slate-950 border border-slate-800 text-xs px-3 py-2 rounded-xl text-slate-200 outline-none h-[38px]"
+                            >
+                              <option value="Pendiente">Pendiente</option>
+                              <option value="En seguimiento">En seguimiento</option>
+                              <option value="Resuelta">Resuelta</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-4">
+                          <Input 
+                            label="Motivo *" 
+                            placeholder="Ej: Revisión de rendimiento táctico, charla sobre minutos jugados, etc." 
+                            value={editingMeetingData.motivo} 
+                            onChange={e => setEditingMeetingData({ ...editingMeetingData, motivo: e.target.value })} 
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div>
+                            <label className="text-xs text-slate-455 font-bold block mb-1">Desarrollo de la Charla</label>
+                            <textarea 
+                              placeholder="Resumen de los temas tratados..."
+                              className="w-full h-24 px-3 py-2 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-200 outline-none focus:border-[#CC0E21]"
+                              value={editingMeetingData.desarrollo || ''}
+                              onChange={e => setEditingMeetingData({ ...editingMeetingData, desarrollo: e.target.value })}
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs text-slate-455 font-bold block mb-1">Resolución / Acuerdos</label>
+                            <textarea 
+                              placeholder="Conclusiones y compromisos alcanzados..."
+                              className="w-full h-24 px-3 py-2 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-200 outline-none focus:border-[#CC0E21]"
+                              value={editingMeetingData.resolucion || ''}
+                              onChange={e => setEditingMeetingData({ ...editingMeetingData, resolucion: e.target.value })}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                          <Input 
+                            label="Participantes (Separados por comas)" 
+                            placeholder="Ej: Aitor, Preparador físico"
+                            value={(editingMeetingData.participantes || []).join(', ')}
+                            onChange={e => setEditingMeetingData({ ...editingMeetingData, participantes: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })}
+                          />
+                          <Input 
+                            label="Seguimiento / Próximos pasos" 
+                            placeholder="Ej: Revisar en 2 semanas"
+                            value={editingMeetingData.seguimiento_notes || ''}
+                            onChange={e => setEditingMeetingData({ ...editingMeetingData, seguimiento_notes: e.target.value })}
+                          />
+                          <Input 
+                            label="Fecha de Recordatorio" 
+                            type="date"
+                            value={editingMeetingData.recordatorio_fecha || ''}
+                            onChange={e => setEditingMeetingData({ ...editingMeetingData, recordatorio_fecha: e.target.value || null })}
+                          />
+                        </div>
+
+                        <div className="flex justify-end gap-2 text-xs">
+                          <Button 
+                            variant="secondary" 
+                            onClick={() => {
+                              setEditingMeetingId(null);
+                              setEditingMeetingData(null);
+                            }}
+                            className="px-4 py-2 font-bold"
                           >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        )}
+                            Cancelar
+                          </Button>
+                          <Button 
+                            onClick={() => handleSaveMeetingEdit(meeting.id)} 
+                            className="px-4 py-2 font-bold"
+                          >
+                            Guardar cambios
+                          </Button>
+                        </div>
                       </div>
-                    </div>
+                    );
+                  }
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                      {meeting.desarrollo && (
-                        <div>
-                          <strong className="text-slate-500 block mb-0.5 uppercase tracking-wide text-[9px] font-bold">Desarrollo:</strong>
-                          <p className="text-slate-250 leading-relaxed bg-slate-950/30 p-3 rounded-xl border border-slate-850/40">{meeting.desarrollo}</p>
+                  return (
+                    <div key={meeting.id} className="p-5 rounded-2xl bg-slate-900/30 border border-slate-800/80 space-y-4 relative group">
+                      <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b border-slate-850 pb-2.5">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-xs text-slate-500 font-semibold">{meeting.fecha}</span>
+                          <strong className="text-slate-100 text-sm">{meeting.motivo}</strong>
+                          <span className={`text-[10px] font-black px-2 py-0.5 rounded-lg border ${
+                            meeting.solicitada_por === 'Staff' 
+                              ? 'bg-[#CC0E21]/10 text-[#CC0E21] border-[#CC0E21]/20' 
+                              : 'bg-blue-950/20 text-blue-400 border-blue-900/30'
+                          }`}>
+                            Por: {meeting.solicitada_por}
+                          </span>
+                          {meeting.participantes && meeting.participantes.length > 0 && (
+                            <span className="text-[10px] text-slate-400">
+                              (Con: {meeting.participantes.join(', ')})
+                            </span>
+                          )}
                         </div>
-                      )}
-                      {meeting.resolucion && (
-                        <div>
-                          <strong className="text-slate-500 block mb-0.5 uppercase tracking-wide text-[9px] font-bold">Resolución / Acuerdos:</strong>
-                          <p className="text-slate-250 leading-relaxed bg-slate-950/30 p-3 rounded-xl border border-slate-850/40">{meeting.resolucion}</p>
+                        <div className="flex items-center gap-3">
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border ${
+                            meeting.estado === 'Resuelta' ? 'bg-green-950/20 text-green-450 border-green-900/30' :
+                            meeting.estado === 'Pendiente' ? 'bg-red-950/20 text-red-450 border-red-900/30' :
+                            'bg-amber-950/20 text-amber-455 border-amber-900/30'
+                          }`}>
+                            {meeting.estado}
+                          </span>
+                          {isEditMode && (
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => {
+                                  setEditingMeetingId(meeting.id);
+                                  setEditingMeetingData({ ...meeting });
+                                }}
+                                className="text-slate-400 hover:text-white text-xs font-semibold px-2 py-1 rounded bg-slate-850 hover:bg-slate-800 transition-colors cursor-pointer"
+                              >
+                                Editar
+                              </button>
+                              <button 
+                                onClick={() => handleDeleteMeeting(meeting.id)} 
+                                className="text-red-500 hover:text-red-400 p-1 bg-slate-850 hover:bg-slate-800 rounded transition-colors cursor-pointer"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
+                      </div>
 
-                    {/* Mostrar campos de expansión si existen */}
-                    {(meeting.seguimiento_notas || meeting.recordatorio_fecha) && (
-                      <div className="bg-slate-900/10 p-3 rounded-xl border border-slate-850/40 text-[11px] grid grid-cols-1 sm:grid-cols-2 gap-2 text-slate-400">
-                        {meeting.seguimiento_notas && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                        {meeting.desarrollo && (
                           <div>
-                            <span className="font-bold text-slate-500 mr-1">Seguimiento:</span>
-                            {meeting.seguimiento_notas}
+                            <strong className="text-slate-500 block mb-0.5 uppercase tracking-wide text-[9px] font-bold">Desarrollo:</strong>
+                            <p className="text-slate-250 leading-relaxed bg-slate-950/30 p-3 rounded-xl border border-slate-850/40">{meeting.desarrollo}</p>
                           </div>
                         )}
-                        {meeting.recordatorio_fecha && (
+                        {meeting.resolucion && (
                           <div>
-                            <span className="font-bold text-slate-500 mr-1">Fecha Recordatorio:</span>
-                            {meeting.recordatorio_fecha}
+                            <strong className="text-slate-500 block mb-0.5 uppercase tracking-wide text-[9px] font-bold">Resolución / Acuerdos:</strong>
+                            <p className="text-slate-250 leading-relaxed bg-slate-950/30 p-3 rounded-xl border border-slate-850/40">{meeting.resolucion}</p>
                           </div>
                         )}
                       </div>
-                    )}
-                  </div>
-                ))}
+
+                      {/* Mostrar campos de expansión si existen */}
+                      {(meeting.seguimiento_notas || meeting.recordatorio_fecha) && (
+                        <div className="bg-slate-900/10 p-3 rounded-xl border border-slate-850/40 text-[11px] grid grid-cols-1 sm:grid-cols-2 gap-2 text-slate-400">
+                          {meeting.seguimiento_notas && (
+                            <div>
+                              <span className="font-bold text-slate-500 mr-1">Seguimiento:</span>
+                              {meeting.seguimiento_notas}
+                            </div>
+                          )}
+                          {meeting.recordatorio_fecha && (
+                            <div>
+                              <span className="font-bold text-slate-500 mr-1">Fecha Recordatorio:</span>
+                              {meeting.recordatorio_fecha}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
