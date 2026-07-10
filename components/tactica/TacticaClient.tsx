@@ -57,6 +57,8 @@ export function TacticaClient() {
 
   // Selected lineup / ID for update
   const [currentLineupId, setCurrentLineupId] = useState<string | null>(null);
+  // Ref flag: true while handleLoadLineup is running → prevents init useEffects from wiping restored nodes
+  const isLoadingLineupRef = React.useRef(false);
 
   // Board states
   const [selectedFormation, setSelectedFormation] = useState<string>('1-4-2-3-1');
@@ -155,7 +157,9 @@ export function TacticaClient() {
   }, [selectedFormation, rivalFormation, systems, matchups]);
 
   // Initialize nodes based on selected own formation
+  // Skip if a lineup load is in progress (isLoadingLineupRef) to avoid wiping restored nodes
   useEffect(() => {
+    if (isLoadingLineupRef.current) return;
     if (!currentLineupId && systems.length > 0) {
       const activeSys = systems.find(s => s.nombre === selectedFormation);
       const defaultCoords = activeSys?.coordenadas_base || [];
@@ -171,6 +175,7 @@ export function TacticaClient() {
 
   // Initialize nodes based on selected rival formation
   useEffect(() => {
+    if (isLoadingLineupRef.current) return;
     if (!currentLineupId && systems.length > 0) {
       const activeSys = systems.find(s => s.nombre === rivalFormation);
       const defaultCoords = activeSys?.coordenadas_base || [];
@@ -185,7 +190,9 @@ export function TacticaClient() {
   }, [rivalFormation, currentLineupId, systems]);
 
   // Sync date/match selection details and proposals
+  // Skip while a lineup is being loaded (isLoadingLineupRef) to avoid overwriting the lineup's saved analysis
   useEffect(() => {
+    if (isLoadingLineupRef.current) return;
     if (!activeMatchup) {
       setVentajas(`Ventajas teóricas de jugar con ${selectedFormation} contra un rival posicionado en ${rivalFormation}. Superioridad local en salida de balón y ocupación racional del carril medio.`);
       setDesventajas(`Vulnerabilidad del dibujo ${selectedFormation} ante repliegues fallidos o transiciones rápidas por el perfil exterior si el rival ${rivalFormation} explota las bandas.`);
@@ -411,6 +418,10 @@ export function TacticaClient() {
 
   // --- Load Saved Lineup ---
   const handleLoadLineup = async (lineup: TacticalLineup) => {
+    // Raise the flag BEFORE any setState so the init useEffects (formation / analysis)
+    // skip their reset logic and don't wipe the nodes we are about to restore.
+    isLoadingLineupRef.current = true;
+
     setCurrentLineupId(lineup.id);
     setSelectedFormation(lineup.sistema_propio || lineup.nombre_sistema || '1-4-2-3-1');
     setLineupName(lineup.nombre_pizarra || lineup.nombre_sistema);
@@ -476,6 +487,13 @@ export function TacticaClient() {
         setLineupNotes(plan.notas_entrenador);
       }
     }
+
+    // Lower the flag after the current microtask queue is flushed so all
+    // queued useEffect callbacks (which run after paint) still see it as true,
+    // then release for subsequent user-driven formation changes.
+    setTimeout(() => {
+      isLoadingLineupRef.current = false;
+    }, 0);
   };
 
   const handleDuplicateLineup = () => {
