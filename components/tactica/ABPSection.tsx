@@ -1031,6 +1031,7 @@ export function ABPSection({ players }: ABPSectionProps) {
       const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
       const rolesPayload = playRoles.map((role) => ({
         id: role.id,
+        abp_play_id: selectedPlay.id,
         player_id: role.player_id || null,
         rol_asignado: role.rol_asignado,
         posicion_x: role.posicion_x !== null ? parseFloat(role.posicion_x.toFixed(1)) : null,

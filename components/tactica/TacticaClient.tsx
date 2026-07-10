@@ -343,7 +343,7 @@ export function TacticaClient() {
         nombre_pizarra: lineupName,
         sistema_propio: selectedFormation,
         sistema_rival: rivalFormation,
-        notes: lineupNotes || null,
+        notas: lineupNotes || null,
         posiciones: {
           propio: nodesPropio.map(formatNodeForDb),
           rival: nodesRival.map(formatNodeForDb)
@@ -358,6 +358,7 @@ export function TacticaClient() {
 
       const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
       let error;
+
       if (currentLineupId) {
         const res = await supabase.rpc('exec_secure_upsert', {
           target_table: 'tactical_lineups',
