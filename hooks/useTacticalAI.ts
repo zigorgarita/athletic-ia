@@ -176,20 +176,27 @@ export function useTacticalAI() {
       verifyWritePermission();
       
       const promises = cards.map(async (card, idx) => {
-        const conflictCols = card.match_plan_id 
-          ? ['match_plan_id', 'posicion_label'] 
-          : ['matchup_id', 'posicion_label'];
+        const cardToSave = { ...card };
+        let conflictCols: string[];
+        
+        if (cardToSave.match_plan_id) {
+          conflictCols = ['match_plan_id', 'posicion_label'];
+          cardToSave.matchup_id = null;
+        } else {
+          conflictCols = ['matchup_id', 'posicion_label'];
+          cardToSave.match_plan_id = null;
+        }
           
         console.log(`[Card ${idx}] Saving:`, {
-          posicion_label: card.posicion_label,
-          matchup_id: card.matchup_id,
-          match_plan_id: card.match_plan_id,
+          posicion_label: cardToSave.posicion_label,
+          matchup_id: cardToSave.matchup_id,
+          match_plan_id: cardToSave.match_plan_id,
           conflictCols
         });
 
         const rpcRes = await supabase.rpc('exec_secure_upsert', {
           target_table: 'tactical_role_cards',
-          payload: card,
+          payload: cardToSave,
           conflict_columns: conflictCols,
           staff_passkey: passkey
         });
