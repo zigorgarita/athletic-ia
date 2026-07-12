@@ -2,7 +2,6 @@
 
 import React from 'react';
 import { Player } from '@/types';
-import { Avatar } from '@/components/ui/Avatar';
 import { PositionNode } from './TacticalField';
 
 interface TacticalFieldExportProps {
@@ -14,10 +13,17 @@ export function TacticalFieldExport({ nodes, players }: TacticalFieldExportProps
   // We render a horizontal pitch (Aspect ratio 3:2)
   return (
     <div 
-      className="relative w-[1200px] h-[800px] bg-emerald-950 rounded-[1rem] border-4 border-emerald-500 overflow-hidden"
+      className="relative overflow-hidden"
+      style={{
+        width: '1200px',
+        height: '800px',
+        borderRadius: '1rem',
+        border: '4px solid #4ade80',
+        backgroundColor: '#3b8c5a',
+      }}
     >
       {/* SVG Horizontal Pitch */}
-      <svg viewBox="0 0 600 400" className="absolute inset-0 w-full h-full pointer-events-none opacity-40">
+      <svg viewBox="0 0 600 400" className="absolute inset-0 w-full h-full pointer-events-none" style={{ opacity: 0.35 }}>
         {/* Core field lines */}
         <rect x="15" y="15" width="570" height="370" fill="none" stroke="#fff" strokeWidth="2.5" />
         <line x1="300" y1="15" x2="300" y2="385" stroke="#fff" strokeWidth="2.5" />
@@ -52,15 +58,6 @@ export function TacticalFieldExport({ nodes, players }: TacticalFieldExportProps
           : (node.customNumber || '');
 
         // Map coordinates for horizontal layout
-        // Assuming team attacks left to right.
-        // Original field: y=100 is bottom (our goal), y=0 is top (opponent goal).
-        // x=0 is left, x=100 is right.
-        // So for horizontal (left to right):
-        // X-axis: our goal is at left (0), opponent is at right (100).
-        // So newX = 100 - original Y
-        // Y-axis: original X was left-right. If we rotate -90 deg, original left (0) becomes bottom (100), right (100) becomes top (0).
-        // wait, let's trace: original (x=20, y=90) -> (left back). In horizontal (attacking right), left back is top left or bottom left?
-        // Let's say top is left side of field. So newY = original X.
         const newX = 100 - node.y;
         const newY = node.x;
 
@@ -71,39 +68,96 @@ export function TacticalFieldExport({ nodes, players }: TacticalFieldExportProps
               left: `${newX}%`,
               top: `${newY}%`,
               transform: 'translate(-50%, -50%)',
+              position: 'absolute',
+              zIndex: 10,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
             }}
-            className="absolute z-10 flex flex-col items-center"
           >
-            {/* Player Token */}
+            {/* Position badge — above the photo */}
             <div
-              className={`h-24 w-24 rounded-full border-[3px] flex items-center justify-center shadow-2xl ${
-                assignedPlayer
-                  ? 'border-[#CC0E21] bg-slate-950'
-                  : hasCustomDetails
-                  ? 'border-blue-500 bg-slate-900'
-                  : 'border-slate-800 bg-slate-900'
-              }`}
+              style={{
+                backgroundColor: '#1a1a2e',
+                border: '2px solid rgba(204, 14, 33, 0.7)',
+                borderRadius: '4px',
+                padding: '2px 8px',
+                marginBottom: '8px',
+                fontSize: '13px',
+                fontWeight: 800,
+                color: '#FF4D5E',
+                letterSpacing: '0.5px',
+                whiteSpace: 'nowrap',
+                lineHeight: '1.3',
+              }}
             >
-              {assignedPlayer ? (
-                <Avatar src={assignedPlayer.foto_url} name={assignedPlayer.nombre} size="xl" className="w-full h-full" />
-              ) : hasCustomDetails ? (
-                <div className="flex flex-col items-center justify-center">
-                  <span className="text-2xl font-black text-blue-400">{displayNumber}</span>
-                  <span className="text-base font-extrabold text-slate-400 leading-none">{node.label}</span>
-                </div>
-              ) : (
-                <span className="text-xl font-black text-slate-500">{node.label}</span>
-              )}
-            </div>
-
-            {/* Position badge */}
-            <div className="absolute -top-4 bg-slate-950 border-2 border-[#CC0E21]/50 px-2 py-0.5 rounded text-sm font-extrabold text-[#CC0E21]">
               {node.label}
             </div>
 
-            {/* Name overlay */}
-            <div className="mt-2 bg-slate-950/90 border-2 border-slate-900 px-3 py-1 rounded-xl text-base font-bold text-slate-200">
-              <span className="truncate max-w-[150px] block text-center">{displayName}</span>
+            {/* Player Token — photo circle */}
+            <div
+              style={{
+                width: '72px',
+                height: '72px',
+                borderRadius: '50%',
+                border: assignedPlayer
+                  ? '3px solid #CC0E21'
+                  : hasCustomDetails
+                  ? '3px solid #3b82f6'
+                  : '3px solid #475569',
+                backgroundColor: assignedPlayer ? '#0f172a' : '#1e293b',
+                overflow: 'hidden',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+              }}
+            >
+              {assignedPlayer && assignedPlayer.foto_url ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
+                  src={assignedPlayer.foto_url}
+                  alt={assignedPlayer.nombre}
+                  crossOrigin="anonymous"
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    objectPosition: 'center 15%',
+                    borderRadius: '50%',
+                  }}
+                />
+              ) : hasCustomDetails ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                  <span style={{ fontSize: '22px', fontWeight: 900, color: '#60a5fa' }}>{displayNumber}</span>
+                  <span style={{ fontSize: '12px', fontWeight: 800, color: '#94a3b8', lineHeight: '1' }}>{node.label}</span>
+                </div>
+              ) : (
+                <span style={{ fontSize: '18px', fontWeight: 900, color: '#64748b' }}>{node.label}</span>
+              )}
+            </div>
+
+            {/* Name label — below the photo */}
+            <div
+              style={{
+                marginTop: '8px',
+                backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                border: '2px solid #334155',
+                borderRadius: '10px',
+                padding: '5px 16px',
+                fontSize: '14px',
+                fontWeight: 700,
+                color: '#f1f5f9',
+                whiteSpace: 'nowrap',
+                maxWidth: '140px',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                textAlign: 'center',
+                letterSpacing: '0.3px',
+                lineHeight: '1.4',
+              }}
+            >
+              {displayName}
             </div>
           </div>
         );

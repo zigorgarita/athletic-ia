@@ -82,7 +82,7 @@ export async function exportToPDF(config: ExportConfig): Promise<void> {
       scale: 3,
       useCORS: true,
       allowTaint: true,
-      backgroundColor: '#052e16', // emerald-950 equivalent
+      backgroundColor: '#3b8c5a', // lighter grass green for print
       logging: false,
     });
   } finally {
