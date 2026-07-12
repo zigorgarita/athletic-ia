@@ -278,17 +278,52 @@ function extractSection(text: string, sectionName: string): string {
 }
 
 function extractRoleCardsFromText(text: string, context: TacticalAIContext): Partial<TacticalRoleCard>[] {
-  const cards: Partial<TacticalRoleCard>[] = [];
+  console.log('--- START extractRoleCardsFromText ---');
   
-  // Buscar cualquier etiqueta que contenga de 2 a 4 letras mayúsculas, permitiendo texto extra dentro como [DFC 1] o [MCD Der] o (POR)
-  const regex = /(?:\[|\b|\()([A-Z]{2,4})(?:\]|\b|\))[^:\n]*?:?\s*([\s\S]*?)(?=(?:(?:\[|\b|\()([A-Z]{2,4})(?:\]|\b|\))[^:\n]*?:)|\n\n[A-Z]|$)/gi;
+  // Lista blanca de posiciones válidas en la aplicación
+  const validPositions = new Set([
+    'POR', 'LD', 'LI', 'DFC', 'CT', 'DCD', 'DCI', 'CAD', 'CAI',
+    'MCD', 'MC', 'MCO', 'MCDD', 'MCDI', 'MDI', 'MDD', 'MI', 'MD',
+    'ED', 'EI', 'DC', 'SD', 'EXD', 'EXI'
+  ]);
+
+  // Regex ESTRICTO: Solo busca posiciones entre corchetes [POR], [MCD], etc.
+  // Evita atrapar palabras normales como "del" o "por"
+  const regex = /\[([A-Z]{2,4})\]\s*([\s\S]*?)(?=\[([A-Z]{2,4})\]|$)/g;
   
   let match;
+  const stats = { detectadas: 0, validas: 0, descartadas: 0 };
+  const motivosDescarte: string[] = [];
+  
+  // Usamos un Map para evitar duplicados y conservar la última
+  const cardsMap = new Map<string, Partial<TacticalRoleCard>>();
+
   while ((match = regex.exec(text)) !== null) {
-    const pos = match[1].toUpperCase();
+    stats.detectadas++;
+    const pos = match[1]; // Ya está en mayúsculas por [A-Z]
     const content = match[2].trim();
-      
-    // Intentar dividir en secciones ofensivas, defensivas, etc. si el texto está estructurado
+
+    // 1. Validar posición
+    if (!validPositions.has(pos)) {
+      stats.descartadas++;
+      motivosDescarte.push(`Posición inválida o no reconocida: [${pos}]`);
+      continue;
+    }
+
+    // 2. Validar contexto válido (necesitamos al menos un matchup)
+    if (!context.matchupId && !context.matchId) {
+      stats.descartadas++;
+      motivosDescarte.push(`Falta contexto de partido o matchup para guardar [${pos}]`);
+      continue;
+    }
+
+    // 3. Validar contenido suficiente
+    if (content.length < 15) {
+      stats.descartadas++;
+      motivosDescarte.push(`Contenido insuficiente para [${pos}] (${content.length} caracteres)`);
+      continue;
+    }
+
     const faseOfensiva = extractSubSection(content, 'ofensiva', 'ataque') || content.substring(0, 150);
     const faseDefensiva = extractSubSection(content, 'defensiva', 'defensa') || content.substring(150, 300);
     const transiciones = extractSubSection(content, 'transici') || '';
@@ -299,7 +334,13 @@ function extractRoleCardsFromText(text: string, context: TacticalAIContext): Par
     else if (['LD', 'LI', 'DFC', 'CT', 'DCD', 'DCI', 'CAD', 'CAI'].includes(pos)) linea = 'Defensa';
     else if (['ED', 'EI', 'DC', 'SD', 'EXD', 'EXI'].includes(pos)) linea = 'Delantera';
 
-    cards.push({
+    // 4. Si ya existe, se conservará la última
+    if (cardsMap.has(pos)) {
+      motivosDescarte.push(`Ficha [${pos}] duplicada (se ha sobrescrito con la última)`);
+      // No sumamos a descartadas, pero registramos el evento
+    }
+
+    cardsMap.set(pos, {
       matchup_id: context.matchupId || undefined,
       match_plan_id: context.matchId || undefined,
       linea,
@@ -311,7 +352,22 @@ function extractRoleCardsFromText(text: string, context: TacticalAIContext): Par
     });
   }
 
-  return cards;
+  const result = Array.from(cardsMap.values());
+  stats.validas = result.length;
+
+  console.log('');
+  console.log('--- Resumen Parser Fichas de Rol ---');
+  console.log(`${stats.detectadas} fichas detectadas`);
+  console.log(`${stats.validas} fichas válidas`);
+  console.log(`${stats.descartadas} descartadas`);
+  if (motivosDescarte.length > 0) {
+    console.log('Motivos de descarte/duplicados:');
+    motivosDescarte.forEach(m => console.log(' - ' + m));
+  }
+  console.log('------------------------------------');
+  console.log('');
+
+  return result;
 }
 
 function extractSubSection(text: string, key: string, altKey?: string): string {
