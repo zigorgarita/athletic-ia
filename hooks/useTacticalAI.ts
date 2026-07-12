@@ -166,34 +166,62 @@ export function useTacticalAI() {
   }, [verifyWritePermission, passkey]);
 
   // Aplicar sugerencias de fichas de rol a la base de datos
-  const applyToRoleCards = useCallback(async (cards: Partial<TacticalRoleCard>[]): Promise<boolean> => {
+  const applyToRoleCards = useCallback(async (cards: Partial<TacticalRoleCard>[]): Promise<{ success: boolean; error?: any }> => {
     setLoading(true);
     setError(null);
+    console.log("=== APPLY TO ROLE CARDS: START ===");
+    console.log("Payload/Cards received:", JSON.stringify(cards, null, 2));
+    
     try {
       verifyWritePermission();
       
-      const promises = cards.map(card => {
+      const promises = cards.map(async (card, idx) => {
         const conflictCols = card.match_plan_id 
           ? ['match_plan_id', 'posicion_label'] 
           : ['matchup_id', 'posicion_label'];
           
-        return supabase.rpc('exec_secure_upsert', {
+        console.log(`[Card ${idx}] Saving:`, {
+          posicion_label: card.posicion_label,
+          matchup_id: card.matchup_id,
+          match_plan_id: card.match_plan_id,
+          conflictCols
+        });
+
+        const rpcRes = await supabase.rpc('exec_secure_upsert', {
           target_table: 'tactical_role_cards',
           payload: card,
           conflict_columns: conflictCols,
           staff_passkey: passkey
         });
+
+        console.log(`[Card ${idx}] RPC Raw Response:`, JSON.stringify(rpcRes, null, 2));
+        
+        if (rpcRes.error) {
+          console.error(`[Card ${idx}] RPC Error details:`, {
+            code: rpcRes.error.code,
+            message: rpcRes.error.message,
+            details: rpcRes.error.details,
+            hint: rpcRes.error.hint
+          });
+          throw rpcRes.error;
+        }
+        
+        return rpcRes;
       });
 
-      const results = await Promise.all(promises);
-      const errors = results.filter(res => res.error);
-      if (errors.length > 0) throw errors[0].error;
-
-      return true;
+      await Promise.all(promises);
+      console.log("=== APPLY TO ROLE CARDS: SUCCESS ===");
+      return { success: true };
     } catch (err: any) {
-      console.error('Error al aplicar fichas de rol sugeridas:', err);
+      console.error('=== APPLY TO ROLE CARDS: EXCEPTION ===');
+      console.error('Error object:', err);
+      console.error('Error code:', err.code);
+      console.error('Error message:', err.message);
+      console.error('Error details:', err.details);
+      console.error('Error hint:', err.hint);
+      
       setError(err.message || 'Error al guardar fichas de rol sugeridas.');
-      return false;
+      return { success: false, error: err };
     } finally {
       setLoading(false);
     }

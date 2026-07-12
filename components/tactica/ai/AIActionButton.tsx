@@ -58,12 +58,12 @@ export function AIActionButton({ action, onApplied }: AIActionButtonProps) {
       verifyWritePermission();
 
       if (action.type === 'apply_to_role_card') {
-        const ok = await applyToRoleCards(action.data.roleCards);
-        if (ok) {
+        const res = await applyToRoleCards(action.data.roleCards);
+        if (res.success) {
           setSuccess(true);
           if (onApplied) onApplied('¡Fichas de rol actualizadas correctamente!');
         } else {
-          alert('No se pudieron aplicar las fichas de rol.');
+          throw res.error || new Error('No se pudieron aplicar las fichas de rol.');
         }
       }
 
