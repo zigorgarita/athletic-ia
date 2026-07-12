@@ -197,8 +197,25 @@ export async function POST(request: Request) {
     const provider = createProvider();
     const response = await provider.chat(messagesForAI);
 
+    // Cargar plan de partido si existe para obtener su ID real (evitando enviar el match_id que viola la FK)
+    let matchPlanId = null;
+    if (context.matchId) {
+      try {
+        const { data: plan } = await supabase
+          .from('tactical_match_plans')
+          .select('id')
+          .eq('match_id', context.matchId)
+          .maybeSingle();
+        if (plan) {
+          matchPlanId = plan.id;
+        }
+      } catch (dbErr) {
+        console.warn('Error al verificar tactical_match_plans:', dbErr);
+      }
+    }
+
     // 7. Parsear acciones sugeridas automáticamente
-    const suggestedActions = parseSuggestedActions(response.content, context, actionType);
+    const suggestedActions = parseSuggestedActions(response.content, context, actionType, matchPlanId);
 
     return NextResponse.json({
       content: response.content,
@@ -219,7 +236,7 @@ export async function POST(request: Request) {
  * Parsea el texto generado por la IA en busca de directrices estructuradas
  * para sugerir botones de acción rápida en el cliente.
  */
-function parseSuggestedActions(content: string, context: TacticalAIContext, actionType?: string): AIAction[] {
+function parseSuggestedActions(content: string, context: TacticalAIContext, actionType?: string, matchPlanId?: string | null): AIAction[] {
   const actions: AIAction[] = [];
 
   // 1. Detectar si la respuesta sugiere fichas de rol (role cards)
@@ -234,7 +251,7 @@ function parseSuggestedActions(content: string, context: TacticalAIContext, acti
       label: '📋 Aplicar Fichas de Rol Sugeridas',
       data: {
         systemOwn: context.systemOwn,
-        roleCards: extractRoleCardsFromText(content, context)
+        roleCards: extractRoleCardsFromText(content, context, matchPlanId)
       }
     });
   }
@@ -294,7 +311,7 @@ function extractSection(text: string, sectionName: string): string {
   return match ? match[1].trim() : '';
 }
 
-function extractRoleCardsFromText(text: string, context: TacticalAIContext): Partial<TacticalRoleCard>[] {
+function extractRoleCardsFromText(text: string, context: TacticalAIContext, matchPlanId?: string | null): Partial<TacticalRoleCard>[] {
   console.log('--- START extractRoleCardsFromText ---');
   
   // Lista blanca de posiciones válidas en la aplicación
@@ -359,7 +376,7 @@ function extractRoleCardsFromText(text: string, context: TacticalAIContext): Par
 
     cardsMap.set(pos, {
       matchup_id: context.matchupId || undefined,
-      match_plan_id: context.matchId || undefined,
+      match_plan_id: matchPlanId || undefined,
       linea,
       posicion_label: pos,
       fase_ofensiva: faseOfensiva,
