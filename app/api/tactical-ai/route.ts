@@ -212,6 +212,11 @@ function parseSuggestedActions(content: string, context: TacticalAIContext, acti
 
   // 1. Detectar si la respuesta sugiere fichas de rol (role cards)
   if (actionType === 'generate_line_tasks' || content.includes('Ficha de Rol') || content.includes('Rol por posición') || content.includes('[POR]') || content.includes('[LD]')) {
+    console.log("=========================================");
+    console.log("=== RAW GEMINI RESPONSE FOR ROLE CARDS ===");
+    console.log(content);
+    console.log("=========================================");
+    
     actions.push({
       type: 'apply_to_role_card',
       label: '📋 Aplicar Fichas de Rol Sugeridas',
