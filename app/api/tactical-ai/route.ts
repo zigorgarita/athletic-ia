@@ -155,10 +155,22 @@ export async function POST(request: Request) {
 
     // 4. Compilar el Prompt enriquecido
     let compiledPrompt = '';
-    const actionKey = actionType as keyof typeof PROMPTS;
+    let actionKey = actionType;
+    if (actionType === 'generate_line_tasks') actionKey = 'generateLineTasks';
+    else if (actionType === 'analyze_rival') actionKey = 'analyzeRival';
+    else if (actionType === 'analyze_own_system') actionKey = 'analyzeOwnSystem';
+    else if (actionType === 'compare_systems') actionKey = 'compareSystems';
+    else if (actionType === 'prepare_match') actionKey = 'prepareMatch';
+    else if (actionType === 'create_briefing') actionKey = 'createBriefing';
+    else if (actionType === 'recommend_exercises') actionKey = 'recommendExercises';
+    else if (actionType === 'recommend_session') actionKey = 'recommendSession';
+    else if (actionType === 'search_knowledge') actionKey = 'searchKnowledge';
+    else if (actionType === 'explain_concept') actionKey = 'explainConcept';
 
-    if (actionType && PROMPTS[actionKey]) {
-      compiledPrompt = PROMPTS[actionKey](promptCtx, message);
+    const promptFn = actionKey ? PROMPTS[actionKey as keyof typeof PROMPTS] : null;
+
+    if (promptFn) {
+      compiledPrompt = promptFn(promptCtx, message);
     } else {
       compiledPrompt = PROMPTS.freeChat(promptCtx, message);
     }
