@@ -20,6 +20,29 @@ export function AIActionButton({ action, onApplied }: AIActionButtonProps) {
   const [success, setSuccess] = useState(false);
   const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
 
+  // Validación de posiciones para aplicar fichas de rol
+  if (action.type === 'apply_to_role_card') {
+    const required = ['POR', 'LD', 'DFC', 'LI', 'MCD', 'MCO', 'ED', 'EI', 'DC'];
+    const present = new Set(action.data.roleCards?.map((c: { posicion_label: string }) => c.posicion_label) || []);
+    const missing = required.filter(r => !present.has(r));
+    
+    if (missing.length > 0) {
+      return (
+        <div className="text-xs bg-red-950/40 border border-red-900/50 text-red-400 px-3.5 py-2.5 rounded-xl font-medium w-full flex flex-col gap-1 mt-1">
+          <span className="flex items-center gap-1.5 font-bold text-red-300">
+            ⚠️ Fichas de rol incompletas
+          </span>
+          <span className="text-[11px] text-slate-300 leading-normal">
+            La IA generó {present.size} de 9 fichas. Faltan: <strong className="text-red-300 font-bold">{missing.join(', ')}</strong>.
+          </span>
+          <span className="text-[10px] text-red-400/80 italic mt-0.5 font-semibold">
+            Regenerar fichas.
+          </span>
+        </div>
+      );
+    }
+  }
+
   const handleExecute = async () => {
     setLoading(true);
     try {

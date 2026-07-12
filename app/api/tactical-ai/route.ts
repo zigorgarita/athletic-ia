@@ -332,7 +332,7 @@ function extractRoleCardsFromText(text: string, context: TacticalAIContext): Par
     const faseOfensiva = extractSubSection(content, 'ofensiva', 'ataque') || content.substring(0, 150);
     const faseDefensiva = extractSubSection(content, 'defensiva', 'defensa') || content.substring(150, 300);
     const transiciones = extractSubSection(content, 'transici') || '';
-    const instrucc = extractSubSection(content, 'especifica', 'instrucci') || '';
+    const instrucc = extractSubSection(content, 'especifica', 'instrucci|detalle|partido') || '';
 
     let linea: 'Portería' | 'Defensa' | 'Mediocampo' | 'Delantera' = 'Mediocampo';
     if (pos === 'POR') linea = 'Portería';

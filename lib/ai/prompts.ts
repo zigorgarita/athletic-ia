@@ -120,20 +120,23 @@ Divide la charla en:
   generateLineTasks: (ctx: PromptContext) => `
 ${buildContextString(ctx)}
 
-TAREA: Genera las fichas de instrucciones tácticas individuales para TODOS los puestos del sistema ${ctx.systemOwn}.
-El sistema actualmente desplegado en la pizarra contiene exactamente las siguientes posiciones: ${ctx.systemNodes ? ctx.systemNodes.join(', ') : 'No definidas'}.
+TAREA: Genera las fichas de instrucciones tácticas individuales para las posiciones del sistema ${ctx.systemOwn}.
 
-INSTRUCCIONES CRÍTICAS, INCUMPLIRLAS RESULTARÁ EN ERROR DEL SISTEMA:
-1. GENERACIÓN COMPLETA SIN AGRUPAR: Debes generar OBLIGATORIAMENTE un bloque separado para CADA UNA de las posiciones listadas arriba. Si hay dos 'DFC' en la lista, debes generar dos bloques separados (ej: uno para el central derecho y otro para el izquierdo). ¡PROHIBIDO agrupar posiciones!
-2. FORMATO EXACTO DE ETIQUETA: Cada bloque debe comenzar única y exclusivamente con la etiqueta de la posición entre corchetes EXACTAMENTE igual a la lista, por ejemplo: [POR], [LD], [DFC], [MCD]. No añadas texto dentro del corchete (mal: [DFC Derecho], bien: [DFC]).
-3. CONTEXTO TÁCTICO: Personaliza basándote en el sistema propio (${ctx.systemOwn}) vs rival (${ctx.systemRival}).
-4. ESTRUCTURA DE LA FICHA: Para cada posición, divide las instrucciones usando exactamente estos 4 subtítulos con un guión al inicio:
+INSTRUCCIONES CRÍTICAS, INCUMPLIRLAS RESULTARÁ EN UN DEFECTO DE PARSEO:
+1. UN BLOQUE POR CADA POSICIÓN ÚNICA: Debes generar OBLIGATORIAMENTE un bloque separado para cada tipo de posición única requerida por el sistema.
+   - Si el sistema tiene varias posiciones repetidas de la misma etiqueta (por ejemplo, dos 'DFC' o dos 'MCD'), NO generes bloques duplicados. Genera una única ficha reutilizable usando la etiqueta simple: [DFC] o [MCD].
+   - Las posiciones únicas requeridas para este sistema son: [POR], [LD], [DFC], [LI], [MCD], [MCO], [ED], [EI] y [DC].
+   - Está COMPLETAMENTE PROHIBIDO agrupar posiciones en un solo bloque con comas o guiones (mal: [LD, LI], [DFC/MCD], bien: bloques separados e independientes para [LD], [DFC], etc.).
+
+2. FORMATO EXACTO DE ETIQUETA: Cada bloque debe comenzar única y exclusivamente con la etiqueta de la posición entre corchetes, por ejemplo: [POR], [LD], [DFC], [LI], [MCD], [MCO], [ED], [EI], [DC]. No añadas texto ni números dentro del corchete (mal: [DFC Derecho], bien: [DFC]).
+
+3. ESTRUCTURA DE LA FICHA: Para cada posición, divide las instrucciones usando exactamente estos 4 subtítulos con un guión al inicio:
 - Fase Ofensiva: (texto aquí)
 - Fase Defensiva: (texto aquí)
 - Transiciones: (texto aquí)
 - Instrucción Específica: (texto aquí)
 
-Genera las fichas sin texto introductorio ni conclusiones. Solo los bloques de cada posición.
+No incluyas texto de bienvenida, introducción, explicaciones iniciales ni conclusiones al final. Solo devuelve los bloques estructurados de las posiciones.
 `,
 
   recommendExercises: (ctx: PromptContext) => `

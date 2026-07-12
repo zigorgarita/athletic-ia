@@ -12,13 +12,16 @@ interface BriefingViewProps {
 }
 
 export function BriefingView({ nodesPropio, players, roleCards }: BriefingViewProps) {
-  // Group nodes by tactical lines
+  console.log('--- BriefingView Render ---');
+  console.log('Active Matchup ID:', roleCards[0]?.matchup_id || 'null');
+  console.log('Number of roleCards:', roleCards.length);
+  console.log('roleCards positions:', roleCards.map(c => c.posicion_label));
+  console.log('nodesPropio positions:', nodesPropio.map(n => n.label));
+
   const POR = nodesPropio.filter(n => n.label === 'POR');
   const DEF = nodesPropio.filter(n => ['LD', 'LI', 'DFC', 'CT', 'DCD', 'DCI', 'CAD', 'CAI'].includes(n.label));
   const MED = nodesPropio.filter(n => ['MCD', 'MC', 'MCO', 'MD', 'MI', 'MVD', 'MVI', 'PIV'].includes(n.label));
   const DEL = nodesPropio.filter(n => !['POR', 'LD', 'LI', 'DFC', 'CT', 'DCD', 'DCI', 'CAD', 'CAI', 'MCD', 'MC', 'MCO', 'MD', 'MI', 'MVD', 'MVI', 'PIV'].includes(n.label));
-  
-  // Track which cards have already been assigned to ensure duplicate positions get unique instructions
   const usedCardIndexes = new Set<number>();
 
   const renderLineSection = (title: string, icon: string, lineNodes: PositionNode[]) => {
