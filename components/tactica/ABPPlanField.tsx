@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { Player, ABPPlayerRole, MatchABPPlayerAssignment, ABPType } from '@/types';
 import { Avatar } from '@/components/ui/Avatar';
-import { UserCheck, X, HelpCircle } from 'lucide-react';
+import { UserCheck, X } from 'lucide-react';
 
 interface RoleWithAssignment extends ABPPlayerRole {
   assignment?: MatchABPPlayerAssignment;
@@ -109,7 +109,7 @@ export function ABPPlanField({
         onClick={() => handlePlayerClick(p.id)}
         className={`w-full flex items-center justify-between p-2 rounded-xl border text-xs transition-all text-left ${
           isSelected
-            ? 'bg-red-500/10 border-[#CC0E21] text-red-200 ring-1 ring-[#CC0E21]'
+            ? 'bg-green-500/10 border-green-500 text-green-200 ring-2 ring-green-500/30'
             : assignment
               ? 'bg-slate-900/30 border-slate-800 text-slate-500 opacity-60 hover:opacity-80'
               : 'bg-slate-950/60 border-slate-850 text-slate-200 hover:border-slate-800 hover:bg-slate-900/30'
@@ -128,11 +128,11 @@ export function ABPPlanField({
         </div>
         <div>
           {assignment ? (
-            <span className="text-[9px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded uppercase font-black tracking-wider truncate max-w-[80px] block">
+            <span className="text-[9px] bg-red-500/10 text-red-400 px-1.5 py-0.5 rounded border border-red-500/20 uppercase font-black tracking-wider truncate max-w-[80px] block text-center">
               {assignment.etiqueta || assignment.rol_asignado}
             </span>
           ) : (
-            <span className="text-[9px] bg-green-500/10 text-green-400 px-1.5 py-0.5 rounded border border-green-500/20 font-bold uppercase tracking-wider">
+            <span className="text-[9px] bg-green-500/10 text-green-400 px-1.5 py-0.5 rounded border border-green-500/20 font-bold uppercase tracking-wider text-center block">
               Libre
             </span>
           )}
@@ -294,11 +294,11 @@ export function ABPPlanField({
       <div className="w-full xl:w-72 bg-slate-900/80 rounded-2xl border border-slate-800/80 flex flex-col p-4">
         {/* Banner de flujo de asignación manual */}
         {selectedRoleId ? (
-          <div className="mb-3 p-3 bg-[#CC0E21]/10 border border-[#CC0E21]/30 rounded-xl text-xs text-slate-200">
+          <div className="mb-3 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-xl text-xs text-slate-200">
             <div className="flex justify-between items-center mb-1.5">
-              <span className="font-bold flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-[#CC0E21] animate-pulse"></span>
-                Puesto: {roles.find(r => r.id === selectedRoleId)?.etiqueta || roles.find(r => r.id === selectedRoleId)?.rol_asignado}
+              <span className="font-bold flex items-center gap-1.5 text-yellow-500">
+                <span className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse"></span>
+                Posición: {roles.find(r => r.id === selectedRoleId)?.etiqueta || roles.find(r => r.id === selectedRoleId)?.rol_asignado}
               </span>
               <button 
                 type="button" 
@@ -308,8 +308,8 @@ export function ABPPlanField({
                 <X className="w-3.5 h-3.5" />
               </button>
             </div>
-            <p className="text-[10px] text-slate-350 leading-relaxed mb-2">
-              Haz clic en un jugador de la lista de abajo para asignarlo a esta ficha.
+            <p className="text-[11px] text-slate-200 leading-relaxed font-semibold mb-2">
+              Posición seleccionada. Ahora elige un jugador.
             </p>
             {roles.find(r => r.id === selectedRoleId)?.assignedPlayer && (
               <button
@@ -325,10 +325,10 @@ export function ABPPlanField({
             )}
           </div>
         ) : selectedPlayerId ? (
-          <div className="mb-3 p-3 bg-blue-500/10 border border-blue-500/30 rounded-xl text-xs text-slate-200">
-            <div className="flex justify-between items-center mb-1">
-              <span className="font-bold flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
+          <div className="mb-3 p-3 bg-green-500/10 border border-green-500/30 rounded-xl text-xs text-slate-200">
+            <div className="flex justify-between items-center mb-1.5">
+              <span className="font-bold flex items-center gap-1.5 text-green-400">
+                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
                 Jugador seleccionado
               </span>
               <button 
@@ -339,16 +339,19 @@ export function ABPPlanField({
                 <X className="w-3.5 h-3.5" />
               </button>
             </div>
-            <p className="text-[10px] text-slate-350 leading-relaxed">
-              Haz clic en una ficha o rol del campo para posicionar a: <span className="font-bold text-blue-200">{players.find(p => p.id === selectedPlayerId)?.nombre}</span>.
+            <p className="text-[11px] text-slate-200 leading-relaxed font-semibold">
+              Jugador seleccionado: <span className="font-bold text-green-300">{players.find(p => p.id === selectedPlayerId)?.nombre}</span>. Ahora pulsa una posición del campo.
             </p>
           </div>
         ) : (
-          <div className="mb-3 p-3 bg-slate-950/60 rounded-xl border border-slate-850 text-[10px] text-slate-400 flex items-start gap-2 leading-relaxed">
-            <HelpCircle className="w-4 h-4 text-slate-500 flex-shrink-0 mt-0.5" />
-            <span>
-              Para asignar manualmente: selecciona un jugador de la lista y haz clic en una ficha del campo (o viceversa).
-            </span>
+          <div className="mb-3 p-3 bg-slate-950/60 rounded-xl border border-slate-850 text-xs text-slate-350 text-center font-semibold leading-relaxed flex flex-col items-center justify-center gap-1.5">
+            <div className="text-[9px] text-slate-400 uppercase tracking-widest font-black">Asignación de Jugadores</div>
+            <div className="text-[11px] text-slate-250">
+              Selecciona un jugador <span className="text-[#CC0E21] font-bold mx-0.5">➜</span> Pulsa una posición del campo
+            </div>
+            <div className="text-[9px] text-slate-500 font-normal">
+              (o viceversa)
+            </div>
           </div>
         )}
 
