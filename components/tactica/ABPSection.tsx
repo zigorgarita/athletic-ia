@@ -7,11 +7,11 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Modal } from '@/components/ui/Modal';
-import { Avatar } from '@/components/ui/Avatar';
+
 import { Skeleton } from '@/components/ui/Skeleton';
 import { 
   Film, Plus, AlertCircle, Trash2, BookOpen, Layers, X, 
-  Save, RefreshCw, Copy, Edit2, Search, UserCheck, 
+  Save, RefreshCw, Copy, Edit2, 
   PlusCircle, Check, ChevronDown, FolderOpen, FileDown, Calendar
 } from 'lucide-react';
 import { useEditMode } from '@/context/EditModeContext';
@@ -202,56 +202,7 @@ const serializePlayDescripcion = (sistema_tactico: string, descripcion_texto: st
   return JSON.stringify({ sistema_tactico, descripcion_texto });
 };
 
-const groupPlayers = (playerList: Player[]) => {
-  const groups: Record<string, { label: string; list: Player[] }> = {
-    Portero: { label: '🧤 Porteros', list: [] },
-    Lateral: { label: '🛡️ Laterales', list: [] },
-    Central: { label: '🧱 Centrales', list: [] },
-    Centrocampista: { label: '⚙️ Centrocampistas', list: [] },
-    Mediapunta: { label: '🎯 Mediapuntas', list: [] },
-    Extremo: { label: '⚡ Extremos', list: [] },
-    Delantero: { label: '🎯 Delanteros', list: [] },
-    Otros: { label: '📋 Otros', list: [] }
-  };
 
-  playerList.forEach(p => {
-    const pos = p.demarcacion || '';
-    const posLower = pos.toLowerCase();
-
-    if (posLower.includes('portero')) {
-      groups.Portero.list.push(p);
-    } else if (posLower.includes('lateral')) {
-      groups.Lateral.list.push(p);
-    } else if (posLower.includes('central') || posLower === 'defensa') {
-      groups.Central.list.push(p);
-    } else if (posLower.includes('mediapunta') || posLower.includes('media punta')) {
-      groups.Mediapunta.list.push(p);
-    } else if (posLower.includes('extremo')) {
-      groups.Extremo.list.push(p);
-    } else if (posLower.includes('delantero')) {
-      groups.Delantero.list.push(p);
-    } else if (posLower.includes('centrocampista') || posLower.includes('pivote') || posLower.includes('interior')) {
-      groups.Centrocampista.list.push(p);
-    } else {
-      groups.Otros.list.push(p);
-    }
-  });
-
-  Object.keys(groups).forEach(k => {
-    groups[k].list.sort((a, b) => a.dorsal - b.dorsal);
-  });
-
-  return [
-    groups.Portero,
-    groups.Lateral,
-    groups.Central,
-    groups.Centrocampista,
-    groups.Mediapunta,
-    groups.Extremo,
-    groups.Delantero,
-    groups.Otros
-  ].filter(g => g.list.length > 0);
-};
 
 // Formación/Posición inicial por defecto según tipo de ABP
 const DEFAULT_POSITIONS_BY_TYPE: Record<ABPType, { role: string; x: number; y: number }[]> = {
@@ -595,15 +546,7 @@ const getFieldView = (type: ABPType, zona?: string | null): 'full' | 'attack' | 
 
 export function ABPSection({ players, matches }: ABPSectionProps) {
   const { isEditMode } = useEditMode();
-  const getEstadoColor = (estado: string) => {
-    switch (estado) {
-      case 'Disponible': return 'bg-green-500/10 text-green-400 border-green-500/20';
-      case 'Lesionado': return 'bg-red-500/10 text-red-400 border-red-500/20';
-      case 'Duda': return 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20';
-      case 'Sancionado': return 'bg-orange-500/10 text-orange-400 border-orange-500/20';
-      default: return 'bg-slate-500/10 text-slate-400 border-slate-500/20';
-    }
-  };
+
 
   const [plays, setPlays] = useState<ABPPlay[]>([]);
   const [selectedPlay, setSelectedPlay] = useState<ABPPlay | null>(null);
@@ -644,9 +587,7 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
   
   // Filters & Search
   const [activeFilter, setActiveFilter] = useState<ABPType | 'Todos'>('Todos');
-  const [playerSearch, setPlayerSearch] = useState('');
-  const [playerFilterPos, setPlayerFilterPos] = useState<string>('Todas');
-  const [playerStatusTab, setPlayerStatusTab] = useState<'todos' | 'libres' | 'ocupados'>('todos');
+
   
   // Board configuration state
   const isEditingPositions = true;
@@ -1375,43 +1316,7 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
     }
   };
 
-  // --- CLEAR ALL PLAYERS FROM ROLES ---
-  const handleClearPlay = () => {
-    setPlayRoles(prev => prev.map(role => ({
-      ...role,
-      player_id: null,
-      player: undefined,
-      comentario: ''
-    })));
-    setSuccessMsg('Fichas vaciadas. Se han desasignado todos los jugadores. Recuerda GUARDAR.');
-  };
 
-  // --- AUTO-ASSIGN PLAYERS TO EMPTY ROLES ---
-  const handleAutoAssignPlayers = () => {
-    const assignedIds = playRoles.map(r => r.player_id).filter(id => !!id) as string[];
-    const freePlayers = players.filter(p => !assignedIds.includes(p.id));
-
-    if (freePlayers.length === 0) {
-      setErrorMsg('No hay jugadores libres en la plantilla.');
-      return;
-    }
-
-    let freeIdx = 0;
-    setPlayRoles(prev => {
-      return prev.map(role => {
-        if (!role.player_id && freeIdx < freePlayers.length) {
-          const player = freePlayers[freeIdx++];
-          return {
-            ...role,
-            player_id: player.id,
-            player: player
-          };
-        }
-        return role;
-      });
-    });
-    setSuccessMsg(`Se han asignado automáticamente ${freeIdx} jugadores. Recuerda GUARDAR.`);
-  };
 
   // --- DRAG AND DROP ON THE FIELD (CANVAS COORDINATES) ---
   const handleDragStart = (e: React.MouseEvent | React.TouchEvent, roleId: string) => {
@@ -1450,107 +1355,22 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
       }));
     };
 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const handleDragEnd = (endEvent: MouseEvent | TouchEvent) => {
       window.removeEventListener('mousemove', handleDragMove);
       window.removeEventListener('mouseup', handleDragEnd);
       window.removeEventListener('touchmove', handleDragMove);
       window.removeEventListener('touchend', handleDragEnd);
 
-      const currentX = 'touches' in endEvent ? (endEvent.changedTouches?.[0]?.clientX || 0) : (endEvent as MouseEvent).clientX;
-      const currentY = 'touches' in endEvent ? (endEvent.changedTouches?.[0]?.clientY || 0) : (endEvent as MouseEvent).clientY;
 
-      const sidebar = document.getElementById('players-sidebar');
-      if (sidebar) {
-        const sRect = sidebar.getBoundingClientRect();
-        if (
-          currentX >= sRect.left &&
-          currentX <= sRect.right &&
-          currentY >= sRect.top &&
-          currentY <= sRect.bottom
-        ) {
-          handleRemovePlayerFromRole(roleId);
-          setSuccessMsg('Jugador liberado y devuelto a la plantilla.');
-        }
-      }
+
+
     };
 
     window.addEventListener('mousemove', handleDragMove);
     window.addEventListener('mouseup', handleDragEnd);
     window.addEventListener('touchmove', handleDragMove, { passive: false });
     window.addEventListener('touchend', handleDragEnd);
-  };
-
-  // --- DRAG FROM SIDEBAR HANDLERS ---
-  const [draggedPlayerId, setDraggedPlayerId] = useState<string | null>(null);
-
-  const handleSidebarDragStart = (playerId: string) => {
-    setDraggedPlayerId(playerId);
-  };
-
-  const handleDropOnRole = (roleId: string) => {
-    if (!draggedPlayerId) return;
-    
-    const player = players.find(p => p.id === draggedPlayerId);
-    if (!player) return;
-
-    setPlayRoles(prev => prev.map(role => {
-      if (role.id === roleId) {
-        return {
-          ...role,
-          player_id: player.id,
-          player: player
-        };
-      }
-      // Evitar duplicar el mismo jugador en varios roles de la misma jugada
-      if (role.player_id === player.id && role.id !== roleId) {
-        return {
-          ...role,
-          player_id: null,
-          player: undefined
-        };
-      }
-      return role;
-    }));
-    setDraggedPlayerId(null);
-  };
-
-  const handlePlayerDoubleClick = (playerId: string) => {
-    const player = players.find(p => p.id === playerId);
-    if (!player) return;
-
-    if (activeNodeId) {
-      handleAssignPlayerDirect(activeNodeId, playerId);
-      setSuccessMsg(`Asignado ${player.nombre} a la posición seleccionada.`);
-      return;
-    }
-
-    const firstEmptyRole = playRoles.find(r => !r.player_id);
-    if (firstEmptyRole) {
-      handleAssignPlayerDirect(firstEmptyRole.id, playerId);
-      setSuccessMsg(`Asignado ${player.nombre} a ${firstEmptyRole.rol_asignado}.`);
-    } else {
-      setErrorMsg('No hay puestos vacíos en la pizarra para asignar. Haz clic en una ficha para seleccionarla y reemplazarla.');
-    }
-  };
-
-  // --- DROPDOWN OR SELECT HANDLERS ---
-  const handleAssignPlayerDirect = (roleId: string, playerId: string) => {
-    const player = players.find(p => p.id === playerId);
-    
-    setPlayRoles(prev => prev.map(role => {
-      if (role.id === roleId) {
-        return {
-          ...role,
-          player_id: playerId || null,
-          player: player
-        };
-      }
-      // Evitar duplicidad
-      if (playerId && role.player_id === playerId && role.id !== roleId) {
-        return { ...role, player_id: null, player: undefined };
-      }
-      return role;
-    }));
   };
 
   const handleRoleChange = (roleId: string, newRole: string) => {
@@ -1578,41 +1398,7 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
     }));
   };
 
-  const handleRemovePlayerFromRole = (roleId: string) => {
-    setPlayRoles(prev => prev.map(role => {
-      if (role.id === roleId) {
-        return {
-          ...role,
-          player_id: null,
-          player: undefined
-        };
-      }
-      return role;
-    }));
-  };
 
-  // --- FILTERS & SQUAD LIST HELPERS ---
-  const getAssignedPlayerIds = () => {
-    return playRoles.map(r => r.player_id).filter(id => !!id) as string[];
-  };
-
-  const filteredSquad = players.filter(p => {
-    // Search filter
-    const matchesSearch = p.nombre.toLowerCase().includes(playerSearch.toLowerCase()) || 
-                          (p.apellidos && p.apellidos.toLowerCase().includes(playerSearch.toLowerCase())) ||
-                          p.dorsal.toString() === playerSearch;
-    
-    // Position filter
-    const matchesPos = playerFilterPos === 'Todas' || p.demarcacion === playerFilterPos;
-
-    // Status filter
-    const isAssigned = getAssignedPlayerIds().includes(p.id);
-    const matchesStatus = playerStatusTab === 'todos' || 
-                          (playerStatusTab === 'libres' && !isAssigned) ||
-                          (playerStatusTab === 'ocupados' && isAssigned);
-
-    return matchesSearch && matchesPos && matchesStatus;
-  });
 
   const filteredPlays = activeFilter === 'Todos' 
     ? plays 
@@ -1866,7 +1652,7 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
               {/* PIZARRA TÁCTICA E INFORMACIÓN */}
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 {/* LA PIZARRA (CAMPOGRAMA INTERACTIVO) */}
-                <div className={`${showAdvanced ? 'lg:col-span-5' : 'lg:col-span-9'} flex flex-col items-center space-y-4`}>
+                <div className={`${showAdvanced ? 'lg:col-span-8' : 'lg:col-span-12'} flex flex-col items-center space-y-4`}>
                   {/* Pizarra Táctica */}
                   <div className="w-full bg-slate-900/20 border border-slate-800/60 rounded-3xl p-4 flex flex-col items-center">
                     <div className="w-full flex justify-between items-center mb-3">
@@ -1900,33 +1686,15 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
                           <Layers className="h-3 w-3 mr-1" /> {showAdvanced ? "Ocultar Puestos" : "Ver Puestos"}
                         </Button>
                         {isEditMode && (
-                          <>
-                            <Button 
-                              variant="secondary" 
-                              onClick={handleResetPositions} 
-                              className="py-1 px-2.5 text-[10px] h-auto border border-slate-800"
-                              title="Restablece posiciones a su esquema inicial"
-                            >
-                              <RefreshCw className="h-3 w-3 mr-1" /> Reiniciar
-                            </Button>
-                            <Button 
-                              variant="secondary" 
-                              onClick={handleAutoAssignPlayers} 
-                              className="py-1 px-2.5 text-[10px] h-auto border border-slate-800"
-                              title="Asigna jugadores de la plantilla automáticamente"
-                            >
-                              <UserCheck className="h-3 w-3 mr-1" /> Auto-Asignar
-                            </Button>
-                          </>
+                          <Button 
+                            variant="secondary" 
+                            onClick={handleResetPositions} 
+                            className="py-1 px-2.5 text-[10px] h-auto border border-slate-800"
+                            title="Restablece posiciones a su esquema inicial"
+                          >
+                            <RefreshCw className="h-3 w-3 mr-1" /> Reiniciar
+                          </Button>
                         )}
-                        <Button 
-                          variant="ghost" 
-                          onClick={handleClearPlay} 
-                          className="py-1 px-2 text-[10px] h-auto text-red-400 hover:bg-red-500/10"
-                          title="Desasigna a todos los jugadores de los roles"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" /> Limpiar
-                        </Button>
                       </div>
                     </div>
 
@@ -1934,55 +1702,7 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
                     <div 
                       ref={containerRef}
                       onDragOver={(e) => e.preventDefault()}
-                      onDrop={async (e) => {
-                        e.preventDefault();
-                        if (!draggedPlayerId) return;
-                        const container = containerRef.current;
-                        if (!container) return;
-                        const rect = container.getBoundingClientRect();
-                        const x = ((e.clientX - rect.left) / rect.width) * 100;
-                        const y = ((e.clientY - rect.top) / rect.height) * 100;
-                        
-                        try {
-                          const player = players.find(p => p.id === draggedPlayerId);
-                          if (!player) return;
-
-                          // Evitar duplicidad en la jugada
-                          setPlayRoles(prev => prev.map(role => {
-                            if (role.player_id === player.id) {
-                              return { ...role, player_id: null, player: undefined };
-                            }
-                            return role;
-                          }));
-
-                          const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
-                          const { data, error } = await supabase
-                            .rpc('exec_secure_upsert', {
-                              target_table: 'abp_player_roles',
-                              payload: {
-                                abp_play_id: selectedPlay.id,
-                                player_id: player.id,
-                                rol_asignado: 'Libre',
-                                posicion_x: parseFloat(x.toFixed(1)),
-                                posicion_y: parseFloat(y.toFixed(1)),
-                                etiqueta: 'LIB',
-                                orden: playRoles.length + 1
-                              },
-                              conflict_columns: null,
-                              staff_passkey: passkey
-                            });
-                          if (error) throw error;
-                          if (data) {
-                            setPlayRoles(prev => [...prev, { ...data, player }]);
-                            setSuccessMsg(`Añadido ${player.nombre} al campo.`);
-                          }
-                        } catch (err) {
-                          console.error('Error inserting player on drop:', err);
-                          setErrorMsg('No se pudo añadir el jugador al campo.');
-                        } finally {
-                          setDraggedPlayerId(null);
-                        }
-                      }}
+                      onDrop={(e) => e.preventDefault()}
                       className="relative w-full aspect-[4/3] bg-emerald-950/80 rounded-2xl border-2 border-emerald-500/25 overflow-hidden select-none"
                     >
                       {(() => {
@@ -2109,44 +1829,11 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
                               setActiveNodeId(role.id);
                               handleDragStart(e, role.id);
                             }}
-                            onDragOver={(e) => e.preventDefault()}
-                            onDrop={(e) => {
-                              e.stopPropagation();
-                              handleDropOnRole(role.id);
-                            }}
+
                           >
                             {/* Ficha Visual del Jugador / Rol */}
-                            <div 
-                              className={`relative h-11 w-11 rounded-full border-2 flex items-center justify-center shadow-lg transition-transform duration-100 active:scale-110 ${
-                                player
-                                  ? 'bg-slate-900 border-[#CC0E21] shadow-red-500/20'
-                                  : 'bg-slate-950 border-slate-700/85 border-dashed text-slate-400'
-                              }`}
-                            >
-                              {player && (
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleRemovePlayerFromRole(role.id);
-                                    setSuccessMsg('Jugador liberado del puesto.');
-                                  }}
-                                  className="absolute -top-1 -right-1 bg-red-650 hover:bg-red-550 text-white rounded-full p-0.5 shadow-md z-20 border border-slate-950 transition-colors"
-                                  title="Liberar jugador"
-                                >
-                                  <X className="h-2 w-2" />
-                                </button>
-                              )}
-                              {player ? (
-                                <div className="relative flex items-center justify-center w-full h-full rounded-full overflow-hidden">
-                                  <Avatar src={player.foto_url} name={player.nombre} size="sm" />
-                                  <span className="absolute bottom-0 right-0 bg-[#CC0E21] text-white font-black text-[7.5px] h-3.5 w-3.5 rounded-full flex items-center justify-center border border-slate-900 shadow">
-                                    #{player.dorsal}
-                                  </span>
-                                </div>
-                              ) : (
-                                <span className="text-[9px] font-black tracking-tight">{label}</span>
-                              )}
+                            <div className="relative h-11 w-11 rounded-full border-2 flex items-center justify-center shadow-lg bg-slate-950 border-slate-700/85 border-dashed text-slate-400">
+                              <span className="text-[9px] font-black tracking-tight">{label}</span>
                             </div>
 
                             {/* Nombre y Rol con Selector */}
@@ -2202,125 +1889,6 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
                   </div>
                 </div>
 
-                {/* COLUMNA LATERAL DE JUGADORES (SIDEBAR) - 3 cols */}
-                <div id="players-sidebar" className="lg:col-span-3 p-4 bg-slate-900/40 border border-slate-800/80 rounded-2xl flex flex-col space-y-3">
-                  <div className="flex justify-between items-center">
-                    <h3 className="text-xs font-bold text-slate-450 uppercase tracking-widest flex items-center gap-1.5">
-                      <UserCheck className="h-3.5 w-3.5 text-[#CC0E21]" /> Plantilla de Jugadores
-                    </h3>
-                    <div className="flex bg-slate-950 rounded-lg p-0.5 border border-slate-850 w-[140px]">
-                      <button
-                        type="button"
-                        onClick={() => setPlayerStatusTab('todos')}
-                        className={`flex-1 text-center py-1 text-[8px] font-bold rounded transition-colors ${
-                          playerStatusTab === 'todos' ? 'bg-slate-800 text-[#CC0E21]' : 'text-slate-500 hover:text-slate-350'
-                        }`}
-                      >
-                        TODOS
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setPlayerStatusTab('libres')}
-                        className={`flex-1 text-center py-1 text-[8px] font-bold rounded transition-colors ${
-                          playerStatusTab === 'libres' ? 'bg-slate-800 text-[#CC0E21]' : 'text-slate-500 hover:text-slate-355'
-                        }`}
-                      >
-                        LIBRES
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setPlayerStatusTab('ocupados')}
-                        className={`flex-1 text-center py-1 text-[8px] font-bold rounded transition-colors ${
-                          playerStatusTab === 'ocupados' ? 'bg-slate-800 text-[#CC0E21]' : 'text-slate-500 hover:text-slate-355'
-                        }`}
-                      >
-                        USADOS
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Inputs de Filtro */}
-                  <div className="flex flex-col gap-2">
-                    <div className="relative">
-                      <span className="absolute inset-y-0 left-2.5 flex items-center pointer-events-none">
-                        <Search className="h-3 w-3 text-slate-500" />
-                      </span>
-                      <input
-                        type="text"
-                        value={playerSearch}
-                        onChange={(e) => setPlayerSearch(e.target.value)}
-                        placeholder="Buscar dorsal/nombre..."
-                        className="w-full bg-slate-950 border border-slate-850 rounded-lg pl-8 pr-2.5 py-1 text-xs text-slate-300 placeholder-slate-650 outline-none focus:border-[#CC0E21]"
-                      />
-                    </div>
-
-                    <select
-                      value={playerFilterPos}
-                      onChange={(e) => setPlayerFilterPos(e.target.value)}
-                      className="bg-slate-950 border border-slate-850 rounded-lg px-2.5 py-1 text-xs text-slate-300 outline-none focus:border-[#CC0E21]"
-                    >
-                      <option value="Todas">Todas las posiciones</option>
-                      <option value="Portero">Portero</option>
-                      <option value="Defensa">Defensa</option>
-                      <option value="Centrocampista">Centrocampista</option>
-                      <option value="Delantero">Delantero</option>
-                    </select>
-                  </div>
-
-                  {/* Squad List */}
-                  <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
-                    {filteredSquad.length === 0 ? (
-                      <p className="text-xs text-slate-550 italic text-center py-6">No hay jugadores disponibles.</p>
-                    ) : (
-                      groupPlayers(filteredSquad).map(group => (
-                        <div key={group.label} className="space-y-1">
-                          <h4 className="text-[9px] font-bold text-slate-400 uppercase tracking-wider bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-900 sticky top-0 z-10">
-                            {group.label} ({group.list.length})
-                          </h4>
-                          <div className="space-y-1.5 pt-1">
-                            {group.list.map((player) => {
-                              const isAssigned = getAssignedPlayerIds().includes(player.id);
-                              return (
-                                <div
-                                  key={player.id}
-                                  draggable
-                                  onDragStart={() => handleSidebarDragStart(player.id)}
-                                  onDoubleClick={() => handlePlayerDoubleClick(player.id)}
-                                  className={`flex items-center justify-between p-2 rounded-xl border text-xs transition-all cursor-grab active:cursor-grabbing select-none ${
-                                    isAssigned
-                                      ? 'bg-slate-900/30 border-slate-850/40 text-slate-500 opacity-60'
-                                      : 'bg-slate-950/60 border-slate-850 text-slate-200 hover:border-slate-800 hover:bg-slate-900/30'
-                                  }`}
-                                  title="Doble clic para asignar al puesto seleccionado o al primero libre"
-                                >
-                                  <div className="flex items-center gap-2 truncate">
-                                    <Avatar src={player.foto_url} name={player.nombre} size="sm" />
-                                    <div className="truncate text-left">
-                                      <div className="flex items-center gap-1.5">
-                                        <span className="font-bold truncate leading-none mb-0.5 text-slate-250">
-                                          {player.nombre} {player.apellidos || ''}
-                                        </span>
-                                        <span className={`px-1 py-0.2 rounded text-[7px] font-black border uppercase tracking-wider ${getEstadoColor(player.estado)}`}>
-                                          {player.estado}
-                                        </span>
-                                      </div>
-                                      <span className="text-[9px] text-slate-500 font-semibold">
-                                        #{player.dorsal} - {player.demarcacion}
-                                      </span>
-                                    </div>
-                                  </div>
-                                  <span className="text-[9px] text-slate-500 bg-slate-900 border border-slate-800/80 px-1.5 py-0.5 rounded uppercase font-bold">
-                                    {isAssigned ? 'Ocupado' : 'Asignar'}
-                                  </span>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
 
                 {/* PANEL: ROLES Y PUESTOS DE LA JUGADA - 4 cols */}
                 {showAdvanced && (
@@ -2404,32 +1972,6 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
                                 </button>
                               </div>
 
-                              {/* Asignar jugador */}
-                              <div className="flex items-center gap-2">
-                                <select
-                                  value={role.player_id || ''}
-                                  onChange={(e) => handleAssignPlayerDirect(role.id, e.target.value)}
-                                  className="flex-1 bg-slate-900 border border-slate-800 text-xs text-slate-350 rounded px-2.5 py-1 outline-none focus:border-[#CC0E21]"
-                                >
-                                  <option value="">-- Sin asignar (Vacío) --</option>
-                                  {players.map((p) => (
-                                    <option key={p.id} value={p.id}>
-                                      #{p.dorsal} - {p.nombre} {p.apellidos || ''} ({p.demarcacion})
-                                    </option>
-                                  ))}
-                                </select>
-
-                                {role.player_id && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleRemovePlayerFromRole(role.id)}
-                                    className="p-1 text-slate-550 hover:text-slate-300 hover:bg-slate-800 rounded"
-                                    title="Desasignar jugador"
-                                  >
-                                    <X className="h-3 w-3" />
-                                  </button>
-                                )}
-                              </div>
 
                               {/* Comentario / Movimiento */}
                               <input
