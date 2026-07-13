@@ -345,34 +345,43 @@ export async function exportABPPlanToPDF(config: ABPPlanExportConfig): Promise<v
     return;
   }
 
-  for (let i = 0; i < config.plays.length; i++) {
-    const play = config.plays[i];
-    
-    if (i > 0) doc.addPage();
+  // Guardar posición de scroll original
+  const originalScrollY = window.scrollY;
+  const originalScrollX = window.scrollX;
 
-    const fieldEl = document.getElementById(play.fieldElementId);
-    if (!fieldEl) {
-      console.warn(`Elemento no encontrado: ${play.fieldElementId}`);
-      continue;
-    }
+  try {
+    for (let i = 0; i < config.plays.length; i++) {
+      const play = config.plays[i];
+      
+      if (i > 0) doc.addPage();
 
-    const noExportEls = fieldEl.querySelectorAll<HTMLElement>('.no-export');
-    noExportEls.forEach(el => { el.style.visibility = 'hidden'; });
+      const fieldEl = document.getElementById(play.fieldElementId);
+      if (!fieldEl) {
+        console.warn(`Elemento no encontrado: ${play.fieldElementId}`);
+        continue;
+      }
 
-    let canvas: HTMLCanvasElement;
-    try {
-      canvas = await html2canvas(fieldEl, {
-        scale: 3,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#3b8c5a',
-        logging: false,
-      });
-    } finally {
-      noExportEls.forEach(el => { el.style.visibility = ''; });
-    }
+      // Asegurar que el elemento está en el viewport para que html2canvas lo dibuje completo y no salga en blanco
+      fieldEl.scrollIntoView({ block: 'center' });
+      await new Promise(resolve => setTimeout(resolve, 100));
 
-    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+      const noExportEls = fieldEl.querySelectorAll<HTMLElement>('.no-export');
+      noExportEls.forEach(el => { el.style.visibility = 'hidden'; });
+
+      let canvas: HTMLCanvasElement;
+      try {
+        canvas = await html2canvas(fieldEl, {
+          scale: 3,
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: '#3b8c5a',
+          logging: false,
+        });
+      } finally {
+        noExportEls.forEach(el => { el.style.visibility = ''; });
+      }
+
+      const imgData = canvas.toDataURL('image/jpeg', 0.95);
 
     // Fondo
     doc.setFillColor(DARK);
@@ -471,4 +480,8 @@ export async function exportABPPlanToPDF(config: ABPPlanExportConfig): Promise<v
   }
 
   doc.save(config.filename);
+  } finally {
+    // Restablecer posición de scroll original
+    window.scrollTo(originalScrollX, originalScrollY);
+  }
 }
