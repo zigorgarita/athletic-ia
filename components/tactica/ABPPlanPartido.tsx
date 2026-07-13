@@ -2,12 +2,12 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Player, ABPPlay, ABPPlayerRole, Match, MatchABPPlan, MatchABPPlayerAssignment } from '@/types';
+import { Player, ABPPlay, Match, MatchABPPlan, MatchABPPlayerAssignment } from '@/types';
 import { Button } from '@/components/ui/Button';
-import { Select } from '@/components/ui/Select';
+
 import { Skeleton } from '@/components/ui/Skeleton';
-import { Calendar, Plus, Trash2, ArrowUp, ArrowDown, Check, UserCheck, Copy, X, FolderOpen, AlertCircle, PlaySquare } from 'lucide-react';
-import { ABPFieldExport } from './ABPFieldExport';
+import { Calendar, Trash2, ArrowUp, ArrowDown, Check, UserCheck, Copy, X, FolderOpen, AlertCircle,  } from 'lucide-react';
+
 import { ABPPlanField } from './ABPPlanField';
 import { exportABPPlanToPDF } from '@/lib/exportPdf';
 
@@ -92,8 +92,8 @@ export function ABPPlanPartido({ players, matches, onExit }: ABPPlanPartidoProps
         if (lineupData && lineupData.posiciones) {
           let pIds: string[] = [];
           const pos = lineupData.posiciones;
-          if (Array.isArray(pos)) pIds = pos.filter((p: any) => p.player_id).map((p: any) => p.player_id);
-          else if (pos.propio && Array.isArray(pos.propio)) pIds = pos.propio.filter((p: any) => p.player_id).map((p: any) => p.player_id);
+          if (Array.isArray(pos)) pIds = pos.filter((p: { player_id?: string }) => p.player_id).map((p: { player_id?: string }) => p.player_id as string);
+          else if (pos.propio && Array.isArray(pos.propio)) pIds = pos.propio.filter((p: { player_id?: string }) => p.player_id).map((p: { player_id?: string }) => p.player_id as string);
           setMatchLineupPlayerIds(pIds);
         } else {
           setMatchLineupPlayerIds([]);
@@ -149,8 +149,8 @@ export function ABPPlanPartido({ players, matches, onExit }: ABPPlanPartidoProps
       
       setSuccessMsg('Jugada añadida al plan correctamente.');
       loadMatchPlans();
-    } catch(e: any) {
-      setErrorMsg('Error al añadir la jugada: ' + e.message);
+    } catch(e: unknown) {
+      setErrorMsg('Error al añadir la jugada: ' + (e as Error).message);
     } finally {
       setLoading(false);
     }
@@ -170,8 +170,8 @@ export function ABPPlanPartido({ players, matches, onExit }: ABPPlanPartidoProps
           ? { ...r, player_id: playerId } 
           : r
       ));
-    } catch(e: any) {
-      setErrorMsg('Error al asignar jugador: ' + e.message);
+    } catch(e: unknown) {
+      setErrorMsg('Error al asignar jugador: ' + (e as Error).message);
     }
   };
 
@@ -189,8 +189,8 @@ export function ABPPlanPartido({ players, matches, onExit }: ABPPlanPartidoProps
           ? { ...r, player_id: null } 
           : r
       ));
-    } catch(e: any) {
-      setErrorMsg('Error al quitar jugador: ' + e.message);
+    } catch(e: unknown) {
+      setErrorMsg('Error al quitar jugador: ' + (e as Error).message);
     }
   };
 
@@ -241,8 +241,8 @@ export function ABPPlanPartido({ players, matches, onExit }: ABPPlanPartidoProps
       
       setMatchAbpRoles(newRolesState);
       setSuccessMsg(`Autocompletado con éxito. Quedan ${availableTitulares.length} titulares sin asignar.`);
-    } catch (e: any) {
-      setErrorMsg('Error en autoasignación: ' + e.message);
+    } catch (e: unknown) {
+      setErrorMsg('Error en autoasignación: ' + (e as Error).message);
     } finally {
       setLoading(false);
     }
@@ -268,8 +268,8 @@ export function ABPPlanPartido({ players, matches, onExit }: ABPPlanPartidoProps
       await supabase.from('match_abp_plans').update({ orden: currentOrder }).eq('id', targetPlan.id);
       
       await loadMatchPlans();
-    } catch(e: any) {
-      setErrorMsg('Error al reordenar: ' + e.message);
+    } catch(e: unknown) {
+      setErrorMsg('Error al reordenar: ' + (e as Error).message);
       setLoading(false);
     }
   };
@@ -280,8 +280,8 @@ export function ABPPlanPartido({ players, matches, onExit }: ABPPlanPartidoProps
       setLoading(true);
       await supabase.from('match_abp_plans').delete().eq('id', planId);
       await loadMatchPlans();
-    } catch(e: any) {
-      setErrorMsg('Error al borrar plan: ' + e.message);
+    } catch(e: unknown) {
+      setErrorMsg('Error al borrar plan: ' + (e as Error).message);
       setLoading(false);
     }
   };
@@ -347,8 +347,8 @@ export function ABPPlanPartido({ players, matches, onExit }: ABPPlanPartidoProps
       
       setSuccessMsg('Jugada convertida en independiente correctamente.');
       await loadMatchPlans();
-    } catch (e: any) {
-      setErrorMsg('Error al convertir jugada: ' + e.message);
+    } catch (e: unknown) {
+      setErrorMsg('Error al convertir jugada: ' + (e as Error).message);
       setLoading(false);
     }
   };
@@ -386,9 +386,9 @@ export function ABPPlanPartido({ players, matches, onExit }: ABPPlanPartidoProps
       });
       
       setSuccessMsg('PDF multipágina generado correctamente.');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      setErrorMsg('Error al exportar PDF: ' + err.message);
+      setErrorMsg('Error al exportar PDF: ' + (err as Error).message);
     } finally {
       setLoading(false);
     }
@@ -515,6 +515,7 @@ export function ABPPlanPartido({ players, matches, onExit }: ABPPlanPartidoProps
               const planRoles = matchAbpRoles
                 .filter(r => r.match_abp_plan_id === plan.id)
                 .map(r => {
+                   // eslint-disable-next-line @typescript-eslint/no-explicit-any
                    const originalRole = r.role || ({} as any);
                    return {
                      ...originalRole,
@@ -543,7 +544,7 @@ export function ABPPlanPartido({ players, matches, onExit }: ABPPlanPartidoProps
                           <ArrowDown className="h-4 w-4" />
                         </Button>
                         <div className="w-px h-6 bg-slate-800 mx-1"></div>
-                        <Button variant="ghost" title="Convertir en independiente" className="text-blue-400 hover:text-blue-300" onClick={() => handleCloneToIndependent(plan.id, play?.id!)}>
+                        <Button variant="ghost" title="Convertir en independiente" className="text-blue-400 hover:text-blue-300" onClick={() => handleCloneToIndependent(plan.id, play?.id as string)}>
                           <Copy className="h-4 w-4" />
                         </Button>
                         <Button variant="ghost" title="Eliminar del plan" className="text-red-400 hover:text-red-300" onClick={() => handleRemovePlan(plan.id)}>

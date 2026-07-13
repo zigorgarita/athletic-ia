@@ -393,7 +393,7 @@ export async function exportABPPlanToPDF(config: ABPPlanExportConfig): Promise<v
     doc.setTextColor(WHITE);
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
-    let title = config.matchInfo.jornada === 'draft' 
+    const title = config.matchInfo.jornada === 'draft' 
        ? 'PLAN ABP - BORRADOR' 
        : `PLAN ABP - JORNADA ${config.matchInfo.jornada} VS ${config.matchInfo.rival.toUpperCase()}`;
     doc.text(title, MARGIN, MARGIN + 6);

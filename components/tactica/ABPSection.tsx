@@ -611,10 +611,15 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
   
   // Modo Plan de Partido
   const [viewMode, setViewMode] = useState<'biblioteca' | 'partido'>('biblioteca');
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [matchAbpPlans, setMatchAbpPlans] = useState<MatchABPPlan[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [matchAbpRoles, setMatchAbpRoles] = useState<MatchABPPlayerAssignment[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [matchLineupPlayerIds, setMatchLineupPlayerIds] = useState<string[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [loadingMatchPlan, setLoadingMatchPlan] = useState(false);
   
   // Modals & loading states
@@ -720,9 +725,9 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
         const pos = lineupData.posiciones;
         
         if (Array.isArray(pos)) {
-          pIds = pos.filter((p: any) => p.player_id).map((p: any) => p.player_id);
+          pIds = pos.filter((p: { player_id?: string }) => p.player_id).map((p: { player_id?: string }) => p.player_id as string);
         } else if (pos.propio && Array.isArray(pos.propio)) {
-          pIds = pos.propio.filter((p: any) => p.player_id).map((p: any) => p.player_id);
+          pIds = pos.propio.filter((p: { player_id?: string }) => p.player_id).map((p: { player_id?: string }) => p.player_id as string);
         }
         
         setMatchLineupPlayerIds(pIds);

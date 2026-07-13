@@ -22,9 +22,6 @@ interface ABPPlanFieldProps {
 }
 
 export function ABPPlanField({
-  planId,
-  tipo,
-  zona,
   roles,
   players,
   lineupPlayerIds,
@@ -34,24 +31,9 @@ export function ABPPlanField({
   const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
 
   // Determinar la vista del campo basada en el tipo y zona
-  const getFieldView = () => {
-    if (tipo === 'Saque inicial' || tipo.includes('medio')) return 'full';
-    if (tipo.includes('banda')) {
-      if (tipo.includes('ofensivo')) {
-        if (zona === 'Inicio') return 'defense';
-        if (zona === 'Medio') return 'midfield';
-        return 'attack';
-      } else {
-        if (zona === 'Inicio') return 'attack';
-        if (zona === 'Medio') return 'midfield';
-        return 'defense';
-      }
-    }
-    if (tipo.toLowerCase().includes('defensiv')) return 'defense';
-    return 'attack';
-  };
+  /* unused getFieldView */
 
-  const fieldView = getFieldView();
+  // const fieldView = getFieldView();
 
   return (
     <div className="relative w-full flex flex-col md:flex-row gap-4 h-full">
