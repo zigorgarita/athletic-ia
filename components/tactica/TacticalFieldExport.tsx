@@ -57,9 +57,9 @@ export function TacticalFieldExport({ nodes, players }: TacticalFieldExportProps
           ? assignedPlayer.dorsal
           : (node.customNumber || '');
 
-        // Map coordinates for horizontal layout
+        // Map coordinates for horizontal layout (inverted node.x to fix reversed left/right flanks)
         const newX = 100 - node.y;
-        const newY = node.x;
+        const newY = 100 - node.x;
 
         return (
           <div
@@ -75,18 +75,18 @@ export function TacticalFieldExport({ nodes, players }: TacticalFieldExportProps
               alignItems: 'center',
             }}
           >
-            {/* Position badge — above the photo */}
+            {/* Position badge — above the photo (enlarged) */}
             <div
               style={{
                 backgroundColor: '#1a1a2e',
-                border: '2px solid rgba(204, 14, 33, 0.7)',
-                borderRadius: '4px',
-                padding: '2px 8px',
+                border: '2.5px solid rgba(204, 14, 33, 0.8)',
+                borderRadius: '6px',
+                padding: '3px 10px',
                 marginBottom: '8px',
-                fontSize: '13px',
-                fontWeight: 800,
+                fontSize: '15px',
+                fontWeight: 850,
                 color: '#FF4D5E',
-                letterSpacing: '0.5px',
+                letterSpacing: '0.6px',
                 whiteSpace: 'nowrap',
                 lineHeight: '1.3',
               }}
@@ -94,11 +94,11 @@ export function TacticalFieldExport({ nodes, players }: TacticalFieldExportProps
               {node.label}
             </div>
 
-            {/* Player Token — photo circle */}
+            {/* Player Token — photo circle (enlarged from 72px to 88px) */}
             <div
               style={{
-                width: '72px',
-                height: '72px',
+                width: '88px',
+                height: '88px',
                 borderRadius: '50%',
                 border: assignedPlayer
                   ? '3px solid #CC0E21'
@@ -129,27 +129,27 @@ export function TacticalFieldExport({ nodes, players }: TacticalFieldExportProps
                 />
               ) : hasCustomDetails ? (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                  <span style={{ fontSize: '22px', fontWeight: 900, color: '#60a5fa' }}>{displayNumber}</span>
-                  <span style={{ fontSize: '12px', fontWeight: 800, color: '#94a3b8', lineHeight: '1' }}>{node.label}</span>
+                  <span style={{ fontSize: '26px', fontWeight: 900, color: '#60a5fa' }}>{displayNumber}</span>
+                  <span style={{ fontSize: '14px', fontWeight: 800, color: '#94a3b8', lineHeight: '1' }}>{node.label}</span>
                 </div>
               ) : (
-                <span style={{ fontSize: '18px', fontWeight: 900, color: '#64748b' }}>{node.label}</span>
+                <span style={{ fontSize: '22px', fontWeight: 900, color: '#64748b' }}>{node.label}</span>
               )}
             </div>
 
-            {/* Name label — below the photo */}
+            {/* Name label — below the photo (enlarged) */}
             <div
               style={{
                 marginTop: '8px',
                 backgroundColor: 'rgba(15, 23, 42, 0.95)',
                 border: '2px solid #334155',
                 borderRadius: '10px',
-                padding: '5px 16px',
-                fontSize: '14px',
+                padding: '6px 18px',
+                fontSize: '15px',
                 fontWeight: 700,
                 color: '#f1f5f9',
                 whiteSpace: 'nowrap',
-                maxWidth: '140px',
+                maxWidth: '160px',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 textAlign: 'center',
