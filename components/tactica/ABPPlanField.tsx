@@ -263,7 +263,7 @@ export function ABPPlanField({
             >
               {assigned ? (
                 <div 
-                  className={`px-2.5 py-1.5 rounded-full flex items-center justify-center text-white font-black text-[9px] shadow-lg border-2 transition-all whitespace-nowrap min-w-[36px] ${
+                  className={`px-2 py-1 rounded-full flex items-center justify-center text-white font-black text-[9px] shadow-lg border-2 transition-all whitespace-nowrap min-w-[28px] ${
                     isTitular 
                       ? 'bg-green-600 border-green-400 hover:bg-green-500' 
                       : 'bg-blue-600 border-blue-400 hover:bg-blue-500'
@@ -272,7 +272,7 @@ export function ABPPlanField({
                   }`}
                   title={assigned.nombre}
                 >
-                  {assigned.dorsal ? `${assigned.dorsal} · ` : ''}{assigned.nombre.split(' ')[0]}
+                  {assigned.dorsal ? `${assigned.dorsal} · ` : ''}{assigned.nombre.split(' ')[0].charAt(0).toUpperCase()}.
                 </div>
               ) : (
                 <div 

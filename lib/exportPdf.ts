@@ -380,12 +380,12 @@ export async function exportABPPlanToPDF(config: ABPPlanExportConfig): Promise<v
 
     // --- CABECERA ---
     const headerH = 20;
-    const infoPanelW = Math.min(100, PAGE_W * 0.35); // 35% del ancho para info
-    const fieldW = PAGE_W - infoPanelW - MARGIN * 3;
-    const maxFieldW = 200;
+    const infoPanelW = 55; // Reducido de 104mm (35%) a 55mm para que el campo de juego sea casi el tamaño A4
+    const fieldW = PAGE_W - infoPanelW - MARGIN * 3; // 297 - 55 - 36 = 206mm
+    const maxFieldW = 210;
     const finalFieldW = Math.min(fieldW, maxFieldW);
     const scale = finalFieldW / canvas.width;
-    const finalFieldH = canvas.height * scale;
+    const finalFieldH = canvas.height * scale; // 206 * 0.75 = 154.5mm
 
     const topY = MARGIN + headerH + 5;
     
