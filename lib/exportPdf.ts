@@ -345,19 +345,6 @@ export async function exportABPPlanToPDF(config: ABPPlanExportConfig): Promise<v
     return;
   }
 
-  // Guardar posición de scroll original de forma segura (para soportar SSR y navegadores antiguos)
-  const originalScrollY = typeof window !== 'undefined' ? (window.scrollY || window.pageYOffset || 0) : 0;
-  const originalScrollX = typeof window !== 'undefined' ? (window.scrollX || window.pageXOffset || 0) : 0;
-
-  // Desactivar temporalmente scroll suave en html y body para evitar que html2canvas falle por elementos en movimiento
-  const htmlEl = typeof document !== 'undefined' ? document.documentElement : null;
-  const bodyEl = typeof document !== 'undefined' ? document.body : null;
-  const originalHtmlScroll = htmlEl ? htmlEl.style.scrollBehavior : '';
-  const originalBodyScroll = bodyEl ? bodyEl.style.scrollBehavior : '';
-
-  if (htmlEl) htmlEl.style.scrollBehavior = 'auto';
-  if (bodyEl) bodyEl.style.scrollBehavior = 'auto';
-
   try {
     for (let i = 0; i < config.plays.length; i++) {
       const play = config.plays[i];
@@ -370,24 +357,26 @@ export async function exportABPPlanToPDF(config: ABPPlanExportConfig): Promise<v
         continue;
       }
 
-      // Asegurar que el elemento está en el viewport para que html2canvas lo dibuje completo y no salga en blanco (con fallback)
-      try {
-        fieldEl.scrollIntoView({ block: 'center', behavior: 'auto' });
-      } catch {
-        try {
-          fieldEl.scrollIntoView();
-        } catch {
-          console.warn('scrollIntoView no soportado en este navegador');
-        }
-      }
-      await new Promise(resolve => setTimeout(resolve, 120));
+      // --- Hidden Clone Strategy (Evita scroll y errores de iframe clonado) ---
+      const clone = fieldEl.cloneNode(true) as HTMLElement;
+      const rect = fieldEl.getBoundingClientRect();
+      clone.style.position = 'fixed';
+      clone.style.top = '0';
+      clone.style.left = '0';
+      clone.style.width = `${rect.width}px`;
+      clone.style.height = `${rect.height}px`;
+      clone.style.zIndex = '-9999';
+      clone.style.pointerEvents = 'none';
 
-      const noExportEls = fieldEl.querySelectorAll<HTMLElement>('.no-export');
+      // Ocultar elementos no exportables en el clon
+      const noExportEls = clone.querySelectorAll<HTMLElement>('.no-export');
       noExportEls.forEach(el => { el.style.visibility = 'hidden'; });
+
+      document.body.appendChild(clone);
 
       let canvas: HTMLCanvasElement;
       try {
-        canvas = await html2canvas(fieldEl, {
+        canvas = await html2canvas(clone, {
           scale: 3,
           useCORS: true,
           allowTaint: true,
@@ -395,7 +384,8 @@ export async function exportABPPlanToPDF(config: ABPPlanExportConfig): Promise<v
           logging: false,
         });
       } finally {
-        noExportEls.forEach(el => { el.style.visibility = ''; });
+        // Eliminar el clon inmediatamente
+        clone.remove();
       }
 
       if (!canvas || canvas.width === 0 || canvas.height === 0) {
@@ -405,110 +395,105 @@ export async function exportABPPlanToPDF(config: ABPPlanExportConfig): Promise<v
 
       const imgData = canvas.toDataURL('image/jpeg', 0.95);
 
-    // Fondo
-    doc.setFillColor(DARK);
-    doc.rect(0, 0, PAGE_W, PAGE_H, 'F');
+      // Fondo
+      doc.setFillColor(DARK);
+      doc.rect(0, 0, PAGE_W, PAGE_H, 'F');
 
-    // --- CABECERA ---
-    const headerH = 20;
-    const infoPanelW = 55; // Reducido de 104mm (35%) a 55mm para que el campo de juego sea casi el tamaño A4
-    const fieldW = PAGE_W - infoPanelW - MARGIN * 3; // 297 - 55 - 36 = 206mm
-    const maxFieldW = 210;
-    const finalFieldW = Math.min(fieldW, maxFieldW);
-    const scale = finalFieldW / canvas.width;
-    const finalFieldH = canvas.height * scale; // 206 * 0.75 = 154.5mm
+      // --- CABECERA ---
+      const headerH = 20;
+      const infoPanelW = 55; // Reducido de 104mm (35%) a 55mm para que el campo de juego sea casi el tamaño A4
+      const fieldW = PAGE_W - infoPanelW - MARGIN * 3; // 297 - 55 - 36 = 206mm
+      const maxFieldW = 210;
+      const finalFieldW = Math.min(fieldW, maxFieldW);
+      const scale = finalFieldW / canvas.width;
+      const finalFieldH = canvas.height * scale; // 206 * 0.75 = 154.5mm
 
-    const topY = MARGIN + headerH + 5;
-    
-    // Título Principal (Match Info)
-    doc.setTextColor(WHITE);
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    const title = config.matchInfo.jornada === 'draft' 
-       ? 'PLAN ABP - BORRADOR' 
-       : `PLAN ABP - JORNADA ${config.matchInfo.jornada} VS ${config.matchInfo.rival.toUpperCase()}`;
-    doc.text(title, MARGIN, MARGIN + 6);
+      const topY = MARGIN + headerH + 5;
+      
+      // Título Principal (Match Info)
+      doc.setTextColor(WHITE);
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      const title = config.matchInfo.jornada === 'draft' 
+         ? 'PLAN ABP - BORRADOR' 
+         : `PLAN ABP - JORNADA ${config.matchInfo.jornada} VS ${config.matchInfo.rival.toUpperCase()}`;
+      doc.text(title, MARGIN, MARGIN + 6);
 
-    // Subtítulo Match
-    doc.setFontSize(9);
-    doc.setTextColor(GRAY);
-    doc.setFont('helvetica', 'normal');
-    let subTitle = `${config.matchInfo.equipo}`;
-    if (config.matchInfo.jornada !== 'draft') {
-        subTitle += ` | ${config.matchInfo.competicion} | ${config.matchInfo.fecha}`;
+      // Subtítulo Match
+      doc.setFontSize(9);
+      doc.setTextColor(GRAY);
+      doc.setFont('helvetica', 'normal');
+      let subTitle = `${config.matchInfo.equipo}`;
+      if (config.matchInfo.jornada !== 'draft') {
+          subTitle += ` | ${config.matchInfo.competicion} | ${config.matchInfo.fecha}`;
+      }
+      doc.text(subTitle, MARGIN, MARGIN + 12);
+
+      // Page indicator
+      doc.setFontSize(9);
+      doc.setTextColor(RED);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`Jugada ${i + 1} de ${config.plays.length}`, PAGE_W - MARGIN, MARGIN + 6, { align: 'right' });
+
+      drawDivider(doc, MARGIN + headerH);
+
+      // --- CAMPO ---
+      const fieldX = PAGE_W - MARGIN - finalFieldW;
+      doc.setDrawColor(LIGHT_GRAY);
+      doc.setLineWidth(0.5);
+      doc.rect(fieldX, topY, finalFieldW, finalFieldH);
+      doc.addImage(imgData, 'JPEG', fieldX, topY, finalFieldW, finalFieldH);
+
+      // --- PANEL IZQUIERDO (Info de la jugada) ---
+      let textY = topY + 4;
+      
+      // Título de la jugada
+      doc.setTextColor(RED);
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.text('TIPO DE ABP', MARGIN, textY);
+      textY += 6;
+      doc.setTextColor(WHITE);
+      doc.setFontSize(12);
+      doc.text(play.tipoABP.toUpperCase(), MARGIN, textY);
+
+      textY += 12;
+      doc.setTextColor(RED);
+      doc.setFontSize(10);
+      doc.text('NOMBRE DE JUGADA', MARGIN, textY);
+      textY += 6;
+      doc.setTextColor(WHITE);
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'normal');
+      const wrapPlayName = wrapText(doc, play.playName || 'Sin título', infoPanelW, 11);
+      doc.text(wrapPlayName, MARGIN, textY);
+      textY += wrapPlayName.length * 5 + 8;
+
+      // Instrucciones
+      doc.setTextColor(RED);
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.text('INSTRUCCIONES', MARGIN, textY);
+      textY += 6;
+      
+      doc.setTextColor(GRAY);
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      const obs = play.instrucciones || 'Sin instrucciones adicionales.';
+      const wrapObs = wrapText(doc, obs, infoPanelW, 9);
+      doc.text(wrapObs, MARGIN, textY);
+      
+      // --- PIE DE PÁGINA ---
+      doc.setFontSize(6);
+      doc.setTextColor(GRAY);
+      const dateStr = new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+      doc.text(`Generado: ${dateStr}`, MARGIN, PAGE_H - 4);
+      doc.text('Athletic Club Indautxu · Temporada 26/27', PAGE_W - MARGIN, PAGE_H - 4, { align: 'right' });
     }
-    doc.text(subTitle, MARGIN, MARGIN + 12);
 
-    // Page indicator
-    doc.setFontSize(9);
-    doc.setTextColor(RED);
-    doc.setFont('helvetica', 'bold');
-    doc.text(`Jugada ${i + 1} de ${config.plays.length}`, PAGE_W - MARGIN, MARGIN + 6, { align: 'right' });
-
-    drawDivider(doc, MARGIN + headerH);
-
-    // --- CAMPO ---
-    const fieldX = PAGE_W - MARGIN - finalFieldW;
-    doc.setDrawColor(LIGHT_GRAY);
-    doc.setLineWidth(0.5);
-    doc.rect(fieldX, topY, finalFieldW, finalFieldH);
-    doc.addImage(imgData, 'JPEG', fieldX, topY, finalFieldW, finalFieldH);
-
-    // --- PANEL IZQUIERDO (Info de la jugada) ---
-    let textY = topY + 4;
-    
-    // Título de la jugada
-    doc.setTextColor(RED);
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'bold');
-    doc.text('TIPO DE ABP', MARGIN, textY);
-    textY += 6;
-    doc.setTextColor(WHITE);
-    doc.setFontSize(12);
-    doc.text(play.tipoABP.toUpperCase(), MARGIN, textY);
-
-    textY += 12;
-    doc.setTextColor(RED);
-    doc.setFontSize(10);
-    doc.text('NOMBRE DE JUGADA', MARGIN, textY);
-    textY += 6;
-    doc.setTextColor(WHITE);
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'normal');
-    const wrapPlayName = wrapText(doc, play.playName || 'Sin título', infoPanelW, 11);
-    doc.text(wrapPlayName, MARGIN, textY);
-    textY += wrapPlayName.length * 5 + 8;
-
-    // Instrucciones
-    doc.setTextColor(RED);
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'bold');
-    doc.text('INSTRUCCIONES', MARGIN, textY);
-    textY += 6;
-    
-    doc.setTextColor(GRAY);
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    const obs = play.instrucciones || 'Sin instrucciones adicionales.';
-    const wrapObs = wrapText(doc, obs, infoPanelW, 9);
-    doc.text(wrapObs, MARGIN, textY);
-    
-    // --- PIE DE PÁGINA ---
-    doc.setFontSize(6);
-    doc.setTextColor(GRAY);
-    const dateStr = new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
-    doc.text(`Generado: ${dateStr}`, MARGIN, PAGE_H - 4);
-    doc.text('Athletic Club Indautxu · Temporada 26/27', PAGE_W - MARGIN, PAGE_H - 4, { align: 'right' });
-  }
-
-  doc.save(config.filename);
-  } finally {
-    // Restablecer posición de scroll original de forma segura
-    if (typeof window !== 'undefined') {
-      window.scrollTo(originalScrollX, originalScrollY);
-    }
-    // Restablecer comportamiento de scroll original
-    if (htmlEl) htmlEl.style.scrollBehavior = originalHtmlScroll;
-    if (bodyEl) bodyEl.style.scrollBehavior = originalBodyScroll;
+    doc.save(config.filename);
+  } catch (err) {
+    console.error('Error al generar PDF de ABP:', err);
+    throw err;
   }
 }
