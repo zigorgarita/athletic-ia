@@ -97,6 +97,8 @@ export function ABPPlanField({
   const starters = players.filter(p => lineupPlayerIds.includes(p.id));
   const bench = players.filter(p => !lineupPlayerIds.includes(p.id));
 
+  const assignedCount = roles.filter(r => r.assignedPlayer || r.player_id).length;
+
   // Render player list item
   const renderPlayerRow = (p: Player) => {
     const assignment = getPlayerAssignment(p.id);
@@ -292,6 +294,11 @@ export function ABPPlanField({
 
       {/* Panel lateral persistent de Plantilla / Once Inicial */}
       <div className="w-full xl:w-72 bg-slate-900/80 rounded-2xl border border-slate-800/80 flex flex-col p-4">
+        {assignedCount === 11 && (
+          <div className="mb-3 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs text-emerald-450 font-bold text-center flex items-center justify-center gap-1.5 shadow-md">
+            ✓ ABP completa (11/11 jugadores asignados)
+          </div>
+        )}
         {/* Banner de flujo de asignación manual */}
         {selectedRoleId ? (
           <div className="mb-3 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-xl text-xs text-slate-200">

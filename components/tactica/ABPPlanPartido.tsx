@@ -158,6 +158,19 @@ export function ABPPlanPartido({ players, matches, onExit }: ABPPlanPartidoProps
 
   const handleAssignPlayer = async (planId: string, roleId: string, playerId: string) => {
     try {
+      // Check if this player is already assigned to a different role in the same plan
+      const existingAssignment = matchAbpRoles.find(
+        r => r.match_abp_plan_id === planId && r.player_id === playerId
+      );
+
+      if (existingAssignment && existingAssignment.abp_player_role_id !== roleId) {
+        // Clear their old position
+        await supabase
+          .from('match_abp_player_assignments')
+          .update({ player_id: null })
+          .match({ match_abp_plan_id: planId, abp_player_role_id: existingAssignment.abp_player_role_id });
+      }
+
       const { error } = await supabase
         .from('match_abp_player_assignments')
         .update({ player_id: playerId })
@@ -165,11 +178,17 @@ export function ABPPlanPartido({ players, matches, onExit }: ABPPlanPartidoProps
       
       if (error) throw error;
       
-      setMatchAbpRoles(prev => prev.map(r => 
-        (r.match_abp_plan_id === planId && r.abp_player_role_id === roleId) 
-          ? { ...r, player_id: playerId } 
-          : r
-      ));
+      setMatchAbpRoles(prev => prev.map(r => {
+        if (r.match_abp_plan_id === planId) {
+          if (r.abp_player_role_id === roleId) {
+            return { ...r, player_id: playerId };
+          }
+          if (existingAssignment && r.abp_player_role_id === existingAssignment.abp_player_role_id) {
+            return { ...r, player_id: null };
+          }
+        }
+        return r;
+      }));
     } catch(e: unknown) {
       setErrorMsg('Error al asignar jugador: ' + (e as Error).message);
     }
@@ -356,6 +375,15 @@ export function ABPPlanPartido({ players, matches, onExit }: ABPPlanPartidoProps
     if (matchAbpPlans.length === 0) {
       setErrorMsg('No hay jugadas en el plan para exportar.');
       return;
+    }
+
+    // Check for unassigned players in the match plan roles
+    const totalUnassigned = matchAbpRoles.filter(r => !r.player_id).length;
+    if (totalUnassigned > 0) {
+      const msg = `Faltan ${totalUnassigned} jugador${totalUnassigned > 1 ? 'es' : ''} por asignar.\n\n¿Deseas continuar con la exportación igualmente?`;
+      if (!window.confirm(msg)) {
+        return;
+      }
     }
     
     setLoading(true);
