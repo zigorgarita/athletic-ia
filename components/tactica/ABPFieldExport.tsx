@@ -191,15 +191,15 @@ export function ABPFieldExport({ playRoles, playType, playZona }: ABPFieldExport
             </div>
 
             {/* Role Badge */}
-            <div className="absolute -top-3.5 bg-slate-950 border border-[#CC0E21]/50 px-2 py-0.5 rounded text-[10px] font-black text-[#CC0E21] whitespace-nowrap">
+            <div className="absolute -top-4.5 bg-slate-950 border border-[#CC0E21]/50 px-2.5 py-0.5 rounded text-[13px] font-black text-[#CC0E21] whitespace-nowrap">
               {label}
             </div>
 
             {/* Name / Info Overlay */}
             {player && (
-              <div className="mt-1.5 bg-slate-950/95 border border-slate-900 px-2.5 py-0.5 rounded-lg text-xs font-bold text-slate-200 shadow-md">
-                <span className="truncate max-w-[120px] block text-center">
-                  {player.nombre.split(' ')[0]} ({player.dorsal})
+              <div className="mt-2 bg-slate-950/95 border border-slate-900 px-3 py-1 rounded-lg text-sm font-bold text-slate-200 shadow-md">
+                <span className="truncate max-w-[140px] block text-center">
+                  {player.nombre.split(' ')[0]}
                 </span>
               </div>
             )}
