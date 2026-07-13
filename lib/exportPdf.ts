@@ -381,29 +381,16 @@ export async function exportABPPlanToPDF(config: ABPPlanExportConfig): Promise<v
         }
       }
       
-      // Esperar brevemente a que el navegador complete la renderización y pintura del elemento en pantalla
-      await new Promise(resolve => setTimeout(resolve, 150));
+      // Esperar a que el navegador complete el scroll y la pintura del elemento en pantalla de forma estable (incluso con scroll suave)
+      await new Promise(resolve => setTimeout(resolve, 700));
 
-      // 2. Clonar el elemento ahora que está pintado y visible
-      const clone = fieldEl.cloneNode(true) as HTMLElement;
-      const rect = fieldEl.getBoundingClientRect();
-      clone.style.position = 'fixed';
-      clone.style.top = '0';
-      clone.style.left = '0';
-      clone.style.width = `${rect.width}px`;
-      clone.style.height = `${rect.height}px`;
-      clone.style.zIndex = '-9999';
-      clone.style.pointerEvents = 'none';
-
-      // Ocultar elementos no exportables en el clon
-      const noExportEls = clone.querySelectorAll<HTMLElement>('.no-export');
+      // Ocultar elementos no exportables temporariamente
+      const noExportEls = fieldEl.querySelectorAll<HTMLElement>('.no-export');
       noExportEls.forEach(el => { el.style.visibility = 'hidden'; });
-
-      document.body.appendChild(clone);
 
       let canvas: HTMLCanvasElement;
       try {
-        canvas = await html2canvas(clone, {
+        canvas = await html2canvas(fieldEl, {
           scale: 3,
           useCORS: true,
           allowTaint: true,
@@ -411,8 +398,8 @@ export async function exportABPPlanToPDF(config: ABPPlanExportConfig): Promise<v
           logging: false,
         });
       } finally {
-        // Eliminar el clon inmediatamente
-        clone.remove();
+        // Restaurar visibilidad
+        noExportEls.forEach(el => { el.style.visibility = ''; });
       }
 
       if (!canvas || canvas.width === 0 || canvas.height === 0) {
