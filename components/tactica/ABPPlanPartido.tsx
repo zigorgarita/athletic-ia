@@ -199,39 +199,38 @@ export function ABPPlanPartido({ players, matches, onExit }: ABPPlanPartidoProps
     setLoading(true);
     
     try {
-      // Create a pool of available titulares
-      let availableTitulares = [...matchLineupPlayerIds];
-      
-      // Updates to perform
       const updates = [];
       const newRolesState = [...matchAbpRoles];
       
-      // Iterate over every role in every plan
-      for (let i = 0; i < newRolesState.length; i++) {
-        const role = newRolesState[i];
+      // Auto-assign per play (plan)
+      for (const plan of matchAbpPlans) {
+        let availableTitulares = [...matchLineupPlayerIds];
+        const planRoles = newRolesState.filter(r => r.match_abp_plan_id === plan.id);
         
-        // If it already has a player and that player is a titular, remove them from available pool
-        if (role.player_id && availableTitulares.includes(role.player_id)) {
-          availableTitulares = availableTitulares.filter(id => id !== role.player_id);
-          continue;
+        // Remove already assigned players from this play's pool
+        for (const role of planRoles) {
+          if (role.player_id && availableTitulares.includes(role.player_id)) {
+            availableTitulares = availableTitulares.filter(id => id !== role.player_id);
+          }
         }
         
-        // If it doesn't have a player or has a non-titular, and we still have titulares
-        if (!role.player_id && availableTitulares.length > 0) {
-          const playerId = availableTitulares.shift(); // Take first available
-          if (playerId) {
-            role.player_id = playerId;
-            updates.push({
-              match_abp_plan_id: role.match_abp_plan_id,
-              abp_player_role_id: role.abp_player_role_id,
-              player_id: playerId
-            });
+        // Assign available players to unassigned roles
+        for (const role of planRoles) {
+          if (!role.player_id && availableTitulares.length > 0) {
+            const playerId = availableTitulares.shift();
+            if (playerId) {
+              role.player_id = playerId;
+              updates.push({
+                match_abp_plan_id: role.match_abp_plan_id,
+                abp_player_role_id: role.abp_player_role_id,
+                player_id: playerId
+              });
+            }
           }
         }
       }
       
-      // Execute all updates sequentially (or could be a bulk upsert if PK was just ID)
-      // The table has unique constraint on (match_abp_plan_id, abp_player_role_id)
+      // Execute all updates sequentially or via bulk
       for (const update of updates) {
         await supabase
           .from('match_abp_player_assignments')
@@ -240,7 +239,7 @@ export function ABPPlanPartido({ players, matches, onExit }: ABPPlanPartidoProps
       }
       
       setMatchAbpRoles(newRolesState);
-      setSuccessMsg(`Autocompletado con éxito. Quedan ${availableTitulares.length} titulares sin asignar.`);
+      setSuccessMsg(`Autocompletado con éxito para todas las jugadas del plan.`);
     } catch (e: unknown) {
       setErrorMsg('Error en autoasignación: ' + (e as Error).message);
     } finally {
