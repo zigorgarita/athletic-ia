@@ -345,9 +345,9 @@ export async function exportABPPlanToPDF(config: ABPPlanExportConfig): Promise<v
     return;
   }
 
-  // Guardar posición de scroll original
-  const originalScrollY = window.scrollY;
-  const originalScrollX = window.scrollX;
+  // Guardar posición de scroll original de forma segura (para soportar SSR y navegadores antiguos)
+  const originalScrollY = typeof window !== 'undefined' ? (window.scrollY || window.pageYOffset || 0) : 0;
+  const originalScrollX = typeof window !== 'undefined' ? (window.scrollX || window.pageXOffset || 0) : 0;
 
   try {
     for (let i = 0; i < config.plays.length; i++) {
@@ -361,9 +361,17 @@ export async function exportABPPlanToPDF(config: ABPPlanExportConfig): Promise<v
         continue;
       }
 
-      // Asegurar que el elemento está en el viewport para que html2canvas lo dibuje completo y no salga en blanco
-      fieldEl.scrollIntoView({ block: 'center' });
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Asegurar que el elemento está en el viewport para que html2canvas lo dibuje completo y no salga en blanco (con fallback)
+      try {
+        fieldEl.scrollIntoView({ block: 'center', behavior: 'auto' });
+      } catch {
+        try {
+          fieldEl.scrollIntoView();
+        } catch {
+          console.warn('scrollIntoView no soportado en este navegador');
+        }
+      }
+      await new Promise(resolve => setTimeout(resolve, 120));
 
       const noExportEls = fieldEl.querySelectorAll<HTMLElement>('.no-export');
       noExportEls.forEach(el => { el.style.visibility = 'hidden'; });
@@ -481,7 +489,9 @@ export async function exportABPPlanToPDF(config: ABPPlanExportConfig): Promise<v
 
   doc.save(config.filename);
   } finally {
-    // Restablecer posición de scroll original
-    window.scrollTo(originalScrollX, originalScrollY);
+    // Restablecer posición de scroll original de forma segura
+    if (typeof window !== 'undefined') {
+      window.scrollTo(originalScrollX, originalScrollY);
+    }
   }
 }
