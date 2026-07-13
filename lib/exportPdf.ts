@@ -349,6 +349,15 @@ export async function exportABPPlanToPDF(config: ABPPlanExportConfig): Promise<v
   const originalScrollY = typeof window !== 'undefined' ? (window.scrollY || window.pageYOffset || 0) : 0;
   const originalScrollX = typeof window !== 'undefined' ? (window.scrollX || window.pageXOffset || 0) : 0;
 
+  // Desactivar temporalmente scroll suave en html y body para evitar que html2canvas falle por elementos en movimiento
+  const htmlEl = typeof document !== 'undefined' ? document.documentElement : null;
+  const bodyEl = typeof document !== 'undefined' ? document.body : null;
+  const originalHtmlScroll = htmlEl ? htmlEl.style.scrollBehavior : '';
+  const originalBodyScroll = bodyEl ? bodyEl.style.scrollBehavior : '';
+
+  if (htmlEl) htmlEl.style.scrollBehavior = 'auto';
+  if (bodyEl) bodyEl.style.scrollBehavior = 'auto';
+
   try {
     for (let i = 0; i < config.plays.length; i++) {
       const play = config.plays[i];
@@ -498,5 +507,8 @@ export async function exportABPPlanToPDF(config: ABPPlanExportConfig): Promise<v
     if (typeof window !== 'undefined') {
       window.scrollTo(originalScrollX, originalScrollY);
     }
+    // Restablecer comportamiento de scroll original
+    if (htmlEl) htmlEl.style.scrollBehavior = originalHtmlScroll;
+    if (bodyEl) bodyEl.style.scrollBehavior = originalBodyScroll;
   }
 }
