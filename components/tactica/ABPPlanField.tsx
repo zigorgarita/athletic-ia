@@ -127,7 +127,7 @@ export function ABPPlanField({
                 className="w-full flex items-center gap-2 p-1.5 rounded-lg hover:bg-slate-800 transition-colors text-left"
                 onClick={() => onAssignPlayer(selectedRoleId, p.id)}
               >
-                <Avatar src={p.foto} fallback={p.nombre.substring(0, 2)} className="w-6 h-6 text-[10px]" />
+                <Avatar src={p.foto_url} name={p.nombre.substring(0, 2)} className="w-6 h-6 text-[10px]" />
                 <span className="text-xs text-slate-300 truncate">{p.nombre}</span>
               </button>
             ))}
@@ -141,7 +141,7 @@ export function ABPPlanField({
                 className="w-full flex items-center gap-2 p-1.5 rounded-lg hover:bg-slate-800 transition-colors text-left opacity-70 hover:opacity-100"
                 onClick={() => onAssignPlayer(selectedRoleId, p.id)}
               >
-                <Avatar src={p.foto} fallback={p.nombre.substring(0, 2)} className="w-6 h-6 text-[10px]" />
+                <Avatar src={p.foto_url} name={p.nombre.substring(0, 2)} className="w-6 h-6 text-[10px]" />
                 <span className="text-xs text-slate-300 truncate">{p.nombre}</span>
               </button>
             ))}

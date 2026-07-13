@@ -17,6 +17,7 @@ import {
 import { useEditMode } from '@/context/EditModeContext';
 import { exportToPDF, buildABPFilename } from '@/lib/exportPdf';
 import { ABPFieldExport } from './ABPFieldExport';
+import { ABPPlanPartido } from './ABPPlanPartido';
 
 interface ABPSectionProps {
   players: Player[];
@@ -1678,7 +1679,7 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
                 </p>
               </div>
               <div className="flex gap-2">
-                <Button variant="outline" onClick={() => setViewMode('partido')}>
+                <Button variant="secondary" onClick={() => setViewMode('partido')}>
                   <Calendar className="h-4 w-4 mr-2" /> Plan de Partido
                 </Button>
               {isEditMode && (
@@ -2648,6 +2649,7 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
       )}
       </>
       )}
+      </div>
     </div>
   );
 }

@@ -367,7 +367,7 @@ export function ABPPlanPartido({ players, matches, onExit }: ABPPlanPartidoProps
           fieldElementId: `abp-plan-field-${plan.id}`,
           playName: p?.titulo || 'Sin título',
           tipoABP: p?.tipo || 'Desconocido',
-          instrucciones: plan.observaciones || p?.observaciones || ''
+          instrucciones: plan.observaciones || ''
         };
       });
       
@@ -379,7 +379,7 @@ export function ABPPlanPartido({ players, matches, onExit }: ABPPlanPartidoProps
           jornada: isDraft ? 'draft' : (selectedMatch?.jornada || ''),
           rival: selectedMatch?.rival || '',
           fecha: selectedMatch?.fecha ? new Date(selectedMatch.fecha).toLocaleDateString('es-ES') : '',
-          competicion: selectedMatch?.competicion || 'Liga',
+          competicion: 'Liga',
           equipo: 'Indautxu 26/27'
         },
         plays: plays
@@ -421,18 +421,18 @@ export function ABPPlanPartido({ players, matches, onExit }: ABPPlanPartidoProps
         </div>
         
         <div className="flex gap-2 w-full md:w-auto">
-          <Select 
+          <select 
             value={selectedMatchId} 
             onChange={(e) => setSelectedMatchId(e.target.value)}
-            className="flex-1 md:w-64"
+            className="flex-1 md:w-64 bg-slate-900 border border-slate-700 text-sm rounded-xl px-3 py-2 text-slate-200"
           >
             <option value="">-- Seleccionar Jornada --</option>
             <option value="draft">Borrador (Sin partido)</option>
             {matches.map(m => (
               <option key={m.id} value={m.id}>J{m.jornada} vs {m.rival}</option>
             ))}
-          </Select>
-          <Button variant="outline" onClick={onExit}>
+          </select>
+          <Button variant="secondary" onClick={onExit}>
             <FolderOpen className="h-4 w-4 mr-2" /> Biblioteca
           </Button>
         </div>
@@ -448,7 +448,7 @@ export function ABPPlanPartido({ players, matches, onExit }: ABPPlanPartidoProps
                </h4>
                {!isDraft && (
                  <p className="text-xs text-slate-400 mt-1">
-                   Competición: {selectedMatch?.competicion || 'Liga'} | Fecha: {new Date(selectedMatch?.fecha || '').toLocaleDateString('es-ES')}
+                   Competición: Liga | Fecha: {new Date(selectedMatch?.fecha || '').toLocaleDateString('es-ES')}
                  </p>
                )}
              </div>
@@ -468,8 +468,8 @@ export function ABPPlanPartido({ players, matches, onExit }: ABPPlanPartidoProps
           </div>
 
           <div className="flex gap-2">
-             <Select 
-               className="flex-1 max-w-sm"
+             <select 
+               className="flex-1 max-w-sm bg-slate-900 border border-slate-700 text-sm rounded-xl px-3 py-2 text-slate-200"
                onChange={(e) => handleAddPlay(e.target.value)}
                value=""
              >
@@ -477,10 +477,10 @@ export function ABPPlanPartido({ players, matches, onExit }: ABPPlanPartidoProps
                {libraryPlays.map(p => (
                  <option key={p.id} value={p.id}>{p.tipo} - {p.titulo}</option>
                ))}
-             </Select>
+             </select>
              
               <Button 
-               variant="outline" 
+               variant="secondary" 
                disabled={!isDraft && matchLineupPlayerIds.length === 0}
                onClick={handleAutoAssignTitulares}
              >
@@ -536,17 +536,17 @@ export function ABPPlanPartido({ players, matches, onExit }: ABPPlanPartidoProps
                        </div>
                      </div>
                      <div className="flex items-center gap-2">
-                        <Button variant="ghost" size="sm" title="Subir orden" disabled={index === 0} onClick={() => handleMoveOrder(plan.id, 'up')}>
+                        <Button variant="ghost"  title="Subir orden" disabled={index === 0} onClick={() => handleMoveOrder(plan.id, 'up')}>
                           <ArrowUp className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="sm" title="Bajar orden" disabled={index === matchAbpPlans.length - 1} onClick={() => handleMoveOrder(plan.id, 'down')}>
+                        <Button variant="ghost"  title="Bajar orden" disabled={index === matchAbpPlans.length - 1} onClick={() => handleMoveOrder(plan.id, 'down')}>
                           <ArrowDown className="h-4 w-4" />
                         </Button>
                         <div className="w-px h-6 bg-slate-800 mx-1"></div>
-                        <Button variant="ghost" size="sm" title="Convertir en independiente" className="text-blue-400 hover:text-blue-300" onClick={() => handleCloneToIndependent(plan.id, play.id)}>
+                        <Button variant="ghost" title="Convertir en independiente" className="text-blue-400 hover:text-blue-300" onClick={() => handleCloneToIndependent(plan.id, play?.id!)}>
                           <Copy className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="sm" title="Eliminar del plan" className="text-red-400 hover:text-red-300" onClick={() => handleRemovePlan(plan.id)}>
+                        <Button variant="ghost" title="Eliminar del plan" className="text-red-400 hover:text-red-300" onClick={() => handleRemovePlan(plan.id)}>
                           <Trash2 className="h-4 w-4" />
                         </Button>
                      </div>
