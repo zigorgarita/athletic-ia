@@ -183,8 +183,8 @@ export function ABPFieldExport({ playRoles, playType, playZona }: ABPFieldExport
             <div
               style={{
                 position: 'relative',
-                height: '86px',
-                width: '86px',
+                height: '80px',
+                width: '80px',
                 borderRadius: '50%',
                 border: player ? '4px solid #CC0E21' : '4px solid #475569',
                 backgroundColor: player ? '#0f172a' : 'rgba(30, 41, 59, 0.9)',
@@ -197,25 +197,30 @@ export function ABPFieldExport({ playRoles, playType, playZona }: ABPFieldExport
               {player ? (
                 <Avatar src={player.foto_url} name={player.nombre} size="xl" className="w-full h-full" />
               ) : (
-                <span style={{ fontSize: '22px', fontWeight: 900, color: '#94a3b8' }}>{label}</span>
+                <span style={{ fontSize: '20px', fontWeight: 900, color: '#94a3b8' }}>{label}</span>
               )}
             </div>
 
-            {/* Role Badge (positioned absolutely on top of circle) */}
+            {/* Role Badge (positioned absolutely on top of circle, centered) */}
             <div
               style={{
                 position: 'absolute',
-                top: '-32px',
+                top: '-28px',
+                left: '50%',
+                transform: 'translateX(-50%)',
                 backgroundColor: '#0f172a',
                 border: '2px solid rgba(204, 14, 33, 0.9)',
-                borderRadius: '8px',
-                padding: '4px 16px',
-                fontSize: '18px',
+                borderRadius: '6px',
+                padding: '0 12px',
+                height: '26px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '15px',
                 fontWeight: 900,
                 color: '#CC0E21',
                 whiteSpace: 'nowrap',
                 boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
-                lineHeight: '1.2',
                 zIndex: 20,
               }}
             >
@@ -226,16 +231,16 @@ export function ABPFieldExport({ playRoles, playType, playZona }: ABPFieldExport
             {player && (
               <div
                 style={{
-                  marginTop: '10px',
+                  marginTop: '6px',
                   backgroundColor: 'rgba(15, 23, 42, 0.95)',
                   border: '2px solid #334155',
-                  borderRadius: '12px',
-                  padding: '8px 22px',
-                  fontSize: '20px',
+                  borderRadius: '10px',
+                  padding: '6px 14px',
+                  fontSize: '18px',
                   fontWeight: 750,
                   color: '#f1f5f9',
                   whiteSpace: 'nowrap',
-                  maxWidth: '180px',
+                  maxWidth: '140px',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
                   textAlign: 'center',
