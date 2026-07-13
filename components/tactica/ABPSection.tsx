@@ -610,7 +610,7 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
   const [playRoles, setPlayRoles] = useState<(ABPPlayerRole & { player?: Player })[]>([]);
   
   // Modo Plan de Partido
-  const [viewMode, setViewMode] = useState<'biblioteca' | 'partido'>('biblioteca');
+  const [viewMode, setViewMode] = useState<'home' | 'biblioteca' | 'partido'>('home');
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -1660,11 +1660,41 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
 
       <div className="flex flex-col gap-6">
         
-        {viewMode === 'partido' ? (
+        {viewMode === 'home' ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto py-12 px-4">
+            {/* Card Plan de Partido */}
+            <button
+              onClick={() => setViewMode('partido')}
+              className="flex flex-col items-center justify-center p-8 bg-slate-900/60 hover:bg-slate-900/90 border border-slate-800 hover:border-red-500/40 rounded-3xl transition-all duration-300 group shadow-2xl hover:shadow-red-500/5 select-none text-center"
+            >
+              <div className="w-20 h-20 rounded-2xl bg-red-500/10 border border-red-500/25 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
+                <Calendar className="h-10 w-10 text-[#CC0E21]" />
+              </div>
+              <h2 className="text-xl font-black text-slate-100 tracking-wider mb-2">📋 PLAN DE PARTIDO</h2>
+              <p className="text-xs text-slate-400 leading-relaxed max-w-xs">
+                Prepara el partido de la jornada seleccionando las jugadas a utilizar, asignando el Once Inicial y generando el PDF multipágina final.
+              </p>
+            </button>
+
+            {/* Card Biblioteca de Jugadas */}
+            <button
+              onClick={() => setViewMode('biblioteca')}
+              className="flex flex-col items-center justify-center p-8 bg-slate-900/60 hover:bg-slate-900/90 border border-slate-800 hover:border-red-500/40 rounded-3xl transition-all duration-300 group shadow-2xl hover:shadow-red-500/5 select-none text-center"
+            >
+              <div className="w-20 h-20 rounded-2xl bg-red-500/10 border border-red-500/25 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
+                <BookOpen className="h-10 w-10 text-[#CC0E21]" />
+              </div>
+              <h2 className="text-xl font-black text-slate-100 tracking-wider mb-2">📚 BIBLIOTECA DE JUGADAS</h2>
+              <p className="text-xs text-slate-400 leading-relaxed max-w-xs">
+                Crea, edita, duplica y mantén todas las jugadas estratégicas de balón parado para toda la temporada.
+              </p>
+            </button>
+          </div>
+        ) : viewMode === 'partido' ? (
           <ABPPlanPartido 
             players={players} 
             matches={matches || []} 
-            onExit={() => setViewMode('biblioteca')} 
+            onExit={() => setViewMode('home')} 
           />
         ) : (
           <>
@@ -1684,8 +1714,8 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
                 </p>
               </div>
               <div className="flex gap-2">
-                <Button variant="secondary" onClick={() => setViewMode('partido')}>
-                  <Calendar className="h-4 w-4 mr-2" /> Plan de Partido
+                <Button variant="secondary" onClick={() => setViewMode('home')}>
+                  <FolderOpen className="h-4 w-4 mr-2" /> Volver a Inicio
                 </Button>
               {isEditMode && (
                 <Button 

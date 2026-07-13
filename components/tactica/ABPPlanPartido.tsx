@@ -6,10 +6,26 @@ import { Player, ABPPlay, Match, MatchABPPlan, MatchABPPlayerAssignment } from '
 import { Button } from '@/components/ui/Button';
 
 import { Skeleton } from '@/components/ui/Skeleton';
-import { Calendar, Trash2, ArrowUp, ArrowDown, Check, UserCheck, Copy, X, FolderOpen, AlertCircle,  } from 'lucide-react';
+import { Calendar, Trash2, ArrowUp, ArrowDown, Check, UserCheck, Copy, X, FolderOpen, AlertCircle, Plus } from 'lucide-react';
 
 import { ABPPlanField } from './ABPPlanField';
 import { exportABPPlanToPDF } from '@/lib/exportPdf';
+
+const ABP_TYPES = [
+  'Córner ofensivo',
+  'Córner defensivo',
+  'Falta lateral ofensiva',
+  'Falta lateral defensiva',
+  'Falta frontal ofensiva',
+  'Falta frontal defensiva',
+  'Saque de banda ofensivo',
+  'Saque de banda defensivo',
+  'Saque de medio ofensivo',
+  'Saque de medio defensivo',
+  'Penalti ofensivo',
+  'Penalti defensivo',
+  'Otros'
+];
 
 interface ABPPlanPartidoProps {
   players: Player[];
@@ -19,6 +35,8 @@ interface ABPPlanPartidoProps {
 
 export function ABPPlanPartido({ players, matches, onExit }: ABPPlanPartidoProps) {
   const [selectedMatchId, setSelectedMatchId] = useState<string>('');
+  const [selectedPlayType, setSelectedPlayType] = useState<string>('');
+  const [selectedPlayToInsertId, setSelectedPlayToInsertId] = useState<string>('');
   const [matchAbpPlans, setMatchAbpPlans] = useState<MatchABPPlan[]>([]);
   const [matchAbpRoles, setMatchAbpRoles] = useState<MatchABPPlayerAssignment[]>([]);
   const [matchLineupPlayerIds, setMatchLineupPlayerIds] = useState<string[]>([]);
@@ -499,33 +517,75 @@ export function ABPPlanPartido({ players, matches, onExit }: ABPPlanPartidoProps
              )}
           </div>
 
-          <div className="flex gap-2">
-             <select 
-               className="flex-1 max-w-sm bg-slate-900 border border-slate-700 text-sm rounded-xl px-3 py-2 text-slate-200"
-               onChange={(e) => handleAddPlay(e.target.value)}
-               value=""
-             >
-               <option value="">+ Añadir jugada de la Biblioteca...</option>
-               {libraryPlays.map(p => (
-                 <option key={p.id} value={p.id}>{p.tipo} - {p.titulo}</option>
-               ))}
-             </select>
-             
-              <Button 
-               variant="secondary" 
-               disabled={!isDraft && matchLineupPlayerIds.length === 0}
-               onClick={handleAutoAssignTitulares}
-             >
-               <UserCheck className="h-4 w-4 mr-2" /> Autoasignar Titulares
-             </Button>
-             
-             <Button
-               className="bg-red-600 hover:bg-red-700 text-white"
-               disabled={matchAbpPlans.length === 0 || loading}
-               onClick={handleExportPDF}
-             >
-               <Copy className="h-4 w-4 mr-2" /> Exportar Plan a PDF
-             </Button>
+          <div className="flex flex-col gap-3 p-3 bg-slate-950/60 rounded-xl border border-slate-850">
+            <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Añadir jugadas de la Biblioteca</div>
+            <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
+              <div className="flex-1 flex flex-col md:flex-row gap-2">
+                {/* Selector de Tipo */}
+                <select
+                  value={selectedPlayType}
+                  onChange={(e) => {
+                    setSelectedPlayType(e.target.value);
+                    setSelectedPlayToInsertId(''); // Reset selection
+                  }}
+                  className="flex-1 min-w-[180px] bg-slate-900 border border-slate-700 text-xs rounded-xl px-3 py-2 text-slate-200"
+                >
+                  <option value="">-- Seleccionar Tipo de ABP --</option>
+                  {ABP_TYPES.map(type => (
+                    <option key={type} value={type}>{type}</option>
+                  ))}
+                </select>
+
+                {/* Selector de Jugadas Filtradas */}
+                <select
+                  value={selectedPlayToInsertId}
+                  onChange={(e) => setSelectedPlayToInsertId(e.target.value)}
+                  disabled={!selectedPlayType}
+                  className="flex-1 min-w-[200px] bg-slate-900 border border-slate-700 text-xs rounded-xl px-3 py-2 text-slate-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <option value="">-- Seleccionar Jugada... --</option>
+                  {libraryPlays
+                    .filter(p => p.tipo === selectedPlayType)
+                    .map(p => (
+                      <option key={p.id} value={p.id}>{p.titulo}</option>
+                    ))
+                  }
+                </select>
+              </div>
+
+              <div className="flex gap-2 shrink-0">
+                <Button
+                  variant="primary"
+                  disabled={!selectedPlayToInsertId || loading}
+                  onClick={async () => {
+                    if (selectedPlayToInsertId) {
+                      await handleAddPlay(selectedPlayToInsertId);
+                      setSelectedPlayToInsertId('');
+                    }
+                  }}
+                  className="bg-[#CC0E21] hover:bg-red-500 text-white font-bold text-xs py-2 px-4 h-auto flex items-center justify-center gap-1.5"
+                >
+                  <Plus className="h-4 w-4" /> Añadir al Plan
+                </Button>
+
+                <Button 
+                  variant="secondary" 
+                  disabled={!isDraft && matchLineupPlayerIds.length === 0}
+                  onClick={handleAutoAssignTitulares}
+                  className="text-xs py-2 h-auto"
+                >
+                  <UserCheck className="h-4 w-4 mr-2" /> Autoasignar Titulares
+                </Button>
+                
+                <Button
+                  className="bg-red-650 hover:bg-red-550 text-white text-xs py-2 h-auto"
+                  disabled={matchAbpPlans.length === 0 || loading}
+                  onClick={handleExportPDF}
+                >
+                  <Copy className="h-4 w-4 mr-2" /> Exportar Plan
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
       )}
