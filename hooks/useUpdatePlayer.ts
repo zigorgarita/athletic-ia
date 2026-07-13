@@ -16,14 +16,26 @@ export function useUpdatePlayer() {
     try {
       verifyWritePermission();
       const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
+
+      // Fetch the current player record to merge fields, preventing database NOT NULL constraint violations on INSERT
+      const { data: current, error: getError } = await supabase
+        .from('players')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (getError) throw getError;
+
+      const { created_at, updated_at, ...mergeableCurrent } = current;
+      const fullPayload = { ...mergeableCurrent, ...player };
+
       const { data, error: supabaseError } = await supabase
         .rpc('exec_secure_upsert', {
           target_table: 'players',
-          payload: { ...player, id },
+          payload: { ...fullPayload, id },
           conflict_columns: ['id'],
           staff_passkey: passkey
         });
-
 
       if (supabaseError) throw supabaseError;
       return data;

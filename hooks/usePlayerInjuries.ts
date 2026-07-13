@@ -62,10 +62,23 @@ export function usePlayerInjuries(playerId: string | null) {
     try {
       verifyWritePermission();
       const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
+
+      // Fetch current injury data to merge, preventing constraint violations in exec_secure_upsert
+      const { data: current, error: getError } = await supabase
+        .from('player_injuries')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (getError) throw getError;
+
+      const { created_at, updated_at, ...mergeableCurrent } = current;
+      const fullPayload = { ...mergeableCurrent, ...updates };
+
       const { data, error: supabaseError } = await supabase
         .rpc('exec_secure_upsert', {
           target_table: 'player_injuries',
-          payload: { ...updates, id },
+          payload: { ...fullPayload, id },
           conflict_columns: ['id'],
           staff_passkey: passkey
         });
