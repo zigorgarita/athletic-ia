@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { Match, MatchPlayerStats } from '@/types';
 import { useEditMode } from '@/context/EditModeContext';
 
-export function useMatches(matchType: 'LIGA' | 'AMISTOSO' = 'LIGA') {
+export function useMatches(matchType: 'LIGA' | 'AMISTOSO' | 'ALL' = 'LIGA') {
   const [matches, setMatches] = useState<Match[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -13,11 +13,11 @@ export function useMatches(matchType: 'LIGA' | 'AMISTOSO' = 'LIGA') {
     setLoading(true);
     setError(null);
     try {
-      const { data, error: supabaseError } = await supabase
-        .from('matches')
-        .select('*')
-        .eq('tipo_partido', matchType)
-        .order('jornada', { ascending: true });
+      let query = supabase.from('matches').select('*');
+      if (matchType !== 'ALL') {
+        query = query.eq('tipo_partido', matchType);
+      }
+      const { data, error: supabaseError } = await query.order('jornada', { ascending: true });
 
       if (supabaseError) throw supabaseError;
       setMatches(data || []);

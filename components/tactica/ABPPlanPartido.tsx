@@ -428,9 +428,14 @@ export function ABPPlanPartido({ players, matches, onExit }: ABPPlanPartidoProps
           >
             <option value="">-- Seleccionar Jornada --</option>
             <option value="draft">Borrador (Sin partido)</option>
-            {matches.map(m => (
-              <option key={m.id} value={m.id}>J{m.jornada} vs {m.rival}</option>
-            ))}
+            {matches.map(m => {
+              const partidoType = m.tipo_partido === 'AMISTOSO' ? 'Amistoso' : 'Liga';
+              return (
+                <option key={m.id} value={m.id}>
+                  Jornada {m.jornada} - {partidoType} vs {m.rival}
+                </option>
+              );
+            })}
           </select>
           <Button variant="secondary" onClick={onExit}>
             <FolderOpen className="h-4 w-4 mr-2" /> Biblioteca
@@ -448,7 +453,7 @@ export function ABPPlanPartido({ players, matches, onExit }: ABPPlanPartidoProps
                </h4>
                {!isDraft && (
                  <p className="text-xs text-slate-400 mt-1">
-                   Competición: Liga | Fecha: {new Date(selectedMatch?.fecha || '').toLocaleDateString('es-ES')}
+                   Competición: {selectedMatch?.tipo_partido === 'AMISTOSO' ? 'Amistoso' : 'Liga'} | Fecha: {new Date(selectedMatch?.fecha || '').toLocaleDateString('es-ES')}
                  </p>
                )}
              </div>

@@ -9,7 +9,7 @@ import { Shield } from 'lucide-react';
 
 export function ABPClient() {
   const { players, loading: loadingPlayers } = usePlayers();
-  const { matches, loading: loadingMatches } = useMatches('LIGA'); // Obtenemos las jornadas para el Plan ABP
+  const { matches, loading: loadingMatches } = useMatches('ALL'); // Obtenemos las jornadas para el Plan ABP
 
   if (loadingPlayers || loadingMatches) {
     return (
