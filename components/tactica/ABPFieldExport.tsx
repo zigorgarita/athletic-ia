@@ -183,8 +183,8 @@ export function ABPFieldExport({ playRoles, playType, playZona }: ABPFieldExport
             <div
               style={{
                 position: 'relative',
-                height: '80px',
-                width: '80px',
+                height: '70px',
+                width: '70px',
                 borderRadius: '50%',
                 border: player ? '3px solid #CC0E21' : '3px solid #475569',
                 backgroundColor: player ? '#0f172a' : 'rgba(30, 41, 59, 0.9)',
@@ -197,7 +197,7 @@ export function ABPFieldExport({ playRoles, playType, playZona }: ABPFieldExport
               {player ? (
                 <Avatar src={player.foto_url} name={player.nombre} size="xl" className="w-full h-full" />
               ) : (
-                <span style={{ fontSize: '20px', fontWeight: 900, color: '#94a3b8' }}>{label}</span>
+                <span style={{ fontSize: '18px', fontWeight: 900, color: '#94a3b8' }}>{label}</span>
               )}
             </div>
 
@@ -205,12 +205,12 @@ export function ABPFieldExport({ playRoles, playType, playZona }: ABPFieldExport
             <div
               style={{
                 position: 'absolute',
-                top: '-15px',
+                top: '-16px',
                 backgroundColor: '#0f172a',
-                border: '1px solid rgba(204, 14, 33, 0.6)',
+                border: '1.5px solid rgba(204, 14, 33, 0.8)',
                 borderRadius: '6px',
-                padding: '3px 10px',
-                fontSize: '13px',
+                padding: '3px 12px',
+                fontSize: '15px',
                 fontWeight: 900,
                 color: '#CC0E21',
                 whiteSpace: 'nowrap',
@@ -229,12 +229,12 @@ export function ABPFieldExport({ playRoles, playType, playZona }: ABPFieldExport
                   backgroundColor: 'rgba(15, 23, 42, 0.95)',
                   border: '2px solid #334155',
                   borderRadius: '10px',
-                  padding: '6px 16px',
-                  fontSize: '15px',
+                  padding: '6px 18px',
+                  fontSize: '17px',
                   fontWeight: 750,
                   color: '#f1f5f9',
                   whiteSpace: 'nowrap',
-                  maxWidth: '150px',
+                  maxWidth: '160px',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
                   textAlign: 'center',
