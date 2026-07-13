@@ -433,7 +433,8 @@ export function ABPPlanPartido({ players, matches, onExit }: ABPPlanPartidoProps
       setSuccessMsg('PDF multipágina generado correctamente.');
     } catch (err: unknown) {
       console.error(err);
-      setErrorMsg('Error al exportar PDF: ' + (err as Error).message);
+      const errMsg = err instanceof Error ? err.message : String(err);
+      setErrorMsg('Error al exportar PDF: ' + errMsg);
     } finally {
       setLoading(false);
     }

@@ -389,6 +389,11 @@ export async function exportABPPlanToPDF(config: ABPPlanExportConfig): Promise<v
         noExportEls.forEach(el => { el.style.visibility = ''; });
       }
 
+      if (!canvas || canvas.width === 0 || canvas.height === 0) {
+        console.warn(`Canvas inválido para: ${play.fieldElementId}`);
+        continue;
+      }
+
       const imgData = canvas.toDataURL('image/jpeg', 0.95);
 
     // Fondo
