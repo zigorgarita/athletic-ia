@@ -553,7 +553,8 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
   const [playRoles, setPlayRoles] = useState<(ABPPlayerRole & { player?: Player })[]>([]);
   
   // Modo Plan de Partido
-  const [viewMode, setViewMode] = useState<'home' | 'biblioteca' | 'partido'>('home');
+  const [viewMode, setViewMode] = useState<'home' | 'categories' | 'category-detail' | 'play-editor' | 'partido'>('home');
+  const [selectedCategory, setSelectedCategory] = useState<ABPType | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -566,6 +567,7 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
   const [loadingMatchPlan, setLoadingMatchPlan] = useState(false);
   
   // Modals & loading states
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [loadingPlays, setLoadingPlays] = useState(true);
   const [loadingRoles, setLoadingRoles] = useState(false);
   const [isPlayModalOpen, setIsPlayModalOpen] = useState(false);
@@ -586,6 +588,7 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
   const [videoFile, setVideoFile] = useState<File | null>(null);
   
   // Filters & Search
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [activeFilter, setActiveFilter] = useState<ABPType | 'Todos'>('Todos');
 
   
@@ -1400,9 +1403,8 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
 
 
 
-  const filteredPlays = activeFilter === 'Todos' 
-    ? plays 
-    : plays.filter(p => p.tipo === activeFilter);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const filteredPlays = plays.filter(p => activeFilter === 'Todos' || p.tipo === activeFilter);
 
   // Helper to extract YouTube video ID if present
   const getEmbedVideoUrl = (url: string | null) => {
@@ -1464,7 +1466,7 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
 
             {/* Card Biblioteca de Jugadas */}
             <button
-              onClick={() => setViewMode('biblioteca')}
+              onClick={() => { setViewMode('categories'); setSelectedCategory(null); setSelectedPlay(null); }}
               className="flex flex-col items-center justify-center p-8 bg-slate-900/60 hover:bg-slate-900/90 border border-slate-800 hover:border-red-500/40 rounded-3xl transition-all duration-300 group shadow-2xl hover:shadow-red-500/5 select-none text-center"
             >
               <div className="w-20 h-20 rounded-2xl bg-red-500/10 border border-red-500/25 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
@@ -1482,27 +1484,59 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
             matches={matches || []} 
             onExit={() => setViewMode('home')} 
           />
-        ) : (
-          <>
-        {/* ========================================================================= */}
-        {/* PANEL SUPERIOR: SELECTOR DE JUGADAS ABP */}
-        {/* ========================================================================= */}
-        <div className="w-full space-y-4">
-          <div className="p-4 bg-slate-900/40 border border-slate-800/80 rounded-2xl">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
+        ) : viewMode === 'categories' ? (
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
               <div>
-                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                  <FolderOpen className="h-4 w-4 text-[#CC0E21]" />
-                  Selector de Jugadas
-                </h3>
-                <p className="text-[10px] text-slate-500 mt-1 max-w-sm">
-                  Organiza tus jugadas de estrategia tácticas (ABP). Cada una contiene su estructura de fichas, notas y vídeo táctico.
-                </p>
+                <h2 className="text-2xl font-black text-slate-100 flex items-center gap-3">
+                  <FolderOpen className="h-8 w-8 text-[#CC0E21]" />
+                  Categorías ABP
+                </h2>
+                <p className="text-sm text-slate-400 mt-1">Explora la biblioteca de jugadas por tipo de acción a balón parado.</p>
               </div>
-              <div className="flex gap-2">
-                <Button variant="secondary" onClick={() => setViewMode('home')}>
-                  <FolderOpen className="h-4 w-4 mr-2" /> Volver a Inicio
+              <Button variant="secondary" onClick={() => setViewMode('home')}>
+                Volver a Inicio
+              </Button>
+            </div>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {ABP_TYPES.map(type => {
+                const typePlays = plays.filter(p => p.tipo === type);
+                return (
+                  <button
+                    key={type}
+                    onClick={() => {
+                      setSelectedCategory(type);
+                      setViewMode('category-detail');
+                    }}
+                    className="flex flex-col items-start p-6 bg-slate-900/60 hover:bg-slate-850 border border-slate-800 hover:border-[#CC0E21]/50 rounded-2xl transition-all duration-200 text-left group shadow-lg hover:shadow-[#CC0E21]/5"
+                  >
+                    <div className="flex justify-between w-full items-start mb-4">
+                      <FolderOpen className="h-10 w-10 text-yellow-500/90 group-hover:text-yellow-400 transition-colors" />
+                      <span className="text-xs font-bold text-slate-500 bg-slate-950/50 px-2 py-1 rounded-lg">
+                        {typePlays.length}
+                      </span>
+                    </div>
+                    <span className="font-bold text-slate-200 group-hover:text-white line-clamp-2">{type}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : viewMode === 'category-detail' && selectedCategory ? (
+          <div className="space-y-6 animate-in fade-in slide-in-from-right-8 duration-300">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-900/40 p-5 rounded-2xl border border-slate-800/80">
+              <div className="flex items-center gap-3">
+                <Button variant="ghost" onClick={() => setViewMode('categories')} className="p-2 hover:bg-slate-800">
+                  <ChevronDown className="h-5 w-5 transform rotate-90 text-slate-400" />
                 </Button>
+                <div>
+                  <h2 className="text-xl font-black text-slate-100 flex items-center gap-2">
+                    <FolderOpen className="h-5 w-5 text-yellow-500" />
+                    {selectedCategory}
+                  </h2>
+                </div>
+              </div>
               {isEditMode && (
                 <Button 
                   variant="primary" 
@@ -1511,150 +1545,94 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
                     setPlayDesc('');
                     setPlayVideoUrl('');
                     setVideoFile(null);
+                    setPlayType(selectedCategory);
                     setIsPlayModalOpen(true);
                   }}
-                  className="py-1 px-2.5 text-[10px] h-auto flex items-center gap-1 bg-[#CC0E21] hover:bg-red-500 text-white font-bold shrink-0"
+                  className="bg-[#CC0E21] hover:bg-red-500 text-white font-bold w-full sm:w-auto"
                 >
-                  <Plus className="h-3.5 w-3.5" />
+                  <Plus className="h-4 w-4 mr-1.5" />
                   Nueva Jugada
                 </Button>
               )}
             </div>
 
-            {/* Categorías de Filtro */}
-            <div className="flex overflow-x-auto gap-2 pb-3 border-b border-slate-800/60 scrollbar-hide">
-              <button
-                onClick={() => setActiveFilter('Todos')}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-[11px] whitespace-nowrap transition-all duration-150 ${
-                  activeFilter === 'Todos' 
-                    ? 'bg-[#CC0E21] text-white font-bold' 
-                    : 'bg-slate-800/50 text-slate-400 hover:bg-slate-800'
-                }`}
-              >
-                Todas ({plays.length})
-              </button>
-              {ABP_TYPES.map(type => {
-                const count = plays.filter(p => p.tipo === type).length;
-                const isActive = activeFilter === type;
-                return (
-                  <button
-                    key={type}
-                    onClick={() => setActiveFilter(type)}
-                    className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-[11px] whitespace-nowrap transition-all duration-150 ${
-                      isActive 
-                        ? 'bg-[#CC0E21] text-white font-bold' 
-                        : 'bg-slate-800/50 text-slate-400 hover:bg-slate-800'
-                    }`}
-                  >
-                    {type} ({count})
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Listado de Jugadas Filtradas */}
-            <div className="mt-4 flex gap-3 overflow-x-auto pb-2 scrollbar-hide snap-x">
-              {loadingPlays ? (
-                <div className="flex gap-3">
-                  <Skeleton className="h-16 w-48 rounded-xl shrink-0" />
-                  <Skeleton className="h-16 w-48 rounded-xl shrink-0" />
-                </div>
-              ) : filteredPlays.length === 0 ? (
-                <p className="text-xs text-slate-500 italic py-4">No hay jugadas registradas.</p>
-              ) : (
-                filteredPlays.map((play) => (
-                  <div
-                    key={play.id}
-                    onClick={() => setSelectedPlay(play)}
-                    className={`group shrink-0 w-64 flex flex-col p-3 rounded-xl border text-xs cursor-pointer transition-all snap-start ${
-                      selectedPlay?.id === play.id
-                        ? 'bg-[#CC0E21]/10 border-[#CC0E21]/50 text-slate-100 ring-1 ring-[#CC0E21]/30 shadow-lg shadow-[#CC0E21]/5'
-                        : 'bg-slate-950/60 border-slate-850 hover:bg-slate-850 hover:border-slate-800 text-slate-350'
-                    }`}
-                  >
-                    <div className="flex justify-between items-start mb-1">
-                      <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">{play.tipo}</span>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleDeletePlay(play.id); }}
-                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-500/20 text-slate-500 hover:text-red-400 rounded transition-all"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </button>
-                    </div>
-                    <div className="font-extrabold text-sm truncate">{play.titulo}</div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+              {plays.filter(p => p.tipo === selectedCategory).map(play => (
+                <div
+                  key={play.id}
+                  onClick={() => {
+                    setSelectedPlay(play);
+                    setViewMode('play-editor');
+                  }}
+                  className="group flex flex-col justify-between p-5 bg-slate-900/60 hover:bg-slate-850 border border-slate-800 hover:border-[#CC0E21]/50 rounded-2xl cursor-pointer transition-all h-32"
+                >
+                  <div className="flex justify-between items-start">
+                    <span className="font-extrabold text-slate-200 line-clamp-2 pr-4">{play.titulo}</span>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleDeletePlay(play.id); }}
+                      className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-500/20 text-slate-500 hover:text-red-400 rounded transition-all shrink-0"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
                   </div>
-                ))
+                  <div className="text-[10px] text-slate-500 flex items-center gap-1.5">
+                    <Film className="h-3 w-3" />
+                    {play.video_url ? 'Con vídeo' : 'Sin vídeo'}
+                  </div>
+                </div>
+              ))}
+              {plays.filter(p => p.tipo === selectedCategory).length === 0 && (
+                <div className="col-span-full py-16 text-center border border-dashed border-slate-800 rounded-2xl bg-slate-900/20">
+                  <FolderOpen className="h-12 w-12 text-slate-700 mx-auto mb-3" />
+                  <p className="text-slate-400 font-bold">Carpeta vacía</p>
+                  <p className="text-sm text-slate-500 mt-1">Añade jugadas a esta categoría para empezar.</p>
+                </div>
               )}
             </div>
           </div>
-        </div>
-
-        {/* ========================================================================= */}
-        {/* DETALLE DE JUGADA Y PIZARRA TÁCTICA */}
-        {/* ========================================================================= */}
-        <div className="w-full space-y-6">
-          {selectedPlay ? (
-            <div className="space-y-6">
-              {/* CABECERA DETALLE DE JUGADA */}
-              <div className="p-5 bg-slate-900/40 border border-slate-800/80 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] text-[#CC0E21] font-bold bg-[#CC0E21]/10 border border-[#CC0E21]/20 px-2 py-0.5 rounded-full uppercase tracking-wider">
+        ) : viewMode === 'play-editor' && selectedPlay ? (
+          <div className="space-y-4 animate-in fade-in zoom-in-95 duration-300">
+            {/* Toolbar superior */}
+            <div className="p-4 bg-slate-900/40 border border-slate-800/80 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 sticky top-0 z-20 backdrop-blur-md">
+              <div className="flex items-center gap-3">
+                <Button variant="ghost" onClick={() => setViewMode('category-detail')} className="p-2 hover:bg-slate-800">
+                  <ChevronDown className="h-5 w-5 transform rotate-90 text-slate-400" />
+                </Button>
+                <div>
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className="text-[9px] text-[#CC0E21] font-bold bg-[#CC0E21]/10 px-2 py-0.5 rounded-full uppercase tracking-wider">
                       {selectedPlay.tipo}
                     </span>
                   </div>
-                  <h2 className="text-xl font-extrabold text-slate-100">{selectedPlay.titulo}</h2>
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  {isEditMode && (
-                    <>
-                      <Button 
-                        variant="secondary"
-                        onClick={openEditModal}
-                        className="py-1.5 px-3 text-xs flex items-center gap-1.5 border border-slate-800"
-                      >
-                        <Edit2 className="h-3.5 w-3.5" />
-                        Editar Título/Info
-                      </Button>
-                      <Button 
-                        variant="secondary"
-                        onClick={handleDuplicatePlay}
-                        loading={isDuplicating}
-                        className="py-1.5 px-3 text-xs flex items-center gap-1.5 border border-slate-800"
-                      >
-                        <Copy className="h-3.5 w-3.5" />
-                        Duplicar
-                      </Button>
-                      <Button 
-                        variant="primary"
-                        onClick={handleSavePositions}
-                        loading={isSaving}
-                        className="py-1.5 px-4 text-xs flex items-center gap-1.5 bg-[#CC0E21] hover:bg-red-500 text-white font-bold"
-                      >
-                        <Save className="h-3.5 w-3.5" />
-                        Guardar Cambios
-                      </Button>
-                    </>
-                  )}
-                  <Button
-                    variant="secondary"
-                    onClick={handleExportPDF}
-                    loading={isPdfExporting}
-                    className="py-1.5 px-3 text-xs flex items-center gap-1.5 bg-slate-900/60 border border-slate-800 text-slate-200 hover:border-[#CC0E21]/50 font-bold"
-                  >
-                    <FileDown className="h-3.5 w-3.5 text-[#CC0E21]" />
-                    {isPdfExporting ? 'Generando...' : 'Exportar PDF'}
-                  </Button>
+                  <h2 className="text-lg font-extrabold text-slate-100 leading-tight">{selectedPlay.titulo}</h2>
                 </div>
               </div>
 
-              {/* PIZARRA TÁCTICA E INFORMACIÓN */}
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                {/* LA PIZARRA (CAMPOGRAMA INTERACTIVO) */}
-                <div className={`${showAdvanced ? 'lg:col-span-8' : 'lg:col-span-12'} flex flex-col items-center space-y-4`}>
-                  {/* Pizarra Táctica */}
-                  <div className="w-full bg-slate-900/20 border border-slate-800/60 rounded-3xl p-4 flex flex-col items-center">
+              <div className="flex flex-wrap items-center gap-2">
+                {isEditMode && (
+                  <>
+                    <Button variant="secondary" onClick={openEditModal} className="text-xs border-slate-800 py-1.5 px-3">
+                      <Edit2 className="h-3.5 w-3.5 mr-1.5" /> Editar Info
+                    </Button>
+                    <Button variant="secondary" onClick={handleDuplicatePlay} loading={isDuplicating} className="text-xs border-slate-800 py-1.5 px-3">
+                      <Copy className="h-3.5 w-3.5 mr-1.5" /> Duplicar
+                    </Button>
+                    <Button variant="primary" onClick={handleSavePositions} loading={isSaving} className="text-xs bg-[#CC0E21] hover:bg-red-500 text-white font-bold py-1.5 px-4 shadow-lg shadow-red-900/20">
+                      <Save className="h-3.5 w-3.5 mr-1.5" /> Guardar Pizarra
+                    </Button>
+                  </>
+                )}
+                <Button variant="secondary" onClick={handleExportPDF} loading={isPdfExporting} className="text-xs border-slate-800 text-slate-200 hover:border-[#CC0E21]/50 font-bold py-1.5 px-3">
+                  <FileDown className="h-3.5 w-3.5 text-[#CC0E21] mr-1.5" /> PDF
+                </Button>
+              </div>
+            </div>
+
+            {/* Area de Trabajo del Editor */}
+            <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+              {/* CAMPOGRAMA INTERACTIVO (Hero size) */}
+              <div className="xl:col-span-9 flex flex-col space-y-4">
+<div className="w-full bg-slate-900/20 border border-slate-800/60 rounded-3xl p-4 flex flex-col items-center">
                     <div className="w-full flex justify-between items-center mb-3">
                       <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
                         Posicionamiento Táctico
@@ -1887,12 +1865,60 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
                       )}
                     </div>
                   </div>
+
+                
+                {/* Instrucciones & Vídeo debajo de la pizarra */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Instrucciones */}
+                  <div className="p-4 bg-slate-900/40 border border-slate-800/80 rounded-2xl flex flex-col h-[220px]">
+                    <h4 className="text-[11px] font-bold text-slate-400 flex items-center gap-1.5 uppercase tracking-wider mb-2 shrink-0">
+                      <BookOpen className="h-3.5 w-3.5 text-[#CC0E21]" /> Instrucciones tácticas
+                    </h4>
+                    <div className="bg-slate-950/40 border border-slate-850 p-3 rounded-xl flex-1 overflow-y-auto custom-scrollbar">
+                      {selectedPlay.descripcion ? (
+                        <p className="text-xs text-slate-300 whitespace-pre-line leading-relaxed">
+                          {selectedPlay.descripcion}
+                        </p>
+                      ) : (
+                        <div className="flex items-center justify-center h-full text-xs text-slate-600 italic">Sin instrucciones.</div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Vídeo */}
+                  <div className="p-4 bg-slate-900/40 border border-slate-800/80 rounded-2xl flex flex-col h-[220px]">
+                    <h4 className="text-[11px] font-bold text-slate-400 flex items-center gap-1.5 uppercase tracking-wider mb-2 shrink-0">
+                      <Film className="h-3.5 w-3.5 text-blue-500" /> Vídeo táctico
+                    </h4>
+                    {selectedPlay.video_url ? (
+                      <div className="relative flex-1 rounded-xl overflow-hidden border border-slate-800 bg-black">
+                        {getEmbedVideoUrl(selectedPlay.video_url) ? (
+                          <iframe
+                            src={getEmbedVideoUrl(selectedPlay.video_url) || ''}
+                            className="absolute inset-0 w-full h-full border-0"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowFullScreen
+                          />
+                        ) : (
+                          <video
+                            src={selectedPlay.video_url}
+                            controls
+                            className="absolute inset-0 w-full h-full object-contain"
+                          />
+                        )}
+                      </div>
+                    ) : (
+                      <div className="border border-slate-850 bg-slate-950/20 rounded-xl text-center text-xs text-slate-600 italic flex items-center justify-center flex-1">
+                        Sin vídeo asociado.
+                      </div>
+                    )}
+                  </div>
                 </div>
+              </div>
 
-
-                {/* PANEL: ROLES Y PUESTOS DE LA JUGADA - 4 cols */}
-                {showAdvanced && (
-                  <div className="lg:col-span-4 p-4 bg-slate-900/40 border border-slate-800/80 rounded-2xl flex flex-col">
+              {/* BARRA LATERAL (Roles y Opciones) */}
+              <div className="xl:col-span-3">
+<div className="p-4 bg-slate-900/40 border border-slate-800/80 rounded-2xl flex flex-col h-full">
                     <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
                       <Layers className="h-3.5 w-3.5 text-[#CC0E21]" /> Puestos de la jugada ({playRoles.length})
                     </h3>
@@ -1994,78 +2020,25 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
                       </div>
                     )}
                   </div>
-                )}
-              </div>
-
-              {/* Instrucciones & Vídeo - Colocados abajo a ancho completo */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-                {/* Instrucciones */}
-                <div className="p-5 bg-slate-900/40 border border-slate-800/80 rounded-2xl space-y-2">
-                  <h4 className="text-xs font-bold text-slate-400 flex items-center gap-1.5 uppercase tracking-wider">
-                    <BookOpen className="h-3.5 w-3.5 text-[#CC0E21]" /> Instrucciones tácticas
-                  </h4>
-                  <div className="bg-slate-950/40 border border-slate-850 p-4 rounded-xl min-h-[140px] max-h-[220px] overflow-y-auto">
-                    {selectedPlay.descripcion ? (
-                      <p className="text-xs text-slate-350 whitespace-pre-line leading-relaxed">
-                        {selectedPlay.descripcion}
-                      </p>
-                    ) : (
-                      <p className="text-xs text-slate-650 italic">No se han registrado órdenes o instrucciones.</p>
-                    )}
-                  </div>
                 </div>
 
-                {/* Vídeo */}
-                <div className="p-5 bg-slate-900/40 border border-slate-800/80 rounded-2xl space-y-2">
-                  <h4 className="text-xs font-bold text-slate-400 flex items-center gap-1.5 uppercase tracking-wider">
-                    <Film className="h-3.5 w-3.5 text-blue-500" /> Vídeo táctico asociado
-                  </h4>
-                  {selectedPlay.video_url ? (
-                    <div className="relative aspect-video rounded-xl overflow-hidden border border-slate-800 bg-black">
-                      {getEmbedVideoUrl(selectedPlay.video_url) ? (
-                        <iframe
-                          src={getEmbedVideoUrl(selectedPlay.video_url) || ''}
-                          className="w-full h-full border-0"
-                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                          allowFullScreen
-                        />
-                      ) : (
-                        <video
-                          src={selectedPlay.video_url}
-                          controls
-                          className="w-full h-full object-contain"
-                        />
-                      )}
-                    </div>
-                  ) : (
-                    <div className="border border-slate-850 bg-slate-950/20 p-8 rounded-xl text-center text-xs text-slate-500 italic flex flex-col justify-center items-center h-[140px]">
-                      No hay un vídeo asociado. Usa &quot;Editar&quot; para añadir una URL de YouTube o subir un vídeo explicativo.
-                    </div>
-                  )}
-              </div>
+              
             </div>
           </div>
-        ) : (
-            <div className="p-16 text-center border border-dashed border-slate-800 bg-slate-900/10 rounded-2xl flex flex-col items-center justify-center space-y-4">
-              <BookOpen className="h-12 w-12 text-slate-600" />
-              <div className="space-y-1">
-                <p className="text-base text-slate-300 font-bold">Sin jugadas de estrategia</p>
-                <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                  Crea tu primera jugada táctica a balón parado (ABP) para empezar a planificar movimientos, asignar roles y analizar jugadas con la plantilla.
-                </p>
-              </div>
-              <Button 
-                variant="primary" 
-                onClick={() => setIsPlayModalOpen(true)}
-                className="mt-2 bg-[#CC0E21] hover:bg-red-500 text-white font-bold"
-              >
-                Crear Primera Jugada
-              </Button>
-            </div>
-          )}
+        ) : null}
+      
+      {/* Hidden container for high-res PDF Export */}
+      {selectedPlay && (
+        <div className="fixed top-0 left-0 -z-50 opacity-0 pointer-events-none">
+          <div id="abp-field-export-container">
+            <ABPFieldExport
+              playRoles={playRoles}
+              playType={selectedPlay.tipo}
+              playZona={selectedPlay.zona}
+            />
+          </div>
         </div>
-      </div>
-
+      )}
       {/* ========================================================================= */}
       {/* MODAL: NUEVA JUGADA ABP */}
       {/* ========================================================================= */}
@@ -2223,8 +2196,6 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
             />
           </div>
         </div>
-      )}
-      </>
       )}
       </div>
     </div>
