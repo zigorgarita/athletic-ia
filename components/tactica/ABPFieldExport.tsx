@@ -205,7 +205,7 @@ export function ABPFieldExport({ playRoles, playType, playZona }: ABPFieldExport
             <div
               style={{
                 position: 'absolute',
-                top: '-20px',
+                top: '-32px',
                 backgroundColor: '#0f172a',
                 border: '2px solid rgba(204, 14, 33, 0.9)',
                 borderRadius: '8px',
@@ -216,6 +216,7 @@ export function ABPFieldExport({ playRoles, playType, playZona }: ABPFieldExport
                 whiteSpace: 'nowrap',
                 boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
                 lineHeight: '1.2',
+                zIndex: 20,
               }}
             >
               {label}
