@@ -345,6 +345,19 @@ export async function exportABPPlanToPDF(config: ABPPlanExportConfig): Promise<v
     return;
   }
 
+  // Guardar posición de scroll original de forma segura (para soportar SSR y navegadores antiguos)
+  const originalScrollY = typeof window !== 'undefined' ? (window.scrollY || window.pageYOffset || 0) : 0;
+  const originalScrollX = typeof window !== 'undefined' ? (window.scrollX || window.pageXOffset || 0) : 0;
+
+  // Desactivar temporalmente scroll suave en html y body para evitar que html2canvas falle por elementos en movimiento
+  const htmlEl = typeof document !== 'undefined' ? document.documentElement : null;
+  const bodyEl = typeof document !== 'undefined' ? document.body : null;
+  const originalHtmlScroll = htmlEl ? htmlEl.style.scrollBehavior : '';
+  const originalBodyScroll = bodyEl ? bodyEl.style.scrollBehavior : '';
+
+  if (htmlEl) htmlEl.style.scrollBehavior = 'auto';
+  if (bodyEl) bodyEl.style.scrollBehavior = 'auto';
+
   try {
     for (let i = 0; i < config.plays.length; i++) {
       const play = config.plays[i];
@@ -357,7 +370,21 @@ export async function exportABPPlanToPDF(config: ABPPlanExportConfig): Promise<v
         continue;
       }
 
-      // --- Hidden Clone Strategy (Evita scroll y errores de iframe clonado) ---
+      // 1. Forzar al navegador a pintar el elemento desplazándolo temporalmente al viewport
+      try {
+        fieldEl.scrollIntoView({ block: 'center', behavior: 'auto' });
+      } catch {
+        try {
+          fieldEl.scrollIntoView();
+        } catch {
+          console.warn('scrollIntoView no soportado');
+        }
+      }
+      
+      // Esperar brevemente a que el navegador complete la renderización y pintura del elemento en pantalla
+      await new Promise(resolve => setTimeout(resolve, 150));
+
+      // 2. Clonar el elemento ahora que está pintado y visible
       const clone = fieldEl.cloneNode(true) as HTMLElement;
       const rect = fieldEl.getBoundingClientRect();
       clone.style.position = 'fixed';
@@ -495,5 +522,13 @@ export async function exportABPPlanToPDF(config: ABPPlanExportConfig): Promise<v
   } catch (err) {
     console.error('Error al generar PDF de ABP:', err);
     throw err;
+  } finally {
+    // Restablecer posición de scroll original de forma segura
+    if (typeof window !== 'undefined') {
+      window.scrollTo(originalScrollX, originalScrollY);
+    }
+    // Restablecer comportamiento de scroll original
+    if (htmlEl) htmlEl.style.scrollBehavior = originalHtmlScroll;
+    if (bodyEl) bodyEl.style.scrollBehavior = originalBodyScroll;
   }
 }
