@@ -72,9 +72,7 @@ export function TacticalField({
             return {
               ...n,
               x: Math.max(4, Math.min(96, initialX + deltaX)),
-              y: team === 'rival' 
-                ? Math.max(4, Math.min(96, initialY - deltaY)) // Inverted Y-drag for rival
-                : Math.max(4, Math.min(96, initialY + deltaY)),
+              y: Math.max(4, Math.min(96, initialY - deltaY)), // Inverted Y-drag for both (GK at top, attacking downwards)
             };
           }
           return n;
@@ -228,8 +226,8 @@ export function TacticalField({
             ? assignedPlayer.dorsal
             : (node.customNumber || '');
 
-          // Calculate Y visual position (inverted for rival)
-          const visualY = team === 'rival' ? (100 - node.y) : node.y;
+          // Calculate Y visual position (both teams now oriented like the rival team: GK at top, attacking downwards)
+          const visualY = 100 - node.y;
 
           return (
             <div
