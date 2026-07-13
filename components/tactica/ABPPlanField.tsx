@@ -53,6 +53,7 @@ const getFieldView = (type: ABPType, zona?: string | null): 'full' | 'attack' | 
 };
 
 export function ABPPlanField({
+  planId,
   tipo,
   zona,
   roles,
@@ -143,7 +144,7 @@ export function ABPPlanField({
   return (
     <div className="relative w-full flex flex-col xl:flex-row gap-4">
       {/* Campo de fútbol */}
-      <div className="relative flex-1 aspect-[4/3] bg-emerald-950/80 rounded-2xl border-2 border-emerald-500/25 overflow-hidden select-none">
+      <div id={`abp-plan-field-${planId}`} className="relative flex-1 aspect-[4/3] bg-emerald-950/80 rounded-2xl border-2 border-emerald-500/25 overflow-hidden select-none">
         {/* Renderizado del campo según la vista */}
         {(() => {
           if (view === 'full') {
@@ -253,26 +254,30 @@ export function ABPPlanField({
             <div
               key={role.id}
               className={`absolute flex flex-col items-center justify-center -translate-x-1/2 -translate-y-1/2 cursor-pointer transition-all ${
-                isSelected 
-                  ? 'scale-110 z-30 ring-2 ring-red-500 ring-offset-2 ring-offset-emerald-950 rounded-full' 
-                  : 'z-10 hover:scale-105'
+                isSelected ? 'scale-110 z-30' : 'z-10 hover:scale-105'
               }`}
               style={{ left: `${px}%`, top: `${py}%` }}
               onClick={() => handleNodeClick(role.id)}
             >
               {assigned ? (
                 <div 
-                  className={`w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-xs shadow-lg border-2 transition-colors ${
+                  className={`px-2.5 py-1.5 rounded-full flex items-center justify-center text-white font-black text-[9px] shadow-lg border-2 transition-all whitespace-nowrap min-w-[36px] ${
                     isTitular 
                       ? 'bg-green-600 border-green-400 hover:bg-green-500' 
                       : 'bg-blue-600 border-blue-400 hover:bg-blue-500'
+                  } ${
+                    isSelected ? 'ring-2 ring-red-500 ring-offset-2 ring-offset-emerald-950 scale-105' : ''
                   }`}
                   title={assigned.nombre}
                 >
-                  {assigned.dorsal || assigned.nombre.charAt(0)}
+                  {assigned.dorsal ? `${assigned.dorsal} · ` : ''}{assigned.nombre.split(' ')[0]}
                 </div>
               ) : (
-                <div className="w-9 h-9 rounded-full bg-slate-900/90 border-2 border-slate-600/80 border-dashed flex items-center justify-center shadow-lg hover:border-white transition-colors">
+                <div 
+                  className={`w-9 h-9 rounded-full bg-slate-900/90 border-2 border-slate-600/80 border-dashed flex items-center justify-center shadow-lg hover:border-white transition-all ${
+                    isSelected ? 'ring-2 ring-red-500 ring-offset-2 ring-offset-emerald-950 scale-105' : ''
+                  }`}
+                >
                   <UserCheck className="w-4 h-4 text-slate-400" />
                 </div>
               )}

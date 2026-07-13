@@ -557,7 +557,7 @@ export function ABPPlanPartido({ players, matches, onExit }: ABPPlanPartidoProps
                      </div>
                   </div>
                   
-                  <div className="mt-4" id={`abp-plan-field-${plan.id}`}>
+                  <div className="mt-4">
                      <ABPPlanField 
                        planId={plan.id}
                        tipo={play?.tipo || ''}
