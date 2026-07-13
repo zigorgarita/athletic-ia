@@ -9,6 +9,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { Calendar, Trash2, ArrowUp, ArrowDown, Check, UserCheck, Copy, X, FolderOpen, AlertCircle, Plus } from 'lucide-react';
 
 import { ABPPlanField } from './ABPPlanField';
+import { ABPFieldExport } from './ABPFieldExport';
 import { exportABPPlanToPDF } from '@/lib/exportPdf';
 
 const ABP_TYPES = [
@@ -409,7 +410,7 @@ export function ABPPlanPartido({ players, matches, onExit }: ABPPlanPartidoProps
       const plays = matchAbpPlans.map(plan => {
         const p = plan.abp_play;
         return {
-          fieldElementId: `abp-plan-field-${plan.id}`,
+          fieldElementId: `abp-plan-field-export-${plan.id}`,
           playName: p?.titulo || 'Sin título',
           tipoABP: p?.tipo || 'Desconocido',
           instrucciones: plan.observaciones || ''
@@ -664,6 +665,31 @@ export function ABPPlanPartido({ players, matches, onExit }: ABPPlanPartidoProps
           )}
         </div>
       )}
+      {/* Contenedor oculto para exportación de PDF de alta resolución */}
+      <div className="fixed top-0 left-0 -z-50 opacity-0 pointer-events-none">
+        {matchAbpPlans.map((plan) => {
+          const playRoles = matchAbpRoles
+            .filter(r => r.match_abp_plan_id === plan.id)
+            .map(r => {
+               // eslint-disable-next-line @typescript-eslint/no-explicit-any
+               const originalRole = r.role || ({} as any);
+               return {
+                 ...originalRole,
+                 player: players.find(p => p.id === r.player_id)
+               };
+            });
+
+          return (
+            <div key={`export-plan-${plan.id}`} id={`abp-plan-field-export-${plan.id}`}>
+              <ABPFieldExport
+                playRoles={playRoles}
+                playType={plan.abp_play?.tipo || 'Córner ofensivo'}
+                playZona={plan.abp_play?.zona}
+              />
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
