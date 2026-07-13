@@ -288,6 +288,40 @@ export interface ABPPlayerRole {
   created_at: string;
 }
 
+export interface MatchABPPlan {
+  id: string;
+  match_id: string;
+  abp_play_id: string;
+  orden: number;
+  observaciones: string | null;
+  video_asociado?: string | null;
+  imagenes?: any | null;
+  exito_porcentaje?: number | null;
+  rival?: string | null;
+  categoria?: string | null;
+  etiquetas?: any | null;
+  observaciones_cuerpo_tecnico?: string | null;
+  recomendaciones_ia?: string | null;
+  created_at: string;
+  
+  // Virtual properties for joins
+  abp_play?: ABPPlay;
+  assignments?: MatchABPPlayerAssignment[];
+}
+
+export interface MatchABPPlayerAssignment {
+  id: string;
+  match_abp_plan_id: string;
+  abp_player_role_id: string;
+  player_id: string | null;
+  notas_especificas: string | null;
+  created_at: string;
+  
+  // Virtual properties for joins
+  role?: ABPPlayerRole;
+  player?: Player;
+}
+
 export interface TacticalLineup {
   id: string;
   nombre_sistema: string;

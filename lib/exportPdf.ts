@@ -310,13 +310,165 @@ export function buildTacticaFilename(opts: {
   return parts.join('_') + '.pdf';
 }
 
-/**
- * Builds a filename for an ABP PDF.
- * E.g.: ABP_Corner_Ofensivo_Mano_Cabeza.pdf
- */
 export function buildABPFilename(opts: {
   tipoABP: string;
   playName: string;
 }): string {
   return 'ABP_' + sanitize(opts.tipoABP) + '_' + sanitize(opts.playName) + '.pdf';
+}
+
+// ─── Multi-page ABP Plan Export ───────────────────────────────────────────────
+
+export interface ABPPlanExportConfig {
+  filename: string;
+  matchInfo: {
+    jornada: number | string;
+    rival: string;
+    fecha: string;
+    competicion: string;
+    equipo: string;
+  };
+  plays: Array<{
+    fieldElementId: string;
+    playName: string;
+    tipoABP: string;
+    instrucciones: string;
+  }>;
+}
+
+export async function exportABPPlanToPDF(config: ABPPlanExportConfig): Promise<void> {
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  doc.setFont('helvetica');
+
+  if (config.plays.length === 0) {
+    console.warn('No hay jugadas para exportar');
+    return;
+  }
+
+  for (let i = 0; i < config.plays.length; i++) {
+    const play = config.plays[i];
+    
+    if (i > 0) doc.addPage();
+
+    const fieldEl = document.getElementById(play.fieldElementId);
+    if (!fieldEl) {
+      console.warn(`Elemento no encontrado: ${play.fieldElementId}`);
+      continue;
+    }
+
+    const noExportEls = fieldEl.querySelectorAll<HTMLElement>('.no-export');
+    noExportEls.forEach(el => { el.style.visibility = 'hidden'; });
+
+    let canvas: HTMLCanvasElement;
+    try {
+      canvas = await html2canvas(fieldEl, {
+        scale: 3,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#3b8c5a',
+        logging: false,
+      });
+    } finally {
+      noExportEls.forEach(el => { el.style.visibility = ''; });
+    }
+
+    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+
+    // Fondo
+    doc.setFillColor(DARK);
+    doc.rect(0, 0, PAGE_W, PAGE_H, 'F');
+
+    // --- CABECERA ---
+    const headerH = 20;
+    const infoPanelW = Math.min(100, PAGE_W * 0.35); // 35% del ancho para info
+    const fieldW = PAGE_W - infoPanelW - MARGIN * 3;
+    const maxFieldW = 200;
+    const finalFieldW = Math.min(fieldW, maxFieldW);
+    const scale = finalFieldW / canvas.width;
+    const finalFieldH = canvas.height * scale;
+
+    const topY = MARGIN + headerH + 5;
+    
+    // Título Principal (Match Info)
+    doc.setTextColor(WHITE);
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    let title = config.matchInfo.jornada === 'draft' 
+       ? 'PLAN ABP - BORRADOR' 
+       : `PLAN ABP - JORNADA ${config.matchInfo.jornada} VS ${config.matchInfo.rival.toUpperCase()}`;
+    doc.text(title, MARGIN, MARGIN + 6);
+
+    // Subtítulo Match
+    doc.setFontSize(9);
+    doc.setTextColor(GRAY);
+    doc.setFont('helvetica', 'normal');
+    let subTitle = `${config.matchInfo.equipo}`;
+    if (config.matchInfo.jornada !== 'draft') {
+        subTitle += ` | ${config.matchInfo.competicion} | ${config.matchInfo.fecha}`;
+    }
+    doc.text(subTitle, MARGIN, MARGIN + 12);
+
+    // Page indicator
+    doc.setFontSize(9);
+    doc.setTextColor(RED);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`Jugada ${i + 1} de ${config.plays.length}`, PAGE_W - MARGIN, MARGIN + 6, { align: 'right' });
+
+    drawDivider(doc, MARGIN + headerH);
+
+    // --- CAMPO ---
+    const fieldX = PAGE_W - MARGIN - finalFieldW;
+    doc.setDrawColor(LIGHT_GRAY);
+    doc.setLineWidth(0.5);
+    doc.rect(fieldX, topY, finalFieldW, finalFieldH);
+    doc.addImage(imgData, 'JPEG', fieldX, topY, finalFieldW, finalFieldH);
+
+    // --- PANEL IZQUIERDO (Info de la jugada) ---
+    let textY = topY + 4;
+    
+    // Título de la jugada
+    doc.setTextColor(RED);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text('TIPO DE ABP', MARGIN, textY);
+    textY += 6;
+    doc.setTextColor(WHITE);
+    doc.setFontSize(12);
+    doc.text(play.tipoABP.toUpperCase(), MARGIN, textY);
+
+    textY += 12;
+    doc.setTextColor(RED);
+    doc.setFontSize(10);
+    doc.text('NOMBRE DE JUGADA', MARGIN, textY);
+    textY += 6;
+    doc.setTextColor(WHITE);
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    const wrapPlayName = wrapText(doc, play.playName || 'Sin título', infoPanelW, 11);
+    doc.text(wrapPlayName, MARGIN, textY);
+    textY += wrapPlayName.length * 5 + 8;
+
+    // Instrucciones
+    doc.setTextColor(RED);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text('INSTRUCCIONES', MARGIN, textY);
+    textY += 6;
+    
+    doc.setTextColor(GRAY);
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    const obs = play.instrucciones || 'Sin instrucciones adicionales.';
+    const wrapObs = wrapText(doc, obs, infoPanelW, 9);
+    doc.text(wrapObs, MARGIN, textY);
+    
+    // --- PIE DE PÁGINA ---
+    doc.setFontSize(6);
+    doc.setTextColor(GRAY);
+    const dateStr = new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    doc.text(`Generado: ${dateStr}`, MARGIN, PAGE_H - 4);
+    doc.text('Athletic Club Indautxu · Temporada 26/27', PAGE_W - MARGIN, PAGE_H - 4, { align: 'right' });
+  }
+
+  doc.save(config.filename);
 }

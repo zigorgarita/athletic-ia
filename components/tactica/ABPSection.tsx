@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Player, ABPPlay, ABPPlayerRole, ABPType } from '@/types';
+import { Player, ABPPlay, ABPPlayerRole, ABPType, Match, MatchABPPlan, MatchABPPlayerAssignment } from '@/types';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
@@ -12,7 +12,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { 
   Film, Plus, AlertCircle, Trash2, BookOpen, Layers, X, 
   Save, RefreshCw, Copy, Edit2, Search, UserCheck, 
-  PlusCircle, Check, ChevronDown, FolderOpen, FileDown
+  PlusCircle, Check, ChevronDown, FolderOpen, FileDown, Calendar
 } from 'lucide-react';
 import { useEditMode } from '@/context/EditModeContext';
 import { exportToPDF, buildABPFilename } from '@/lib/exportPdf';
@@ -20,6 +20,7 @@ import { ABPFieldExport } from './ABPFieldExport';
 
 interface ABPSectionProps {
   players: Player[];
+  matches?: Match[];
 }
 
 const ABP_TYPES: ABPType[] = [
@@ -591,7 +592,7 @@ const getFieldView = (type: ABPType, zona?: string | null): 'full' | 'attack' | 
   return 'attack';
 };
 
-export function ABPSection({ players }: ABPSectionProps) {
+export function ABPSection({ players, matches }: ABPSectionProps) {
   const { isEditMode } = useEditMode();
   const getEstadoColor = (estado: string) => {
     switch (estado) {
@@ -606,6 +607,14 @@ export function ABPSection({ players }: ABPSectionProps) {
   const [plays, setPlays] = useState<ABPPlay[]>([]);
   const [selectedPlay, setSelectedPlay] = useState<ABPPlay | null>(null);
   const [playRoles, setPlayRoles] = useState<(ABPPlayerRole & { player?: Player })[]>([]);
+  
+  // Modo Plan de Partido
+  const [viewMode, setViewMode] = useState<'biblioteca' | 'partido'>('biblioteca');
+  const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
+  const [matchAbpPlans, setMatchAbpPlans] = useState<MatchABPPlan[]>([]);
+  const [matchAbpRoles, setMatchAbpRoles] = useState<MatchABPPlayerAssignment[]>([]);
+  const [matchLineupPlayerIds, setMatchLineupPlayerIds] = useState<string[]>([]);
+  const [loadingMatchPlan, setLoadingMatchPlan] = useState(false);
   
   // Modals & loading states
   const [loadingPlays, setLoadingPlays] = useState(true);
@@ -669,6 +678,70 @@ export function ABPSection({ players }: ABPSectionProps) {
       setLoadingPlays(false);
     }
   }, [selectedPlay]);
+
+  const loadMatchPlans = useCallback(async () => {
+    if (!selectedMatchId) {
+      setMatchAbpPlans([]);
+      setMatchAbpRoles([]);
+      return;
+    }
+    
+    setLoadingMatchPlan(true);
+    try {
+      const { data: plansData, error: plansError } = await supabase
+        .from('match_abp_plans')
+        .select(`*, abp_play:abp_plays(*)`)
+        .eq('match_id', selectedMatchId)
+        .order('orden', { ascending: true });
+        
+      if (plansError) throw plansError;
+      setMatchAbpPlans(plansData || []);
+      
+      const { data: rolesData, error: rolesError } = await supabase
+        .from('match_abp_player_assignments')
+        .select(`*, role:abp_player_roles(*)`)
+        .in('match_abp_plan_id', (plansData || []).map(p => p.id));
+        
+      if (rolesError) throw rolesError;
+      setMatchAbpRoles(rolesData || []);
+      
+      // Obtener la alineación de la pizarra táctica para este partido
+      const { data: lineupData } = await supabase
+        .from('tactical_lineups')
+        .select('posiciones')
+        .eq('match_id', selectedMatchId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+        
+      if (lineupData && lineupData.posiciones) {
+        let pIds: string[] = [];
+        const pos = lineupData.posiciones;
+        
+        if (Array.isArray(pos)) {
+          pIds = pos.filter((p: any) => p.player_id).map((p: any) => p.player_id);
+        } else if (pos.propio && Array.isArray(pos.propio)) {
+          pIds = pos.propio.filter((p: any) => p.player_id).map((p: any) => p.player_id);
+        }
+        
+        setMatchLineupPlayerIds(pIds);
+      } else {
+        setMatchLineupPlayerIds([]);
+      }
+      
+    } catch (err) {
+      console.error('Error loading match plans:', err);
+      setErrorMsg('Error al cargar el plan de partido.');
+    } finally {
+      setLoadingMatchPlan(false);
+    }
+  }, [selectedMatchId]);
+
+  useEffect(() => {
+    if (viewMode === 'partido' && selectedMatchId) {
+      loadMatchPlans();
+    }
+  }, [viewMode, selectedMatchId, loadMatchPlans]);
 
   // Load roles & positions for the selected play
   const loadPlayRoles = useCallback(async (playId: string) => {
@@ -1580,6 +1653,15 @@ export function ABPSection({ players }: ABPSectionProps) {
       )}
 
       <div className="flex flex-col gap-6">
+        
+        {viewMode === 'partido' ? (
+          <ABPPlanPartido 
+            players={players} 
+            matches={matches || []} 
+            onExit={() => setViewMode('biblioteca')} 
+          />
+        ) : (
+          <>
         {/* ========================================================================= */}
         {/* PANEL SUPERIOR: SELECTOR DE JUGADAS ABP */}
         {/* ========================================================================= */}
@@ -1595,7 +1677,10 @@ export function ABPSection({ players }: ABPSectionProps) {
                   Organiza tus jugadas de estrategia tácticas (ABP). Cada una contiene su estructura de fichas, notas y vídeo táctico.
                 </p>
               </div>
-              
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setViewMode('partido')}>
+                  <Calendar className="h-4 w-4 mr-2" /> Plan de Partido
+                </Button>
               {isEditMode && (
                 <Button 
                   variant="primary" 
@@ -2560,6 +2645,8 @@ export function ABPSection({ players }: ABPSectionProps) {
             />
           </div>
         </div>
+      )}
+      </>
       )}
     </div>
   );

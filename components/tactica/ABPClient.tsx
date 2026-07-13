@@ -2,14 +2,16 @@
 
 import React from 'react';
 import { usePlayers } from '@/hooks/usePlayers';
+import { useMatches } from '@/hooks/useMatches';
 import { ABPSection } from './ABPSection';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Shield } from 'lucide-react';
 
 export function ABPClient() {
   const { players, loading: loadingPlayers } = usePlayers();
+  const { matches, loading: loadingMatches } = useMatches('LIGA'); // Obtenemos las jornadas para el Plan ABP
 
-  if (loadingPlayers) {
+  if (loadingPlayers || loadingMatches) {
     return (
       <div className="space-y-6">
         <Skeleton className="h-12 w-full" />
@@ -31,7 +33,7 @@ export function ABPClient() {
         </p>
       </div>
 
-      <ABPSection players={players} />
+      <ABPSection players={players} matches={matches} />
     </div>
   );
 }
