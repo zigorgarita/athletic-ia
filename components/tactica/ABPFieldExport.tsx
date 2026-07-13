@@ -172,35 +172,77 @@ export function ABPFieldExport({ playRoles, playType, playZona }: ABPFieldExport
               left: `${px}%`,
               top: `${py}%`,
               transform: 'translate(-50%, -50%)',
+              position: 'absolute',
+              zIndex: 10,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
             }}
-            className="absolute z-10 flex flex-col items-center"
           >
             {/* Player Token */}
             <div
-              className={`relative h-20 w-20 rounded-full border-[3px] flex items-center justify-center shadow-2xl ${
-                player
-                  ? 'border-[#CC0E21] bg-slate-950'
-                  : 'border-slate-800 bg-slate-900/90'
-              }`}
+              style={{
+                position: 'relative',
+                height: '80px',
+                width: '80px',
+                borderRadius: '50%',
+                border: player ? '3px solid #CC0E21' : '3px solid #475569',
+                backgroundColor: player ? '#0f172a' : 'rgba(30, 41, 59, 0.9)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+              }}
             >
               {player ? (
                 <Avatar src={player.foto_url} name={player.nombre} size="xl" className="w-full h-full" />
               ) : (
-                <span className="text-lg font-black text-slate-400">{label}</span>
+                <span style={{ fontSize: '20px', fontWeight: 900, color: '#94a3b8' }}>{label}</span>
               )}
             </div>
 
-            {/* Role Badge */}
-            <div className="absolute -top-4.5 bg-slate-950 border border-[#CC0E21]/50 px-2.5 py-0.5 rounded text-[13px] font-black text-[#CC0E21] whitespace-nowrap">
+            {/* Role Badge (positioned absolutely on top of circle) */}
+            <div
+              style={{
+                position: 'absolute',
+                top: '-15px',
+                backgroundColor: '#0f172a',
+                border: '1px solid rgba(204, 14, 33, 0.6)',
+                borderRadius: '6px',
+                padding: '3px 10px',
+                fontSize: '13px',
+                fontWeight: 900,
+                color: '#CC0E21',
+                whiteSpace: 'nowrap',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
+                lineHeight: '1.2',
+              }}
+            >
               {label}
             </div>
 
             {/* Name / Info Overlay */}
             {player && (
-              <div className="mt-2 bg-slate-950/95 border border-slate-900 px-3 py-1 rounded-lg text-sm font-bold text-slate-200 shadow-md">
-                <span className="truncate max-w-[140px] block text-center">
-                  {player.nombre.split(' ')[0]}
-                </span>
+              <div
+                style={{
+                  marginTop: '8px',
+                  backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                  border: '2px solid #334155',
+                  borderRadius: '10px',
+                  padding: '6px 16px',
+                  fontSize: '15px',
+                  fontWeight: 750,
+                  color: '#f1f5f9',
+                  whiteSpace: 'nowrap',
+                  maxWidth: '150px',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  textAlign: 'center',
+                  lineHeight: '1.3',
+                  boxShadow: '0 3px 8px rgba(0,0,0,0.4)',
+                }}
+              >
+                {player.nombre.split(' ')[0]}
               </div>
             )}
           </div>
