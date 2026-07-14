@@ -25,8 +25,25 @@ const ABP_TYPES = [
   'Saque de medio defensivo',
   'Penalti ofensivo',
   'Penalti defensivo',
-  'Otros'
 ];
+
+const parsePlayDescripcion = (rawDesc: string | null | undefined): { sistema_tactico: string; descripcion_texto: string } => {
+  if (!rawDesc) return { sistema_tactico: '1-4-3-3', descripcion_texto: '' };
+  try {
+    const trimmed = rawDesc.trim();
+    if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+      const parsed = JSON.parse(trimmed);
+      return {
+        sistema_tactico: parsed.sistema_tactico || '1-4-3-3',
+        descripcion_texto: parsed.descripcion_texto || ''
+      };
+    }
+  } catch {
+    // ignorar
+  }
+  return { sistema_tactico: '1-4-3-3', descripcion_texto: rawDesc };
+};
+
 
 interface ABPPlanPartidoProps {
   players: Player[];
@@ -391,6 +408,7 @@ export function ABPPlanPartido({ players, matches, onExit }: ABPPlanPartidoProps
   };
 
   const handleExportPDF = async () => {
+    console.log(`[ABPPlanPartido] Iniciando Exportación PDF. match_id: "${selectedMatchId || 'null/draft'}", número de jugadas: ${matchAbpPlans.length}, isDraft: ${isDraft}`);
     if (matchAbpPlans.length === 0) {
       setErrorMsg('No hay jugadas en el plan para exportar.');
       return;
@@ -409,16 +427,37 @@ export function ABPPlanPartido({ players, matches, onExit }: ABPPlanPartidoProps
     try {
       const plays = matchAbpPlans.map(plan => {
         const p = plan.abp_play;
+        const { descripcion_texto } = parsePlayDescripcion(p?.descripcion);
+        
+        let fullInstrucciones = '';
+        if (descripcion_texto && descripcion_texto.trim()) {
+          fullInstrucciones += descripcion_texto.trim();
+        }
+        if (plan.observaciones && plan.observaciones.trim()) {
+          if (fullInstrucciones) {
+            fullInstrucciones += '\n\nAjustes partido:\n' + plan.observaciones.trim();
+          } else {
+            fullInstrucciones += plan.observaciones.trim();
+          }
+        }
+        if (!fullInstrucciones) {
+          fullInstrucciones = 'Sin instrucciones adicionales.';
+        }
+
+        console.log(`[ABPPlanPartido] Procesando jugada para PDF - Nombre: "${p?.titulo || 'Sin título'}", Tipo: "${p?.tipo || 'Desconocido'}", descripcion (original): "${p?.descripcion || 'null'}", descripcion_texto (extraída): "${descripcion_texto}", plan.observaciones: "${plan.observaciones || 'null'}", instrucciones finales enviadas: "${fullInstrucciones}"`);
+
         return {
           fieldElementId: `abp-plan-field-export-${plan.id}`,
           playName: p?.titulo || 'Sin título',
           tipoABP: p?.tipo || 'Desconocido',
-          instrucciones: plan.observaciones || ''
+          instrucciones: fullInstrucciones
         };
       });
       
       const fileName = isDraft ? 'Borrador_Plan_ABP.pdf' : `J${selectedMatch?.jornada}_${selectedMatch?.rival}_ABP.pdf`.replace(/ /g, '_');
       
+      console.log(`[ABPPlanPartido] Llamando a exportador: "exportABPPlanToPDF" en "lib/exportPdf.ts". Archivo: "${fileName}", jornada matchInfo: "${isDraft ? 'draft' : (selectedMatch?.jornada || '')}"`);
+
       await exportABPPlanToPDF({
         filename: fileName,
         matchInfo: {

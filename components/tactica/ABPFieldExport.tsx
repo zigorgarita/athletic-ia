@@ -2,7 +2,6 @@
 
 import React from 'react';
 import { Player, ABPPlayerRole, ABPType } from '@/types';
-import { Avatar } from '@/components/ui/Avatar';
 
 interface ABPFieldExportProps {
   playRoles: (ABPPlayerRole & { player?: Player })[];
@@ -165,6 +164,8 @@ export function ABPFieldExport({ playRoles, playType, playZona }: ABPFieldExport
         const label = role.etiqueta || (isRealPosType ? POSITION_ABBRS[role.rol_asignado] : ROLE_ABBRS[role.rol_asignado]) || 'P';
         const player = role.player;
 
+        console.log(`[ABPFieldExport] Ficha - Jugador: ${player ? player.nombre : 'Ninguno'}, Rol: ${role.rol_asignado}, Etiqueta: ${label}, Renderizando: Texto (foto omitida)`);
+
         return (
           <div
             key={role.id}
@@ -194,11 +195,7 @@ export function ABPFieldExport({ playRoles, playType, playZona }: ABPFieldExport
                 boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
               }}
             >
-              {player ? (
-                <Avatar src={player.foto_url} name={player.nombre} size="xl" className="w-full h-full" />
-              ) : (
-                <span style={{ fontSize: '20px', fontWeight: 900, color: '#94a3b8' }}>{label}</span>
-              )}
+              <span style={{ fontSize: '20px', fontWeight: 900, color: player ? '#f1f5f9' : '#94a3b8' }}>{label}</span>
             </div>
 
             {/* Role Badge (positioned absolutely on top of circle, centered) */}
