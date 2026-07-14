@@ -277,7 +277,7 @@ export function RivalDetailsClient({ rivalId }: { rivalId: string }) {
           <StatsTab season={season} onUpdate={updateSeason} />
         )}
         {activeTab === 'CALENDARIO' && (
-          <CalendarTab season={season} />
+          <CalendarTab club={club} season={season} />
         )}
       </div>
     </div>

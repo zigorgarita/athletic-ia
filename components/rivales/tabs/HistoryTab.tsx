@@ -80,7 +80,7 @@ export function HistoryTab({ club, season }: HistoryTabProps) {
     jugado: m.fecha ? new Date(m.fecha).getTime() < Date.now() : false,
     created_at: m.created_at || new Date().toISOString(),
     tipo_partido: m.competicion === 'Amistoso' ? 'AMISTOSO' : 'LIGA',
-    campo: m.campo || undefined,
+    campo: m.campo || (m.local_visitante === 'Visitante' ? club?.campo_nombre : undefined) || undefined,
     hora: m.hora || undefined,
   });
 

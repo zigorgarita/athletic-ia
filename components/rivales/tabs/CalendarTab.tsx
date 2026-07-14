@@ -1,16 +1,17 @@
 'use client';
 import React from 'react';
-import { ClubSeason } from '@/hooks/useClubs';
+import { ClubSeason, Club } from '@/hooks/useClubs';
 import { useClubMatches, ClubMatch } from '@/hooks/useClubMatches';
 import { Calendar as CalendarIcon } from 'lucide-react';
 import { MatchCard } from '@/components/liga/MatchCard';
 import { Match } from '@/types';
 
 interface CalendarTabProps {
+  club: Club | null;
   season: ClubSeason | null;
 }
 
-export function CalendarTab({ season }: CalendarTabProps) {
+export function CalendarTab({ club, season }: CalendarTabProps) {
   const { matches, loading } = useClubMatches(season?.id);
 
   if (!season) {
@@ -35,7 +36,7 @@ export function CalendarTab({ season }: CalendarTabProps) {
     jugado: m.fecha ? new Date(m.fecha).getTime() < Date.now() : false,
     created_at: m.created_at || new Date().toISOString(),
     tipo_partido: m.competicion === 'Amistoso' ? 'AMISTOSO' : 'LIGA',
-    campo: m.campo || undefined,
+    campo: m.campo || (m.local_visitante === 'Visitante' ? club?.campo_nombre : undefined) || undefined,
     hora: m.hora || undefined,
   });
 
