@@ -974,7 +974,7 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
       {/* Cabecera Premium del Partido */}
       <MatchHeader 
         match={match} 
-        onBack={() => router.push('/liga')} 
+        onBack={() => router.push(match.tipo_partido === 'AMISTOSO' ? '/amistosos' : '/liga')} 
       />
 
       {/* Selector de Pestañas */}

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import Link from 'next/link';
+
 import { useMatches } from '@/hooks/useMatches';
 import { Match, MatchPlayerStats } from '@/types';
 import { MatchForm } from '@/components/liga/MatchForm';
@@ -10,8 +10,7 @@ import { MatchCard } from './MatchCard';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { Badge } from '@/components/ui/Badge';
-import { Trophy, Plus, Calendar, Edit, Trash2, ClipboardList } from 'lucide-react';
+import { Trophy, Plus } from 'lucide-react';
 import { useEditMode } from '@/context/EditModeContext';
 
 interface MatchCenterClientProps {
@@ -168,113 +167,6 @@ export function MatchCenterClient({ matchType }: MatchCenterClientProps) {
             ))}
           </div>
 
-          {/* Vista anterior en lista (mantenida temporalmente por seguridad) */}
-          <div className="hidden grid grid-cols-1 gap-4">
-            {matches.map((match) => {
-              const dateObj = new Date(match.fecha);
-              const isWinner = match.jugado && match.goles_favor !== null && match.goles_contra !== null && match.goles_favor > match.goles_contra;
-              const isLoser = match.jugado && match.goles_favor !== null && match.goles_contra !== null && match.goles_favor < match.goles_contra;
-
-              return (
-                <div
-                  key={match.id}
-                  className="p-5 rounded-2xl bg-slate-900/30 border border-slate-800/80 hover:border-slate-700/60 transition-all flex flex-col md:flex-row md:items-center justify-between gap-5 relative overflow-hidden"
-                >
-                  {/* Indicador de resultado lateral */}
-                  {match.jugado && (
-                    <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${
-                      isWinner ? 'bg-green-500' :
-                      isLoser ? 'bg-red-500' : 'bg-amber-500'
-                    }`} />
-                  )}
-
-                  {/* Info de Jornada, Fecha y Local/Visitante */}
-                  <div className="flex items-center gap-4 pl-1.5">
-                    <div className="h-12 w-12 rounded-xl bg-slate-950 border border-slate-800 flex flex-col items-center justify-center flex-shrink-0">
-                      <span className="text-[10px] text-slate-500 uppercase tracking-widest font-black leading-none">Jor.</span>
-                      <span className="text-lg font-black text-white leading-none mt-1">{match.jornada}</span>
-                    </div>
-                    <div>
-                      <span className="text-xs text-slate-500 font-bold flex items-center gap-1">
-                        <Calendar className="h-3 w-3" />
-                        {dateObj.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}
-                      </span>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-sm font-bold text-slate-100">
-                          {match.es_local ? 'SD Indautxu' : match.rival}
-                        </span>
-                        <span className="text-xs font-bold text-slate-500">vs</span>
-                        <span className="text-sm font-bold text-slate-100">
-                          {match.es_local ? match.rival : 'SD Indautxu'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Marcador Central */}
-                  <div className="flex items-center gap-4 justify-center md:justify-start">
-                    {match.jugado ? (
-                      <div className="flex items-center gap-2">
-                        <div className={`px-4 py-1.5 rounded-lg text-lg font-black border ${
-                          isWinner ? 'bg-green-500/10 text-green-400 border-green-500/20' :
-                          isLoser ? 'bg-red-500/10 text-red-400 border-red-500/20' :
-                          'bg-amber-500/10 text-amber-400 border-amber-500/20'
-                        }`}>
-                          {match.goles_favor} - {match.goles_contra}
-                        </div>
-                        <span className="text-[10px] text-slate-500 uppercase font-black tracking-wider">
-                          {isWinner ? 'Ganado' : isLoser ? 'Perdido' : 'Empate'}
-                        </span>
-                      </div>
-                    ) : (
-                      <Badge variant="default" className="bg-slate-950/80 border border-slate-800 text-[10px] py-1 px-3">
-                        Programado
-                      </Badge>
-                    )}
-                  </div>
-
-                  {/* Acciones */}
-                  <div className="flex items-center justify-end gap-2 border-t border-slate-800/40 md:border-transparent pt-3 md:pt-0">
-                    <Link
-                      href={`/liga/${match.id}`}
-                      className="flex items-center gap-1.5 text-xs font-bold py-1.5 px-3 rounded-lg bg-slate-850 hover:bg-slate-800 border border-slate-700 text-slate-200 transition-colors"
-                    >
-                      <Trophy className="h-3.5 w-3.5 text-[#CC0E21]" />
-                      Centro de Partido
-                    </Link>
-                    <Button
-                      onClick={() => handleOpenConvo(match)}
-                      variant="primary"
-                      className="flex items-center gap-1.5 text-xs font-bold py-1.5 px-3"
-                    >
-                      <ClipboardList className="h-3.5 w-3.5" />
-                      Convocatoria y Stats
-                    </Button>
-                    {isEditMode && (
-                      <>
-                        <Button
-                          onClick={() => handleOpenEditMatch(match)}
-                          variant="ghost"
-                          className="h-9 w-9 p-0 text-slate-400 hover:text-[#CC0E21] hover:bg-[#CC0E21]/10 rounded-lg"
-                          title="Editar partido"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          onClick={() => handleDeleteMatch(match.id)}
-                          variant="ghost"
-                          className="h-9 w-9 p-0 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg"
-                          title="Eliminar partido"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
         </>
       )}
 

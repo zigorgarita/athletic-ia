@@ -104,7 +104,7 @@ export function MatchCard({
       {/* Cabecera Tarjeta */}
       <div className="flex justify-between items-center z-10 shrink-0">
         <span className="text-[10px] font-black tracking-widest text-slate-400 bg-slate-950 border border-slate-850 px-2.5 py-0.5 rounded-full uppercase leading-none">
-          {match.tipo_partido || 'LIGA'} — JORNADA {match.jornada}
+          {match.tipo_partido || 'LIGA'}{match.jornada ? ` — JORNADA ${match.jornada}` : ''}
         </span>
         
         {/* Acciones de edición en la esquina */}
@@ -243,7 +243,7 @@ export function MatchCard({
       {/* Botones de Acción */}
       <div className="flex items-center gap-2 mt-3 pt-2 border-t border-slate-800/20 z-10 shrink-0">
         <Link
-          href={`/liga/${match.id}`}
+          href={`/${match.tipo_partido === 'AMISTOSO' ? 'amistosos' : 'liga'}/${match.id}`}
           className="flex-1 flex items-center justify-center gap-1 text-[11px] font-black py-2 px-3 rounded-xl bg-slate-850 hover:bg-slate-800 border border-slate-800 text-slate-200 transition-all hover:border-red-500/20"
         >
           <ExternalLink className="h-3 w-3 text-[#CC0E21]" />
