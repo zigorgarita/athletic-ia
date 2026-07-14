@@ -37,6 +37,8 @@ interface MatchCardProps {
   hasPhotos?: boolean;
   hasDocuments?: boolean;
   hasEvents?: boolean;
+  disableNavigation?: boolean;
+  customHref?: string;
 }
 
 // Helper to normalize and get rival logo if available
@@ -75,6 +77,8 @@ export function MatchCard({
   hasPhotos = false,
   hasDocuments = false,
   hasEvents = false,
+  disableNavigation = false,
+  customHref,
 }: MatchCardProps) {
   const dateObj = new Date(match.fecha);
   const formattedDate = dateObj.toLocaleDateString('es-ES', { 
@@ -241,25 +245,27 @@ export function MatchCard({
       </div>
 
       {/* Botones de Acción */}
-      <div className="flex items-center gap-2 mt-3 pt-2 border-t border-slate-800/20 z-10 shrink-0">
-        <Link
-          href={`/${match.tipo_partido === 'AMISTOSO' ? 'amistosos' : 'liga'}/${match.id}`}
-          className="flex-1 flex items-center justify-center gap-1 text-[11px] font-black py-2 px-3 rounded-xl bg-slate-850 hover:bg-slate-800 border border-slate-800 text-slate-200 transition-all hover:border-red-500/20"
-        >
-          <ExternalLink className="h-3 w-3 text-[#CC0E21]" />
-          Ver Ficha
-        </Link>
-        {onManageConvo && (
-          <Button
-            onClick={() => onManageConvo(match)}
-            variant="primary"
-            className="flex-1 flex items-center justify-center gap-1 text-[11px] font-black py-2 px-3 rounded-xl h-auto bg-[#CC0E21] hover:bg-red-500 border-none text-white transition-all shadow-md shadow-red-900/10"
+      {!disableNavigation && (
+        <div className="flex items-center gap-2 mt-3 pt-2 border-t border-slate-800/20 z-10 shrink-0">
+          <Link
+            href={customHref || `/${match.tipo_partido === 'AMISTOSO' ? 'amistosos' : 'liga'}/${match.id}`}
+            className="flex-1 flex items-center justify-center gap-1 text-[11px] font-black py-2 px-3 rounded-xl bg-slate-850 hover:bg-slate-800 border border-slate-800 text-slate-200 transition-all hover:border-red-500/20"
           >
-            <ClipboardList className="h-3.5 w-3.5" />
-            Convocatoria
-          </Button>
-        )}
-      </div>
+            <ExternalLink className="h-3 w-3 text-[#CC0E21]" />
+            Ver Ficha
+          </Link>
+          {onManageConvo && (
+            <Button
+              onClick={() => onManageConvo(match)}
+              variant="primary"
+              className="flex-1 flex items-center justify-center gap-1 text-[11px] font-black py-2 px-3 rounded-xl h-auto bg-[#CC0E21] hover:bg-red-500 border-none text-white transition-all shadow-md shadow-red-900/10"
+            >
+              <ClipboardList className="h-3.5 w-3.5" />
+              Convocatoria
+            </Button>
+          )}
+        </div>
+      )}
       
     </div>
   );
