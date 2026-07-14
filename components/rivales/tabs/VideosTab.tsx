@@ -5,7 +5,9 @@ import { useClubVideos, ClubVideo } from '@/hooks/useClubVideos';
 import { useEditMode } from '@/context/EditModeContext';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
-import { Film, Plus, Trash2, Search, PlayCircle, ExternalLink, Calendar, Tag } from 'lucide-react';
+import { Film, Plus, Search } from 'lucide-react';
+import { VideoCard } from '@/components/videos/VideoCard';
+import { MatchVideo } from '@/types';
 
 interface VideosTabProps {
   club: Club | null;
@@ -61,8 +63,26 @@ export function VideosTab({ club, season }: VideosTabProps) {
     }
   };
 
-  const handleDelete = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
+  // Adaptador para usar VideoCard
+  const mapToMatchVideo = (cv: ClubVideo): MatchVideo => ({
+    id: cv.id,
+    titulo: cv.titulo,
+    descripcion: cv.descripcion,
+    video_url: cv.url,
+    fecha_partido: cv.fecha || cv.created_at,
+    created_at: cv.created_at,
+  });
+
+  const handlePlayAdapter = (video: MatchVideo) => {
+    window.open(video.video_url, '_blank');
+  };
+
+  const handleEditAdapter = (video: MatchVideo) => {
+    const original = videos.find(v => v.id === video.id);
+    if (original) handleOpenModal(original);
+  };
+
+  const handleDeleteAdapter = async (id: string) => {
     if (confirm('¿Estás seguro de que deseas eliminar este vídeo?')) {
       await deleteVideo(id);
     }
@@ -71,13 +91,6 @@ export function VideosTab({ club, season }: VideosTabProps) {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setEditingVideo(prev => prev ? { ...prev, [name]: value } : null);
-  };
-
-  // Determinar si es una URL de YouTube para mostrar thumbnail
-  const getYouTubeId = (url: string) => {
-    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
-    const match = url.match(regExp);
-    return (match && match[2].length === 11) ? match[2] : null;
   };
 
   if (!club) {
@@ -130,87 +143,15 @@ export function VideosTab({ club, season }: VideosTabProps) {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredVideos.map(video => {
-            const ytId = getYouTubeId(video.url);
-            
-            return (
-              <div 
-                key={video.id} 
-                className="group bg-slate-900/40 border border-slate-800/80 rounded-2xl overflow-hidden hover:border-[#CC0E21]/40 transition-all flex flex-col relative cursor-pointer"
-                onClick={() => window.open(video.url, '_blank')}
-              >
-                {/* Miniatura del vídeo */}
-                <div className="aspect-video bg-slate-950 relative border-b border-slate-800/50 overflow-hidden flex items-center justify-center">
-                  {ytId ? (
-                    <img 
-                      src={`https://img.youtube.com/vi/${ytId}/maxresdefault.jpg`} 
-                      onError={(e) => { e.currentTarget.src = `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`; }}
-                      alt={video.titulo} 
-                      className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity group-hover:scale-105 duration-500" 
-                    />
-                  ) : (
-                    <div className="absolute inset-0 bg-gradient-to-tr from-slate-900 to-slate-800 flex items-center justify-center">
-                      <Film className="h-10 w-10 text-slate-700 group-hover:text-slate-500 transition-colors" />
-                    </div>
-                  )}
-                  
-                  {/* Overlay Play Icon */}
-                  <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                    <PlayCircle className="h-12 w-12 text-white/90 drop-shadow-lg" />
-                  </div>
-
-                  {/* Etiquetas Overlay */}
-                  <div className="absolute top-2 left-2 flex gap-2">
-                    <span className="bg-black/60 backdrop-blur-sm px-2 py-1 rounded text-[10px] uppercase font-bold text-slate-200">
-                      {video.tipo || 'Vídeo'}
-                    </span>
-                  </div>
-
-                  {/* Actions */}
-                  {isEditMode && (
-                    <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); handleOpenModal(video); }} 
-                        className="p-1.5 bg-black/60 backdrop-blur-sm text-slate-300 hover:text-white transition-colors rounded-md"
-                      >
-                        <ExternalLink className="h-3.5 w-3.5" />
-                      </button>
-                      <button 
-                        onClick={(e) => handleDelete(video.id, e)} 
-                        className="p-1.5 bg-black/60 backdrop-blur-sm text-slate-300 hover:text-red-500 transition-colors rounded-md"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  )}
-                </div>
-                
-                {/* Info */}
-                <div className="p-4 flex flex-col flex-1">
-                  <h4 className="font-bold text-slate-200 line-clamp-2 leading-tight group-hover:text-[#CC0E21] transition-colors">{video.titulo}</h4>
-                  
-                  <div className="flex items-center gap-3 mt-2 text-xs text-slate-400">
-                    <span className="flex items-center gap-1">
-                      <Tag className="h-3 w-3" />
-                      {video.categoria || 'Sin clasificar'}
-                    </span>
-                    {video.fecha && (
-                      <span className="flex items-center gap-1">
-                        <Calendar className="h-3 w-3" />
-                        {new Date(video.fecha).toLocaleDateString('es-ES')}
-                      </span>
-                    )}
-                  </div>
-
-                  {video.descripcion && (
-                    <p className="mt-3 text-xs text-slate-500 line-clamp-2 leading-relaxed">
-                      {video.descripcion}
-                    </p>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+          {filteredVideos.map(video => (
+            <VideoCard 
+              key={video.id} 
+              video={mapToMatchVideo(video)} 
+              onPlay={handlePlayAdapter} 
+              onEdit={handleEditAdapter} 
+              onDelete={handleDeleteAdapter} 
+            />
+          ))}
         </div>
       )}
 

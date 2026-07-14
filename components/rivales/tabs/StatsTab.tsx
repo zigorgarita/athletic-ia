@@ -100,7 +100,7 @@ export function StatsTab({ season, onUpdate }: StatsTabProps) {
         
         {/* Columna Izquierda: Clasificación y Rendimiento */}
         <div className="space-y-6">
-          <div className="bg-slate-900/40 p-6 rounded-3xl border border-slate-800/80 relative overflow-hidden group">
+          <div className="bg-slate-900/40 p-6 rounded-3xl border border-slate-800/80 relative overflow-hidden group hover:border-amber-500/30 hover:shadow-[0_8px_30px_rgb(245,158,11,0.1)] transition-all duration-300">
             <div className="absolute -right-6 -top-6 text-slate-800/30 group-hover:text-amber-500/10 transition-colors duration-500">
               <Trophy className="h-40 w-40" />
             </div>
@@ -129,7 +129,7 @@ export function StatsTab({ season, onUpdate }: StatsTabProps) {
             </div>
           </div>
 
-          <div className="bg-slate-900/40 p-6 rounded-3xl border border-slate-800/80">
+          <div className="bg-slate-900/40 p-6 rounded-3xl border border-slate-800/80 hover:border-slate-600/50 hover:shadow-[0_8px_30px_rgb(0,0,0,0.12)] transition-all duration-300">
             <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-6 flex items-center gap-2">
               <Activity className="h-4 w-4" /> Partidos
             </h4>
@@ -186,7 +186,7 @@ export function StatsTab({ season, onUpdate }: StatsTabProps) {
 
         {/* Columna Centro: Goles */}
         <div className="space-y-6">
-          <div className="bg-slate-900/40 p-6 rounded-3xl border border-slate-800/80">
+          <div className="bg-slate-900/40 p-6 rounded-3xl border border-slate-800/80 hover:border-sky-500/30 hover:shadow-[0_8px_30px_rgb(14,165,233,0.1)] transition-all duration-300">
             <h4 className="text-xs font-bold uppercase tracking-wider text-sky-400 mb-6 flex items-center gap-2">
               <Target className="h-4 w-4" /> Fase Ofensiva
             </h4>
@@ -218,7 +218,7 @@ export function StatsTab({ season, onUpdate }: StatsTabProps) {
             )}
           </div>
 
-          <div className="bg-slate-900/40 p-6 rounded-3xl border border-slate-800/80">
+          <div className="bg-slate-900/40 p-6 rounded-3xl border border-slate-800/80 hover:border-orange-500/30 hover:shadow-[0_8px_30px_rgb(249,115,22,0.1)] transition-all duration-300">
             <h4 className="text-xs font-bold uppercase tracking-wider text-orange-400 mb-6 flex items-center gap-2">
               <Shield className="h-4 w-4" /> Fase Defensiva
             </h4>
@@ -262,7 +262,7 @@ export function StatsTab({ season, onUpdate }: StatsTabProps) {
 
         {/* Columna Derecha: Estilo y Disciplina */}
         <div className="space-y-6">
-          <div className="bg-slate-900/40 p-6 rounded-3xl border border-slate-800/80">
+          <div className="bg-slate-900/40 p-6 rounded-3xl border border-slate-800/80 hover:border-purple-500/30 hover:shadow-[0_8px_30px_rgb(168,85,247,0.1)] transition-all duration-300">
             <h4 className="text-xs font-bold uppercase tracking-wider text-purple-400 mb-6 flex items-center gap-2">
               <TrendingUp className="h-4 w-4" /> Estilo de Juego
             </h4>
@@ -280,7 +280,7 @@ export function StatsTab({ season, onUpdate }: StatsTabProps) {
             </div>
           </div>
 
-          <div className="bg-slate-900/40 p-6 rounded-3xl border border-slate-800/80">
+          <div className="bg-slate-900/40 p-6 rounded-3xl border border-slate-800/80 hover:border-red-500/30 hover:shadow-[0_8px_30px_rgb(239,68,68,0.1)] transition-all duration-300">
             <h4 className="text-xs font-bold uppercase tracking-wider text-red-400 mb-6 flex items-center gap-2">
               <AlertCircle className="h-4 w-4" /> Disciplina
             </h4>

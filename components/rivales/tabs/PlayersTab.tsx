@@ -5,7 +5,9 @@ import { useClubPlayers, ClubPlayer } from '@/hooks/useClubPlayers';
 import { useEditMode } from '@/context/EditModeContext';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
-import { Users, Plus, Trash2, User, Search, Filter } from 'lucide-react';
+import { Users, Plus, Search, Filter } from 'lucide-react';
+import { PlayerCard } from '@/components/players/PlayerCard';
+import { Player, Demarcacion } from '@/types';
 
 interface PlayersTabProps {
   season: ClubSeason | null;
@@ -94,12 +96,7 @@ export function PlayersTab({ season }: PlayersTabProps) {
     }
   };
 
-  const handleDelete = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (confirm('¿Estás seguro de que deseas eliminar este jugador de la plantilla?')) {
-      await deletePlayer(id);
-    }
-  };
+
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -113,8 +110,45 @@ export function PlayersTab({ season }: PlayersTabProps) {
   const inputClass = "w-full bg-slate-950/50 border border-slate-800 rounded-xl px-4 py-2.5 text-slate-200 focus:outline-none focus:border-[#CC0E21]/50 focus:ring-1 focus:ring-[#CC0E21]/30 transition-all";
   const labelClass = "block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5";
 
+  const mapToPlayer = (cp: ClubPlayer): Player => {
+    let demar: Demarcacion = 'Centrocampista';
+    const pos = cp.posicion || '';
+    if (pos.includes('Portero')) demar = 'Portero';
+    else if (pos.includes('Lateral') || pos.includes('Central') || pos.includes('Defensa')) demar = 'Defensa';
+    else if (pos.includes('Delantero') || pos.includes('Extremo') || pos.includes('Punta')) demar = 'Delantero';
+
+    return {
+      id: cp.id,
+      nombre: cp.nombre,
+      apellidos: '',
+      dorsal: cp.dorsal || 0,
+      demarcacion: demar,
+      posicion_secundaria: pos !== demar ? pos : null,
+      fecha_nacimiento: cp.fecha_nacimiento || new Date().toISOString(),
+      altura: cp.altura,
+      peso: cp.peso,
+      pierna_dominante: cp.pierna_dominante || 'Diestro',
+      estado: 'Disponible',
+      rol_abp: null,
+      foto_url: cp.foto_url,
+      created_at: cp.created_at,
+      updated_at: cp.created_at,
+    };
+  };
+
+  const handleEditAdapter = (player: Player) => {
+    const original = players.find(p => p.id === player.id);
+    if (original) handleOpenModal(original);
+  };
+
+  const handleDeleteAdapter = async (id: string) => {
+    if (confirm('¿Estás seguro de que deseas eliminar este jugador de la plantilla?')) {
+      await deletePlayer(id);
+    }
+  };
+
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-[1400px] mx-auto">
       
       {/* Barra superior de herramientas */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-900/40 p-4 rounded-3xl border border-slate-800/80">
@@ -182,54 +216,14 @@ export function PlayersTab({ season }: PlayersTabProps) {
                   <div className="h-px bg-slate-800 flex-1" />
                 </h3>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                   {groupPlayers.map(player => (
-                    <div 
-                      key={player.id}
-                      onClick={() => handleOpenModal(player)}
-                      className="group flex bg-slate-900/40 border border-slate-800/80 rounded-2xl overflow-hidden hover:border-[#CC0E21]/40 transition-all cursor-pointer hover:shadow-lg hover:shadow-[#CC0E21]/5"
-                    >
-                      {/* Dorsal / Foto */}
-                      <div className="w-20 bg-slate-950 flex flex-col items-center justify-center border-r border-slate-800/50 relative">
-                        {player.foto_url ? (
-                          <img src={player.foto_url} alt={player.nombre} className="absolute inset-0 w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
-                        ) : (
-                          <User className="h-8 w-8 text-slate-700" />
-                        )}
-                        {player.dorsal && (
-                          <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-slate-950 p-2 text-center">
-                            <span className="text-xl font-black text-white drop-shadow-md">{player.dorsal}</span>
-                          </div>
-                        )}
-                      </div>
-                      
-                      {/* Info principal */}
-                      <div className="p-4 flex-1 flex flex-col">
-                        <div className="flex justify-between items-start">
-                          <h4 className="font-bold text-slate-200 group-hover:text-[#CC0E21] transition-colors line-clamp-1">{player.nombre}</h4>
-                          {isEditMode && (
-                            <button onClick={(e) => handleDelete(player.id, e)} className="p-1 text-slate-600 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100">
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          )}
-                        </div>
-                        
-                        <div className="text-xs text-slate-400 mt-1">{player.posicion || 'Posición sin definir'}</div>
-                        
-                        <div className="mt-auto pt-3 flex gap-2">
-                          {player.pierna_dominante && (
-                            <span className="text-[10px] bg-slate-800/80 text-slate-300 px-2 py-0.5 rounded-full border border-slate-700/50">
-                              {player.pierna_dominante}
-                            </span>
-                          )}
-                          {(player.altura || player.peso) && (
-                            <span className="text-[10px] bg-slate-800/80 text-slate-300 px-2 py-0.5 rounded-full border border-slate-700/50">
-                              {[player.altura ? player.altura + 'm' : '', player.peso ? player.peso + 'kg' : ''].filter(Boolean).join(' - ')}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
+                    <PlayerCard 
+                      key={player.id} 
+                      player={mapToPlayer(player)} 
+                      onEdit={handleEditAdapter} 
+                      onDelete={handleDeleteAdapter} 
+                    />
                   ))}
                 </div>
               </div>

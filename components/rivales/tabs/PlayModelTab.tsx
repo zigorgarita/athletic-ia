@@ -78,7 +78,7 @@ export function PlayModelTab({ season }: PlayModelTabProps) {
       )}
 
       {/* SISTEMAS */}
-      <div className="bg-slate-900/40 border border-slate-800/80 rounded-3xl p-6">
+      <div className="bg-slate-900/40 border border-slate-800/80 rounded-3xl p-6 hover:border-[#CC0E21]/30 hover:shadow-[0_8px_30px_rgb(0,0,0,0.12)] transition-all duration-300">
         <h3 className="text-lg font-bold text-slate-200 mb-5 flex items-center gap-2">
           <Crosshair className="h-5 w-5 text-slate-500" />
           Sistemas de Juego
@@ -96,7 +96,7 @@ export function PlayModelTab({ season }: PlayModelTabProps) {
       </div>
 
       {/* FASE OFENSIVA */}
-      <div className="bg-slate-900/40 border border-slate-800/80 rounded-3xl p-6">
+      <div className="bg-slate-900/40 border border-slate-800/80 rounded-3xl p-6 hover:border-emerald-500/30 hover:shadow-[0_8px_30px_rgb(16,185,129,0.1)] transition-all duration-300">
         <h3 className="text-lg font-bold text-slate-200 mb-5 flex items-center gap-2">
           <Zap className="h-5 w-5 text-emerald-500/70" />
           Fase Ofensiva
@@ -130,7 +130,7 @@ export function PlayModelTab({ season }: PlayModelTabProps) {
       </div>
 
       {/* TRANSICIONES */}
-      <div className="bg-slate-900/40 border border-slate-800/80 rounded-3xl p-6">
+      <div className="bg-slate-900/40 border border-slate-800/80 rounded-3xl p-6 hover:border-blue-500/30 hover:shadow-[0_8px_30px_rgb(59,130,246,0.1)] transition-all duration-300">
         <h3 className="text-lg font-bold text-slate-200 mb-5 flex items-center gap-2">
           <ArrowRightLeft className="h-5 w-5 text-blue-500/70" />
           Transiciones
@@ -148,7 +148,7 @@ export function PlayModelTab({ season }: PlayModelTabProps) {
       </div>
 
       {/* FASE DEFENSIVA */}
-      <div className="bg-slate-900/40 border border-slate-800/80 rounded-3xl p-6">
+      <div className="bg-slate-900/40 border border-slate-800/80 rounded-3xl p-6 hover:border-[#CC0E21]/30 hover:shadow-[0_8px_30px_rgb(204,14,33,0.1)] transition-all duration-300">
         <h3 className="text-lg font-bold text-slate-200 mb-5 flex items-center gap-2">
           <Shield className="h-5 w-5 text-[#CC0E21]/70" />
           Fase Defensiva
@@ -172,7 +172,7 @@ export function PlayModelTab({ season }: PlayModelTabProps) {
       </div>
 
       {/* ABP */}
-      <div className="bg-slate-900/40 border border-slate-800/80 rounded-3xl p-6">
+      <div className="bg-slate-900/40 border border-slate-800/80 rounded-3xl p-6 hover:border-purple-500/30 hover:shadow-[0_8px_30px_rgb(168,85,247,0.1)] transition-all duration-300">
         <h3 className="text-lg font-bold text-slate-200 mb-5 flex items-center gap-2">
           <Flag className="h-5 w-5 text-purple-500/70" />
           Acciones a Balón Parado (ABP)

@@ -5,7 +5,10 @@ import { useClubStaff, ClubStaff } from '@/hooks/useClubStaff';
 import { useEditMode } from '@/context/EditModeContext';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
-import { UserCheck, Plus, Trash2, User, Search } from 'lucide-react';
+import { UserCheck, Plus, Trash2, Search } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/Card';
+import { Avatar } from '@/components/ui/Avatar';
+import { Badge } from '@/components/ui/Badge';
 
 interface StaffTabProps {
   season: ClubSeason | null;
@@ -142,42 +145,44 @@ export function StaffTab({ season }: StaffTabProps) {
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {filteredStaff.map(member => (
-            <div 
+            <Card 
               key={member.id}
               onClick={() => handleOpenModal(member)}
-              className="group flex bg-slate-900/40 border border-slate-800/80 rounded-2xl overflow-hidden hover:border-[#CC0E21]/40 transition-all cursor-pointer hover:shadow-lg hover:shadow-[#CC0E21]/5"
+              className="group relative overflow-hidden bg-slate-900/40 border-slate-800/80 hover:border-[#CC0E21]/50 transition-all duration-300 cursor-pointer hover:shadow-[0_8px_30px_rgb(0,0,0,0.12)] hover:-translate-y-1"
             >
-              {/* Foto */}
-              <div className="w-24 bg-slate-950 flex flex-col items-center justify-center border-r border-slate-800/50 relative">
-                {member.foto_url ? (
-                  <img src={member.foto_url} alt={member.nombre} className="absolute inset-0 w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
-                ) : (
-                  <User className="h-8 w-8 text-slate-700" />
-                )}
-              </div>
+              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#CC0E21] to-red-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
               
-              {/* Info principal */}
-              <div className="p-4 flex-1 flex flex-col justify-center">
-                <div className="flex justify-between items-start">
-                  <h4 className="font-bold text-slate-200 group-hover:text-[#CC0E21] transition-colors line-clamp-1">{member.nombre}</h4>
-                  {isEditMode && (
-                    <button onClick={(e) => handleDelete(member.id, e)} className="p-1 text-slate-600 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100">
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  )}
-                </div>
+              {isEditMode && (
+                <button 
+                  onClick={(e) => handleDelete(member.id, e)} 
+                  className="absolute top-3 right-3 p-1.5 text-slate-500 hover:text-red-500 hover:bg-red-500/10 rounded-md transition-colors opacity-0 group-hover:opacity-100 z-10"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              )}
+
+              <CardContent className="p-6 flex flex-col items-center text-center mt-2">
+                <Avatar 
+                  src={member.foto_url} 
+                  name={member.nombre} 
+                  size="xl" 
+                  className="mb-4 border-2 border-slate-800 group-hover:border-[#CC0E21]/30 transition-colors"
+                />
                 
-                <div className="text-xs font-medium text-slate-400 mt-1 uppercase tracking-wider">{member.rol}</div>
+                <h4 className="font-bold text-slate-100 text-lg mb-1 group-hover:text-[#CC0E21] transition-colors">{member.nombre}</h4>
+                <Badge variant="default" className="mb-4 text-xs font-semibold px-3 py-0.5 border-slate-700 text-slate-300">
+                  {member.rol}
+                </Badge>
                 
                 {member.observaciones && (
-                  <div className="mt-3 text-xs text-slate-500 line-clamp-2 border-t border-slate-800 pt-2">
+                  <p className="text-xs text-slate-400 line-clamp-3 leading-relaxed w-full">
                     {member.observaciones}
-                  </div>
+                  </p>
                 )}
-              </div>
-            </div>
+              </CardContent>
+            </Card>
           ))}
         </div>
       )}

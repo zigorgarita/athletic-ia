@@ -133,9 +133,10 @@ export function DocumentsTab({ club, season }: DocumentsTabProps) {
           {filteredDocs.map(doc => (
             <div 
               key={doc.id} 
-              className="group bg-slate-900/40 border border-slate-800/80 rounded-2xl p-4 flex flex-col hover:border-[#CC0E21]/40 transition-all cursor-pointer relative"
+              className="group bg-slate-900/40 border border-slate-800/80 rounded-2xl p-5 flex flex-col hover:border-[#CC0E21]/50 transition-all duration-300 cursor-pointer relative hover:shadow-[0_8px_30px_rgb(0,0,0,0.12)] hover:-translate-y-1"
               onClick={() => window.open(doc.url, '_blank')}
             >
+              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-slate-800 to-slate-700 opacity-0 group-hover:opacity-100 group-hover:from-[#CC0E21] group-hover:to-red-500 transition-all duration-300 rounded-t-2xl" />
               <div className="flex justify-between items-start mb-3">
                 <div className="p-2 bg-slate-950 rounded-xl border border-slate-800/50">
                   {getDocIcon(doc.tipo)}

@@ -142,7 +142,7 @@ export function ReportsTab({ season }: ReportsTabProps) {
             return (
               <div 
                 key={report.id} 
-                className={`bg-slate-900/40 border ${isExpanded ? 'border-[#CC0E21]/40' : 'border-slate-800/80'} rounded-2xl overflow-hidden transition-all`}
+                className={`bg-slate-900/40 border ${isExpanded ? 'border-[#CC0E21]/40 shadow-[0_8px_30px_rgb(204,14,33,0.1)]' : 'border-slate-800/80 hover:border-[#CC0E21]/30 hover:shadow-[0_8px_30px_rgb(0,0,0,0.12)]'} rounded-2xl overflow-hidden transition-all duration-300`}
               >
                 {/* Cabecera del informe (siempre visible) */}
                 <div 
