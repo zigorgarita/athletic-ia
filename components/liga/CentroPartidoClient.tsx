@@ -8,7 +8,7 @@ import { useEditMode } from '@/context/EditModeContext';
 import {
   Player, Match, MatchPlayerStats, MatchABPPlay, MatchABPPlayerRole,
   MatchFullVideo, MatchVideoClip, MatchStrategicAction, MatchCustomVideo, MatchDocument,
-  ABPPlay
+  ABPPlay, TacticalLineup
 } from '@/types';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
@@ -17,6 +17,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { VideoPlayerModal } from './VideoPlayerModal';
 import { MatchHeader } from './MatchHeader';
 import { MatchTabs } from './MatchTabs';
+import { TacticalField, PositionNode } from '@/components/tactica/TacticalField';
 import {
   Trophy, MapPin, Users, Shield, Film,
   BookOpen, Plus, PlusCircle, Save, Trash2, FileText, ClipboardList,
@@ -70,6 +71,8 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
   const [matchCampo, setMatchCampo] = useState('');
   const [matchClasificacionNota, setMatchClasificacionNota] = useState('');
   const [matchStats, setMatchStats] = useState<MatchPlayerStats[]>([]);
+  const [nodesPropio, setNodesPropio] = useState<PositionNode[]>([]);
+  const [tacticalLineup, setTacticalLineup] = useState<TacticalLineup | null>(null);
 
   // Tab 2: ABP states
   const [matchABPs, setMatchABPs] = useState<MatchABPPlay[]>([]);
@@ -257,6 +260,49 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
         .eq('match_id', matchId);
       if (docsErr) throw docsErr;
       setDocuments(documentsData || []);
+
+      // 10. Tactical Lineup
+      const { data: lineupData, error: lineupErr } = await supabase
+        .from('tactical_lineups')
+        .select('*')
+        .eq('match_id', matchId)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      // Fetch systems for default coordinates fallback
+      const { data: systemsData } = await supabase
+        .from('tactical_systems')
+        .select('*');
+
+      if (lineupErr) {
+        console.error('Error loading tactical lineup:', lineupErr);
+      } else if (lineupData && lineupData.length > 0) {
+        const lineup = lineupData[0];
+        setTacticalLineup(lineup);
+        if (lineup.posiciones) {
+          let pos = lineup.posiciones;
+          if (!Array.isArray(pos) && pos.propio && Array.isArray(pos.propio)) {
+            pos = pos.propio;
+          }
+          if (Array.isArray(pos)) {
+            setNodesPropio(pos as PositionNode[]);
+          }
+        }
+      } else {
+        setTacticalLineup(null);
+        const defaultSys = systemsData?.find(s => s.nombre === '1-4-2-3-1') || systemsData?.[0];
+        if (defaultSys && defaultSys.coordenadas_base) {
+          setNodesPropio(
+            (defaultSys.coordenadas_base as unknown as PositionNode[]).map(c => ({
+              ...c,
+              player_id: null,
+              notas_entrenador: ''
+            }))
+          );
+        } else {
+          setNodesPropio([]);
+        }
+      }
 
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Error al cargar los datos del Centro de Partido');
@@ -1023,6 +1069,26 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
                 )}
               </div>
             </div>
+
+            {/* Pizarra Táctica / Alineación Visual */}
+            {nodesPropio.length > 0 && (
+              <div className="p-6 bg-slate-900/30 border border-slate-800/80 rounded-2xl space-y-4 flex flex-col items-center">
+                <h3 className="font-bold text-slate-200 flex items-center gap-2 text-sm border-b border-slate-800/60 pb-3 w-full self-start">
+                  <Shield className="h-4.5 w-4.5 text-[#CC0E21]" />
+                  Disposición Táctica / Pizarra del Partido {tacticalLineup?.nombre_pizarra && `(${tacticalLineup.nombre_pizarra})`}
+                </h3>
+                <div className="w-full max-w-[700px] flex justify-center bg-slate-950/20 p-4 rounded-xl border border-slate-900/50">
+                  <TacticalField
+                    team="propio"
+                    nodes={nodesPropio}
+                    players={players}
+                    isEditMode={false}
+                    onNodesChange={() => {}}
+                    onNodeClick={() => {}}
+                  />
+                </div>
+              </div>
+            )}
 
             {/* Estadísticas de Jugadores */}
             {matchStats.length > 0 && (

@@ -101,6 +101,14 @@ Documentación del estado del proyecto tras completar las mejoras.
 | **Bloque 5** | **Perfil del Jugador & Ficha Profesional (5A y 5B)** | **✅ Cerrado** |
 | Bloque 6 | Liga / Centro de Partidos | ⏳ Pendiente |
 
+## 📋 Backlog Post-Despliegue (Para después del último bloque)
+- **Escudos del Rivales**: Completar los escudos de todos los rivales en `/public/logos/`.
+- **Refactorización de Logos**: Centralizar la función `getRivalLogo` en un archivo de utilidades compartidas.
+- **Dinamicidad de Escudos**: Preparar el sistema en Supabase/Frontend para usar rutas o `logo_url` sin tener que modificar código en la aplicación.
+- **Pizarra Táctica (Maquetación)**: Mejorar la colocación automática de nombres y roles en la pizarra para evitar solapamientos visuales.
+- **Acta del Partido**: Añadir el acta oficial de la RFEF en la pestaña *Plan*.
+- **Diario de Partido**: Desarrollar la pestaña *Partido* como un diario completo del encuentro en tiempo real.
+
 ## ☁️ Estado de los Servicios
 - **Base de Datos (Supabase)**: Conexión activa. Tablas de asistencia, evaluaciones y perfil de jugador completamente actualizadas.
 - **Despliegue (Vercel)**: Producción activa en https://athletic-ia.vercel.app y https://indautxu2026.vercel.app
