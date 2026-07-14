@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/Button';
 import { 
   Calendar, 
   MapPin, 
-  Trophy, 
   ClipboardList, 
   Edit3, 
   Trash2, 
@@ -86,14 +85,15 @@ export function MatchCard({
 
   const isWinner = match.jugado && match.goles_favor !== null && match.goles_contra !== null && match.goles_favor > match.goles_contra;
   const isLoser = match.jugado && match.goles_favor !== null && match.goles_contra !== null && match.goles_favor < match.goles_contra;
-  const isDraw = match.jugado && match.goles_favor !== null && match.goles_contra !== null && match.goles_favor === match.goles_contra;
 
   const rivalLogo = getRivalLogo(match.rival);
   const rivalInitials = getRivalInitials(match.rival);
-  const fieldName = (match as any).campo || (match.es_local ? 'Iparralde (Local)' : 'Campo Rival (Visitante)');
+  
+  const matchWithFields = match as Match & { campo?: string; hora?: string };
+  const fieldName = matchWithFields.campo || (match.es_local ? 'Iparralde (Local)' : 'Campo Rival (Visitante)');
   
   // Custom type casting since Match interface doesn't explicitly declare hora in TS
-  const matchTime = (match as any).hora || null;
+  const matchTime = matchWithFields.hora || null;
 
   return (
     <div className="relative bg-slate-900/40 border border-slate-800 hover:border-red-500/20 rounded-3xl p-5 flex flex-col justify-between transition-all duration-300 group shadow-lg hover:shadow-red-500/5 select-none overflow-hidden h-[330px]">

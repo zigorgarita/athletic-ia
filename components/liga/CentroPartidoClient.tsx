@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { useEditMode } from '@/context/EditModeContext';
 import {
@@ -14,16 +15,27 @@ import { Modal } from '@/components/ui/Modal';
 import { Badge } from '@/components/ui/Badge';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { VideoPlayerModal } from './VideoPlayerModal';
+import { MatchHeader } from './MatchHeader';
+import { MatchTabs } from './MatchTabs';
 import {
-  Trophy, ArrowLeft, Calendar, MapPin, Users, Shield, Film,
+  Trophy, MapPin, Users, Shield, Film,
   BookOpen, Plus, PlusCircle, Save, Trash2, FileText, ClipboardList,
-  Eye, Download, Upload, AlertCircle, Info
+  Eye, Download, Upload, AlertCircle
 } from 'lucide-react';
 
 interface CentroPartidoClientProps {
   matchId: string;
 }
 
+const MAIN_TABS = [
+  { id: 'analisis', label: 'Análisis', icon: FileText },
+  { id: 'equipo', label: 'Equipo', icon: Users },
+  { id: 'plan', label: 'Plan', icon: BookOpen },
+  { id: 'abp', label: 'ABP', icon: Shield },
+  { id: 'partido', label: 'Partido', icon: ClipboardList }
+];
+
+/*
 const TABS = [
   { id: 'general', label: 'Info General', icon: Info },
   { id: 'abp', label: 'ABP del Partido', icon: Shield },
@@ -35,10 +47,12 @@ const TABS = [
   { id: 'analista', label: 'Informe Analista', icon: FileText },
   { id: 'documentacion', label: 'Documentación', icon: BookOpen }
 ];
+*/
 
 export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
   const { isEditMode } = useEditMode();
-  const [activeTab, setActiveTab] = useState('general');
+  const router = useRouter();
+  const [activeTab, setActiveTab] = useState('analisis');
   const [match, setMatch] = useState<Match | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(true);
@@ -907,74 +921,28 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
     );
   }
 
-  const dateObj = new Date(match.fecha);
-  const formattedDate = dateObj.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
 
   return (
     <div className="space-y-6">
-      {/* Volver y Título */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-800 pb-5">
-        <div className="flex items-start gap-4">
-          <Link
-            href="/liga"
-            className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-slate-100 transition-colors"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Link>
-          <div>
-            <div className="flex items-center gap-2">
-              <Badge variant="default" className="bg-[#CC0E21]/15 text-[#CC0E21] border-[#CC0E21]/35 font-black uppercase text-[10px] py-0.5 px-2">
-                Jornada {match.jornada}
-              </Badge>
-              <span className="text-slate-500 font-bold text-xs flex items-center gap-1">
-                <Calendar className="h-3.5 w-3.5" />
-                {formattedDate}
-              </span>
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-black text-slate-100 mt-1 flex items-center gap-3">
-              {match.es_local ? 'SD Indautxu' : match.rival}
-              <span className="text-[#CC0E21] text-xl sm:text-2xl">vs</span>
-              {match.es_local ? match.rival : 'SD Indautxu'}
-            </h1>
-          </div>
-        </div>
-        {match.jugado && match.goles_favor !== null && (
-          <div className="px-5 py-2.5 rounded-xl bg-slate-900/60 border border-slate-850 self-start sm:self-auto flex items-center gap-3">
-            <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">Resultado</span>
-            <span className="text-2xl font-black text-white px-3 py-1 rounded bg-[#CC0E21]/20 border border-[#CC0E21]/30">
-              {match.goles_favor} - {match.goles_contra}
-            </span>
-          </div>
-        )}
-      </div>
+      {/* Cabecera Premium del Partido */}
+      <MatchHeader 
+        match={match} 
+        onBack={() => router.push('/liga')} 
+      />
 
-      {/* Tabs Selector */}
-      <div className="flex overflow-x-auto gap-2 p-1 bg-slate-950/40 border border-slate-900 rounded-xl scrollbar-none">
-        {TABS.map(tab => {
-          const Icon = tab.icon;
-          const isActive = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all duration-200 ${
-                isActive
-                  ? 'bg-[#CC0E21] text-white shadow-lg shadow-[#CC0E21]/10'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/40'
-              }`}
-            >
-              <Icon className="h-4 w-4" />
-              {tab.label}
-            </button>
-          );
-        })}
-      </div>
+      {/* Selector de Pestañas */}
+      <MatchTabs
+        tabs={MAIN_TABS}
+        activeTab={activeTab}
+        onChange={setActiveTab}
+      />
 
       {/* Tab Contents */}
       <div className="bg-slate-900/10 border border-slate-900 rounded-2xl p-6 min-h-[500px]">
 
-        {/* TAB 1: INFORMACIÓN GENERAL */}
-        {activeTab === 'general' && (
+        {/* TAB 1: EQUIPO (CONVOCATORIA Y ESTADÍSTICAS) */}
+        {activeTab === 'equipo' && (
           <div className="space-y-8">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {/* Card Datos Encuentro */}
@@ -1232,6 +1200,19 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
                 )}
               </div>
             )}
+          </div>
+        )}
+
+        {/* TAB 5: PARTIDO */}
+        {activeTab === 'partido' && (
+          <div className="p-12 border border-dashed border-slate-800 rounded-2xl flex flex-col items-center justify-center text-center gap-4 bg-slate-900/10 select-none">
+            <ClipboardList className="h-12 w-12 text-slate-655" />
+            <div>
+              <h3 className="text-lg font-bold text-slate-200">Cronología de Eventos</h3>
+              <p className="text-xs text-slate-400 max-w-md mx-auto mt-2 leading-relaxed">
+                Próximamente podrás visualizar el registro detallado de incidencias del encuentro (goles, cambios, tarjetas y momentos clave) en tiempo real.
+              </p>
+            </div>
           </div>
         )}
 
@@ -1568,8 +1549,8 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
           </div>
         )}
 
-        {/* TAB 8: INFORME DEL ANALISTA */}
-        {activeTab === 'analista' && (
+        {/* TAB 8: INFORME DEL ANALISTA (ANÁLISIS) */}
+        {activeTab === 'analisis' && (
           <div className="space-y-6">
             <div className="flex items-center justify-between border-b border-slate-850 pb-4">
               <div>
@@ -1649,8 +1630,8 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
           </div>
         )}
 
-        {/* TAB 9: DOCUMENTACIÓN DEL PARTIDO */}
-        {activeTab === 'documentacion' && (
+        {/* TAB 9: DOCUMENTACIÓN DEL PARTIDO (PLAN DE PARTIDO) */}
+        {activeTab === 'plan' && (
           <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-850 pb-4">
               <div>
