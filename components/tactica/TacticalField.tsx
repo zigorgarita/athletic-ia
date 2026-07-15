@@ -24,6 +24,7 @@ interface TacticalFieldProps {
   onNodesChange: (newNodes: PositionNode[]) => void;
   onNodeClick: (node: PositionNode) => void;
   highlightedZone?: 'central' | 'interior' | 'exterior' | null;
+  selectedPlayerId?: string | null;
 }
 
 const POSITION_ROLES = ['POR', 'LD', 'LI', 'DFC', 'MCD', 'MC', 'MCO', 'ED', 'EI', 'DC'];
@@ -36,6 +37,7 @@ export function TacticalField({
   onNodesChange,
   onNodeClick,
   highlightedZone = null,
+  selectedPlayerId = null,
 }: TacticalFieldProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -215,6 +217,7 @@ export function TacticalField({
         {/* Render Nodes / Players */}
         {nodes.map((node) => {
           const assignedPlayer = team === 'propio' ? players.find((p) => p.id === node.player_id) : null;
+          const isSelected = !!(node.player_id && node.player_id === selectedPlayerId);
           const hasCustomDetails = node.customName || node.customNumber;
 
           // Determine label details
@@ -258,7 +261,9 @@ export function TacticalField({
               {/* Outer circle with premium jersey design */}
               <div
                 className={`h-12 w-12 rounded-full border-2 flex items-center justify-center shadow-xl transition-all duration-200 ${
-                  assignedPlayer
+                  isSelected
+                    ? 'border-amber-400 ring-4 ring-amber-500/50 scale-110 shadow-amber-500/30'
+                    : assignedPlayer
                     ? 'border-[#CC0E21] bg-slate-950 shadow-red-500/10'
                     : hasCustomDetails
                     ? 'border-blue-500 bg-slate-900 shadow-blue-500/10'

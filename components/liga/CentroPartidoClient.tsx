@@ -21,7 +21,8 @@ import { TacticalField, PositionNode } from '@/components/tactica/TacticalField'
 import {
   Trophy, MapPin, Users, Shield, Film,
   BookOpen, Plus, PlusCircle, Save, Trash2, FileText, ClipboardList,
-  Eye, Download, Upload, AlertCircle
+  Eye, Download, Upload, AlertCircle, Brain, TrendingUp, Lightbulb,
+  AlertTriangle, Activity, CheckCircle2, User
 } from 'lucide-react';
 
 interface CentroPartidoClientProps {
@@ -54,6 +55,7 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
   const { isEditMode } = useEditMode();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('analisis');
+  const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
   const [match, setMatch] = useState<Match | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(true);
@@ -988,159 +990,623 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
       <div className="bg-slate-900/10 border border-slate-900 rounded-2xl p-6 min-h-[500px]">
 
         {/* TAB 1: EQUIPO (CONVOCATORIA Y ESTADÍSTICAS) */}
-        {activeTab === 'equipo' && (
-          <div className="space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* Card Datos Encuentro */}
-              <div className="p-5 bg-slate-900/30 border border-slate-800 rounded-2xl space-y-4">
-                <div className="flex items-center justify-between border-b border-slate-800/60 pb-3">
-                  <h3 className="font-bold text-slate-200 flex items-center gap-2 text-sm">
-                    <MapPin className="h-4.5 w-4.5 text-[#CC0E21]" />
-                    Detalles del Encuentro
-                  </h3>
-                  {isEditMode && (
-                    <button
-                      onClick={() => {
-                        if (isEditingInfo) handleSaveGeneralInfo();
-                        else setIsEditingInfo(true);
-                      }}
-                      className="text-xs text-[#CC0E21] hover:underline font-bold"
-                    >
-                      {isEditingInfo ? 'Guardar' : 'Editar'}
-                    </button>
-                  )}
-                </div>
-                <div className="space-y-3">
-                  <div>
-                    <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block mb-1">Campo / Instalación</label>
-                    {isEditingInfo ? (
-                      <input value={matchCampo} onChange={(e) => setMatchCampo(e.target.value)} placeholder="Ej: Iparralde, Fadura..." className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-850 text-slate-100 text-xs focus:border-[#CC0E21] outline-none" />
-                    ) : (
-                      <span className="text-sm font-semibold text-slate-300">{matchCampo || 'No asignado'}</span>
-                    )}
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block mb-1">Hora del Partido</label>
-                    {isEditingInfo ? (
-                      <input value={matchHora} onChange={(e) => setMatchHora(e.target.value)} placeholder="Ej: 12:00, 17:30..." className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-850 text-slate-100 text-xs focus:border-[#CC0E21] outline-none" />
-                    ) : (
-                      <span className="text-sm font-semibold text-slate-300">{matchHora || 'No asignada'}</span>
-                    )}
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block mb-1">Impacto Clasificatorio</label>
-                    {isEditingInfo ? (
-                      <input value={matchClasificacionNota} onChange={(e) => setMatchClasificacionNota(e.target.value)} placeholder="Ej: Nos ponemos colíderes..." className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-850 text-slate-100 text-xs focus:border-[#CC0E21] outline-none" />
-                    ) : (
-                      <p className="text-xs text-slate-400 leading-relaxed italic">{matchClasificacionNota || 'Sin comentarios sobre la clasificación.'}</p>
-                    )}
-                  </div>
-                </div>
-              </div>
+        {activeTab === 'equipo' && (() => {
+          // Categorizar jugadores
+          const titularPlayers = nodesPropio
+            .filter((n) => n.player_id)
+            .map((node) => {
+              const player = players.find((p) => p.id === node.player_id);
+              return player ? { ...player, role: node.label, node } : null;
+            })
+            .filter(Boolean) as (Player & { role: string; node: PositionNode })[];
 
-              {/* Card Resumen Convocatoria */}
-              <div className="p-5 bg-slate-900/30 border border-slate-800 rounded-2xl space-y-4 md:col-span-2">
-                <h3 className="font-bold text-slate-200 flex items-center gap-2 text-sm border-b border-slate-800/60 pb-3">
-                  <Users className="h-4.5 w-4.5 text-[#CC0E21]" />
-                  Convocatoria ({matchStats.length} Jugadores)
-                </h3>
-                {matchStats.length === 0 ? (
-                  <div className="py-8 text-center text-slate-500 text-xs">
-                    No se ha registrado la convocatoria todavía para esta jornada.
+          const suplentePlayers = matchStats
+            .filter((stat) => !nodesPropio.some((node) => node.player_id === stat.player_id))
+            .map((stat) => {
+              const player = players.find((p) => p.id === stat.player_id);
+              return player ? { ...player, stat } : null;
+            })
+            .filter(Boolean) as (Player & { stat: MatchPlayerStats })[];
+
+          const noConvocados = players.filter(
+            (player) => !matchStats.some((stat) => stat.player_id === player.id)
+          );
+
+          const selectedPlayer = selectedPlayerId ? players.find((p) => p.id === selectedPlayerId) : null;
+          const selectedNode = selectedPlayerId ? nodesPropio.find((n) => n.player_id === selectedPlayerId) : null;
+
+          // Generador de mockups de IA por jugador basado en su demarcación natural
+          const getMockIAIndividual = (p: Player, node: PositionNode | undefined | null) => {
+            let category = 'Delantero';
+            if (['Portero'].includes(p.demarcacion)) category = 'Portero';
+            else if (['Defensa', 'Lateral', 'Central'].includes(p.demarcacion)) category = 'Defensa';
+            else if (['Centrocampista', 'Pivote', 'Interior', 'MCD', 'MC', 'MCO'].includes(p.demarcacion)) category = 'Centrocampista';
+
+            const isOutOfPosition = node && 
+              ((category === 'Portero' && node.label !== 'POR') ||
+               (category === 'Defensa' && !['DFC', 'LD', 'LI', 'CAD', 'CAI'].includes(node.label)) ||
+               (category === 'Centrocampista' && !['MC', 'MCD', 'MCO', 'Pivote', 'Interior'].includes(node.label)) ||
+               (category === 'Delantero' && !['DC', 'ED', 'EI', 'SP', 'Extremo'].includes(node.label)));
+
+            const encaje = isOutOfPosition ? 65 : 95;
+            const encajeLabel = isOutOfPosition ? 'Ajustado (Fuera de rol natural)' : 'Óptimo (Rol ideal)';
+
+            switch (category) {
+              case 'Portero':
+                return {
+                  encaje,
+                  encajeLabel,
+                  fortalezas: [
+                    'Excelente colocación bajo palos y reflejos rápidos.',
+                    'Seguridad y solvencia en salidas y blocaje aéreo.',
+                    'Liderazgo y comunicación constante con la defensa.'
+                  ],
+                  mejoras: [
+                    'Juego de pies bajo presión intensa de la delantera rival.',
+                    'Velocidad de reacción en salidas en el borde del área.'
+                  ],
+                  riesgos: [
+                    p.estado === 'Duda' ? 'Alerta física: Molestias menores que reducen golpeos en largo.' : 'Ninguno crítico detectado para esta jornada.'
+                  ],
+                  recomendaciones: [
+                    'Priorizar juego en corto con los centrales en salida organizada.',
+                    'Mantener una distancia prudencial en repliegues.'
+                  ]
+                };
+              case 'Defensa':
+                return {
+                  encaje,
+                  encajeLabel,
+                  fortalezas: [
+                    'Fuerte capacidad de anticipación y recuperación en duelos individuales.',
+                    'Excelente cobertura al lateral y juego aéreo contundente.',
+                    'Gran disciplina táctica y solidez en el repliegue.'
+                  ],
+                  mejoras: [
+                    'Precisión en envíos largos bajo presión de espaldas.',
+                    'Velocidad en basculaciones defensivas laterales.'
+                  ],
+                  riesgos: [
+                    p.estado === 'Duda' ? 'Riesgo de fatiga prematura y lentitud en giros.' : 'Vulnerabilidad ante delantera rival veloz con desmarques al espacio.'
+                  ],
+                  recomendaciones: [
+                    'Coordinar la altura de la línea de fuera de juego.',
+                    'Evitar saltar a la presión sin la cobertura del pivote defensivo.'
+                  ]
+                };
+              case 'Centrocampista':
+                return {
+                  encaje,
+                  encajeLabel,
+                  fortalezas: [
+                    'Gran visión de juego y precisión en distribución en corto.',
+                    'Excelente control orientado para superar la primera línea de presión.',
+                    'Compromiso táctico alto para equilibrar fases ofensivas y defensivas.'
+                  ],
+                  mejoras: [
+                    'Velocidad en la transición defensiva tras pérdida en campo rival.',
+                    'Efectividad en duelos terrestres divididos.'
+                  ],
+                  riesgos: [
+                    p.estado === 'Duda' ? 'Molestias musculares: Riesgo de pérdida de metros en el segundo tiempo.' : 'Pérdidas de balón en zonas de transición bajo presión rival.'
+                  ],
+                  recomendaciones: [
+                    'Temporizar el juego cuando el rival suba la intensidad de presión.',
+                    'Buscar pases progresivos y directos con el mediapunta/extremos.'
+                  ]
+                };
+              case 'Delantero':
+              default:
+                return {
+                  encaje,
+                  encajeLabel,
+                  fortalezas: [
+                    'Gran capacidad de finalización en el área y remate de primera.',
+                    'Velocidad punta para explotar el espacio libre en contragolpes.',
+                    'Capacidad de desborde y regate uno contra uno en banda.'
+                  ],
+                  mejoras: [
+                    'Coordinación en la presión alta tras pérdida en campo rival.',
+                    'Definición y juego con el perfil no hábil.'
+                  ],
+                  riesgos: [
+                    p.estado === 'Duda' ? 'Alerta física: Posible reducción de velocidad explosiva.' : 'Pérdida de balones aéreos contra centrales de gran envergadura.'
+                  ],
+                  recomendaciones: [
+                    'Fijar a la pareja de centrales rivales para liberar al mediapunta.',
+                    'Atacar el primer palo con agresividad en centros laterales.'
+                  ]
+                };
+            }
+          };
+
+          const mockIA = selectedPlayer ? getMockIAIndividual(selectedPlayer, selectedNode) : null;
+
+          return (
+            <div className="space-y-8">
+              {/* Contenedor Superior: Detalles + Grid Principal */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                
+                {/* COLUMNA IZQUIERDA Y CENTRAL: Detalles + Pizarra + Convocatoria (8 cols) */}
+                <div className="lg:col-span-8 space-y-6">
+                  
+                  {/* Detalles del Encuentro */}
+                  <div className="p-5 bg-slate-900/30 border border-slate-800 rounded-2xl">
+                    <div className="flex items-center justify-between border-b border-slate-800/60 pb-3 mb-4">
+                      <h3 className="font-bold text-slate-200 flex items-center gap-2 text-sm">
+                        <MapPin className="h-4.5 w-4.5 text-[#CC0E21]" />
+                        Detalles del Encuentro
+                      </h3>
+                      {isEditMode && (
+                        <button
+                          onClick={() => {
+                            if (isEditingInfo) handleSaveGeneralInfo();
+                            else setIsEditingInfo(true);
+                          }}
+                          className="text-xs text-[#CC0E21] hover:underline font-bold"
+                        >
+                          {isEditingInfo ? 'Guardar' : 'Editar'}
+                        </button>
+                      )}
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block mb-1">Campo / Instalación</label>
+                        {isEditingInfo ? (
+                          <input value={matchCampo} onChange={(e) => setMatchCampo(e.target.value)} placeholder="Ej: Iparralde, Fadura..." className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-850 text-slate-100 text-xs focus:border-[#CC0E21] outline-none" />
+                        ) : (
+                          <span className="text-xs font-semibold text-slate-300">{matchCampo || 'No asignado'}</span>
+                        )}
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block mb-1">Hora del Partido</label>
+                        {isEditingInfo ? (
+                          <input value={matchHora} onChange={(e) => setMatchHora(e.target.value)} placeholder="Ej: 12:00, 17:30..." className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-850 text-slate-100 text-xs focus:border-[#CC0E21] outline-none" />
+                        ) : (
+                          <span className="text-xs font-semibold text-slate-300">{matchHora || 'No asignada'}</span>
+                        )}
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block mb-1">Impacto Clasificatorio</label>
+                        {isEditingInfo ? (
+                          <input value={matchClasificacionNota} onChange={(e) => setMatchClasificacionNota(e.target.value)} placeholder="Ej: Nos ponemos colíderes..." className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-850 text-slate-100 text-xs focus:border-[#CC0E21] outline-none" />
+                        ) : (
+                          <p className="text-xs text-slate-400 leading-relaxed italic">{matchClasificacionNota || 'Sin comentarios sobre la clasificación.'}</p>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    {matchStats.map(stat => {
-                      const player = players.find(p => p.id === stat.player_id);
-                      if (!player) return null;
-                      return (
-                        <div key={stat.id} className="p-3 bg-slate-950/60 border border-slate-850 rounded-xl flex items-center gap-2.5">
-                          <div className="h-7 w-7 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-xs font-bold text-slate-200">
-                            {player.dorsal}
-                          </div>
-                          <div className="min-w-0">
-                            <h4 className="text-xs font-bold text-slate-200 truncate">{player.nombre} {player.apellidos}</h4>
-                            <span className="text-[10px] text-slate-500 font-bold">{stat.titular ? 'Titular' : 'Suplente'}</span>
+
+                  {/* Pizarra Táctica */}
+                  {nodesPropio.length > 0 && (
+                    <div className="p-6 bg-slate-900/30 border border-slate-800 rounded-2xl flex flex-col items-center">
+                      <div className="flex items-center justify-between border-b border-slate-800/60 pb-3 w-full mb-4">
+                        <h3 className="font-bold text-slate-200 flex items-center gap-2 text-sm">
+                          <Shield className="h-4.5 w-4.5 text-[#CC0E21]" />
+                          Disposición Táctica / Pizarra del Partido
+                        </h3>
+                        <Badge className="bg-[#CC0E21]/15 text-[#CC0E21] border-[#CC0E21]/30">
+                          {tacticalLineup?.nombre_pizarra || tacticalLineup?.nombre_sistema || '1-4-2-3-1'}
+                        </Badge>
+                      </div>
+                      <div className="w-full max-w-[550px] flex justify-center bg-slate-950/20 p-4 rounded-xl border border-slate-900/50">
+                        <TacticalField
+                          team="propio"
+                          nodes={nodesPropio}
+                          players={players}
+                          isEditMode={false}
+                          onNodesChange={() => {}}
+                          onNodeClick={(node) => {
+                            if (node.player_id) {
+                              setSelectedPlayerId(node.player_id);
+                            }
+                          }}
+                          selectedPlayerId={selectedPlayerId}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Convocatoria y Roster */}
+                  <div className="p-5 bg-slate-900/30 border border-slate-800 rounded-2xl space-y-4">
+                    <h3 className="font-bold text-slate-200 flex items-center gap-2 text-sm border-b border-slate-800/60 pb-3">
+                      <Users className="h-4.5 w-4.5 text-[#CC0E21]" />
+                      Panel de Convocatoria ({matchStats.length} Jugadores)
+                    </h3>
+                    
+                    {matchStats.length === 0 ? (
+                      <div className="py-8 text-center text-slate-500 text-xs">
+                        No se ha registrado la convocatoria todavía para esta jornada.
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {/* TITULARES */}
+                        <div>
+                          <h4 className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                            Once Inicial / Titulares ({titularPlayers.length})
+                          </h4>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                            {titularPlayers.map(p => {
+                              const isSelected = p.id === selectedPlayerId;
+                              return (
+                                <div
+                                  key={p.id}
+                                  onClick={() => setSelectedPlayerId(p.id)}
+                                  className={`p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                                    isSelected
+                                      ? 'bg-amber-500/10 border-amber-500/50 shadow-lg shadow-amber-500/5'
+                                      : 'bg-slate-950/60 border-slate-850 hover:border-slate-800'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2.5 min-w-0">
+                                    <div className={`h-7 w-7 rounded-lg flex items-center justify-center text-xs font-bold ${
+                                      isSelected
+                                        ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                                        : 'bg-slate-900 border border-slate-800 text-slate-200'
+                                    }`}>
+                                      {p.dorsal}
+                                    </div>
+                                    <div className="min-w-0">
+                                      <h4 className="text-xs font-bold text-slate-200 truncate">{p.nombre} {p.apellidos}</h4>
+                                      <div className="flex items-center gap-1.5 mt-0.5">
+                                        <span className="text-[9px] text-slate-400 font-bold">{p.demarcacion}</span>
+                                        <span className="text-[9px] text-[#CC0E21] font-black uppercase">({p.role})</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className={`text-[9px] px-1.5 py-0.5 rounded font-extrabold ${
+                                      p.estado === 'Disponible' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+                                      p.estado === 'Duda' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
+                                      'bg-red-500/10 text-red-400 border border-red-500/20'
+                                    }`}>
+                                      {p.estado}
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
-                      );
-                    })}
+
+                        {/* SUPLENTES */}
+                        {suplentePlayers.length > 0 && (
+                          <div>
+                            <h4 className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                              <span className="h-2 w-2 rounded-full bg-slate-500" />
+                              Suplencia / Convocados ({suplentePlayers.length})
+                            </h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                              {suplentePlayers.map(p => {
+                                const isSelected = p.id === selectedPlayerId;
+                                return (
+                                  <div
+                                    key={p.id}
+                                    onClick={() => setSelectedPlayerId(p.id)}
+                                    className={`p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                                      isSelected
+                                        ? 'bg-amber-500/10 border-amber-500/50 shadow-lg shadow-amber-500/5'
+                                        : 'bg-slate-950/40 border-slate-850 hover:border-slate-800'
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-2.5 min-w-0">
+                                      <div className={`h-7 w-7 rounded-lg flex items-center justify-center text-xs font-bold ${
+                                        isSelected
+                                          ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                                          : 'bg-slate-900 border border-slate-800 text-slate-200'
+                                      }`}>
+                                        {p.dorsal}
+                                      </div>
+                                      <div className="min-w-0">
+                                        <h4 className="text-xs font-bold text-slate-350 truncate">{p.nombre} {p.apellidos}</h4>
+                                        <span className="text-[9px] text-slate-500 font-bold block mt-0.5">{p.demarcacion}</span>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <span className={`text-[9px] px-1.5 py-0.5 rounded font-extrabold ${
+                                        p.estado === 'Disponible' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+                                        p.estado === 'Duda' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
+                                        'bg-red-500/10 text-red-400 border border-red-500/20'
+                                      }`}>
+                                        {p.estado}
+                                      </span>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* NO CONVOCADOS / BAJAS */}
+                        {noConvocados.length > 0 && (
+                          <div>
+                            <h4 className="text-[10px] text-red-400/80 font-bold uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                              <span className="h-2 w-2 rounded-full bg-red-500/60" />
+                              Resto de Plantilla ({noConvocados.length})
+                            </h4>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                              {noConvocados.map(p => {
+                                const isSelected = p.id === selectedPlayerId;
+                                return (
+                                  <div
+                                    key={p.id}
+                                    onClick={() => setSelectedPlayerId(p.id)}
+                                    className={`p-2 rounded-lg border transition-all cursor-pointer flex flex-col justify-between gap-1.5 text-center ${
+                                      isSelected
+                                        ? 'bg-amber-500/10 border-amber-500/50 shadow-lg shadow-amber-500/5'
+                                        : 'bg-slate-950/20 border-slate-850 hover:border-slate-800'
+                                    }`}
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-[10px] font-bold text-slate-400 font-mono">#{p.dorsal}</span>
+                                      <span className={`h-1.5 w-1.5 rounded-full ${
+                                        p.estado === 'Disponible' ? 'bg-emerald-500' :
+                                        p.estado === 'Duda' ? 'bg-amber-500' :
+                                        'bg-red-500'
+                                      }`} />
+                                    </div>
+                                    <h4 className="text-[10px] font-semibold text-slate-450 truncate leading-tight">{p.nombre}</h4>
+                                    <span className="text-[8px] text-slate-500 leading-none">{p.estado === 'Baja temporal' ? 'Baja' : p.estado}</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
+
+                {/* COLUMNA DERECHA: IA Táctica e IA Individual (4 cols) */}
+                <div className="lg:col-span-4 space-y-6">
+                  
+                  {/* Panel IA Táctica */}
+                  <div className="p-5 bg-slate-900/30 border border-slate-800 rounded-2xl space-y-4">
+                    <div className="flex items-center justify-between border-b border-slate-800/60 pb-3">
+                      <h3 className="font-bold text-slate-200 flex items-center gap-2 text-sm">
+                        <Brain className="h-4.5 w-4.5 text-[#CC0E21]" />
+                        Análisis del Sistema (IA)
+                      </h3>
+                      <span className="text-[9px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-1.5 py-0.5 rounded font-black tracking-widest uppercase flex items-center gap-1 animate-pulse">
+                        <Activity className="h-2.5 w-2.5" /> Activo
+                      </span>
+                    </div>
+
+                    <div className="space-y-4">
+                      {/* Equilibrio de formación */}
+                      <div>
+                        <h4 className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block mb-2">Equilibrio Sectorial</h4>
+                        <div className="space-y-2 bg-slate-950/40 border border-slate-850 p-3 rounded-xl">
+                          <div>
+                            <div className="flex justify-between text-[10px] mb-1 font-bold">
+                              <span className="text-slate-400">Bloque Defensivo</span>
+                              <span className="text-emerald-400">85%</span>
+                            </div>
+                            <div className="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden">
+                              <div className="bg-emerald-500 h-full rounded-full" style={{ width: '85%' }} />
+                            </div>
+                          </div>
+                          <div>
+                            <div className="flex justify-between text-[10px] mb-1 font-bold">
+                              <span className="text-slate-400">Medio / Transición</span>
+                              <span className="text-emerald-400">90%</span>
+                            </div>
+                            <div className="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden">
+                              <div className="bg-emerald-500 h-full rounded-full" style={{ width: '90%' }} />
+                            </div>
+                          </div>
+                          <div>
+                            <div className="flex justify-between text-[10px] mb-1 font-bold">
+                              <span className="text-slate-400">Poder Ofensivo</span>
+                              <span className="text-amber-400">78%</span>
+                            </div>
+                            <div className="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden">
+                              <div className="bg-amber-500 h-full rounded-full" style={{ width: '78%' }} />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Fortalezas */}
+                      <div className="space-y-1.5">
+                        <h4 className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                          <CheckCircle2 className="h-3.5 w-3.5" /> Fortalezas del Sistema
+                        </h4>
+                        <ul className="text-xs text-slate-350 space-y-1 pl-4 list-disc">
+                          <li>Sólida densidad defensiva en el pasillo central mediante el doble pivote.</li>
+                          <li>Amplitud ofensiva natural gracias al despliegue y profundidad de los volantes/extremos.</li>
+                          <li>Estructura idónea para transiciones rápidas defensa-ataque tras recuperación de balón.</li>
+                        </ul>
+                      </div>
+
+                      {/* Debilidades */}
+                      <div className="space-y-1.5">
+                        <h4 className="text-[10px] text-amber-500 font-bold uppercase tracking-wider flex items-center gap-1">
+                          <AlertTriangle className="h-3.5 w-3.5" /> Desajustes / Debilidades
+                        </h4>
+                        <ul className="text-xs text-slate-350 space-y-1 pl-4 list-disc">
+                          <li>Distancia de separación excesiva entre la línea de ataque y la línea defensiva en bloque bajo.</li>
+                          <li>Exposición en las bandas a espaldas de los laterales si no se coordinan coberturas de pivotes.</li>
+                        </ul>
+                      </div>
+
+                      {/* Riesgos y Alertas */}
+                      <div className="space-y-2 bg-red-500/5 border border-red-500/10 p-3 rounded-xl">
+                        <h4 className="text-[10px] text-red-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                          <AlertCircle className="h-3.5 w-3.5" /> Riesgos de Roster
+                        </h4>
+                        <div className="space-y-1.5">
+                          <div className="text-[11px] text-slate-300 flex items-start gap-1">
+                            <span className="text-[#CC0E21] font-bold mt-0.5">•</span>
+                            <span>Presencia de jugadores listados como &quot;Duda&quot; en el once inicial. Posible decaimiento físico en el minuto 60.</span>
+                          </div>
+                          <div className="text-[11px] text-slate-300 flex items-start gap-1">
+                            <span className="text-[#CC0E21] font-bold mt-0.5">•</span>
+                            <span>Un jugador en campo está posicionado fuera de su rol natural del perfil.</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Recomendaciones */}
+                      <div className="space-y-1.5">
+                        <h4 className="text-[10px] text-blue-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                          <Lightbulb className="h-3.5 w-3.5" /> Recomendaciones Generales
+                        </h4>
+                        <ul className="text-xs text-slate-350 space-y-1 pl-4 list-disc">
+                          <li>Asegurar que los interiores mantengan distancia de seguridad táctica.</li>
+                          <li>Ajustar la altura de la zaga defensiva para evitar pases a la espalda de centrales lentos.</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Panel IA Individual */}
+                  <div className="p-5 bg-slate-900/30 border border-slate-800 rounded-2xl min-h-[300px] flex flex-col">
+                    <h3 className="font-bold text-slate-200 flex items-center gap-2 text-sm border-b border-slate-800/60 pb-3 mb-4">
+                      <User className="h-4.5 w-4.5 text-[#CC0E21]" />
+                      Informe Individual (IA)
+                    </h3>
+
+                    {mockIA && selectedPlayer ? (
+                      <div className="space-y-4 flex-1">
+                        {/* Cabecera Jugador */}
+                        <div className="flex items-center gap-3 bg-slate-950/40 border border-slate-850 p-3 rounded-xl">
+                          <div className="h-10 w-10 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-sm font-bold text-slate-200 font-mono">
+                            {selectedPlayer.dorsal}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <h4 className="text-sm font-bold text-slate-200 truncate">{selectedPlayer.nombre} {selectedPlayer.apellidos}</h4>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className="text-[10px] text-slate-400 font-bold">{selectedPlayer.demarcacion}</span>
+                              {selectedNode && (
+                                <span className="text-[10px] text-[#CC0E21] font-black uppercase">Rol: {selectedNode.label}</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Encaje en el rol */}
+                        <div>
+                          <div className="flex justify-between text-[10px] mb-1 font-bold">
+                            <span className="text-slate-400">Encaje del Jugador en el Sistema</span>
+                            <span className={mockIA.encaje > 80 ? 'text-emerald-400' : 'text-amber-400'}>{mockIA.encaje}%</span>
+                          </div>
+                          <div className="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden">
+                            <div className={`h-full rounded-full ${mockIA.encaje > 80 ? 'bg-emerald-500' : 'bg-amber-500'}`} style={{ width: `${mockIA.encaje}%` }} />
+                          </div>
+                          <span className="text-[9px] text-slate-500 font-semibold mt-1 block">{mockIA.encajeLabel}</span>
+                        </div>
+
+                        {/* Puntos Fuertes */}
+                        <div className="space-y-1.5">
+                          <h5 className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                            <CheckCircle2 className="h-3 w-3" /> Puntos Fuertes
+                          </h5>
+                          <ul className="text-[11px] text-slate-350 space-y-1 pl-4 list-disc">
+                            {mockIA.fortalezas.map((f, idx) => <li key={idx}>{f}</li>)}
+                          </ul>
+                        </div>
+
+                        {/* Aspectos a Mejorar */}
+                        <div className="space-y-1.5">
+                          <h5 className="text-[10px] text-amber-500 font-bold uppercase tracking-wider flex items-center gap-1">
+                            <TrendingUp className="h-3 w-3" /> Puntos de Mejora
+                          </h5>
+                          <ul className="text-[11px] text-slate-350 space-y-1 pl-4 list-disc">
+                            {mockIA.mejoras.map((m, idx) => <li key={idx}>{m}</li>)}
+                          </ul>
+                        </div>
+
+                        {/* Riesgos */}
+                        <div className="space-y-1.5 bg-red-500/5 border border-red-500/10 p-2.5 rounded-lg">
+                          <h5 className="text-[10px] text-red-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                            <AlertTriangle className="h-3 w-3" /> Factores de Riesgo
+                          </h5>
+                          <ul className="text-[10px] text-slate-400 space-y-1 pl-3 list-disc">
+                            {mockIA.riesgos.map((r, idx) => <li key={idx}>{r}</li>)}
+                          </ul>
+                        </div>
+
+                        {/* Recomendación Individual */}
+                        <div className="space-y-1.5">
+                          <h5 className="text-[10px] text-blue-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                            <Lightbulb className="h-3 w-3" /> Recomendaciones IA
+                          </h5>
+                          <ul className="text-[11px] text-slate-350 space-y-1 pl-4 list-disc">
+                            {mockIA.recomendaciones.map((rec, idx) => <li key={idx}>{rec}</li>)}
+                          </ul>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex-1 flex flex-col items-center justify-center text-center p-6 border border-dashed border-slate-800 rounded-xl bg-slate-950/20">
+                        <Brain className="h-10 w-10 text-slate-700 mb-2.5 animate-pulse" />
+                        <h4 className="text-xs font-bold text-slate-300">Mesa de Análisis de Jugador</h4>
+                        <p className="text-[11px] text-slate-500 leading-normal max-w-[200px] mt-1.5">
+                          Selecciona a cualquier jugador desde la pizarra táctica o la convocatoria para visualizar su informe individual en tiempo real.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
               </div>
+
+              {/* Estadísticas de Jugadores */}
+              {matchStats.length > 0 && (
+                <div className="p-5 bg-slate-900/30 border border-slate-800 rounded-2xl space-y-4">
+                  <h3 className="font-bold text-slate-200 flex items-center gap-2 text-sm border-b border-slate-800/60 pb-3">
+                    <ClipboardList className="h-4.5 w-4.5 text-[#CC0E21]" />
+                    Estadísticas y Minutos de Juego
+                  </h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="border-b border-slate-800 text-slate-500 uppercase tracking-wider text-[10px]">
+                          <th className="py-2.5 px-3">Jugador</th>
+                          <th className="py-2.5 px-3 text-center">Rol</th>
+                          <th className="py-2.5 px-3 text-center">Minutos</th>
+                          <th className="py-2.5 px-3 text-center">Goles</th>
+                          <th className="py-2.5 px-3 text-center">Asist.</th>
+                          <th className="py-2.5 px-3 text-center">Tarjetas</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-850">
+                        {matchStats.map(stat => {
+                          const player = players.find(p => p.id === stat.player_id);
+                          if (!player) return null;
+                          return (
+                            <tr key={stat.id} className="hover:bg-slate-900/20 text-slate-350">
+                              <td className="py-2.5 px-3 font-semibold text-slate-100">{player.nombre} {player.apellidos}</td>
+                              <td className="py-2.5 px-3 text-center">
+                                <Badge className={stat.titular ? 'bg-[#CC0E21]/15 text-[#CC0E21] border-[#CC0E21]/30' : 'bg-slate-800 text-slate-400'}>
+                                  {stat.titular ? 'Titular' : 'Suplente'}
+                                </Badge>
+                              </td>
+                              <td className="py-2.5 px-3 text-center font-mono font-bold text-slate-200">{stat.minutos}&apos;</td>
+                              <td className="py-2.5 px-3 text-center font-bold text-green-400">{stat.goles || 0}</td>
+                              <td className="py-2.5 px-3 text-center font-bold text-amber-400">{stat.asistencias || 0}</td>
+                              <td className="py-2.5 px-3 text-center">
+                                <div className="flex items-center justify-center gap-1">
+                                  {stat.tarjeta_amarilla && <div className="h-4 w-3 bg-yellow-500 rounded-sm" title="Tarjeta Amarilla" />}
+                                  {stat.tarjeta_roja && <div className="h-4 w-3 bg-red-500 rounded-sm" title="Tarjeta Roja" />}
+                                  {!stat.tarjeta_amarilla && !stat.tarjeta_roja && <span className="text-slate-600">-</span>}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
             </div>
-
-            {/* Pizarra Táctica / Alineación Visual */}
-            {nodesPropio.length > 0 && (
-              <div className="p-6 bg-slate-900/30 border border-slate-800/80 rounded-2xl space-y-4 flex flex-col items-center">
-                <h3 className="font-bold text-slate-200 flex items-center gap-2 text-sm border-b border-slate-800/60 pb-3 w-full self-start">
-                  <Shield className="h-4.5 w-4.5 text-[#CC0E21]" />
-                  Disposición Táctica / Pizarra del Partido {tacticalLineup?.nombre_pizarra && `(${tacticalLineup.nombre_pizarra})`}
-                </h3>
-                <div className="w-full max-w-[700px] flex justify-center bg-slate-950/20 p-4 rounded-xl border border-slate-900/50">
-                  <TacticalField
-                    team="propio"
-                    nodes={nodesPropio}
-                    players={players}
-                    isEditMode={false}
-                    onNodesChange={() => {}}
-                    onNodeClick={() => {}}
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Estadísticas de Jugadores */}
-            {matchStats.length > 0 && (
-              <div className="p-5 bg-slate-900/30 border border-slate-800 rounded-2xl space-y-4">
-                <h3 className="font-bold text-slate-200 flex items-center gap-2 text-sm border-b border-slate-800/60 pb-3">
-                  <ClipboardList className="h-4.5 w-4.5 text-[#CC0E21]" />
-                  Estadísticas y Minutos de Juego
-                </h3>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs border-collapse">
-                    <thead>
-                      <tr className="border-b border-slate-800 text-slate-500 uppercase tracking-wider text-[10px]">
-                        <th className="py-2.5 px-3">Jugador</th>
-                        <th className="py-2.5 px-3 text-center">Rol</th>
-                        <th className="py-2.5 px-3 text-center">Minutos</th>
-                        <th className="py-2.5 px-3 text-center">Goles</th>
-                        <th className="py-2.5 px-3 text-center">Asist.</th>
-                        <th className="py-2.5 px-3 text-center">Tarjetas</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-850">
-                      {matchStats.map(stat => {
-                        const player = players.find(p => p.id === stat.player_id);
-                        if (!player) return null;
-                        return (
-                          <tr key={stat.id} className="hover:bg-slate-900/20 text-slate-300">
-                            <td className="py-2.5 px-3 font-semibold text-slate-100">{player.nombre} {player.apellidos}</td>
-                            <td className="py-2.5 px-3 text-center">
-                              <Badge className={stat.titular ? 'bg-[#CC0E21]/15 text-[#CC0E21] border-[#CC0E21]/30' : 'bg-slate-800 text-slate-400'}>
-                                {stat.titular ? 'Titular' : 'Suplente'}
-                              </Badge>
-                            </td>
-                            <td className="py-2.5 px-3 text-center font-mono font-bold text-slate-200">{stat.minutos}&apos;</td>
-                            <td className="py-2.5 px-3 text-center font-bold text-green-400">{stat.goles || 0}</td>
-                            <td className="py-2.5 px-3 text-center font-bold text-amber-400">{stat.asistencias || 0}</td>
-                            <td className="py-2.5 px-3 text-center">
-                              <div className="flex items-center justify-center gap-1">
-                                {stat.tarjeta_amarilla && <div className="h-4 w-3 bg-yellow-500 rounded-sm" title="Tarjeta Amarilla" />}
-                                {stat.tarjeta_roja && <div className="h-4 w-3 bg-red-500 rounded-sm" title="Tarjeta Roja" />}
-                                {!stat.tarjeta_amarilla && !stat.tarjeta_roja && <span className="text-slate-600">-</span>}
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
+          );
+        })()}
 
         {/* TAB 2: ABP DEL PARTIDO */}
         {activeTab === 'abp' && (
