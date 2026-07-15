@@ -22,7 +22,7 @@ import {
   Trophy, MapPin, Users, Shield, Film,
   BookOpen, Plus, PlusCircle, Save, Trash2, FileText, ClipboardList,
   Eye, Download, Upload, AlertCircle, Brain, TrendingUp, Lightbulb,
-  AlertTriangle, Activity, CheckCircle2, User, Calendar, Image, FolderOpen
+  AlertTriangle, Activity, CheckCircle2, User, Calendar, Image, FolderOpen, RefreshCw
 } from 'lucide-react';
 
 interface CentroPartidoClientProps {
@@ -2330,62 +2330,192 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
           );
         })()}
 
-        {/* TAB 9: DOCUMENTACIÓN DEL PARTIDO (PLAN DE PARTIDO) */}
-        {activeTab === 'plan' && (
-          <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-850 pb-4">
-              <div>
-                <h3 className="font-bold text-slate-200 flex items-center gap-2">
-                  <BookOpen className="h-5 w-5 text-[#CC0E21]" />
-                  Documentación del Partido
-                </h3>
-                <p className="text-slate-500 text-xs mt-0.5">Repositorio centralizado del encuentro: convocatorias, planes de partido e informes del rival.</p>
-              </div>
-              <Button onClick={() => setIsDocModalOpen(true)} className="flex items-center gap-1 text-xs self-start sm:self-auto">
-                <Plus className="h-3.5 w-3.5" />
-                Añadir Documento
-              </Button>
-            </div>
+        {activeTab === 'plan' && (() => {
+          const mainPlan = documents.find(doc => doc.tipo_documento === 'Plan de partido');
+          const otherDocs = documents.filter(doc => doc.id !== mainPlan?.id);
 
-            {documents.length === 0 ? (
-              <div className="p-12 border border-dashed border-slate-800 rounded-2xl text-center text-slate-500 space-y-2 bg-slate-900/5">
-                <BookOpen className="h-10 w-10 text-slate-700 mx-auto" />
-                <p className="text-sm">No hay documentos cargados para esta jornada todavía.</p>
+          return (
+            <div className="space-y-6">
+              {/* CABECERA */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-850 pb-4">
+                <div>
+                  <h3 className="font-bold text-slate-200 flex items-center gap-2">
+                    <BookOpen className="h-5 w-5 text-[#CC0E21]" />
+                    Planificación del Encuentro
+                  </h3>
+                  <p className="text-slate-500 text-xs mt-0.5">Repositorio de trabajo pre-partido: planes de juego, convocatorias e informes.</p>
+                </div>
+                <Button onClick={() => setIsDocModalOpen(true)} className="flex items-center gap-1.5 text-xs self-start sm:self-auto">
+                  <Plus className="h-4 w-4" />
+                  Añadir Documento
+                </Button>
               </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {documents.map(doc => (
-                  <div key={doc.id} className="p-5 bg-slate-950/20 border border-slate-850 rounded-2xl flex flex-col justify-between gap-4">
-                    <div className="space-y-2.5">
-                      <div className="flex items-center justify-between">
-                        <Badge className="bg-slate-850 border border-slate-800 text-slate-400">
-                          {doc.tipo_documento}
-                        </Badge>
-                        <span className="text-[10px] text-slate-500 font-bold">{new Date(doc.fecha).toLocaleDateString('es-ES')}</span>
+
+              {/* CONTENIDO EN GRID */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                
+                {/* COLUMNA IZQUIERDA: PLAN PRINCIPAL + ADJUNTOS (8 cols) */}
+                <div className="lg:col-span-8 space-y-6">
+                  
+                  {/* AREA 1: PLAN DE PARTIDO PRINCIPAL */}
+                  <div className="p-5 bg-slate-900/30 border border-slate-800 rounded-2xl space-y-4">
+                    <h4 className="text-xs font-black uppercase text-slate-200 tracking-widest border-b border-slate-850 pb-2">
+                      Plan de Partido Principal
+                    </h4>
+                    
+                    {mainPlan ? (
+                      <div className="p-4 bg-slate-950/60 border border-[#CC0E21]/20 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-4 relative overflow-hidden">
+                        <div className="absolute top-0 left-0 bg-[#CC0E21] w-1 h-full" />
+                        <div className="space-y-2 pl-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[9px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded font-extrabold uppercase">
+                              Vigente
+                            </span>
+                            <span className="text-[10px] text-slate-500 font-medium">Actualizado: {new Date(mainPlan.fecha).toLocaleDateString('es-ES')}</span>
+                          </div>
+                          <div>
+                            <h5 className="text-sm font-bold text-slate-200">{mainPlan.nombre_documento}</h5>
+                            {mainPlan.comentario && <p className="text-xs text-slate-400 italic mt-0.5">{mainPlan.comentario}</p>}
+                          </div>
+                          <div className="flex items-center gap-4 text-[10px] text-slate-500">
+                            <span className="flex items-center gap-1"><User className="h-3 w-3" /> Responsable: Cuerpo Técnico</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 self-start md:self-auto pl-2 md:pl-0">
+                          <Button
+                            onClick={() => window.open(mainPlan.url_storage, '_blank', 'noopener,noreferrer')}
+                            className="flex items-center gap-1.5 text-xs py-1.5 px-3 bg-slate-900 border border-slate-800 text-slate-200 hover:bg-slate-855 transition-colors"
+                          >
+                            <Download className="h-3.5 w-3.5 text-[#CC0E21]" />
+                            Ver / Descargar
+                          </Button>
+                          <button onClick={() => handleDeleteDoc(mainPlan.id)} className="text-slate-500 hover:text-red-400 p-2 border border-slate-850 bg-slate-900/40 rounded-xl hover:border-red-900/30 transition-colors">
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
                       </div>
-                      <div>
-                        <h4 className="text-sm font-bold text-slate-200">{doc.nombre_documento}</h4>
-                        {doc.comentario && <p className="text-xs text-slate-400 italic mt-1 leading-relaxed">{doc.comentario}</p>}
+                    ) : (
+                      <div className="p-6 border border-dashed border-slate-800 rounded-xl text-center text-slate-500 space-y-3 bg-slate-950/20">
+                        <div className="h-10 w-10 rounded-full bg-slate-900 border border-slate-850 flex items-center justify-center mx-auto text-slate-650">
+                          <BookOpen className="h-5 w-5" />
+                        </div>
+                        <div className="max-w-md mx-auto space-y-1">
+                          <p className="text-xs font-bold text-slate-405">No se ha cargado el Plan de Partido Principal</p>
+                          <p className="text-[10px] text-slate-500 leading-relaxed">Sube el documento de planificación para que los jugadores y asistentes conozcan las directrices tácticas del encuentro.</p>
+                        </div>
+                        <Button onClick={() => { setDocType('Plan de partido'); setIsDocModalOpen(true); }} className="text-xs py-1.5 px-3 bg-[#CC0E21]/10 text-[#CC0E21] border border-[#CC0E21]/20 hover:bg-[#CC0E21]/20">
+                          Subir Plan de Partido
+                        </Button>
                       </div>
+                    )}
+                  </div>
+
+                  {/* AREA 2: DOCUMENTACIÓN ADJUNTA */}
+                  <div className="p-5 bg-slate-900/30 border border-slate-800 rounded-2xl space-y-4">
+                    <h4 className="text-xs font-black uppercase text-slate-200 tracking-widest border-b border-slate-850 pb-2">
+                      Documentación Adjunta y Archivos
+                    </h4>
+                    
+                    {otherDocs.length === 0 ? (
+                      <div className="p-8 text-center text-slate-600 space-y-1">
+                        <FileText className="h-8 w-8 text-slate-800 mx-auto" />
+                        <p className="text-xs font-medium">No hay informes o documentos adicionales subidos.</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {otherDocs.map(doc => (
+                          <div key={doc.id} className="p-4 bg-slate-950/20 border border-slate-850 rounded-xl flex flex-col justify-between gap-4.5 hover:border-slate-800 transition-colors">
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between">
+                                <Badge className="bg-slate-850 border border-slate-800 text-[9px] text-slate-400 font-bold px-1.5 py-0.5 rounded">
+                                  {doc.tipo_documento}
+                                </Badge>
+                                <span className="text-[9px] text-slate-500 font-medium">{new Date(doc.fecha).toLocaleDateString('es-ES')}</span>
+                              </div>
+                              <div>
+                                <h5 className="text-xs font-bold text-slate-200 line-clamp-1">{doc.nombre_documento}</h5>
+                                {doc.comentario && <p className="text-[10px] text-slate-400 italic mt-0.5 line-clamp-2 leading-relaxed">{doc.comentario}</p>}
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-between border-t border-slate-850/60 pt-2.5">
+                              <Button
+                                onClick={() => window.open(doc.url_storage, '_blank', 'noopener,noreferrer')}
+                                className="flex items-center gap-1.5 text-[10px] py-1 px-2.5 bg-slate-900 border border-slate-855 text-slate-350 hover:text-slate-200"
+                              >
+                                <Download className="h-3 w-3 text-[#CC0E21]" />
+                                Descargar
+                              </Button>
+                              <button onClick={() => handleDeleteDoc(doc.id)} className="text-slate-600 hover:text-red-400 p-1">
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                </div>
+
+                {/* COLUMNA DERECHA: ACTA RFEF + ACCIONES RÁPIDAS (4 cols) */}
+                <div className="lg:col-span-4 space-y-6">
+                  
+                  {/* AREA 3: ACTA OFICIAL RFEF */}
+                  <div className="p-5 bg-slate-900/30 border border-slate-800 rounded-2xl space-y-4">
+                    <div className="flex items-center justify-between border-b border-slate-850 pb-2">
+                      <h4 className="text-xs font-black uppercase text-slate-200 tracking-widest flex items-center gap-1.5">
+                        <Shield className="h-4 w-4 text-[#CC0E21]" />
+                        Acta Oficial RFEF
+                      </h4>
+                      <span className="text-[8px] bg-amber-500/15 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded font-black tracking-widest uppercase">
+                        Pendiente
+                      </span>
                     </div>
-                    <div className="flex items-center justify-between border-t border-slate-850 pt-3">
-                      <Button
-                        onClick={() => window.open(doc.url_storage, '_blank', 'noopener,noreferrer')}
-                        className="flex items-center gap-1.5 text-xs py-1.5 px-3 bg-slate-900 border border-slate-800 text-slate-200"
-                      >
-                        <Download className="h-3.5 w-3.5 text-[#CC0E21]" />
-                        Ver / Descargar
-                      </Button>
-                      <button onClick={() => handleDeleteDoc(doc.id)} className="text-slate-500 hover:text-red-400 p-1">
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                    
+                    <div className="p-4 bg-slate-950/40 border border-slate-850 rounded-xl space-y-3 text-center">
+                      <div className="h-10 w-10 rounded-full bg-slate-900 border border-slate-850 flex items-center justify-center mx-auto text-slate-600">
+                        <FileText className="h-5 w-5" />
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-xs font-bold text-slate-300">Sincronización de Acta Oficial</p>
+                        <p className="text-[9px] text-slate-500 leading-relaxed">
+                          Permite enlazar directamente el acta oficial RFEF una vez cerrado y subido por el equipo arbitral en su portal.
+                        </p>
+                      </div>
+                      <div className="pt-1.5">
+                        <Button disabled className="w-full flex items-center justify-center gap-1.5 text-[10px] py-1.5 bg-slate-900 border border-slate-850 text-slate-500 select-none">
+                          <RefreshCw className="h-3 w-3 animate-pulse" />
+                          Sincronizar con RFEF
+                        </Button>
+                      </div>
                     </div>
                   </div>
-                ))}
+
+                  {/* AREA 4: ACCIONES RÁPIDAS / GUÍA */}
+                  <div className="p-5 bg-slate-900/30 border border-slate-850 rounded-2xl space-y-3.5">
+                    <h4 className="text-xs font-black uppercase text-slate-200 tracking-widest border-b border-slate-850 pb-2">
+                      Gestión Documental
+                    </h4>
+                    <div className="space-y-2">
+                      <Button onClick={() => setIsDocModalOpen(true)} className="w-full flex items-center justify-center gap-1.5 text-xs py-2 bg-[#CC0E21] hover:bg-[#a80b1a]">
+                        <Plus className="h-4 w-4" />
+                        Subir Nuevo Documento
+                      </Button>
+                    </div>
+                    <div className="p-3 bg-slate-950/20 border border-slate-850/60 rounded-xl">
+                      <span className="text-[9px] text-[#CC0E21] font-extrabold uppercase tracking-wider block mb-1">Tip de Formato</span>
+                      <p className="text-[10px] text-slate-450 leading-relaxed">
+                        Para optimizar la visualización por parte de los jugadores en la app móvil, te recomendamos subir los planes y convocatorias en formato **PDF** o mediante enlaces públicos.
+                      </p>
+                    </div>
+                  </div>
+
+                </div>
+
               </div>
-            )}
-          </div>
-        )}
+            </div>
+          );
+        })()}
 
       </div>
 
