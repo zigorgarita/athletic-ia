@@ -22,7 +22,8 @@ import {
   Trophy, MapPin, Users, Shield, Film,
   BookOpen, Plus, PlusCircle, Save, Trash2, FileText, ClipboardList,
   Eye, Download, Upload, AlertCircle, Brain, TrendingUp, Lightbulb,
-  AlertTriangle, Activity, CheckCircle2, User, Calendar, Image, FolderOpen, RefreshCw
+  AlertTriangle, Activity, CheckCircle2, User, Calendar, Image, FolderOpen, RefreshCw,
+  Sparkles, PlayCircle, Target
 } from 'lucide-react';
 
 interface CentroPartidoClientProps {
@@ -1609,131 +1610,348 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
         })()}
 
         {/* TAB 2: ABP DEL PARTIDO */}
-        {activeTab === 'abp' && (
-          <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-850 pb-4">
-              <div>
-                <h3 className="font-bold text-slate-200 flex items-center gap-2">
-                  <Shield className="h-5 w-5 text-[#CC0E21]" />
-                  Acciones a Balón Parado del Partido
-                </h3>
-                <p className="text-slate-500 text-xs mt-0.5">Clona jugadas maestras y adapta las asignaciones sin modificar la biblioteca principal.</p>
-              </div>
-              <div className="flex items-center gap-2 self-start sm:self-auto">
-                <Button onClick={openImportABPModal} className="flex items-center gap-1 text-xs">
-                  <Plus className="h-3.5 w-3.5" />
-                  Importar de Biblioteca
-                </Button>
-                <Button onClick={() => setIsCreatingABP(true)} variant="secondary" className="flex items-center gap-1 text-xs">
-                  <PlusCircle className="h-3.5 w-3.5" />
-                  Nueva ABP Exclusiva
-                </Button>
-              </div>
-            </div>
+        {activeTab === 'abp' && (() => {
+          const offensiveABPs = matchABPs.filter(abp => 
+            abp.tipo.toLowerCase().includes('ofensiv') || 
+            abp.tipo.toLowerCase().includes('saque')
+          );
+          const defensiveABPs = matchABPs.filter(abp => 
+            !abp.tipo.toLowerCase().includes('ofensiv') && 
+            !abp.tipo.toLowerCase().includes('saque')
+          );
 
-            {matchABPs.length === 0 ? (
-              <div className="p-12 border border-dashed border-slate-800 rounded-2xl text-center text-slate-500 space-y-3 bg-slate-900/5">
-                <Shield className="h-10 w-10 text-slate-700 mx-auto" />
-                <p className="text-sm">No se han asociado jugadas ABP a este partido de liga.</p>
-                <Button onClick={openImportABPModal} variant="secondary" className="text-xs">Importar una jugada ahora</Button>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                {/* Lateral: List of match ABPs */}
-                <div className="space-y-2">
-                  {matchABPs.map(abp => {
-                    const isSelected = selectedABP?.id === abp.id;
-                    return (
-                      <div
-                        key={abp.id}
-                        onClick={() => setSelectedABP(abp)}
-                        className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
-                          isSelected
-                            ? 'bg-[#CC0E21]/10 border-[#CC0E21]/40 text-[#CC0E21]'
-                            : 'bg-slate-900/30 border-slate-800 hover:border-slate-700 text-slate-300'
-                        }`}
-                      >
-                        <div className="min-w-0">
-                          <span className="text-[9px] font-black uppercase text-[#CC0E21]">{abp.tipo}</span>
-                          <h4 className="text-xs font-bold text-slate-200 truncate mt-0.5">{abp.titulo}</h4>
-                        </div>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteMatchABP(abp.id);
-                          }}
-                          className="text-slate-500 hover:text-red-400 p-1"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    );
-                  })}
+          return (
+            <div className="space-y-6">
+              {/* CABECERA */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-850 pb-4">
+                <div>
+                  <h3 className="font-bold text-slate-200 flex items-center gap-2">
+                    <Shield className="h-5 w-5 text-[#CC0E21]" />
+                    Acciones a Balón Parado (ABP)
+                  </h3>
+                  <p className="text-slate-500 text-xs mt-0.5">Centro de preparación estratégica. Diseña y asigna responsabilidades para faltas, córners y saques.</p>
                 </div>
+                <div className="flex items-center gap-2 self-start sm:self-auto">
+                  <Button onClick={openImportABPModal} className="flex items-center gap-1.5 text-xs">
+                    <Plus className="h-3.5 w-3.5" />
+                    Importar de Biblioteca
+                  </Button>
+                  <Button onClick={() => setIsCreatingABP(true)} variant="secondary" className="flex items-center gap-1.5 text-xs">
+                    <PlusCircle className="h-3.5 w-3.5" />
+                    Nueva ABP Exclusiva
+                  </Button>
+                </div>
+              </div>
 
-                {/* Main: Details, Player Assignments & Video */}
-                {selectedABP && (
-                  <div className="lg:col-span-3 p-6 bg-slate-950/20 border border-slate-850 rounded-2xl space-y-6">
-                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b border-slate-850 pb-4">
-                      <div>
-                        <span className="text-[10px] font-black uppercase tracking-widest text-[#CC0E21]">{selectedABP.tipo}</span>
-                        <h3 className="text-lg font-bold text-slate-100 mt-1">{selectedABP.titulo}</h3>
-                        <p className="text-xs text-slate-400 mt-1">{selectedABP.descripcion}</p>
-                      </div>
-                      {selectedABP.video_url && (
-                        <Button
-                          onClick={() => handlePlayVideo(selectedABP.titulo, selectedABP.video_url!, selectedABP.tipo_origen)}
-                          className="flex items-center gap-1.5 text-xs py-1.5 px-3 self-start"
-                        >
-                          <Film className="h-3.5 w-3.5" />
-                          Ver vídeo ABP
-                        </Button>
-                      )}
-                    </div>
-
-                    {/* Role Player Assignments Editor */}
-                    <div className="space-y-4">
-                      <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                        <Users className="h-4 w-4 text-[#CC0E21]" />
-                        Asignación de Roles del Partido
+              {matchABPs.length === 0 ? (
+                <div className="p-12 border border-dashed border-slate-800 rounded-2xl text-center text-slate-500 space-y-3 bg-slate-900/5">
+                  <Shield className="h-10 w-10 text-slate-700 mx-auto" />
+                  <div className="max-w-md mx-auto space-y-1">
+                    <p className="text-sm font-bold text-slate-400">No se han asociado jugadas ABP a este partido todavía</p>
+                    <p className="text-xs text-slate-500 leading-relaxed">Importa jugadas maestras de tu biblioteca estratégica o crea jugadas exclusivas para este encuentro.</p>
+                  </div>
+                  <Button onClick={openImportABPModal} variant="secondary" className="text-xs mt-2">Importar una jugada ahora</Button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                  
+                  {/* COLUMNA IZQUIERDA: MESA DE TRABAJO Y LISTADO DE ABP (4 cols) */}
+                  <div className="lg:col-span-4 space-y-5">
+                    
+                    <div className="p-4 bg-slate-900/30 border border-slate-800 rounded-2xl space-y-4">
+                      <h4 className="text-xs font-black uppercase text-slate-200 tracking-widest border-b border-slate-850 pb-2">
+                        Mesa de Trabajo ABP
                       </h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {abpRoles.map(role => (
-                          <div key={role.id} className="p-3 bg-slate-900/50 border border-slate-850 rounded-xl flex items-center justify-between gap-4">
-                            <div>
-                              <span className="text-[10px] font-bold uppercase text-slate-500 tracking-wide block">Rol</span>
-                              <span className="text-xs font-bold text-slate-200">{role.rol_asignado}</span>
-                            </div>
-                            <div className="w-48">
-                              <select
-                                value={role.player_id || ''}
-                                onChange={(e) => handleUpdateABPRole(role.id, e.target.value || null)}
-                                className="w-full px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-850 text-slate-100 text-xs focus:border-[#CC0E21] outline-none"
-                              >
-                                <option value="">-- Sin asignar / Histórico --</option>
-                                {players.map(p => (
-                                  <option key={p.id} value={p.id} className="bg-slate-900 text-slate-100">
-                                    ({p.dorsal}) {p.nombre} {p.apellidos}
-                                  </option>
-                                ))}
-                              </select>
-                              {/* Show Backup Info if player was deleted or not matching */}
-                              {!role.player_id && role.player_full_name_backup && (
-                                <span className="text-[9px] text-amber-500/80 block mt-1 font-semibold">
-                                  Historial: {role.player_full_name_backup} (Dorsal {role.player_dorsal_backup})
-                                </span>
-                              )}
-                            </div>
+
+                      {/* SUBSECCIÓN: ABP OFENSIVO */}
+                      <div className="space-y-2">
+                        <span className="text-[10px] text-red-400 font-bold uppercase tracking-wider flex items-center gap-1.5 mb-2">
+                          <Target className="h-3.5 w-3.5 text-[#CC0E21]" />
+                          ABP Ofensivo
+                        </span>
+                        
+                        {offensiveABPs.length === 0 ? (
+                          <p className="text-[10px] text-slate-550 italic pl-5">Sin jugadas ofensivas cargadas.</p>
+                        ) : (
+                          <div className="space-y-1.5">
+                            {offensiveABPs.map(abp => {
+                              const isSelected = selectedABP?.id === abp.id;
+                              return (
+                                <div
+                                  key={abp.id}
+                                  onClick={() => setSelectedABP(abp)}
+                                  className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                                    isSelected
+                                      ? 'bg-[#CC0E21]/10 border-[#CC0E21]/45 text-[#CC0E21]'
+                                      : 'bg-slate-950/20 border-slate-850/60 hover:border-slate-800 text-slate-355'
+                                  }`}
+                                >
+                                  <div className="min-w-0">
+                                    <span className="text-[8px] font-black uppercase bg-[#CC0E21]/10 px-1.5 py-0.5 rounded text-[#CC0E21]">{abp.tipo}</span>
+                                    <h4 className="text-xs font-bold text-slate-200 truncate mt-1.5">{abp.titulo}</h4>
+                                  </div>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteMatchABP(abp.id);
+                                    }}
+                                    className="text-slate-500 hover:text-red-400 p-1"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                </div>
+                              );
+                            })}
                           </div>
-                        ))}
+                        )}
                       </div>
+
+                      {/* SUBSECCIÓN: ABP DEFENSIVO */}
+                      <div className="space-y-2 border-t border-slate-850/60 pt-4">
+                        <span className="text-[10px] text-blue-450 font-bold uppercase tracking-wider flex items-center gap-1.5 mb-2">
+                          <Shield className="h-3.5 w-3.5 text-blue-455" />
+                          ABP Defensivo
+                        </span>
+                        
+                        {defensiveABPs.length === 0 ? (
+                          <p className="text-[10px] text-slate-550 italic pl-5">Sin jugadas defensivas cargadas.</p>
+                        ) : (
+                          <div className="space-y-1.5">
+                            {defensiveABPs.map(abp => {
+                              const isSelected = selectedABP?.id === abp.id;
+                              return (
+                                <div
+                                  key={abp.id}
+                                  onClick={() => setSelectedABP(abp)}
+                                  className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                                    isSelected
+                                      ? 'bg-blue-950/15 border-blue-900/40 text-blue-400'
+                                      : 'bg-slate-950/20 border-slate-850/60 hover:border-slate-800 text-slate-355'
+                                  }`}
+                                >
+                                  <div className="min-w-0">
+                                    <span className="text-[8px] font-black uppercase bg-blue-950 text-blue-455 px-1.5 py-0.5 rounded">{abp.tipo}</span>
+                                    <h4 className="text-xs font-bold text-slate-200 truncate mt-1.5">{abp.titulo}</h4>
+                                  </div>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteMatchABP(abp.id);
+                                    }}
+                                    className="text-slate-500 hover:text-red-400 p-1"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+
                     </div>
                   </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
+
+                  {/* COLUMNA DERECHA: DETALLE, ROLES Y OBSERVACIONES (8 cols) */}
+                  <div className="lg:col-span-8">
+                    {selectedABP ? (
+                      <div className="space-y-6">
+                        
+                        {/* PANEL PRINCIPAL: DETALLES DE JUGADA */}
+                        <div className="p-5 bg-slate-900/30 border border-slate-800 rounded-2xl flex flex-col md:flex-row md:items-start justify-between gap-4">
+                          <div className="space-y-1 max-w-xl">
+                            <span className="text-[9px] font-black uppercase tracking-widest bg-slate-950 border border-slate-850 text-slate-400 px-2 py-0.5 rounded">
+                              {selectedABP.tipo}
+                            </span>
+                            <h3 className="text-base font-bold text-slate-200 mt-2">{selectedABP.titulo}</h3>
+                            <p className="text-xs text-slate-400 leading-relaxed mt-1">{selectedABP.descripcion}</p>
+                          </div>
+                          {selectedABP.video_url && (
+                            <Button
+                              onClick={() => handlePlayVideo(selectedABP.titulo, selectedABP.video_url!, selectedABP.tipo_origen)}
+                              className="flex items-center gap-1.5 text-xs py-1.5 px-3 self-start hover:bg-[#a80b1a]"
+                            >
+                              <Film className="h-3.5 w-3.5" />
+                              Ver vídeo ABP
+                            </Button>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+                          
+                          {/* COLUMNA INTERNA IZQ (7 cols): ASIGNACIONES + OBSERVACIONES */}
+                          <div className="md:col-span-7 space-y-6">
+                            
+                            {/* AREA 3: ROLES Y ASIGNACIONES DE JUGADORES */}
+                            <div className="p-5 bg-slate-900/30 border border-slate-800 rounded-2xl space-y-4">
+                              <h4 className="text-xs font-black uppercase text-slate-205 tracking-widest border-b border-slate-850/60 pb-2.5 flex items-center gap-1.5">
+                                <Users className="h-4.5 w-4.5 text-[#CC0E21]" />
+                                Asignación de Roles del Partido
+                              </h4>
+                              
+                              {abpRoles.length === 0 ? (
+                                <p className="text-xs text-slate-500 italic py-2">No hay roles tácticos definidos para esta jugada en particular.</p>
+                              ) : (
+                                <div className="space-y-3">
+                                  {abpRoles.map(role => (
+                                    <div key={role.id} className="p-3 bg-slate-950/40 border border-slate-850 rounded-xl flex items-center justify-between gap-4">
+                                      <div className="min-w-0">
+                                        <span className="text-[9px] font-bold uppercase text-slate-550 tracking-wider block">Función</span>
+                                        <span className="text-xs font-extrabold text-slate-350 truncate block mt-0.5">{role.rol_asignado}</span>
+                                      </div>
+                                      <div className="w-48 flex-shrink-0">
+                                        <select
+                                          value={role.player_id || ''}
+                                          onChange={(e) => handleUpdateABPRole(role.id, e.target.value || null)}
+                                          className="w-full px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-850 text-slate-100 text-xs focus:border-[#CC0E21]/60 outline-none"
+                                        >
+                                          <option value="">-- Sin asignar / Histórico --</option>
+                                          {players.map(p => (
+                                            <option key={p.id} value={p.id} className="bg-slate-900 text-slate-100">
+                                              ({p.dorsal}) {p.nombre} {p.apellidos}
+                                            </option>
+                                          ))}
+                                        </select>
+                                        {!role.player_id && role.player_full_name_backup && (
+                                          <span className="text-[8px] text-amber-500/80 block mt-1 font-semibold">
+                                            Historial: {role.player_full_name_backup} (Dorsal {role.player_dorsal_backup})
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* AREA 3: OBSERVACIONES TÁCTICAS DEL MÍSTER */}
+                            <div className="p-5 bg-slate-900/30 border border-slate-800 rounded-2xl space-y-4">
+                              <h4 className="text-xs font-black uppercase text-slate-205 tracking-widest border-b border-slate-850 pb-2">
+                                Observaciones y Puntos Clave
+                              </h4>
+                              
+                              <div className="space-y-3.5 text-xs text-slate-400">
+                                <div className="space-y-1">
+                                  <span className="text-[9px] font-extrabold text-[#CC0E21] uppercase tracking-wider block">Instrucciones Críticas</span>
+                                  <p className="leading-relaxed bg-slate-950/40 p-2.5 rounded-xl border border-slate-850/50">
+                                    Asegurar el arrastre defensivo en el primer poste. El lanzador debe buscar la comba hacia adentro para facilitar el remate.
+                                  </p>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 pt-1.5 border-t border-slate-850/40">
+                                  <div>
+                                    <span className="text-[9px] font-bold text-amber-500 uppercase tracking-wider block">Vigilancias Defensivas</span>
+                                    <p className="text-[11px] leading-relaxed mt-0.5">Mediapunta y un interior preparados al rechace para cortar el contraataque rápido.</p>
+                                  </div>
+                                  <div>
+                                    <span className="text-[9px] font-bold text-blue-400 uppercase tracking-wider block">Recordatorio Clave</span>
+                                    <p className="text-[11px] leading-relaxed mt-0.5">Máxima concentración en segundas jugadas. Prohibido girarse de espaldas.</p>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                          </div>
+
+                          {/* COLUMNA INTERNA DER (5 cols): PIZARRA MOCKUP + SIMULACIONES */}
+                          <div className="md:col-span-5 space-y-6">
+                            
+                            {/* AREA 5: PIZARRA ABP (Visual Mockup) */}
+                            <div className="p-5 bg-slate-900/30 border border-slate-800 rounded-2xl space-y-4 relative overflow-hidden">
+                              <div className="flex items-center justify-between border-b border-slate-850 pb-2.5">
+                                <h4 className="text-xs font-black uppercase text-slate-205 tracking-widest flex items-center gap-1.5">
+                                  <Sparkles className="h-4.5 w-4.5 text-[#CC0E21]" />
+                                  Pizarra Táctica ABP
+                                </h4>
+                                <span className="text-[8px] bg-[#CC0E21]/15 text-[#CC0E21] border border-[#CC0E21]/20 px-1.5 py-0.5 rounded font-black tracking-widest uppercase">
+                                  Mock-UP
+                                </span>
+                              </div>
+
+                              <div className="relative aspect-[3/4] bg-emerald-950/80 border border-emerald-900 rounded-xl overflow-hidden flex flex-col justify-between p-4">
+                                {/* Soccer pitch markings (aesthetic design) */}
+                                <div className="absolute inset-0 border border-emerald-800/35 m-3 pointer-events-none rounded-lg" />
+                                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-28 h-14 border border-emerald-800/35 pointer-events-none" />
+                                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-12 h-5 border border-emerald-800/35 pointer-events-none" />
+                                <div className="absolute top-0 left-1/2 -translate-x-1/2 translate-y-12 w-6 h-6 rounded-full border border-emerald-800/35 pointer-events-none" />
+
+                                {/* Mock tactical nodes */}
+                                <div className="absolute top-4 left-1/4 h-5 w-5 bg-red-650 text-white rounded-full flex items-center justify-center text-[9px] font-black shadow-md border border-white/20 select-none">3</div>
+                                <div className="absolute top-8 left-1/2 -translate-x-1/2 h-5 w-5 bg-red-650 text-white rounded-full flex items-center justify-center text-[9px] font-black shadow-md border border-white/20 select-none">9</div>
+                                <div className="absolute top-10 left-2/3 h-5 w-5 bg-red-650 text-white rounded-full flex items-center justify-center text-[9px] font-black shadow-md border border-white/20 select-none">7</div>
+                                <div className="absolute top-16 left-1/3 h-5 w-5 bg-blue-600 text-white rounded-full flex items-center justify-center text-[9px] font-black shadow-md border border-white/20 select-none">4</div>
+                                <div className="absolute top-20 left-1/2 -translate-x-1/2 h-5 w-5 bg-blue-600 text-white rounded-full flex items-center justify-center text-[9px] font-black shadow-md border border-white/20 select-none">5</div>
+
+                                {/* Arrow path mockup */}
+                                <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 120">
+                                  <path d="M 25,20 Q 50,45 50,32" fill="none" stroke="#e11d48" strokeWidth="1.5" strokeDasharray="3" />
+                                  <polygon points="50,32 47,36 53,36" fill="#e11d48" />
+                                </svg>
+
+                                <div className="text-center w-full z-10 mt-auto bg-slate-950/80 p-2.5 rounded-lg border border-slate-850/85">
+                                  <p className="text-[10px] font-bold text-slate-300">Pizarra Gráfica Interactiva</p>
+                                  <span className="text-[8px] text-slate-500 font-semibold block mt-0.5">Próximamente: Editor y animador táctico</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* MÓDULOS DE INTEGRACIÓN FUTURA ABP */}
+                            <div className="p-5 bg-slate-900/30 border border-slate-800 rounded-2xl space-y-4">
+                              <h4 className="text-xs font-black uppercase text-slate-205 tracking-widest border-b border-slate-850 pb-2">
+                                Simulaciones y Vídeo
+                              </h4>
+                              <div className="space-y-3">
+                                
+                                {/* Animación 3D */}
+                                <div className="p-3 bg-slate-950/20 border border-slate-850 rounded-xl flex items-center gap-3 opacity-55 select-none">
+                                  <div className="h-8 w-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-550">
+                                    <PlayCircle className="h-4.5 w-4.5 animate-pulse" />
+                                  </div>
+                                  <div>
+                                    <h5 className="text-xs font-bold text-slate-350">Simulación 2D / 3D</h5>
+                                    <span className="text-[8px] text-slate-500 font-semibold block mt-0.5">Próximamente disponible</span>
+                                  </div>
+                                </div>
+
+                                {/* Estadísticas de efectividad */}
+                                <div className="p-3 bg-slate-950/20 border border-slate-850 rounded-xl flex items-center gap-3 opacity-55 select-none">
+                                  <div className="h-8 w-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-550">
+                                    <TrendingUp className="h-4.5 w-4.5" />
+                                  </div>
+                                  <div className="flex-1">
+                                    <div className="flex items-center justify-between">
+                                      <h5 className="text-xs font-bold text-slate-355">Tasa Éxito Estimada</h5>
+                                      <span className="text-[9px] text-[#CC0E21] font-extrabold">64%</span>
+                                    </div>
+                                    <div className="w-full bg-slate-800 h-1.5 rounded-full mt-1.5 overflow-hidden">
+                                      <div className="bg-[#CC0E21] h-full rounded-full" style={{ width: '64%' }} />
+                                    </div>
+                                  </div>
+                                </div>
+
+                              </div>
+                            </div>
+
+                          </div>
+
+                        </div>
+
+                      </div>
+                    ) : (
+                      <div className="p-12 border border-dashed border-slate-800 rounded-2xl text-center text-slate-500 space-y-3 bg-slate-900/5 h-full flex flex-col items-center justify-center select-none">
+                        <Shield className="h-10 w-10 text-slate-700 mx-auto" />
+                        <div className="max-w-md mx-auto space-y-1">
+                          <p className="text-sm font-bold text-slate-400">Ninguna jugada seleccionada</p>
+                          <p className="text-xs text-slate-500 leading-relaxed">Selecciona una jugada ofensiva o defensiva de la mesa de trabajo de la izquierda para ver su detalle, roles asignados y simulaciones tácticas.</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* TAB 5: PARTIDO */}
         {activeTab === 'partido' && (
