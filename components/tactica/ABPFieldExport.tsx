@@ -19,6 +19,9 @@ const ROLE_ABBRS: Record<string, string> = {
   'Cierre': 'CIER',
   'Primer palo': 'P.PALO',
   'Segundo palo': 'S.PALO',
+  '1º palo': '1ºPALO',
+  '2º palo': '2ºPALO',
+  'Barrera': 'BARR',
   'Vigilancia': 'VIG',
   'Defensa zona': 'D.ZONA',
   'Marca individual': 'M.INDIV',
@@ -161,10 +164,17 @@ export function ABPFieldExport({ playRoles, playType, playZona }: ABPFieldExport
         const isRealPosType = isRealPositionPlayType(playType);
         const px = role.posicion_x !== null ? role.posicion_x : 50;
         const py = role.posicion_y !== null ? role.posicion_y : 50;
-        const label = role.etiqueta || (isRealPosType ? POSITION_ABBRS[role.rol_asignado] : ROLE_ABBRS[role.rol_asignado]) || 'P';
+        const normalizedRoleName = (roleName: string) => {
+          if (!roleName) return roleName;
+          if (roleName === 'Primer palo') return '1º palo';
+          if (roleName === 'Segundo palo') return '2º palo';
+          return roleName;
+        };
+        const rName = normalizedRoleName(role.rol_asignado);
+        const label = role.etiqueta || (isRealPosType ? POSITION_ABBRS[rName] : ROLE_ABBRS[rName]) || 'P';
         const player = role.player;
 
-        console.log(`[ABPFieldExport] Ficha - Jugador: ${player ? player.nombre : 'Ninguno'}, Rol: ${role.rol_asignado}, Etiqueta: ${label}, Renderizando: Texto (foto omitida)`);
+        console.log(`[ABPFieldExport] Ficha - Jugador: ${player ? player.nombre : 'Ninguno'}, Rol: ${rName}, Etiqueta: ${label}, Renderizando: Texto (foto omitida)`);
 
         return (
           <div

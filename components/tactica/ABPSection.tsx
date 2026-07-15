@@ -19,6 +19,13 @@ import { exportToPDF, buildABPFilename } from '@/lib/exportPdf';
 import { ABPFieldExport } from './ABPFieldExport';
 import { ABPPlanPartido } from './ABPPlanPartido';
 
+const normalizeRoleName = (role: string): string => {
+  if (!role) return role;
+  if (role === 'Primer palo') return '1º palo';
+  if (role === 'Segundo palo') return '2º palo';
+  return role;
+};
+
 interface ABPSectionProps {
   players: Player[];
   matches?: Match[];
@@ -53,6 +60,9 @@ const ROLE_ABBRS: Record<string, string> = {
   'Cierre': 'CIER',
   'Primer palo': 'P.PALO',
   'Segundo palo': 'S.PALO',
+  '1º palo': '1ºPALO',
+  '2º palo': '2ºPALO',
+  'Barrera': 'BARR',
   'Vigilancia': 'VIG',
   'Defensa zona': 'D.ZONA',
   'Marca individual': 'M.INDIV',
@@ -208,8 +218,8 @@ const serializePlayDescripcion = (sistema_tactico: string, descripcion_texto: st
 const DEFAULT_POSITIONS_BY_TYPE: Record<ABPType, { role: string; x: number; y: number }[]> = {
   'Córner ofensivo': [
     { role: 'Lanzador', x: 5, y: 10 },
-    { role: 'Primer palo', x: 42, y: 22 },
-    { role: 'Segundo palo', x: 58, y: 24 },
+    { role: '1º palo', x: 42, y: 22 },
+    { role: '2º palo', x: 58, y: 24 },
     { role: 'Rematador', x: 48, y: 32 },
     { role: 'Rematador', x: 53, y: 32 },
     { role: 'Bloqueador', x: 44, y: 36 },
@@ -226,7 +236,7 @@ const DEFAULT_POSITIONS_BY_TYPE: Record<ABPType, { role: string; x: number; y: n
     { role: 'Libre', x: 42, y: 28 },
     { role: 'Libre', x: 48, y: 28 },
     { role: 'Libre', x: 58, y: 28 },
-    { role: 'Primer palo', x: 40, y: 22 },
+    { role: '1º palo', x: 40, y: 22 },
     { role: 'Rechace', x: 50, y: 48 },
     { role: 'Vigilancia', x: 20, y: 60 },
     { role: 'Vigilancia', x: 80, y: 60 }
@@ -262,7 +272,7 @@ const DEFAULT_POSITIONS_BY_TYPE: Record<ABPType, { role: string; x: number; y: n
     { role: 'Rematador', x: 48, y: 28 },
     { role: 'Rematador', x: 54, y: 25 },
     { role: 'Bloqueador', x: 44, y: 32 },
-    { role: 'Segundo palo', x: 58, y: 26 },
+    { role: '2º palo', x: 58, y: 26 },
     { role: 'Rechace', x: 50, y: 48 },
     { role: 'Vigilancia', x: 30, y: 75 },
     { role: 'Vigilancia', x: 70, y: 75 },
@@ -428,8 +438,9 @@ const getRolesForPlayType = (type: ABPType): string[] => {
     'Arrastrador',
     'Rechace',
     'Cierre',
-    'Primer palo',
-    'Segundo palo',
+    '1º palo',
+    '2º palo',
+    'Barrera',
     'Vigilancia',
     'Defensa zona',
     'Marca individual',
@@ -505,7 +516,7 @@ const getPositionsForPlay = (type: ABPType, zona?: string | null): { role: strin
         { role: 'Vigilancia', x: 42, y: 28 },
         { role: 'Vigilancia', x: 48, y: 28 },
         { role: 'Vigilancia', x: 58, y: 28 },
-        { role: 'Primer palo', x: 40, y: 22 },
+        { role: '1º palo', x: 40, y: 22 },
         { role: 'Rechace', x: 50, y: 48 },
         { role: 'Vigilancia', x: 20, y: 60 },
         { role: 'Vigilancia', x: 80, y: 60 },
@@ -706,6 +717,7 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
       if (error) throw error;
       const mapped = (data || []).map((r: ABPPlayerRole) => ({
         ...r,
+        rol_asignado: normalizeRoleName(r.rol_asignado),
         player: players.find(p => p.id === r.player_id),
         posicion_x: r.posicion_x !== null ? parseFloat(String(r.posicion_x)) : null,
         posicion_y: r.posicion_y !== null ? parseFloat(String(r.posicion_y)) : null,

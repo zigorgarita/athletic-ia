@@ -12,6 +12,13 @@ import { ABPPlanField } from './ABPPlanField';
 import { ABPFieldExport } from './ABPFieldExport';
 import { exportABPPlanToPDF } from '@/lib/exportPdf';
 
+const normalizeRoleName = (role: string): string => {
+  if (!role) return role;
+  if (role === 'Primer palo') return '1º palo';
+  if (role === 'Segundo palo') return '2º palo';
+  return role;
+};
+
 const ABP_TYPES = [
   'Córner ofensivo',
   'Córner defensivo',
@@ -110,7 +117,13 @@ export function ABPPlanPartido({ players, matches, onExit }: ABPPlanPartidoProps
           .in('match_abp_plan_id', plansData.map(p => p.id));
           
         if (rolesError) throw rolesError;
-        setMatchAbpRoles(rolesData || []);
+        const normalized = (rolesData || []).map(r => {
+          if (r.role) {
+            r.role.rol_asignado = normalizeRoleName(r.role.rol_asignado);
+          }
+          return r;
+        });
+        setMatchAbpRoles(normalized);
       } else {
         setMatchAbpRoles([]);
       }
@@ -158,6 +171,10 @@ export function ABPPlanPartido({ players, matches, onExit }: ABPPlanPartidoProps
       setLoading(true);
       // 1. Get play roles to create empty assignments
       const { data: roles } = await supabase.from('abp_player_roles').select('*').eq('abp_play_id', playId);
+      const normalizedRoles = (roles || []).map(r => ({
+        ...r,
+        rol_asignado: normalizeRoleName(r.rol_asignado)
+      }));
       
       // 2. Create Plan
       const newOrder = matchAbpPlans.length + 1;
@@ -174,8 +191,8 @@ export function ABPPlanPartido({ players, matches, onExit }: ABPPlanPartidoProps
       if (planError) throw planError;
       
       // 3. Create Empty Assignments
-      if (roles && roles.length > 0) {
-        const assignments = roles.map(r => ({
+      if (normalizedRoles && normalizedRoles.length > 0) {
+        const assignments = normalizedRoles.map(r => ({
           match_abp_plan_id: plan.id,
           abp_player_role_id: r.id,
           player_id: null
@@ -368,6 +385,7 @@ export function ABPPlanPartido({ players, matches, onExit }: ABPPlanPartidoProps
            delete nr.id;
            delete nr.created_at;
            nr.abp_play_id = newPlay.id;
+           nr.rol_asignado = normalizeRoleName(nr.rol_asignado);
            return nr;
          });
          const { data: insertedRoles, error: rolesErr } = await supabase.from('abp_player_roles').insert(rolesToInsert).select();
@@ -652,6 +670,7 @@ export function ABPPlanPartido({ players, matches, onExit }: ABPPlanPartidoProps
                    const originalRole = r.role || ({} as any);
                    return {
                      ...originalRole,
+                     rol_asignado: normalizeRoleName(originalRole.rol_asignado),
                      assignment: r,
                      assignedPlayer: players.find(p => p.id === r.player_id)
                    };
@@ -714,6 +733,7 @@ export function ABPPlanPartido({ players, matches, onExit }: ABPPlanPartidoProps
                const originalRole = r.role || ({} as any);
                return {
                  ...originalRole,
+                 rol_asignado: normalizeRoleName(originalRole.rol_asignado),
                  player: players.find(p => p.id === r.player_id)
                };
             });
