@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 import React, { useState, useEffect, useMemo } from 'react';
-import { Player, DetailedEvaluation, PlayerInjury } from '@/types';
+import { Player, DetailedEvaluation, PlayerInjury, PlayerFine } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
@@ -15,12 +15,14 @@ import { useUpdatePlayer } from '@/hooks/useUpdatePlayer';
 import { useUploadPlayerPhoto } from '@/hooks/useUploadPlayerPhoto';
 import { usePlayerInjuries } from '@/hooks/usePlayerInjuries';
 import { usePlayerMeetings } from '@/hooks/usePlayerMeetings';
+import { usePlayerFines } from '@/hooks/usePlayerFines';
 import { compressImage } from '@/lib/image';
 import { formatLocalYYYYMMDD } from '@/lib/dateUtils';
 import { 
   Award, ClipboardList, BarChart3, PlusCircle, 
   Calendar, Check, Star, Sparkles, User, AlertTriangle,
-  History, Trash2, Heart, Plus, ShieldAlert, MessageSquare
+  History, Trash2, Heart, Plus, ShieldAlert, MessageSquare,
+  Coins, X
 } from 'lucide-react';
 import { useEditMode } from '@/context/EditModeContext';
 import { PlayerProfileViewer } from '@/components/players/PlayerProfileViewer';
@@ -45,6 +47,25 @@ const METRICAS_GENERALES = {
   MENTAL: ['Concentración', 'Competitividad', 'Liderazgo', 'Comunicación', 'Actitud']
 };
 
+const SANCIONES_PREDEFINIDAS = [
+  { motivo: 'No estar a la hora indicada', base: 3, variable: false },
+  { motivo: '5 minutos tarde sin justificar', base: 5, variable: false },
+  { motivo: '10 minutos tarde sin justificar', base: 10, variable: false },
+  { motivo: 'Olvidarse una prenda', base: 2, variable: true, labelVariable: 'Prendas olvidadas' },
+  { motivo: 'Camiseta de color diferente', base: 3, variable: false },
+  { motivo: 'Sonar el móvil', base: 5, variable: false },
+  { motivo: 'No venir a entrenar sin avisar', base: 20, variable: false },
+  { motivo: 'Balones sin hinchar', base: 3, variable: true, labelVariable: 'Grupos de material' },
+  { motivo: 'Grupo de material: olvidarse algo', base: 3, variable: true, labelVariable: 'Personas implicadas' },
+  { motivo: 'No rellenar el wellness o el Borg', base: 2, variable: false },
+  { motivo: 'No ducharse', base: 5, variable: false },
+  { motivo: 'No usar el chándal', base: 15, variable: false },
+  { motivo: 'No venir a jugar sin avisar', base: 50, variable: false },
+  { motivo: 'No ir a ver el partido', base: 15, variable: false },
+  { motivo: 'Tarjeta amarilla por hablar o pegarse', base: 20, variable: false },
+  { motivo: 'Tarjeta roja por hablar', base: 30, variable: false }
+];
+
 interface PlayerDetailProps {
   player: Player;
   onBack: () => void;
@@ -52,13 +73,32 @@ interface PlayerDetailProps {
 
 export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
   const [currentPlayer, setCurrentPlayer] = useState<Player>(player);
-  const [activeTab, setActiveTab] = useState<'personal' | 'resumen' | 'rendimiento' | 'tactica' | 'fisico' | 'multimedia' | 'reuniones' | 'ia'>('personal');
-  const { isEditMode } = useEditMode();
+  const [activeTab, setActiveTab] = useState<'personal' | 'resumen' | 'rendimiento' | 'tactica' | 'fisico' | 'multimedia' | 'reuniones' | 'ia' | 'multas'>('personal');
+  const { isEditMode, verifyWritePermission } = useEditMode();
   
   // Training Attendance States
   const [trainingAttendance, setTrainingAttendance] = useState<any[]>([]);
   const [trainingEvaluations, setTrainingEvaluations] = useState<any[]>([]);
   const [loadingTraining, setLoadingTraining] = useState(false);
+
+  // Fines States
+  const [sessionList, setSessionList] = useState<any[]>([]);
+  const [matchList, setMatchList] = useState<any[]>([]);
+  const [isFineModalOpen, setIsFineModalOpen] = useState(false);
+  const [editingFine, setEditingFine] = useState<PlayerFine | null>(null);
+  
+  const [formMotivo, setFormMotivo] = useState('No estar a la hora indicada');
+  const [formCantidad, setFormCantidad] = useState(1);
+  const [formFecha, setFormFecha] = useState(formatLocalYYYYMMDD(new Date()));
+  const [formContexto, setFormContexto] = useState<'Entrenamiento' | 'Partido' | 'Otro'>('Entrenamiento');
+  const [formEventoId, setFormEventoId] = useState('');
+  const [formEventoManual, setFormEventoManual] = useState('');
+  const [formEstado, setFormEstado] = useState<'Pendiente' | 'Pagado'>('Pendiente');
+  const [formObservaciones, setFormObservaciones] = useState('');
+  const [finesFilter, setFinesFilter] = useState<'Todas' | 'Pendientes' | 'Pagadas' | 'Entrenamiento' | 'Partido'>('Todas');
+
+  const selectedSancion = SANCIONES_PREDEFINIDAS.find(s => s.motivo === formMotivo) || SANCIONES_PREDEFINIDAS[0];
+  const calculatedImporte = selectedSancion.base * formCantidad;
 
   // Load training history
   useEffect(() => {
@@ -142,6 +182,48 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
   const { uploadPhoto, loading: uploadingPhoto } = useUploadPlayerPhoto();
   const { injuries, loading: loadingInjuries, addInjury, updateInjury, deleteInjury } = usePlayerInjuries(currentPlayer.id);
   const { meetings, loading: loadingMeetings, createMeeting, deleteMeeting, updateMeeting } = usePlayerMeetings(currentPlayer.id);
+  const { fines, loading: loadingFines, addFine, updateFine, deleteFine } = usePlayerFines(currentPlayer.id);
+
+  // Load sessions and matches when Multas tab is active
+  useEffect(() => {
+    if (activeTab === 'multas') {
+      supabase.from('planning_sessions')
+        .select('id, fecha, tipo_sesion, objetivo_principal')
+        .order('fecha', { ascending: false })
+        .then(({ data }) => setSessionList(data || []));
+
+      supabase.from('matches')
+        .select('id, fecha, rival, es_local, tipo_partido, jornada')
+        .order('jornada', { ascending: false })
+        .then(({ data }) => setMatchList(data || []));
+    }
+  }, [activeTab]);
+
+  const finesSummary = useMemo(() => {
+    const totalPending = fines
+      .filter(f => f.estado === 'Pendiente')
+      .reduce((sum, f) => sum + Number(f.importe), 0);
+    const totalPaid = fines
+      .filter(f => f.estado === 'Pagado')
+      .reduce((sum, f) => sum + Number(f.importe), 0);
+    const totalCount = fines.length;
+    const lastFineDate = fines.length > 0 
+      ? fines.reduce((latest, f) => f.fecha > latest ? f.fecha : latest, fines[0].fecha)
+      : 'Sin multas';
+
+    return { totalPending, totalPaid, totalCount, lastFineDate };
+  }, [fines]);
+
+  const filteredFines = useMemo(() => {
+    return fines.filter(fine => {
+      if (finesFilter === 'Todas') return true;
+      if (finesFilter === 'Pendientes') return fine.estado === 'Pendiente';
+      if (finesFilter === 'Pagadas') return fine.estado === 'Pagado';
+      if (finesFilter === 'Entrenamiento') return fine.contexto === 'Entrenamiento';
+      if (finesFilter === 'Partido') return fine.contexto === 'Partido';
+      return true;
+    });
+  }, [fines, finesFilter]);
 
   // Compute independent performance averages (360)
   const performanceAverages = useMemo(() => {
@@ -597,6 +679,103 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
     }
   };
 
+  const handleFineSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      verifyWritePermission();
+
+      const selectedConfig = SANCIONES_PREDEFINIDAS.find(s => s.motivo === formMotivo);
+      const basePrice = selectedConfig ? selectedConfig.base : 0;
+      const finalImporte = basePrice * formCantidad;
+
+      let targetNombre = '';
+      if (formContexto === 'Entrenamiento') {
+        const sess = sessionList.find(s => s.id === formEventoId);
+        targetNombre = sess ? `Entrenamiento - ${sess.fecha} (${sess.tipo_sesion})` : 'Entrenamiento';
+      } else if (formContexto === 'Partido') {
+        const matchObj = matchList.find(m => m.id === formEventoId);
+        targetNombre = matchObj ? `Jornada ${matchObj.jornada} vs ${matchObj.rival}` : 'Partido';
+      } else {
+        targetNombre = formEventoManual;
+      }
+
+      const fineData = {
+        player_id: currentPlayer.id,
+        motivo: formMotivo,
+        fecha: formFecha,
+        contexto: formContexto,
+        evento_id: formContexto !== 'Otro' ? formEventoId || null : null,
+        evento_nombre: targetNombre,
+        importe: finalImporte,
+        cantidad: formCantidad,
+        estado: formEstado,
+        observaciones: formObservaciones || null
+      };
+
+      if (editingFine) {
+        const updated = await updateFine(editingFine.id, fineData);
+        if (updated) {
+          setIsFineModalOpen(false);
+          setEditingFine(null);
+        }
+      } else {
+        const created = await addFine(fineData);
+        if (created) {
+          setIsFineModalOpen(false);
+        }
+      }
+    } catch (err: any) {
+      alert(err.message || 'Error al guardar la multa');
+    }
+  };
+
+  const handleOpenNewFine = () => {
+    setEditingFine(null);
+    setFormMotivo(SANCIONES_PREDEFINIDAS[0].motivo);
+    setFormCantidad(1);
+    setFormFecha(formatLocalYYYYMMDD(new Date()));
+    setFormContexto('Entrenamiento');
+    setFormEventoId('');
+    setFormEventoManual('');
+    setFormEstado('Pendiente');
+    setFormObservaciones('');
+    setIsFineModalOpen(true);
+  };
+
+  const handleOpenEditFine = (fine: PlayerFine) => {
+    setEditingFine(fine);
+    setFormMotivo(fine.motivo);
+    setFormCantidad(fine.cantidad);
+    setFormFecha(fine.fecha);
+    setFormContexto(fine.contexto);
+    setFormEventoId(fine.evento_id || '');
+    setFormEventoManual(fine.contexto === 'Otro' ? fine.evento_nombre || '' : '');
+    setFormEstado(fine.estado);
+    setFormObservaciones(fine.observaciones || '');
+    setIsFineModalOpen(true);
+  };
+
+  const handleToggleFineStatus = async (fine: PlayerFine) => {
+    try {
+      verifyWritePermission();
+      const nextStatus = fine.estado === 'Pendiente' ? 'Pagado' : 'Pendiente';
+      await updateFine(fine.id, { estado: nextStatus });
+    } catch (err: any) {
+      alert(err.message || 'Error al cambiar estado de la multa');
+    }
+  };
+
+  const handleDeleteFine = async (fineId: string) => {
+    try {
+      verifyWritePermission();
+      if (confirm('¿Estás seguro de que deseas eliminar esta multa del historial?')) {
+        await deleteFine(fineId);
+      }
+    } catch (err: any) {
+      alert(err.message || 'Error al eliminar la multa');
+    }
+  };
+
   const getAge = (birthDateString: string) => {
     if (!birthDateString) return '-';
     const today = new Date();
@@ -725,7 +904,7 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
           onClick={() => setActiveTab('reuniones')}
           className={`flex items-center gap-2 px-5 py-3.5 border-b-2 text-sm font-semibold transition-all duration-200 ${
             activeTab === 'reuniones'
-              ? 'border-[#CC0E21] text-[#CC0E21] bg-[#CC0E21]/5'
+              ? 'border-[#CC0E21]' + ' text-[#CC0E21] bg-[#CC0E21]/5'
               : 'border-transparent text-slate-400 hover:text-slate-200'
           }`}
         >
@@ -733,10 +912,21 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
           Reuniones
         </button>
         <button
+          onClick={() => setActiveTab('multas')}
+          className={`flex items-center gap-2 px-5 py-3.5 border-b-2 text-sm font-semibold transition-all duration-200 ${
+            activeTab === 'multas'
+              ? 'border-[#CC0E21]' + ' text-[#CC0E21] bg-[#CC0E21]/5'
+              : 'border-transparent text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <Coins className="h-4 w-4" />
+          Multas
+        </button>
+        <button
           onClick={() => setActiveTab('ia')}
           className={`flex items-center gap-2 px-5 py-3.5 border-b-2 text-sm font-semibold transition-all duration-200 ${
             activeTab === 'ia'
-              ? 'border-[#CC0E21] text-[#CC0E21] bg-[#CC0E21]/5'
+              ? 'border-[#CC0E21]' + ' text-[#CC0E21] bg-[#CC0E21]/5'
               : 'border-transparent text-slate-400 hover:text-slate-200'
           }`}
         >
@@ -2054,6 +2244,359 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
                     </div>
                   );
                 })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Tab: Multas */}
+        {activeTab === 'multas' && (
+          <div className="space-y-6 animate-fadeIn">
+            {/* Resumen de multas */}
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+              <div className="bg-slate-900/50 border border-slate-800/80 p-5 rounded-2xl flex flex-col justify-between">
+                <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Total Pendiente</span>
+                <span className="text-2xl font-black text-red-500 mt-2">{finesSummary.totalPending} €</span>
+              </div>
+              <div className="bg-slate-900/50 border border-slate-800/80 p-5 rounded-2xl flex flex-col justify-between">
+                <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Total Pagado</span>
+                <span className="text-2xl font-black text-green-500 mt-2">{finesSummary.totalPaid} €</span>
+              </div>
+              <div className="bg-slate-900/50 border border-slate-800/80 p-5 rounded-2xl flex flex-col justify-between">
+                <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Total Multas</span>
+                <span className="text-2xl font-black text-slate-300 mt-2">{finesSummary.totalCount}</span>
+              </div>
+              <div className="bg-slate-900/50 border border-slate-800/80 p-5 rounded-2xl flex flex-col justify-between">
+                <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Último Registro</span>
+                <span className="text-sm font-bold text-slate-400 mt-2 truncate">
+                  {finesSummary.lastFineDate !== 'Sin multas' 
+                    ? new Date(finesSummary.lastFineDate).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })
+                    : 'Sin multas'}
+                </span>
+              </div>
+            </div>
+
+            {/* Filtros e Historial */}
+            <div className="bg-slate-900/40 border border-slate-800/80 p-6 rounded-2xl space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                {/* Filtros */}
+                <div className="flex flex-wrap gap-2">
+                  {(['Todas', 'Pendientes', 'Pagadas', 'Entrenamiento', 'Partido'] as const).map((filter) => (
+                    <button
+                      key={filter}
+                      onClick={() => setFinesFilter(filter)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
+                        finesFilter === filter
+                          ? 'bg-[#CC0E21] text-white shadow-md'
+                          : 'bg-slate-850 text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                      }`}
+                    >
+                      {filter}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Botón Nueva Multa */}
+                {isEditMode ? (
+                  <Button
+                    onClick={handleOpenNewFine}
+                    className="flex items-center gap-2 font-bold px-4 py-2 bg-red-650 hover:bg-red-750 transition-colors shadow-lg"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Registrar Multa
+                  </Button>
+                ) : (
+                  <div className="text-xs text-slate-500 italic bg-slate-950/30 px-3 py-2 rounded-xl border border-slate-850/40">
+                    Modo Solo Lectura. Desbloquea la edición para registrar multas.
+                  </div>
+                )}
+              </div>
+
+              {/* Lista */}
+              {loadingFines ? (
+                <div className="py-12 text-center text-slate-400 text-sm">Cargando historial de multas...</div>
+              ) : filteredFines.length === 0 ? (
+                <div className="py-12 text-center text-slate-400 text-sm italic">
+                  No se han encontrado multas registradas para este jugador con los filtros seleccionados.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-800 text-slate-500 font-bold uppercase tracking-wider">
+                        <th className="pb-3 pr-4">Fecha</th>
+                        <th className="pb-3 pr-4">Motivo</th>
+                        <th className="pb-3 pr-4">Contexto</th>
+                        <th className="pb-3 pr-4">Evento / Descripción</th>
+                        <th className="pb-3 pr-4 text-right">Importe</th>
+                        <th className="pb-3 pr-4 text-center">Estado</th>
+                        {isEditMode && <th className="pb-3 text-center">Acciones</th>}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800">
+                      {filteredFines.map((fine) => (
+                        <tr key={fine.id} className="group hover:bg-slate-800/20 transition-colors">
+                          <td className="py-4 pr-4 text-slate-400 font-medium">
+                            {new Date(fine.fecha).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                          </td>
+                          <td className="py-4 pr-4">
+                            <div className="font-semibold text-slate-200">{fine.motivo}</div>
+                            {fine.cantidad > 1 && (
+                              <span className="text-[10px] text-slate-500 block">
+                                Cantidad: {fine.cantidad}
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-4 pr-4">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                              fine.contexto === 'Entrenamiento' 
+                                ? 'bg-blue-950/40 text-blue-400 border border-blue-900/30' 
+                                : fine.contexto === 'Partido'
+                                ? 'bg-green-950/40 text-green-400 border border-green-900/30'
+                                : 'bg-slate-950/40 text-slate-400 border border-slate-800/30'
+                            }`}>
+                              {fine.contexto}
+                            </span>
+                          </td>
+                          <td className="py-4 pr-4 max-w-[200px] truncate text-slate-400">
+                            {fine.evento_nombre || '-'}
+                          </td>
+                          <td className="py-4 pr-4 text-right font-black text-slate-100">
+                            {fine.importe} €
+                          </td>
+                          <td className="py-4 pr-4 text-center">
+                            <button
+                              disabled={!isEditMode}
+                              onClick={() => handleToggleFineStatus(fine)}
+                              className={`px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer transition-colors ${
+                                fine.estado === 'Pagado'
+                                  ? 'bg-green-950/40 text-green-400 border border-green-900/30 hover:bg-green-900/20'
+                                  : 'bg-red-950/40 text-red-400 border border-red-900/30 hover:bg-red-900/20'
+                              } disabled:cursor-not-allowed`}
+                            >
+                              {fine.estado}
+                            </button>
+                          </td>
+                          {isEditMode && (
+                            <td className="py-4 text-center">
+                              <div className="flex items-center justify-center gap-2">
+                                <button
+                                  onClick={() => handleOpenEditFine(fine)}
+                                  className="text-slate-400 hover:text-white text-xs font-semibold px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 transition-colors cursor-pointer"
+                                >
+                                  Editar
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteFine(fine.id)}
+                                  className="text-red-500 hover:text-red-400 p-1 bg-slate-800 hover:bg-slate-700 rounded transition-colors cursor-pointer"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Modal para Crear/Editar Multa */}
+            {isFineModalOpen && (
+              <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                <div className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl animate-scaleUp">
+                  {/* Header */}
+                  <div className="px-6 py-4 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
+                    <h3 className="font-extrabold text-sm text-slate-100 uppercase tracking-wider">
+                      {editingFine ? 'Editar Multa' : 'Registrar Nueva Multa'}
+                    </h3>
+                    <button 
+                      onClick={() => setIsFineModalOpen(false)}
+                      className="text-slate-500 hover:text-slate-300 transition-colors cursor-pointer"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+
+                  {/* Formulario */}
+                  <form onSubmit={handleFineSubmit} className="p-6 space-y-4">
+                    {/* Motivo */}
+                    <div className="space-y-1">
+                      <label className="text-[10px] uppercase font-bold text-slate-500">Motivo de la Sanción</label>
+                      <select
+                        value={formMotivo}
+                        onChange={(e) => {
+                          setFormMotivo(e.target.value);
+                          setFormCantidad(1);
+                        }}
+                        className="w-full px-3 py-2 text-sm rounded-xl bg-slate-950 border border-slate-800 text-slate-200 outline-none focus:border-red-650 transition-colors"
+                      >
+                        {SANCIONES_PREDEFINIDAS.map((s) => (
+                          <option key={s.motivo} value={s.motivo}>
+                            {s.motivo} ({s.base} €)
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Cantidad/Multiplicador si es variable */}
+                    {SANCIONES_PREDEFINIDAS.find(s => s.motivo === formMotivo)?.variable && (
+                      <div className="space-y-1">
+                        <label className="text-[10px] uppercase font-bold text-slate-500">
+                          {SANCIONES_PREDEFINIDAS.find(s => s.motivo === formMotivo)?.labelVariable || 'Cantidad'}
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="20"
+                          value={formCantidad}
+                          onChange={(e) => setFormCantidad(Math.max(1, parseInt(e.target.value) || 1))}
+                          className="w-full px-3 py-2 text-sm rounded-xl bg-slate-950 border border-slate-800 text-slate-200 outline-none focus:border-red-650 transition-colors"
+                        />
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-4">
+                      {/* Fecha */}
+                      <div className="space-y-1">
+                        <label className="text-[10px] uppercase font-bold text-slate-500">Fecha</label>
+                        <input
+                          type="date"
+                          value={formFecha}
+                          onChange={(e) => setFormFecha(e.target.value)}
+                          className="w-full px-3 py-2 text-sm rounded-xl bg-slate-950 border border-slate-800 text-slate-200 outline-none focus:border-red-650 transition-colors"
+                          required
+                        />
+                      </div>
+
+                      {/* Contexto */}
+                      <div className="space-y-1">
+                        <label className="text-[10px] uppercase font-bold text-slate-500">Contexto</label>
+                        <select
+                          value={formContexto}
+                          onChange={(e) => {
+                            const val = e.target.value as any;
+                            setFormContexto(val);
+                            setFormEventoId('');
+                          }}
+                          className="w-full px-3 py-2 text-sm rounded-xl bg-slate-950 border border-slate-800 text-slate-200 outline-none focus:border-red-650 transition-colors"
+                        >
+                          <option value="Entrenamiento">Entrenamiento</option>
+                          <option value="Partido">Partido</option>
+                          <option value="Otro">Otro</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Evento relacionado */}
+                    {formContexto === 'Entrenamiento' && (
+                      <div className="space-y-1">
+                        <label className="text-[10px] uppercase font-bold text-slate-500">Sesión de Entrenamiento</label>
+                        <select
+                          value={formEventoId}
+                          onChange={(e) => setFormEventoId(e.target.value)}
+                          className="w-full px-3 py-2 text-sm rounded-xl bg-slate-950 border border-slate-800 text-slate-200 outline-none focus:border-red-650 transition-colors"
+                          required
+                        >
+                          <option value="">Selecciona una sesión...</option>
+                          {sessionList.map((s) => (
+                            <option key={s.id} value={s.id}>
+                              {s.fecha} - {s.tipo_sesion} {s.objetivo_principal ? `(${s.objetivo_principal})` : ''}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    {formContexto === 'Partido' && (
+                      <div className="space-y-1">
+                        <label className="text-[10px] uppercase font-bold text-slate-500">Partido de Liga / Amistoso</label>
+                        <select
+                          value={formEventoId}
+                          onChange={(e) => setFormEventoId(e.target.value)}
+                          className="w-full px-3 py-2 text-sm rounded-xl bg-slate-950 border border-slate-800 text-slate-200 outline-none focus:border-red-650 transition-colors"
+                          required
+                        >
+                          <option value="">Selecciona un partido...</option>
+                          {matchList.map((m) => (
+                            <option key={m.id} value={m.id}>
+                              Jornada {m.jornada} - vs {m.rival} ({m.tipo_partido}) - {m.fecha}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    {formContexto === 'Otro' && (
+                      <div className="space-y-1">
+                        <label className="text-[10px] uppercase font-bold text-slate-500">Descripción del Contexto / Evento</label>
+                        <input
+                          type="text"
+                          placeholder="Ej. Autobús del viaje a Bilbao, cena del club, etc."
+                          value={formEventoManual}
+                          onChange={(e) => setFormEventoManual(e.target.value)}
+                          className="w-full px-3 py-2 text-sm rounded-xl bg-slate-950 border border-slate-800 text-slate-200 outline-none focus:border-red-650 transition-colors"
+                          required
+                        />
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-4">
+                      {/* Estado */}
+                      <div className="space-y-1">
+                        <label className="text-[10px] uppercase font-bold text-slate-500">Estado de Pago</label>
+                        <select
+                          value={formEstado}
+                          onChange={(e) => setFormEstado(e.target.value as any)}
+                          className="w-full px-3 py-2 text-sm rounded-xl bg-slate-950 border border-slate-800 text-slate-200 outline-none focus:border-red-650 transition-colors"
+                        >
+                          <option value="Pendiente">Pendiente</option>
+                          <option value="Pagado">Pagado</option>
+                        </select>
+                      </div>
+
+                      {/* Importe Resumen */}
+                      <div className="space-y-1 flex flex-col justify-end">
+                        <span className="text-[10px] uppercase font-bold text-slate-500 block">Importe Estimado</span>
+                        <div className="text-lg font-black text-slate-200 h-[38px] flex items-center">
+                          {calculatedImporte} €
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Observaciones */}
+                    <div className="space-y-1">
+                      <label className="text-[10px] uppercase font-bold text-slate-500">Observaciones (Opcional)</label>
+                      <textarea
+                        rows={2}
+                        value={formObservaciones}
+                        onChange={(e) => setFormObservaciones(e.target.value)}
+                        className="w-full px-3 py-2 text-sm rounded-xl bg-slate-950 border border-slate-850 text-slate-200 outline-none focus:border-red-650 resize-none transition-colors"
+                        placeholder="Añadir notas o comentarios adicionales..."
+                      />
+                    </div>
+
+                    {/* Acciones */}
+                    <div className="flex gap-3 pt-3">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={() => setIsFineModalOpen(false)}
+                        className="flex-1 font-bold animate-fadeIn"
+                      >
+                        Cancelar
+                      </Button>
+                      <Button
+                        type="submit"
+                        className="flex-1 font-bold bg-red-650 hover:bg-red-750 text-white animate-fadeIn"
+                      >
+                        {editingFine ? 'Actualizar' : 'Guardar'}
+                      </Button>
+                    </div>
+                  </form>
+                </div>
               </div>
             )}
           </div>

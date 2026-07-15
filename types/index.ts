@@ -824,4 +824,21 @@ export interface TacticalAIContext {
   tareasLineas: string;
 }
 
+export interface PlayerFine {
+  id: string;
+  player_id: string;
+  motivo: string;
+  fecha: string;
+  contexto: 'Entrenamiento' | 'Partido' | 'Otro';
+  evento_id: string | null;
+  evento_nombre: string | null;
+  importe: number;
+  cantidad: number;
+  estado: 'Pendiente' | 'Pagado';
+  observaciones: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+
 
