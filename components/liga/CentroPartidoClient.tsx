@@ -22,7 +22,7 @@ import {
   Trophy, MapPin, Users, Shield, Film,
   BookOpen, Plus, PlusCircle, Save, Trash2, FileText, ClipboardList,
   Eye, Download, Upload, AlertCircle, Brain, TrendingUp, Lightbulb,
-  AlertTriangle, Activity, CheckCircle2, User
+  AlertTriangle, Activity, CheckCircle2, User, Calendar, Image, FolderOpen
 } from 'lucide-react';
 
 interface CentroPartidoClientProps {
@@ -2082,85 +2082,253 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
         )}
 
         {/* TAB 8: INFORME DEL ANALISTA (ANÁLISIS) */}
-        {activeTab === 'analisis' && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between border-b border-slate-850 pb-4">
-              <div>
-                <h3 className="font-bold text-slate-200 flex items-center gap-2">
-                  <FileText className="h-5 w-5 text-[#CC0E21]" />
-                  Informe Técnico del Analista
-                </h3>
-                <p className="text-slate-500 text-xs mt-0.5">Redacta el análisis en profundidad estructurado en las cinco áreas principales.</p>
+        {activeTab === 'analisis' && (() => {
+          const hasSomeAnalysis = reportResumen || reportPositivos || reportMejorar || reportClaves || reportConclusiones;
+          const hasAllAnalysis = reportResumen && reportPositivos && reportMejorar && reportClaves && reportConclusiones;
+          const statusLabel = hasAllAnalysis ? 'Completado' : hasSomeAnalysis ? 'En progreso' : 'Pendiente';
+          const statusColor = hasAllAnalysis 
+            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
+            : hasSomeAnalysis 
+            ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' 
+            : 'bg-slate-800 text-slate-400 border-slate-700/50';
+
+          return (
+            <div className="space-y-6">
+              {/* AREA 1: RESUMEN DEL PARTIDO (Cabecera Horizontal) */}
+              <div className="p-5 bg-slate-900/30 border border-slate-800 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="h-10 w-10 rounded-xl bg-slate-950 border border-slate-850 flex items-center justify-center text-[#CC0E21]">
+                    <Trophy className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-200">Preparación del Encuentro vs {match?.rival || 'Rival'}</h3>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs text-slate-400">
+                      <span className="flex items-center gap-1">
+                        <Calendar className="h-3.5 w-3.5 text-slate-500" /> 
+                        {match?.fecha ? new Date(match.fecha).toLocaleDateString('es-ES') : 'Sin fecha'}
+                      </span>
+                      <span className="text-slate-650">•</span>
+                      <span className="font-semibold text-slate-300">
+                        {match?.tipo_partido === 'AMISTOSO' ? 'Partido Amistoso' : `Jornada ${match?.jornada || ''}`}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 self-start md:self-auto">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Estado:</span>
+                    <span className={`text-[10px] px-2 py-0.5 rounded font-extrabold border ${statusColor}`}>{statusLabel}</span>
+                  </div>
+                  <Button onClick={handleSaveReport} disabled={isSavingReport} className="flex items-center gap-1.5 text-xs">
+                    <Save className="h-3.5 w-3.5" />
+                    {isSavingReport ? 'Guardando...' : 'Guardar Informe'}
+                  </Button>
+                </div>
               </div>
-              <Button onClick={handleSaveReport} disabled={isSavingReport} className="flex items-center gap-1 text-xs">
-                <Save className="h-4 w-4" />
-                {isSavingReport ? 'Guardando...' : 'Guardar Informe'}
-              </Button>
+
+              {/* GRID PRINCIPAL */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                
+                {/* AREA 3: OBSERVACIONES DEL CUERPO TÉCNICO (7 columnas de 12) */}
+                <div className="lg:col-span-7 space-y-6">
+                  <div className="p-5 bg-slate-900/30 border border-slate-800 rounded-2xl space-y-5">
+                    <h4 className="text-xs font-black uppercase text-slate-200 tracking-widest border-b border-slate-850 pb-2.5">
+                      Observaciones del Cuerpo Técnico
+                    </h4>
+                    <div className="space-y-4">
+                      
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Resumen del Encuentro</label>
+                        <textarea
+                          value={reportResumen}
+                          onChange={(e) => setReportResumen(e.target.value)}
+                          placeholder="Redacta un resumen general de cómo se desarrolló el encuentro..."
+                          rows={4}
+                          className="w-full bg-slate-950/80 border border-slate-850 rounded-xl px-4 py-3 text-xs text-slate-300 focus:outline-none focus:border-[#CC0E21]/60 resize-y"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Puntos Fuertes Propios</label>
+                          <textarea
+                            value={reportPositivos}
+                            onChange={(e) => setReportPositivos(e.target.value)}
+                            placeholder="Fortalezas del equipo en el encuentro..."
+                            rows={4}
+                            className="w-full bg-slate-950/80 border border-slate-850 rounded-xl px-4 py-3 text-xs text-slate-300 focus:outline-none focus:border-[#CC0E21]/60 resize-y"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Áreas de Mejora Propias</label>
+                          <textarea
+                            value={reportMejorar}
+                            onChange={(e) => setReportMejorar(e.target.value)}
+                            placeholder="Desajustes y errores a corregir..."
+                            rows={4}
+                            className="w-full bg-slate-950/80 border border-slate-850 rounded-xl px-4 py-3 text-xs text-slate-300 focus:outline-none focus:border-[#CC0E21]/60 resize-y"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Claves Tácticas del Encuentro</label>
+                        <textarea
+                          value={reportClaves}
+                          onChange={(e) => setReportClaves(e.target.value)}
+                          placeholder="Aspectos tácticos determinantes del partido..."
+                          rows={3}
+                          className="w-full bg-slate-950/80 border border-slate-850 rounded-xl px-4 py-3 text-xs text-slate-300 focus:outline-none focus:border-[#CC0E21]/60 resize-y"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Notas del Entrenador / Plan de Trabajo</label>
+                        <textarea
+                          value={reportConclusiones}
+                          onChange={(e) => setReportConclusiones(e.target.value)}
+                          placeholder="Directrices de cara a los próximos entrenamientos..."
+                          rows={3}
+                          className="w-full bg-slate-950/80 border border-slate-850 rounded-xl px-4 py-3 text-xs text-slate-300 focus:outline-none focus:border-[#CC0E21]/60 resize-y"
+                        />
+                      </div>
+
+                    </div>
+                  </div>
+                </div>
+
+                {/* COLUMNA DERECHA: IA ANÁLISIS + INTEGRACIONES (5 columnas de 12) */}
+                <div className="lg:col-span-5 space-y-6">
+                  
+                  {/* AREA 2: ANÁLISIS IA (Visual Placeholder) */}
+                  <div className="p-5 bg-slate-900/30 border border-slate-850 rounded-2xl space-y-4 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 bg-gradient-to-l from-red-500/5 via-transparent to-transparent h-full w-24 pointer-events-none" />
+                    <div className="flex items-center justify-between border-b border-slate-850/60 pb-3">
+                      <h4 className="text-xs font-black uppercase text-slate-200 tracking-widest flex items-center gap-1.5">
+                        <Brain className="h-4.5 w-4.5 text-[#CC0E21]" />
+                        Análisis Táctico (IA)
+                      </h4>
+                      <span className="text-[8px] bg-amber-500/15 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded font-black tracking-widest uppercase">
+                        Mock-UP IA
+                      </span>
+                    </div>
+
+                    <div className="space-y-4">
+                      {/* Resumen Automático */}
+                      <div className="space-y-1">
+                        <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider block">Resumen de Inteligencia</span>
+                        <p className="text-xs text-slate-400 leading-relaxed italic bg-slate-950/40 p-3 rounded-xl border border-slate-850/40">
+                          &quot;El rival explota transiciones rápidas por banda exterior. Su bloque bajo se repliega en 1-4-4-2. Vulnerable ante giros veloces de juego y superioridad numérica en carriles interiores.&quot;
+                        </p>
+                      </div>
+
+                      {/* Fortalezas y Debilidades */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-b border-slate-850/45 py-3">
+                        <div className="space-y-1">
+                          <span className="text-[9px] text-emerald-400 font-bold uppercase tracking-wider block">Fortalezas Rival</span>
+                          <ul className="text-xs text-slate-350 space-y-1 list-disc pl-4">
+                            <li>Presión tras pérdida intensa.</li>
+                            <li>Juego aéreo ofensivo.</li>
+                          </ul>
+                        </div>
+                        <div className="space-y-1">
+                          <span className="text-[9px] text-red-400/80 font-bold uppercase tracking-wider block">Debilidades Rival</span>
+                          <ul className="text-xs text-slate-350 space-y-1 list-disc pl-4">
+                            <li>Espaldas de laterales altos.</li>
+                            <li>Salida bajo presión.</li>
+                          </ul>
+                        </div>
+                      </div>
+
+                      {/* Risks and recommendations */}
+                      <div className="space-y-3 bg-slate-950/40 p-3.5 rounded-xl border border-slate-850/80">
+                        <div>
+                          <span className="text-[9px] text-amber-500 font-bold uppercase tracking-wider block mb-1">Riesgos Principales</span>
+                          <p className="text-xs text-slate-350 leading-relaxed">
+                            Contragolpes rápidos si perdemos balón en zona activa de tres cuartos.
+                          </p>
+                        </div>
+                        <div className="border-t border-slate-850 pt-2">
+                          <span className="text-[9px] text-blue-400 font-bold uppercase tracking-wider block mb-1">Recomendación Táctica</span>
+                          <p className="text-xs text-slate-350 leading-relaxed">
+                            Atacar carriles interiores mediante desmarques del mediapunta en diagonal.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* AREA 4: FUTURAS INTEGRACIONES (Visual Placeholders) */}
+                  <div className="p-5 bg-slate-900/30 border border-slate-800 rounded-2xl space-y-4">
+                    <h4 className="text-xs font-black uppercase text-slate-200 tracking-widest border-b border-slate-850 pb-2">
+                      Módulos de Integración Futura
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      
+                      {/* Vídeos */}
+                      <div className="p-3 bg-slate-950/20 border border-slate-850 rounded-xl flex items-center gap-3 opacity-50 select-none">
+                        <div className="h-8 w-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-500">
+                          <Film className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <h5 className="text-xs font-bold text-slate-350">Vídeo del Rival</h5>
+                          <span className="text-[8px] text-slate-500 font-semibold block mt-0.5">Próximamente</span>
+                        </div>
+                      </div>
+
+                      {/* Fotografías */}
+                      <div className="p-3 bg-slate-950/20 border border-slate-850 rounded-xl flex items-center gap-3 opacity-50 select-none">
+                        <div className="h-8 w-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-500">
+                          <Image className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <h5 className="text-xs font-bold text-slate-350">Fotografías</h5>
+                          <span className="text-[8px] text-slate-500 font-semibold block mt-0.5">Próximamente</span>
+                        </div>
+                      </div>
+
+                      {/* Informes PDF */}
+                      <div className="p-3 bg-slate-950/20 border border-slate-850 rounded-xl flex items-center gap-3 opacity-50 select-none">
+                        <div className="h-8 w-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-500">
+                          <FileText className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <h5 className="text-xs font-bold text-slate-350">Informes Rival</h5>
+                          <span className="text-[8px] text-slate-500 font-semibold block mt-0.5">Próximamente</span>
+                        </div>
+                      </div>
+
+                      {/* TipIA */}
+                      <div className="p-3 bg-slate-950/20 border border-slate-850 rounded-xl flex items-center gap-3 opacity-50 select-none">
+                        <div className="h-8 w-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-500">
+                          <Lightbulb className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <h5 className="text-xs font-bold text-slate-350">Tip Táctico IA</h5>
+                          <span className="text-[8px] text-slate-500 font-semibold block mt-0.5">Próximamente</span>
+                        </div>
+                      </div>
+
+                      {/* Documentos */}
+                      <div className="p-3 bg-slate-950/20 border border-slate-850 rounded-xl flex items-center gap-3 opacity-50 select-none md:col-span-2">
+                        <div className="h-8 w-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-500">
+                          <FolderOpen className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <h5 className="text-xs font-bold text-slate-350">Archivos / Actas / Viajes</h5>
+                          <span className="text-[8px] text-slate-500 font-semibold block mt-0.5">Desactivado para esta fase</span>
+                        </div>
+                      </div>
+
+                    </div>
+                  </div>
+
+                </div>
+
+              </div>
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Sección 1 */}
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-350 uppercase tracking-wider block">Resumen del Partido</label>
-                <textarea
-                  value={reportResumen}
-                  onChange={(e) => setReportResumen(e.target.value)}
-                  placeholder="Redacta un resumen general de cómo se desarrolló el encuentro..."
-                  rows={6}
-                  className="w-full bg-slate-950/80 border border-slate-850 rounded-xl px-4 py-3 text-xs text-slate-300 focus:outline-none focus:border-[#CC0E21]/60 resize-y"
-                />
-              </div>
-
-              {/* Sección 2 */}
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-350 uppercase tracking-wider block">Aspectos Positivos</label>
-                <textarea
-                  value={reportPositivos}
-                  onChange={(e) => setReportPositivos(e.target.value)}
-                  placeholder="Fortalezas, dinámicas que funcionaron, buena actitud..."
-                  rows={6}
-                  className="w-full bg-slate-950/80 border border-slate-850 rounded-xl px-4 py-3 text-xs text-slate-300 focus:outline-none focus:border-[#CC0E21]/60 resize-y"
-                />
-              </div>
-
-              {/* Sección 3 */}
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-350 uppercase tracking-wider block">Aspectos a Mejorar</label>
-                <textarea
-                  value={reportMejorar}
-                  onChange={(e) => setReportMejorar(e.target.value)}
-                  placeholder="Errores cometidos, desajustes defensivos, tomas de decisión incorrectas..."
-                  rows={6}
-                  className="w-full bg-slate-950/80 border border-slate-850 rounded-xl px-4 py-3 text-xs text-slate-300 focus:outline-none focus:border-[#CC0E21]/60 resize-y"
-                />
-              </div>
-
-              {/* Sección 4 */}
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-350 uppercase tracking-wider block">Claves Tácticas del Encuentro</label>
-                <textarea
-                  value={reportClaves}
-                  onChange={(e) => setReportClaves(e.target.value)}
-                  placeholder="Decisiones tácticas del rival o propias que decantaron el marcador..."
-                  rows={6}
-                  className="w-full bg-slate-950/80 border border-slate-850 rounded-xl px-4 py-3 text-xs text-slate-300 focus:outline-none focus:border-[#CC0E21]/60 resize-y"
-                />
-              </div>
-
-              {/* Sección 5 */}
-              <div className="space-y-2 md:col-span-2">
-                <label className="text-xs font-bold text-slate-350 uppercase tracking-wider block">Conclusiones Finales</label>
-                <textarea
-                  value={reportConclusiones}
-                  onChange={(e) => setReportConclusiones(e.target.value)}
-                  placeholder="Plan de trabajo derivado, conclusiones de cara a la próxima semana..."
-                  rows={4}
-                  className="w-full bg-slate-950/80 border border-slate-850 rounded-xl px-4 py-3 text-xs text-slate-300 focus:outline-none focus:border-[#CC0E21]/60 resize-y"
-                />
-              </div>
-            </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* TAB 9: DOCUMENTACIÓN DEL PARTIDO (PLAN DE PARTIDO) */}
         {activeTab === 'plan' && (
