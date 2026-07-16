@@ -17,6 +17,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { VideoPlayerModal } from './VideoPlayerModal';
 import { MatchHeader } from './MatchHeader';
 import { MatchTabs } from './MatchTabs';
+import { useClubLogos } from '@/hooks/useClubLogos';
 import { TacticalField, PositionNode } from '@/components/tactica/TacticalField';
 import {
   Trophy, MapPin, Users, Shield, Film,
@@ -54,6 +55,7 @@ const TABS = [
 
 export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
   const { isEditMode } = useEditMode();
+  const { getLogo } = useClubLogos();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('analisis');
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
@@ -978,6 +980,7 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
       <MatchHeader 
         match={match} 
         onBack={() => router.push(match.tipo_partido === 'AMISTOSO' ? '/amistosos' : '/liga')} 
+        getLogo={getLogo}
       />
 
       {/* Selector de Pestañas */}

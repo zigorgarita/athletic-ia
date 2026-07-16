@@ -81,6 +81,9 @@ export function EditModeModal({ isOpen, onClose }: EditModeModalProps) {
               <option value="aitor" className="bg-slate-900 text-slate-100">
                 Aitor
               </option>
+              <option value="nacho" className="bg-slate-900 text-slate-100">
+                Nacho
+              </option>
             </select>
           </div>
 

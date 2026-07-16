@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 
 import { useMatches } from '@/hooks/useMatches';
+import { useClubLogos } from '@/hooks/useClubLogos';
 import { Match, MatchPlayerStats } from '@/types';
 import { MatchForm } from '@/components/liga/MatchForm';
 import { ConvocatoriaModal } from '@/components/liga/ConvocatoriaModal';
@@ -19,6 +20,7 @@ interface MatchCenterClientProps {
 
 export function MatchCenterClient({ matchType }: MatchCenterClientProps) {
   const { isEditMode } = useEditMode();
+  const { getLogo } = useClubLogos();
   const {
     matches,
     loading,
@@ -163,6 +165,7 @@ export function MatchCenterClient({ matchType }: MatchCenterClientProps) {
                 onEdit={handleOpenEditMatch}
                 onDelete={handleDeleteMatch}
                 onManageConvo={handleOpenConvo}
+                getLogo={getLogo}
               />
             ))}
           </div>

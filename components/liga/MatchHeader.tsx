@@ -2,24 +2,12 @@
 
 import React from 'react';
 import { Match } from '@/types';
-import { ArrowLeft, Calendar, Clock, MapPin } from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, MapPin, Shield } from 'lucide-react';
 
 interface MatchHeaderProps {
   match: Match;
   onBack: () => void;
-}
-
-// Helper to normalize and get rival logo if available
-function getRivalLogo(rivalName: string): string | null {
-  const normalized = rivalName.toLowerCase().trim()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // remove accents
-    .replace(/[^a-z0-9]/g, '');
-
-  if (normalized.includes('arratia')) return '/logos/arratia.svg';
-  if (normalized.includes('santutxu')) return '/logos/santutxu.svg';
-  if (normalized.includes('unionistas')) return '/logos/unionistas.svg';
-
-  return null;
+  getLogo?: (name: string) => string | null;
 }
 
 // Helper to get rival initials for the fallback logo
@@ -31,7 +19,9 @@ function getRivalInitials(rivalName: string): string {
   return rivalName.substring(0, 2).toUpperCase();
 }
 
-export function MatchHeader({ match, onBack }: MatchHeaderProps) {
+export function MatchHeader({ match, onBack, getLogo }: MatchHeaderProps) {
+  const [imageError, setImageError] = React.useState(false);
+
   const dateObj = new Date(match.fecha);
   const formattedDate = dateObj.toLocaleDateString('es-ES', { 
     weekday: 'long',
@@ -43,7 +33,8 @@ export function MatchHeader({ match, onBack }: MatchHeaderProps) {
   const isWinner = match.jugado && match.goles_favor !== null && match.goles_contra !== null && match.goles_favor > match.goles_contra;
   const isLoser = match.jugado && match.goles_favor !== null && match.goles_contra !== null && match.goles_favor < match.goles_contra;
 
-  const rivalLogo = getRivalLogo(match.rival);
+  // Single source of truth: escudo from DB (clubs table via getLogo prop)
+  const rivalLogo = getLogo ? getLogo(match.rival) : null;
   const rivalInitials = getRivalInitials(match.rival);
   
   const matchWithFields = match as Match & { campo?: string; hora?: string };
@@ -82,11 +73,12 @@ export function MatchHeader({ match, onBack }: MatchHeaderProps) {
             {match.es_local ? (
               <img src="/escudo.jpg" alt="SD Indautxu" className="object-contain max-h-full max-w-full" />
             ) : (
-              rivalLogo ? (
-                <img src={rivalLogo} alt={match.rival} className="object-contain max-h-full max-w-full" />
+              rivalLogo && !imageError ? (
+                <img src={rivalLogo} alt={match.rival} className="object-contain max-h-full max-w-full" onError={() => setImageError(true)} />
               ) : (
-                <div className="h-full w-full rounded-full bg-gradient-to-br from-slate-700 to-slate-900 flex items-center justify-center text-sm font-black text-slate-200">
-                  {rivalInitials}
+                <div className="h-full w-full rounded-full bg-gradient-to-br from-slate-800 to-slate-900 flex flex-col items-center justify-center text-[10px] font-black text-slate-350 border border-slate-700/50">
+                  <Shield className="h-5 w-5 text-slate-500 mb-0.5 shrink-0" />
+                  <span>{rivalInitials}</span>
                 </div>
               )
             )}
@@ -129,11 +121,12 @@ export function MatchHeader({ match, onBack }: MatchHeaderProps) {
             {!match.es_local ? (
               <img src="/escudo.jpg" alt="SD Indautxu" className="object-contain max-h-full max-w-full" />
             ) : (
-              rivalLogo ? (
-                <img src={rivalLogo} alt={match.rival} className="object-contain max-h-full max-w-full" />
+              rivalLogo && !imageError ? (
+                <img src={rivalLogo} alt={match.rival} className="object-contain max-h-full max-w-full" onError={() => setImageError(true)} />
               ) : (
-                <div className="h-full w-full rounded-full bg-gradient-to-br from-slate-700 to-slate-900 flex items-center justify-center text-sm font-black text-slate-200">
-                  {rivalInitials}
+                <div className="h-full w-full rounded-full bg-gradient-to-br from-slate-800 to-slate-900 flex flex-col items-center justify-center text-[10px] font-black text-slate-355 border border-slate-700/50">
+                  <Shield className="h-5 w-5 text-slate-500 mb-0.5 shrink-0" />
+                  <span>{rivalInitials}</span>
                 </div>
               )
             )}

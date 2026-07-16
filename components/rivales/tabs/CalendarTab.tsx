@@ -5,6 +5,7 @@ import { useClubMatches, ClubMatch } from '@/hooks/useClubMatches';
 import { Calendar as CalendarIcon } from 'lucide-react';
 import { MatchCard } from '@/components/liga/MatchCard';
 import { Match } from '@/types';
+import { useClubLogos } from '@/hooks/useClubLogos';
 
 interface CalendarTabProps {
   club: Club | null;
@@ -13,6 +14,7 @@ interface CalendarTabProps {
 
 export function CalendarTab({ club, season }: CalendarTabProps) {
   const { matches, loading } = useClubMatches(season?.id);
+  const { getLogo } = useClubLogos();
 
   if (!season) {
     return <div className="p-8 text-center text-slate-400">No hay datos de temporada disponibles.</div>;
@@ -67,6 +69,7 @@ export function CalendarTab({ club, season }: CalendarTabProps) {
               key={match.id}
               match={mapToMatch(match)}
               disableNavigation={!match.our_match_id}
+              getLogo={getLogo}
             />
           ))}
         </div>

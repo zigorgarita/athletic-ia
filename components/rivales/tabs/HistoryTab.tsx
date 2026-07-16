@@ -8,6 +8,7 @@ import { Modal } from '@/components/ui/Modal';
 import { History, Plus, Search } from 'lucide-react';
 import { MatchCard } from '@/components/liga/MatchCard';
 import { Match } from '@/types';
+import { useClubLogos } from '@/hooks/useClubLogos';
 
 interface HistoryTabProps {
   club: Club | null;
@@ -17,6 +18,7 @@ interface HistoryTabProps {
 export function HistoryTab({ club, season }: HistoryTabProps) {
   const { matches, loading, saveMatch, deleteMatch } = useClubMatches(season?.id);
   const { isEditMode } = useEditMode();
+  const { getLogo } = useClubLogos();
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingMatch, setEditingMatch] = useState<Partial<ClubMatch> | null>(null);
@@ -143,6 +145,7 @@ export function HistoryTab({ club, season }: HistoryTabProps) {
                 onDelete={() => deleteMatch(match.id)}
                 disableNavigation={!match.our_match_id}
                 hasReport={!!match.informe_analista || !!match.observaciones_mister}
+                getLogo={getLogo}
               />
             );
           })}

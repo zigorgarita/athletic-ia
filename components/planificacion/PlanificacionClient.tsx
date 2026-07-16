@@ -6,12 +6,14 @@ import {
   Calendar as CalendarIcon, Plus, Printer, RefreshCw, 
   BookOpen, X, Clock, MapPin, 
   Play, CheckCircle2,
-  Trash2, Share2, Info, Star, ArrowUp, ArrowDown
+  Trash2, Share2, Info, Star, ArrowUp, ArrowDown,
+  Shield
 } from 'lucide-react';
 import { useEditMode } from '@/context/EditModeContext';
 import { getDaysOfWeek, getDaysOfMonthGrid } from '@/lib/dateUtils';
 import { PlanningTaskLibrary } from '@/types';
 import { BibliotecaTareasModal } from './BibliotecaTareasModal';
+import { useClubLogos } from '@/hooks/useClubLogos';
 
 // Mock material checklist interface
 interface MockChecklist {
@@ -90,6 +92,8 @@ const CONCEPTOS_TACTICOS = {
 // Mock interface type definitions are kept for state typing
 export function PlanificacionClient() {
   const { isEditMode, verifyWritePermission } = useEditMode();
+  const { getLogo } = useClubLogos();
+  const [rivalImageError, setRivalImageError] = useState(false);
   // Views and navigation
   const [viewMode, setViewMode] = useState<'semanal' | 'mensual'>('semanal');
   const [loading, setLoading] = useState(true);
@@ -718,6 +722,11 @@ export function PlanificacionClient() {
   const doubtCount = players.filter(p => p.estado === 'Duda').length;
 
   const matchSession = sessions.find(s => s.tipo_sesion === 'Partido');
+  const rivalName = matchSession?.rival || '';
+
+  useEffect(() => {
+    setRivalImageError(false);
+  }, [rivalName]);
 
   if (loading) {
     return (
@@ -811,15 +820,35 @@ export function PlanificacionClient() {
                 PARTIDO DE LA SEMANA
               </span>
               <div className="mt-3 flex items-center gap-2">
-                <div className="h-7 w-7 rounded-full bg-slate-950 flex items-center justify-center font-bold text-white text-[10px] border border-slate-800">
-                  SDI
+                <div className="h-7 w-7 rounded-full bg-slate-950 flex items-center justify-center border border-slate-800 p-0.5 overflow-hidden shrink-0">
+                  <img src="/escudo.jpg" alt="SD Indautxu" className="object-contain h-full w-full" />
                 </div>
-                <span className="text-[10px] font-bold text-slate-600">VS</span>
-                <div className="h-7 w-7 rounded-full bg-slate-950 flex items-center justify-center font-bold text-white text-[10px] border border-slate-800 uppercase">
-                  {matchSession?.rival ? matchSession.rival.substring(0, 2) : '??'}
+                <span className="text-[10px] font-bold text-slate-600 font-sans">VS</span>
+                <div className="h-7 w-7 rounded-full bg-slate-950 flex items-center justify-center border border-slate-800 p-0.5 overflow-hidden shrink-0 uppercase">
+                  {(() => {
+                    const rivalLogo = getLogo(rivalName);
+                    const parts = rivalName.trim().split(/\s+/);
+                    const rivalInitials = parts.length >= 2 
+                      ? (parts[0].substring(0, 1) + parts[1].substring(0, 1)).toUpperCase()
+                      : rivalName.substring(0, 2).toUpperCase() || '??';
+
+                    return rivalLogo && !rivalImageError ? (
+                      <img 
+                        src={rivalLogo} 
+                        alt={rivalName} 
+                        className="object-contain h-full w-full" 
+                        onError={() => setRivalImageError(true)} 
+                      />
+                    ) : (
+                      <div className="h-full w-full flex flex-col items-center justify-center text-[7px] font-black text-slate-350 bg-gradient-to-br from-slate-800 to-slate-900 leading-none">
+                        <Shield className="h-2.5 w-2.5 text-slate-500 mb-0.5" />
+                        <span>{rivalInitials}</span>
+                      </div>
+                    );
+                  })()}
                 </div>
                 <div>
-                  <h3 className="text-xs font-black text-slate-200">
+                  <h3 className="text-sm font-black text-slate-100">
                     {matchSession ? (matchSession.rival || 'Rival por definir') : 'Sin partido oficial'}
                   </h3>
                   <p className="text-[8px] text-slate-500 font-extrabold uppercase tracking-wider">

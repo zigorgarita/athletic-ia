@@ -18,7 +18,8 @@ import {
   Camera, 
   Paperclip, 
   ClipboardCheck, 
-  ExternalLink 
+  ExternalLink,
+  Shield
 } from 'lucide-react';
 
 interface MatchCardProps {
@@ -27,6 +28,7 @@ interface MatchCardProps {
   onEdit?: (match: Match) => void;
   onDelete?: (id: string) => void;
   onManageConvo?: (match: Match) => void;
+  getLogo?: (name: string) => string | null;
   
   // Extensibility indicators (optional)
   hasReport?: boolean;
@@ -41,20 +43,7 @@ interface MatchCardProps {
   customHref?: string;
 }
 
-// Helper to normalize and get rival logo if available
-function getRivalLogo(rivalName: string): string | null {
-  const normalized = rivalName.toLowerCase().trim()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // remove accents
-    .replace(/[^a-z0-9]/g, '');
 
-  if (normalized.includes('arratia')) return '/logos/arratia.svg';
-  if (normalized.includes('santutxu')) return '/logos/santutxu.svg';
-  if (normalized.includes('unionistas')) return '/logos/unionistas.svg';
-
-  return null;
-}
-
-// Helper to get rival initials for the fallback logo
 function getRivalInitials(rivalName: string): string {
   const parts = rivalName.trim().split(/\s+/);
   if (parts.length >= 2) {
@@ -69,6 +58,7 @@ export function MatchCard({
   onEdit,
   onDelete,
   onManageConvo,
+  getLogo,
   hasReport = false,
   hasLineup = false,
   hasMatchPlan = false,
@@ -80,6 +70,8 @@ export function MatchCard({
   disableNavigation = false,
   customHref,
 }: MatchCardProps) {
+  const [imageError, setImageError] = React.useState(false);
+  
   const dateObj = new Date(match.fecha);
   const formattedDate = dateObj.toLocaleDateString('es-ES', { 
     day: 'numeric', 
@@ -90,7 +82,8 @@ export function MatchCard({
   const isWinner = match.jugado && match.goles_favor !== null && match.goles_contra !== null && match.goles_favor > match.goles_contra;
   const isLoser = match.jugado && match.goles_favor !== null && match.goles_contra !== null && match.goles_favor < match.goles_contra;
 
-  const rivalLogo = getRivalLogo(match.rival);
+  // Single source of truth: escudo from DB (clubs table via getLogo prop)
+  const rivalLogo = getLogo ? getLogo(match.rival) : null;
   const rivalInitials = getRivalInitials(match.rival);
   
   const matchWithFields = match as Match & { campo?: string; hora?: string };
@@ -126,7 +119,7 @@ export function MatchCard({
             {onDelete && (
               <button
                 onClick={(e) => { e.stopPropagation(); onDelete(match.id); }}
-                className="p-1.5 hover:bg-red-500/10 rounded-lg text-slate-400 hover:text-red-500 transition-colors"
+                className="p-1.5 hover:bg-slate-800/80 rounded-lg text-slate-400 hover:text-red-400 transition-colors"
                 title="Eliminar jornada"
               >
                 <Trash2 className="h-3.5 w-3.5" />
@@ -144,16 +137,17 @@ export function MatchCard({
             {match.es_local ? (
               <img src="/escudo.jpg" alt="SD Indautxu" className="object-contain max-h-full max-w-full" />
             ) : (
-              rivalLogo ? (
-                <img src={rivalLogo} alt={match.rival} className="object-contain max-h-full max-w-full" />
+              rivalLogo && !imageError ? (
+                <img src={rivalLogo} alt={match.rival} className="object-contain max-h-full max-w-full" onError={() => setImageError(true)} />
               ) : (
-                <div className="h-full w-full rounded-full bg-gradient-to-br from-slate-700 to-slate-900 flex items-center justify-center text-xs font-black text-slate-200">
-                  {rivalInitials}
+                <div className="h-full w-full rounded-full bg-gradient-to-br from-slate-800 to-slate-900 flex flex-col items-center justify-center text-[10px] font-black text-slate-300 border border-slate-700/50">
+                  <Shield className="h-4.5 w-4.5 text-slate-500 mb-0.5 shrink-0" />
+                  <span>{rivalInitials}</span>
                 </div>
               )
             )}
           </div>
-          <span className="text-xs font-bold text-slate-250 mt-2 truncate w-full max-w-[85px] leading-tight">
+          <span className={`mt-2 truncate w-full leading-tight font-bold ${match.es_local ? 'text-xs text-slate-300 max-w-[85px]' : 'text-sm text-slate-100 max-w-[100px]'}`}>
             {match.es_local ? 'SD Indautxu' : match.rival}
           </span>
         </div>
@@ -189,16 +183,17 @@ export function MatchCard({
             {!match.es_local ? (
               <img src="/escudo.jpg" alt="SD Indautxu" className="object-contain max-h-full max-w-full" />
             ) : (
-              rivalLogo ? (
-                <img src={rivalLogo} alt={match.rival} className="object-contain max-h-full max-w-full" />
+              rivalLogo && !imageError ? (
+                <img src={rivalLogo} alt={match.rival} className="object-contain max-h-full max-w-full" onError={() => setImageError(true)} />
               ) : (
-                <div className="h-full w-full rounded-full bg-gradient-to-br from-slate-700 to-slate-900 flex items-center justify-center text-xs font-black text-slate-200">
-                  {rivalInitials}
+                <div className="h-full w-full rounded-full bg-gradient-to-br from-slate-800 to-slate-900 flex flex-col items-center justify-center text-[10px] font-black text-slate-300 border border-slate-700/50">
+                  <Shield className="h-4.5 w-4.5 text-slate-500 mb-0.5 shrink-0" />
+                  <span>{rivalInitials}</span>
                 </div>
               )
             )}
           </div>
-          <span className="text-xs font-bold text-slate-250 mt-2 truncate w-full max-w-[85px] leading-tight">
+          <span className={`mt-2 truncate w-full leading-tight font-bold ${!match.es_local ? 'text-xs text-slate-300 max-w-[85px]' : 'text-sm text-slate-100 max-w-[100px]'}`}>
             {!match.es_local ? 'SD Indautxu' : match.rival}
           </span>
         </div>
