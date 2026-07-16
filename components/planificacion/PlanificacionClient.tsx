@@ -112,6 +112,8 @@ export function PlanificacionClient() {
   const [players, setPlayers] = useState<MockPlayer[]>([]);
   const [allConceptsMap, setAllConceptsMap] = useState<Record<string, { id: string; session_id: string; categoria: string; concepto: string }[]>>({});
   const [sessionConcepts, setSessionConcepts] = useState<{ id?: string; session_id: string; categoria: string; concepto: string }[]>([]);
+  // Official match (Liga/Amistoso) falling within the visible week
+  const [weekMatch, setWeekMatch] = useState<{ rival: string; fecha: string; hora?: string; campo?: string; tipo_partido?: string } | null>(null);
   
   const [selectedDate, setSelectedDate] = useState<string>(() => {
     const d = new Date();
@@ -282,6 +284,26 @@ export function PlanificacionClient() {
       setSessions(fullPeriodSessions);
       setAllTasksMap(tasksMap);
       setAllConceptsMap(conceptsMap);
+
+      // Fetch official match (Liga/Amistoso) for this week range
+      const { data: matchesData } = await supabase
+        .from('matches')
+        .select('rival, fecha, tipo_partido')
+        .gte('fecha', start)
+        .lte('fecha', end)
+        .order('fecha', { ascending: true })
+        .limit(1);
+
+      if (matchesData && matchesData.length > 0) {
+        const m = matchesData[0];
+        setWeekMatch({
+          rival: m.rival || '',
+          fecha: m.fecha || '',
+          tipo_partido: m.tipo_partido || 'LIGA',
+        });
+      } else {
+        setWeekMatch(null);
+      }
     } catch (err) {
       console.error('Error fetching period data:', err);
       triggerToast('Error al conectar con Supabase');
@@ -722,7 +744,10 @@ export function PlanificacionClient() {
   const doubtCount = players.filter(p => p.estado === 'Duda').length;
 
   const matchSession = sessions.find(s => s.tipo_sesion === 'Partido');
-  const rivalName = matchSession?.rival || '';
+  // Use official match from matches table as primary source; fall back to planning session
+  const effectiveRivalName = weekMatch?.rival || matchSession?.rival || '';
+  const rivalName = effectiveRivalName;
+  const hasOfficialMatch = !!(weekMatch || matchSession);
 
   useEffect(() => {
     setRivalImageError(false);
@@ -820,11 +845,11 @@ export function PlanificacionClient() {
                 PARTIDO DE LA SEMANA
               </span>
               <div className="mt-3 flex items-center gap-2">
-                <div className="h-7 w-7 rounded-full bg-slate-950 flex items-center justify-center border border-slate-800 p-0.5 overflow-hidden shrink-0">
+                <div className="h-9 w-9 rounded-full bg-slate-950 flex items-center justify-center border border-slate-800 p-0.5 overflow-hidden shrink-0">
                   <img src="/escudo.jpg" alt="SD Indautxu" className="object-contain h-full w-full" />
                 </div>
                 <span className="text-[10px] font-bold text-slate-600 font-sans">VS</span>
-                <div className="h-7 w-7 rounded-full bg-slate-950 flex items-center justify-center border border-slate-800 p-0.5 overflow-hidden shrink-0 uppercase">
+                <div className="h-9 w-9 rounded-full bg-slate-950 flex items-center justify-center border border-slate-800 p-0.5 overflow-hidden shrink-0 uppercase">
                   {(() => {
                     const rivalLogo = getLogo(rivalName);
                     const parts = rivalName.trim().split(/\s+/);
@@ -849,16 +874,16 @@ export function PlanificacionClient() {
                 </div>
                 <div>
                   <h3 className="text-sm font-black text-slate-100">
-                    {matchSession ? (matchSession.rival || 'Rival por definir') : 'Sin partido oficial'}
+                    {hasOfficialMatch ? (rivalName || 'Rival por definir') : 'Sin partido oficial'}
                   </h3>
                   <p className="text-[8px] text-slate-500 font-extrabold uppercase tracking-wider">
-                    {matchSession ? 'División de Honor' : 'Semana de Descanso'}
+                    {hasOfficialMatch ? (weekMatch?.tipo_partido === 'AMISTOSO' ? 'Amistoso' : 'Division de Honor') : 'Semana de Descanso'}
                   </p>
                 </div>
               </div>
             </div>
             
-            {matchSession && (
+            {hasOfficialMatch && (
               <div className="text-right">
                 <span className="text-[9px] font-black text-[#CC0E21] bg-[#CC0E21]/5 border border-[#CC0E21]/15 px-2 py-0.5 rounded uppercase">
                   FALTAN DÍAS
@@ -868,9 +893,9 @@ export function PlanificacionClient() {
           </div>
 
           <div className="border-t border-slate-850 pt-2.5 mt-3 flex justify-between items-center text-[10px] font-semibold text-slate-400 z-10">
-            <span>📅 {matchSession ? matchSession.fecha : '---'}</span>
-            <span>⏰ {matchSession ? (matchSession.hora_inicio ? `${matchSession.hora_inicio}h` : '--:--') : '---'}</span>
-            <span className="truncate max-w-[150px]">📍 {matchSession ? (matchSession.campo_instalacion || 'Por definir') : '---'}</span>
+            <span>📅 {hasOfficialMatch ? (weekMatch?.fecha || matchSession?.fecha || '---') : '---'}</span>
+            <span>⏰ {hasOfficialMatch ? (matchSession?.hora_inicio ? `${matchSession.hora_inicio}h` : '--:--') : '---'}</span>
+            <span className="truncate max-w-[150px]">📍 {hasOfficialMatch ? (matchSession?.campo_instalacion || 'Por definir') : '---'}</span>
           </div>
         </div>
       </div>

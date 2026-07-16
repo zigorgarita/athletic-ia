@@ -40,7 +40,20 @@ export function useClubLogos() {
 
   const getLogo = (clubName: string): string | null => {
     if (!clubName) return null;
-    return logosMap[normalizeClubName(clubName)] || null;
+    const normalized = normalizeClubName(clubName);
+
+    // 1st attempt: exact normalized match
+    if (logosMap[normalized]) return logosMap[normalized];
+
+    // 2nd attempt: partial match — one name contains the other (handles prefix/suffix differences)
+    // e.g. "Cultural Leonesa" (normalized: "culturalleonesa") vs "Cultural y Deportiva Leonesa" ("culturalydeportivaleonesa")
+    for (const key of Object.keys(logosMap)) {
+      if (key.includes(normalized) || normalized.includes(key)) {
+        return logosMap[key];
+      }
+    }
+
+    return null;
   };
 
   return { getLogo, logosMap, loading };
