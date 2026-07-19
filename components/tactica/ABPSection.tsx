@@ -18,6 +18,7 @@ import { useEditMode } from '@/context/EditModeContext';
 import { exportToPDF, buildABPFilename } from '@/lib/exportPdf';
 import { ABPFieldExport } from './ABPFieldExport';
 import { ABPPlanPartido } from './ABPPlanPartido';
+import { ABPPlayerNode, LabelPosition } from './ABPPlayerNode';
 
 const normalizeRoleName = (role: string): string => {
   if (!role) return role;
@@ -1113,7 +1114,8 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
         posicion_y: role.posicion_y !== null ? parseFloat(role.posicion_y.toFixed(1)) : null,
         etiqueta: role.etiqueta || ROLE_ABBRS[role.rol_asignado] || role.rol_asignado.substring(0, 4).toUpperCase(),
         comentario: role.comentario || null,
-        orden: role.orden || null
+        orden: role.orden || null,
+        label_position: role.label_position ?? 'bottom'
       }));
 
       const { error } = await supabase.rpc('exec_secure_bulk_upsert', {
@@ -1411,6 +1413,13 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
       }
       return role;
     }));
+  };
+
+  // Actualiza la posición de la etiqueta del rol en el estado local
+  const handleLabelPositionChange = (roleId: string, pos: LabelPosition) => {
+    setPlayRoles(prev => prev.map(role =>
+      role.id === roleId ? { ...role, label_position: pos } : role
+    ));
   };
 
 
@@ -1791,14 +1800,12 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
                         }
                       })()}
 
-                      {/* Renderizado de Fichas/Roles */}
+                      {/* Renderizado de Fichas/Roles — usa ABPPlayerNode (mismo visual que PDF) */}
                       {playRoles.map((role) => {
                         const isRealPosType = isRealPositionPlayType(selectedPlay.tipo);
                         const px = role.posicion_x !== null ? role.posicion_x : 50;
                         const py = role.posicion_y !== null ? role.posicion_y : 50;
-                        const { funcion_tactica } = parseComentario(role.comentario);
                         const label = role.etiqueta || (isRealPosType ? POSITION_ABBRS[role.rol_asignado] : ROLE_ABBRS[role.rol_asignado]) || 'P';
-                        const player = role.player;
 
                         return (
                           <div
@@ -1808,8 +1815,8 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
                               top: `${py}%`,
                               transform: 'translate(-50%, -50%)',
                             }}
-                            className={`absolute z-10 flex flex-col items-center cursor-move rounded-full transition-transform duration-100 ${
-                              activeNodeId === role.id ? 'ring-2 ring-[#CC0E21] ring-offset-2 ring-offset-emerald-950 scale-105 shadow-2xl' : ''
+                            className={`absolute z-10 cursor-move transition-transform duration-100 ${
+                              activeNodeId === role.id ? 'ring-2 ring-[#CC0E21] ring-offset-2 ring-offset-emerald-950 scale-105 shadow-2xl rounded-full' : ''
                             }`}
                             onMouseDown={(e) => {
                               setActiveNodeId(role.id);
@@ -1819,43 +1826,13 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
                               setActiveNodeId(role.id);
                               handleDragStart(e, role.id);
                             }}
-
                           >
-                            {/* Ficha Visual del Jugador / Rol */}
-                            <div className="relative h-11 w-11 rounded-full border-2 flex items-center justify-center shadow-lg bg-slate-950 border-slate-700/85 border-dashed text-slate-400">
-                              <span className="text-[9px] font-black tracking-tight">{label}</span>
-                            </div>
-
-                            {/* Nombre y Rol con Selector */}
-                            <div className="mt-1 bg-slate-950/95 border border-slate-800 px-1.5 py-0.5 rounded text-[8px] font-bold text-slate-350 max-w-[100px] flex flex-col items-center leading-tight select-none pointer-events-auto shadow-md">
-                              <span className="truncate max-w-[85px] text-slate-100">{player ? player.nombre.split(' ')[0] : (POSITION_ABBRS[role.rol_asignado] || role.rol_asignado)}</span>
-                              <div className="flex flex-col items-center gap-0.5 mt-0.5 text-[7px] text-slate-400 border-t border-slate-800/60 pt-0.5 w-full justify-center">
-                                <span className="truncate max-w-[85px] text-center text-slate-400">{role.rol_asignado}</span>
-                                {isRealPosType && funcion_tactica && (
-                                  <span className="bg-[#CC0E21]/20 text-[#CC0E21] border border-[#CC0E21]/30 px-1 py-0.2 rounded mt-0.5 font-black text-[6.5px]">
-                                    {funcion_tactica}
-                                  </span>
-                                )}
-                                <div className="relative shrink-0 mt-0.5 flex items-center justify-center">
-                                  <select
-                                    value={role.rol_asignado}
-                                    onChange={(e) => handleRoleChange(role.id, e.target.value)}
-                                    className="absolute inset-0 opacity-0 w-4 h-4 cursor-pointer"
-                                  >
-                                    {isRealPosType ? (
-                                      Object.keys(POSITION_ABBRS).map((pos) => (
-                                        <option key={pos} value={pos}>{pos}</option>
-                                      ))
-                                    ) : (
-                                      getRolesForPlayType(selectedPlay.tipo).map((r) => (
-                                        <option key={r} value={r}>{r}</option>
-                                      ))
-                                    )}
-                                  </select>
-                                  <ChevronDown className="h-2 w-2 text-slate-450 hover:text-slate-300" />
-                                </div>
-                              </div>
-                            </div>
+                            <ABPPlayerNode
+                              role={role}
+                              roleLabel={label}
+                              isExport={false}
+                              onChangeLabelPosition={(pos) => handleLabelPositionChange(role.id, pos)}
+                            />
                           </div>
                         );
                       })}

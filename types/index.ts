@@ -285,6 +285,8 @@ export interface ABPPlayerRole {
   etiqueta?: string | null;
   comentario?: string | null;
   orden?: number | null;
+  /** Posición del rol respecto al círculo en la pizarra y PDF. Default: 'bottom' */
+  label_position?: 'top' | 'bottom' | 'left' | 'right' | null;
   created_at: string;
 }
 

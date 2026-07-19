@@ -3,7 +3,8 @@
 import React, { useState } from 'react';
 import { Player, ABPPlayerRole, MatchABPPlayerAssignment, ABPType } from '@/types';
 import { Avatar } from '@/components/ui/Avatar';
-import { UserCheck, X } from 'lucide-react';
+import { X } from 'lucide-react';
+import { ABPPlayerNode, LabelPosition } from './ABPPlayerNode';
 
 interface RoleWithAssignment extends ABPPlayerRole {
   assignment?: MatchABPPlayerAssignment;
@@ -19,6 +20,8 @@ interface ABPPlanFieldProps {
   lineupPlayerIds: string[]; // IDs de los 11 titulares
   onAssignPlayer: (roleId: string, playerId: string) => void;
   onRemovePlayer: (roleId: string) => void;
+  /** Callback para actualizar la posición de la etiqueta del rol en DB */
+  onUpdateLabelPosition?: (roleId: string, position: LabelPosition) => void;
 }
 
 // Map database string to typed ABPType
@@ -52,6 +55,7 @@ const getFieldView = (type: ABPType, zona?: string | null): 'full' | 'attack' | 
   return 'attack';
 };
 
+
 export function ABPPlanField({
   planId,
   tipo,
@@ -60,7 +64,8 @@ export function ABPPlanField({
   players,
   lineupPlayerIds,
   onAssignPlayer,
-  onRemovePlayer
+  onRemovePlayer,
+  onUpdateLabelPosition,
 }: ABPPlanFieldProps) {
   const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
@@ -246,47 +251,31 @@ export function ABPPlanField({
         {/* Nodos de la jugada */}
         {roles.map((role) => {
           const isSelected = selectedRoleId === role.id;
-          const assigned = role.assignedPlayer;
-          const isTitular = assigned ? lineupPlayerIds.includes(assigned.id) : false;
 
           const px = role.posicion_x !== null ? role.posicion_x : 50;
           const py = role.posicion_y !== null ? role.posicion_y : 50;
 
+          // Etiqueta del rol (misma lógica que ABPFieldExport)
+          const roleLabel = role.etiqueta || role.rol_asignado;
+
           return (
             <div
               key={role.id}
-              className={`absolute flex flex-col items-center justify-center -translate-x-1/2 -translate-y-1/2 cursor-pointer transition-all ${
-                isSelected ? 'scale-110 z-30' : 'z-10 hover:scale-105'
+              className={`absolute -translate-x-1/2 -translate-y-1/2 cursor-pointer transition-all ${
+                isSelected ? 'scale-110 z-30 ring-2 ring-[#CC0E21] ring-offset-2 ring-offset-emerald-950 rounded-full' : 'z-10 hover:scale-105'
               }`}
               style={{ left: `${px}%`, top: `${py}%` }}
               onClick={() => handleNodeClick(role.id)}
             >
-              {assigned ? (
-                <div 
-                  className={`px-2.5 py-1 rounded-full flex items-center justify-center text-white font-black text-[9px] shadow-lg border-2 transition-all whitespace-nowrap min-w-[28px] ${
-                    isTitular 
-                      ? 'bg-green-600 border-green-400 hover:bg-green-500' 
-                      : 'bg-blue-600 border-blue-400 hover:bg-blue-500'
-                  } ${
-                    isSelected ? 'ring-2 ring-red-500 ring-offset-2 ring-offset-emerald-950 scale-105' : ''
-                  }`}
-                  title={assigned.nombre}
-                >
-                  {assigned.nombre.split(' ')[0]}
-                </div>
-              ) : (
-                <div 
-                  className={`w-9 h-9 rounded-full bg-slate-900/90 border-2 border-slate-600/80 border-dashed flex items-center justify-center shadow-lg hover:border-white transition-all ${
-                    isSelected ? 'ring-2 ring-red-500 ring-offset-2 ring-offset-emerald-950 scale-105' : ''
-                  }`}
-                >
-                  <UserCheck className="w-4 h-4 text-slate-400" />
-                </div>
-              )}
-              
-              <div className="mt-1 bg-black/85 border border-slate-800/80 px-2 py-0.5 rounded text-[8px] font-bold text-slate-200 whitespace-nowrap shadow-md">
-                {role.etiqueta || role.rol_asignado}
-              </div>
+              <ABPPlayerNode
+                role={{ ...role, player: role.assignedPlayer }}
+                roleLabel={roleLabel}
+                isExport={false}
+                onChangeLabelPosition={onUpdateLabelPosition
+                  ? (pos) => onUpdateLabelPosition(role.id, pos)
+                  : undefined
+                }
+              />
             </div>
           );
         })}

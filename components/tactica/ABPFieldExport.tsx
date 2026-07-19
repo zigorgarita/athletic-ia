@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Player, ABPPlayerRole, ABPType } from '@/types';
+import { ABPPlayerNode } from './ABPPlayerNode';
 
 interface ABPFieldExportProps {
   playRoles: (ABPPlayerRole & { player?: Player })[];
@@ -65,24 +66,18 @@ const getFieldView = (type: ABPType, zona?: string | null): 'full' | 'attack' | 
   if (type === 'Saque inicial' || type === 'Saque de medio ofensivo' || type === 'Saque de medio defensivo') {
     return 'full';
   }
-  
   if (type === 'Saque de banda ofensivo') {
     if (zona === 'Inicio') return 'defense';
     if (zona === 'Medio') return 'midfield';
     return 'attack';
   }
-  
   if (type === 'Saque de banda defensivo') {
     if (zona === 'Inicio') return 'attack';
     if (zona === 'Medio') return 'midfield';
     return 'defense';
   }
-  
   const lower = type.toLowerCase();
-  if (lower.includes('defensivo') || lower.includes('defensiva')) {
-    return 'defense';
-  }
-  
+  if (lower.includes('defensivo') || lower.includes('defensiva')) return 'defense';
   return 'attack';
 };
 
@@ -90,10 +85,10 @@ export function ABPFieldExport({ playRoles, playType, playZona }: ABPFieldExport
   const view = getFieldView(playType, playZona);
 
   return (
-    <div 
+    <div
       className="relative w-[1200px] h-[900px] bg-emerald-950 rounded-[1rem] border-4 border-emerald-500 overflow-hidden"
     >
-      {/* SVG Horizontal Pitch depending on View */}
+      {/* SVG Pitch */}
       {(() => {
         if (view === 'full') {
           return (
@@ -102,13 +97,11 @@ export function ABPFieldExport({ playRoles, playType, playZona }: ABPFieldExport
               <line x1="200" y1="15" x2="200" y2="285" stroke="#fff" strokeWidth="2.5" />
               <circle cx="200" cy="150" r="45" fill="none" stroke="#fff" strokeWidth="2.5" />
               <circle cx="200" cy="150" r="3" fill="#fff" />
-              
               <rect x="15" y="65" width="60" height="170" fill="none" stroke="#fff" strokeWidth="2.5" />
               <rect x="15" y="105" width="22" height="90" fill="none" stroke="#fff" strokeWidth="2.5" />
               <circle cx="55" cy="150" r="2.5" fill="#fff" />
               <path d="M 75 115 A 40 40 0 0 1 75 185" fill="none" stroke="#fff" strokeWidth="2.5" />
               <rect x="7" y="115" width="8" height="70" fill="none" stroke="#fff" strokeWidth="3" />
-              
               <rect x="325" y="65" width="60" height="170" fill="none" stroke="#fff" strokeWidth="2.5" />
               <rect x="363" y="105" width="22" height="90" fill="none" stroke="#fff" strokeWidth="2.5" />
               <circle cx="345" cy="150" r="2.5" fill="#fff" />
@@ -132,7 +125,6 @@ export function ABPFieldExport({ playRoles, playType, playZona }: ABPFieldExport
               <rect x="0" y="0" width="400" height="300" fill="none" stroke="#fff" strokeWidth="2.5" />
               <path d="M 0 10 A 10 10 0 0 1 10 0" fill="none" stroke="#fff" strokeWidth="3" />
               <path d="M 400 10 A 10 10 0 0 0 390 0" fill="none" stroke="#fff" strokeWidth="3" />
-              
               <rect x="75" y="0" width="250" height="110" fill="none" stroke="#fff" strokeWidth="2.5" />
               <rect x="140" y="0" width="120" height="40" fill="none" stroke="#fff" strokeWidth="2.5" />
               <circle cx="200" cy="80" r="3" fill="#fff" />
@@ -147,7 +139,6 @@ export function ABPFieldExport({ playRoles, playType, playZona }: ABPFieldExport
               <rect x="0" y="0" width="400" height="300" fill="none" stroke="#fff" strokeWidth="2.5" />
               <path d="M 0 10 A 10 10 0 0 1 10 0" fill="none" stroke="#fff" strokeWidth="3" />
               <path d="M 400 10 A 10 10 0 0 0 390 0" fill="none" stroke="#fff" strokeWidth="3" />
-              
               <rect x="75" y="0" width="250" height="110" fill="none" stroke="#fff" strokeWidth="2.5" />
               <rect x="140" y="0" width="120" height="40" fill="none" stroke="#fff" strokeWidth="2.5" />
               <circle cx="200" cy="80" r="3" fill="#fff" />
@@ -159,105 +150,40 @@ export function ABPFieldExport({ playRoles, playType, playZona }: ABPFieldExport
         }
       })()}
 
-      {/* Render Nodes / Roles / Players */}
+      {/* Tokens — usa ABPPlayerNode en modo export (idéntico al editor, tamaño fijo) */}
       {playRoles.map((role) => {
         const isRealPosType = isRealPositionPlayType(playType);
         const px = role.posicion_x !== null ? role.posicion_x : 50;
         const py = role.posicion_y !== null ? role.posicion_y : 50;
-        const normalizedRoleName = (roleName: string) => {
-          if (!roleName) return roleName;
-          if (roleName === 'Primer palo') return '1º palo';
-          if (roleName === 'Segundo palo') return '2º palo';
-          return roleName;
+
+        const normalizedRoleName = (rn: string) => {
+          if (!rn) return rn;
+          if (rn === 'Primer palo') return '1º palo';
+          if (rn === 'Segundo palo') return '2º palo';
+          return rn;
         };
         const rName = normalizedRoleName(role.rol_asignado);
-        const label = role.etiqueta || (isRealPosType ? POSITION_ABBRS[rName] : ROLE_ABBRS[rName]) || 'P';
-        const player = role.player;
-
-        console.log(`[ABPFieldExport] Ficha - Jugador: ${player ? player.nombre : 'Ninguno'}, Rol: ${rName}, Etiqueta: ${label}, Renderizando: Texto (foto omitida)`);
+        const roleLabel = role.etiqueta || (isRealPosType ? POSITION_ABBRS[rName] : ROLE_ABBRS[rName]) || rName.substring(0, 4).toUpperCase();
 
         return (
           <div
             key={role.id}
             style={{
+              position: 'absolute',
               left: `${px}%`,
               top: `${py}%`,
               transform: 'translate(-50%, -50%)',
-              position: 'absolute',
               zIndex: 10,
               display: 'flex',
-              flexDirection: 'column',
               alignItems: 'center',
+              justifyContent: 'center',
             }}
           >
-            {/* Player Token */}
-            <div
-              style={{
-                position: 'relative',
-                height: '80px',
-                width: '80px',
-                borderRadius: '50%',
-                border: player ? '4px solid #CC0E21' : '4px solid #475569',
-                backgroundColor: player ? '#0f172a' : 'rgba(30, 41, 59, 0.9)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
-              }}
-            >
-              <span style={{ fontSize: '20px', fontWeight: 900, color: player ? '#f1f5f9' : '#94a3b8' }}>{label}</span>
-            </div>
-
-            {/* Role Badge (positioned absolutely on top of circle, centered) */}
-            <div
-              style={{
-                position: 'absolute',
-                top: '-28px',
-                left: '50%',
-                transform: 'translateX(-50%)',
-                backgroundColor: '#0f172a',
-                border: '2px solid rgba(204, 14, 33, 0.9)',
-                borderRadius: '6px',
-                padding: '0 12px',
-                height: '26px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '15px',
-                fontWeight: 900,
-                color: '#CC0E21',
-                whiteSpace: 'nowrap',
-                boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
-                zIndex: 20,
-              }}
-            >
-              {label}
-            </div>
-
-            {/* Name / Info Overlay */}
-            {player && (
-              <div
-                style={{
-                  marginTop: '6px',
-                  backgroundColor: 'rgba(15, 23, 42, 0.95)',
-                  border: '2px solid #334155',
-                  borderRadius: '10px',
-                  padding: '6px 14px',
-                  fontSize: '18px',
-                  fontWeight: 750,
-                  color: '#f1f5f9',
-                  whiteSpace: 'nowrap',
-                  maxWidth: '140px',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  textAlign: 'center',
-                  lineHeight: '1.3',
-                  boxShadow: '0 3px 8px rgba(0,0,0,0.4)',
-                }}
-              >
-                {player.nombre.split(' ')[0]}
-              </div>
-            )}
+            <ABPPlayerNode
+              role={role}
+              roleLabel={roleLabel}
+              isExport={true}
+            />
           </div>
         );
       })}

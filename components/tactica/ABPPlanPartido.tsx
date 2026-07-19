@@ -266,6 +266,29 @@ export function ABPPlanPartido({ players, matches, onExit }: ABPPlanPartidoProps
     }
   };
 
+  /**
+   * Guarda la posición de la etiqueta del rol (top/bottom/left/right)
+   * directamente en abp_player_roles para que persista en el PDF.
+   */
+  const handleUpdateLabelPosition = async (roleId: string, position: 'top' | 'bottom' | 'left' | 'right') => {
+    try {
+      await supabase
+        .from('abp_player_roles')
+        .update({ label_position: position })
+        .eq('id', roleId);
+
+      // Actualiza el estado local para reflejar el cambio inmediatamente
+      setMatchAbpRoles(prev => prev.map(r =>
+        r.role?.id === roleId
+          ? { ...r, role: r.role ? { ...r.role, label_position: position } : r.role }
+          : r
+      ));
+    } catch(e: unknown) {
+      setErrorMsg('Error al guardar posición de etiqueta: ' + (e as Error).message);
+    }
+  };
+
+
   const handleAutoAssignTitulares = async () => {
     if (matchLineupPlayerIds.length === 0) return;
     setLoading(true);
@@ -715,6 +738,7 @@ export function ABPPlanPartido({ players, matches, onExit }: ABPPlanPartidoProps
                        lineupPlayerIds={matchLineupPlayerIds}
                        onAssignPlayer={(roleId, playerId) => handleAssignPlayer(plan.id, roleId, playerId)}
                        onRemovePlayer={(roleId) => handleRemovePlayer(plan.id, roleId)}
+                       onUpdateLabelPosition={(roleId, pos) => handleUpdateLabelPosition(roleId, pos)}
                      />
                   </div>
                 </div>
