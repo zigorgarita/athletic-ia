@@ -845,11 +845,11 @@ export function PlanificacionClient() {
                 PARTIDO DE LA SEMANA
               </span>
               <div className="mt-3 flex items-center gap-2">
-                <div className="h-9 w-9 rounded-full bg-slate-950 flex items-center justify-center border border-slate-800 p-0.5 overflow-hidden shrink-0">
+                <div className="h-11 w-11 rounded-full bg-slate-950 flex items-center justify-center border border-slate-800 p-0.5 overflow-hidden shrink-0">
                   <img src="/escudo.jpg" alt="SD Indautxu" className="object-contain h-full w-full" />
                 </div>
                 <span className="text-[10px] font-bold text-slate-600 font-sans">VS</span>
-                <div className="h-9 w-9 rounded-full bg-slate-950 flex items-center justify-center border border-slate-800 p-0.5 overflow-hidden shrink-0 uppercase">
+                <div className="h-11 w-11 rounded-full bg-slate-950 flex items-center justify-center border border-slate-800 p-0.5 overflow-hidden shrink-0 uppercase">
                   {(() => {
                     const rivalLogo = getLogo(rivalName);
                     const parts = rivalName.trim().split(/\s+/);
