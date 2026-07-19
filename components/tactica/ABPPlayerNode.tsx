@@ -85,9 +85,8 @@ export function ABPPlayerNode({
   if (isExport) {
     // ── EXPORT MODE: tamaños fijos en px, sin selector ──────────────────────
     const CIRCLE_PX = 80;
-    const RADIUS = CIRCLE_PX / 2;      // 40px
-    const GAP = 8;                      // separación círculo ↔ badge
-    const OFFSET = RADIUS + GAP;        // 48px
+    const GAP = 12;                     // separación círculo ↔ badge (equivale a mt-1.5 × escala 2×)
+    const OFFSET = CIRCLE_PX + GAP;    // 92px — empieza FUERA del círculo, igual que top-full en editor
 
     const badgePosStyle: React.CSSProperties = (() => {
       switch (labelPos) {
