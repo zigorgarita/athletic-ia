@@ -5,6 +5,7 @@ import { Player, ABPPlayerRole, MatchABPPlayerAssignment, ABPType } from '@/type
 import { Avatar } from '@/components/ui/Avatar';
 import { X } from 'lucide-react';
 import { ABPPlayerNode, LabelPosition } from './ABPPlayerNode';
+import { normalizeRoleLabel } from '@/lib/abpUtils';
 
 interface RoleWithAssignment extends ABPPlayerRole {
   assignment?: MatchABPPlayerAssignment;
@@ -256,7 +257,7 @@ export function ABPPlanField({
           const py = role.posicion_y !== null ? role.posicion_y : 50;
 
           // Etiqueta del rol (misma lógica que ABPFieldExport)
-          const roleLabel = role.etiqueta || role.rol_asignado;
+          const roleLabel = normalizeRoleLabel(role.etiqueta) || role.rol_asignado;
 
           return (
             <div

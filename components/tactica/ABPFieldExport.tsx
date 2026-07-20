@@ -3,7 +3,7 @@
 import React from 'react';
 import { Player, ABPPlayerRole, ABPType } from '@/types';
 import { ABPPlayerNode } from './ABPPlayerNode';
-import { normalizeRoleName } from '@/lib/abpUtils';
+import { normalizeRoleName, normalizeRoleLabel, ROLE_ABBRS } from '@/lib/abpUtils';
 
 interface ABPFieldExportProps {
   playRoles: (ABPPlayerRole & { player?: Player })[];
@@ -11,29 +11,7 @@ interface ABPFieldExportProps {
   playZona?: string | null;
 }
 
-const ROLE_ABBRS: Record<string, string> = {
-  'Lanzador': 'LAN',
-  'Sacador': 'SAC',
-  'Rematador': 'REM',
-  'Bloqueador': 'BLOQ',
-  'Arrastrador': 'ARR',
-  'Rechace': 'RECH',
-  'Cierre': 'CIER',
-  'Primer palo': 'P.PALO',
-  'Segundo palo': 'S.PALO',
-  '1º palo': '1ºPALO',
-  '2º palo': '2ºPALO',
-  'Barrera': 'BARR',
-  'Vigilancia': 'VIG',
-  'Defensa zona': 'D.ZONA',
-  'Marca individual': 'M.INDIV',
-  'Libre': 'LIB',
-  'Apoyo': 'APOYO',
-  'Receptor': 'REC',
-  'Cambio de orientación': 'C.ORI',
-  'Profundidad': 'PROF',
-  'Cobertura': 'COB'
-};
+
 
 const POSITION_ABBRS: Record<string, string> = {
   'Portero': 'POR',
@@ -158,7 +136,7 @@ export function ABPFieldExport({ playRoles, playType, playZona }: ABPFieldExport
         const py = role.posicion_y !== null ? role.posicion_y : 50;
 
         const rName = normalizeRoleName(role.rol_asignado);
-        const roleLabel = role.etiqueta || (isRealPosType ? POSITION_ABBRS[rName] : ROLE_ABBRS[rName]) || rName.substring(0, 4).toUpperCase();
+        const roleLabel = normalizeRoleLabel(role.etiqueta) || (isRealPosType ? POSITION_ABBRS[rName] : ROLE_ABBRS[rName]) || rName.substring(0, 4).toUpperCase();
 
         return (
           <div

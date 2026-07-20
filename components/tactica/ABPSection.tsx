@@ -19,7 +19,7 @@ import { exportToPDF, buildABPFilename } from '@/lib/exportPdf';
 import { ABPFieldExport } from './ABPFieldExport';
 import { ABPPlanPartido } from './ABPPlanPartido';
 import { ABPPlayerNode, LabelPosition } from './ABPPlayerNode';
-import { normalizeRoleName } from '@/lib/abpUtils';
+import { normalizeRoleName, normalizeRoleLabel, ROLE_ABBRS } from '@/lib/abpUtils';
 
 interface ABPSectionProps {
   players: Player[];
@@ -43,31 +43,6 @@ const ABP_TYPES: ABPType[] = [
   'Jugada especial defensiva',
   'Saque inicial'
 ];
-
-// Mapeo de abreviaturas para la ficha en la pizarra
-const ROLE_ABBRS: Record<string, string> = {
-  'Lanzador': 'LAN',
-  'Sacador': 'SAC',
-  'Rematador': 'REM',
-  'Bloqueador': 'BLOQ',
-  'Arrastrador': 'ARR',
-  'Rechace': 'RECH',
-  'Cierre': 'CIER',
-  'Primer palo': 'P.PALO',
-  'Segundo palo': 'S.PALO',
-  '1º palo': '1ºPALO',
-  '2º palo': '2ºPALO',
-  'Barrera': 'BARR',
-  'Vigilancia': 'VIG',
-  'Defensa zona': 'D.ZONA',
-  'Marca individual': 'M.INDIV',
-  'Libre': 'LIB',
-  'Apoyo': 'APOYO',
-  'Receptor': 'REC',
-  'Cambio de orientación': 'C.ORI',
-  'Profundidad': 'PROF',
-  'Cobertura': 'COB'
-};
 
 const POSITION_ABBRS: Record<string, string> = {
   'Portero': 'POR',
@@ -774,7 +749,7 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
       const leyenda: Record<string, string> = {};
       playRoles.forEach((role) => {
         const rName = normalizeRoleName(role.rol_asignado);
-        const label = role.etiqueta || (isRealPosType ? POSITION_ABBRS[rName] : ROLE_ABBRS[rName]);
+        const label = normalizeRoleLabel(role.etiqueta) || (isRealPosType ? POSITION_ABBRS[rName] : ROLE_ABBRS[rName]);
         if (label) {
           leyenda[label] = rName;
         }
@@ -881,7 +856,7 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
           rol_asignado: dr.role,
           posicion_x: dr.x,
           posicion_y: dr.y,
-          etiqueta: ROLE_ABBRS[dr.role] || dr.role.substring(0, 4).toUpperCase(),
+          etiqueta: normalizeRoleLabel(ROLE_ABBRS[normalizeRoleName(dr.role)] || dr.role.substring(0, 4).toUpperCase()),
           orden: index + 1
         }));
       }
@@ -1107,7 +1082,7 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
         rol_asignado: role.rol_asignado,
         posicion_x: role.posicion_x !== null ? parseFloat(role.posicion_x.toFixed(1)) : null,
         posicion_y: role.posicion_y !== null ? parseFloat(role.posicion_y.toFixed(1)) : null,
-        etiqueta: role.etiqueta || ROLE_ABBRS[role.rol_asignado] || role.rol_asignado.substring(0, 4).toUpperCase(),
+        etiqueta: normalizeRoleLabel(role.etiqueta || ROLE_ABBRS[normalizeRoleName(role.rol_asignado)] || role.rol_asignado.substring(0, 4).toUpperCase()),
         comentario: role.comentario || null,
         orden: role.orden || null,
         label_position: role.label_position ?? 'bottom'
@@ -1297,7 +1272,7 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
           rol_asignado: dr.role,
           posicion_x: dr.x,
           posicion_y: dr.y,
-          etiqueta: ROLE_ABBRS[dr.role] || dr.role.substring(0, 4).toUpperCase(),
+          etiqueta: normalizeRoleLabel(ROLE_ABBRS[normalizeRoleName(dr.role)] || dr.role.substring(0, 4).toUpperCase()),
           comentario: '',
           orden: index + 1
         }));
@@ -1391,7 +1366,7 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
         return {
           ...role,
           rol_asignado: newRole,
-          etiqueta: ROLE_ABBRS[newRole] || newRole.substring(0, 4).toUpperCase()
+          etiqueta: normalizeRoleLabel(ROLE_ABBRS[normalizeRoleName(newRole)] || newRole.substring(0, 4).toUpperCase())
         };
       }
       return role;
@@ -1801,7 +1776,7 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
                         const px = role.posicion_x !== null ? role.posicion_x : 50;
                         const py = role.posicion_y !== null ? role.posicion_y : 50;
                         const rName = normalizeRoleName(role.rol_asignado);
-                        const label = role.etiqueta || (isRealPosType ? POSITION_ABBRS[rName] : ROLE_ABBRS[rName]) || 'P';
+                        const label = normalizeRoleLabel(role.etiqueta) || (isRealPosType ? POSITION_ABBRS[rName] : ROLE_ABBRS[rName]) || 'P';
 
                         return (
                           <div
@@ -1919,7 +1894,8 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
                         {playRoles.map((role) => {
                           const isRealPosType = isRealPositionPlayType(selectedPlay.tipo);
                           const { funcion_tactica, comentario } = parseComentario(role.comentario);
-                          const label = role.etiqueta || (isRealPosType ? POSITION_ABBRS[role.rol_asignado] : ROLE_ABBRS[role.rol_asignado]) || 'P';
+                          const rName = normalizeRoleName(role.rol_asignado);
+                          const label = normalizeRoleLabel(role.etiqueta) || (isRealPosType ? POSITION_ABBRS[rName] : ROLE_ABBRS[rName]) || 'P';
 
                           return (
                             <div 
