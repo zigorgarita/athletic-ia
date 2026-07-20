@@ -778,6 +778,46 @@ export function TacticaClient() {
     }
   };
 
+  // Save tactical position role cards in bulk (sintetizados por la IA del briefing)
+  const handleApplyRoleCards = async (cards: Partial<TacticalRoleCard>[]): Promise<boolean> => {
+    try {
+      let planId = null;
+      if (selectedMatchId) {
+        const plan = await fetchMatchPlan(selectedMatchId);
+        if (plan) planId = plan.id;
+      }
+
+      const promises = cards.map(async (card) => {
+        const activeCard = roleCards.find(c => c.posicion_label === card.posicion_label);
+        const payload = {
+          matchup_id: activeMatchup?.id || null,
+          match_plan_id: planId,
+          posicion_label: card.posicion_label!,
+          linea: activeCard?.linea || 'Portería' as const,
+          fase_ofensiva: card.fase_ofensiva !== undefined ? card.fase_ofensiva : (activeCard?.fase_ofensiva || null),
+          fase_defensiva: card.fase_defensiva !== undefined ? card.fase_defensiva : (activeCard?.fase_defensiva || null),
+          transiciones: card.transiciones !== undefined ? card.transiciones : (activeCard?.transiciones || null),
+          instrucciones_especificas: card.instrucciones_especificas !== undefined ? card.instrucciones_especificas : (activeCard?.instrucciones_especificas || null),
+          referencia_visual: activeCard?.referencia_visual || null,
+          ai_context: activeCard?.ai_context || null
+        };
+        return saveRoleCard(payload);
+      });
+
+      const results = await Promise.all(promises);
+      const allSuccess = results.every(res => res === true);
+      
+      if (allSuccess) {
+        loadRoleCardsData();
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error('Error al aplicar fichas de rol masivas:', err);
+      return false;
+    }
+  };
+
   // Helper to save rival node custom details (traditional modal)
   const handleSaveNodeDetails = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1056,11 +1096,24 @@ export function TacticaClient() {
         isAnalyzing={isAnalyzing}
       />
 
-      {/* Briefing Táctico agrupado por Línea y Posición (Subblock 4C) */}
+      {/* Briefing Táctico del Equipo */}
       <BriefingView
         nodesPropio={nodesPropio}
         players={players}
         roleCards={roleCards}
+        ventajas={ventajas}
+        desventajas={desventajas}
+        zonaConflicto={zonaConflicto}
+        dueloClave={dueloClave}
+        tareasLineas={tareasLineas}
+        selectedMatchId={selectedMatchId}
+        rivalName={matches.find(m => m.id === selectedMatchId)?.rival || ''}
+        sistemaPropio={selectedFormation}
+        sistemaRival={rivalFormation}
+        isEditMode={isEditMode}
+        onNodeClick={(node) => handleOpenNodeEditor('propio', node)}
+        onTareasLineasChange={setTareasLineas}
+        onApplyRoleCards={handleApplyRoleCards}
       />
 
       {/* Base de Conocimiento Táctico (Subblock 4D) */}
