@@ -1041,12 +1041,19 @@ export function PlanificacionClient() {
         <div className="space-y-6">
           {/* BARRA DE KPIs MENSUAL */}
           {(() => {
-            const monthMinutes = sessions.reduce((acc, s) => acc + (s.duracion_total || 0), 0);
-            const countTrainings = sessions.filter(s => s.tipo_sesion === 'Entrenamiento').length;
-            const countMatches = sessions.filter(s => s.tipo_sesion === 'Partido').length;
-            const countRecup = sessions.filter(s => s.tipo_sesion === 'Recuperación').length;
-            const countRest = sessions.filter(s => s.tipo_sesion === 'Libre').length;
-            const countTrips = sessions.filter(s => s.tipo_sesion === 'Viaje').length;
+            const targetYear = currentMonday.getFullYear();
+            const targetMonth = currentMonday.getMonth(); // 0-11
+            const filteredSessions = sessions.filter(s => {
+              const [year, month] = s.fecha.split('-').map(Number);
+              return year === targetYear && (month - 1) === targetMonth;
+            });
+
+            const monthMinutes = filteredSessions.reduce((acc, s) => acc + (s.duracion_total || 0), 0);
+            const countTrainings = filteredSessions.filter(s => s.tipo_sesion === 'Entrenamiento').length;
+            const countMatches = filteredSessions.filter(s => s.tipo_sesion === 'Partido').length;
+            const countRecup = filteredSessions.filter(s => s.tipo_sesion === 'Recuperación').length;
+            const countRest = filteredSessions.filter(s => s.tipo_sesion === 'Libre').length;
+            const countTrips = filteredSessions.filter(s => s.tipo_sesion === 'Viaje').length;
 
             return (
               <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-xl bg-slate-900/20 border border-slate-850/40 text-xs text-slate-400 font-semibold tracking-wide backdrop-blur-sm">
