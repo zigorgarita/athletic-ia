@@ -19,13 +19,7 @@ import { exportToPDF, buildABPFilename } from '@/lib/exportPdf';
 import { ABPFieldExport } from './ABPFieldExport';
 import { ABPPlanPartido } from './ABPPlanPartido';
 import { ABPPlayerNode, LabelPosition } from './ABPPlayerNode';
-
-const normalizeRoleName = (role: string): string => {
-  if (!role) return role;
-  if (role === 'Primer palo') return '1º palo';
-  if (role === 'Segundo palo') return '2º palo';
-  return role;
-};
+import { normalizeRoleName } from '@/lib/abpUtils';
 
 interface ABPSectionProps {
   players: Player[];
@@ -779,9 +773,10 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
       const isRealPosType = isRealPositionPlayType(selectedPlay.tipo);
       const leyenda: Record<string, string> = {};
       playRoles.forEach((role) => {
-        const label = role.etiqueta || (isRealPosType ? POSITION_ABBRS[role.rol_asignado] : ROLE_ABBRS[role.rol_asignado]);
+        const rName = normalizeRoleName(role.rol_asignado);
+        const label = role.etiqueta || (isRealPosType ? POSITION_ABBRS[rName] : ROLE_ABBRS[rName]);
         if (label) {
-          leyenda[label] = role.rol_asignado;
+          leyenda[label] = rName;
         }
       });
 
@@ -1805,7 +1800,8 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
                         const isRealPosType = isRealPositionPlayType(selectedPlay.tipo);
                         const px = role.posicion_x !== null ? role.posicion_x : 50;
                         const py = role.posicion_y !== null ? role.posicion_y : 50;
-                        const label = role.etiqueta || (isRealPosType ? POSITION_ABBRS[role.rol_asignado] : ROLE_ABBRS[role.rol_asignado]) || 'P';
+                        const rName = normalizeRoleName(role.rol_asignado);
+                        const label = role.etiqueta || (isRealPosType ? POSITION_ABBRS[rName] : ROLE_ABBRS[rName]) || 'P';
 
                         return (
                           <div

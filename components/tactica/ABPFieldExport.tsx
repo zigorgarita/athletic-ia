@@ -3,6 +3,7 @@
 import React from 'react';
 import { Player, ABPPlayerRole, ABPType } from '@/types';
 import { ABPPlayerNode } from './ABPPlayerNode';
+import { normalizeRoleName } from '@/lib/abpUtils';
 
 interface ABPFieldExportProps {
   playRoles: (ABPPlayerRole & { player?: Player })[];
@@ -156,13 +157,7 @@ export function ABPFieldExport({ playRoles, playType, playZona }: ABPFieldExport
         const px = role.posicion_x !== null ? role.posicion_x : 50;
         const py = role.posicion_y !== null ? role.posicion_y : 50;
 
-        const normalizedRoleName = (rn: string) => {
-          if (!rn) return rn;
-          if (rn === 'Primer palo') return '1º palo';
-          if (rn === 'Segundo palo') return '2º palo';
-          return rn;
-        };
-        const rName = normalizedRoleName(role.rol_asignado);
+        const rName = normalizeRoleName(role.rol_asignado);
         const roleLabel = role.etiqueta || (isRealPosType ? POSITION_ABBRS[rName] : ROLE_ABBRS[rName]) || rName.substring(0, 4).toUpperCase();
 
         return (

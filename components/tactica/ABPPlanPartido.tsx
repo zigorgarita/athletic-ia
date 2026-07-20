@@ -11,13 +11,7 @@ import { Calendar, Trash2, ArrowUp, ArrowDown, Check, UserCheck, Copy, X, Folder
 import { ABPPlanField } from './ABPPlanField';
 import { ABPFieldExport } from './ABPFieldExport';
 import { exportABPPlanToPDF } from '@/lib/exportPdf';
-
-const normalizeRoleName = (role: string): string => {
-  if (!role) return role;
-  if (role === 'Primer palo') return '1º palo';
-  if (role === 'Segundo palo') return '2º palo';
-  return role;
-};
+import { normalizeRoleName } from '@/lib/abpUtils';
 
 const ABP_TYPES = [
   'Córner ofensivo',
