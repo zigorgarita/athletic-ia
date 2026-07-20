@@ -7,7 +7,7 @@ import {
   BookOpen, X, Clock, MapPin, 
   Play, CheckCircle2,
   Trash2, Share2, Info, Star, ArrowUp, ArrowDown,
-  Shield
+  Shield, Timer, Square
 } from 'lucide-react';
 import { useEditMode } from '@/context/EditModeContext';
 import { getDaysOfWeek, getDaysOfMonthGrid } from '@/lib/dateUtils';
@@ -333,6 +333,27 @@ export function PlanificacionClient() {
   useEffect(() => {
     fetchWeekData(currentMonday, viewMode);
   }, [currentMonday, viewMode, fetchWeekData]);
+
+  // Recalcular automáticamente duracion_total al cambiar hora_inicio u hora_fin
+  useEffect(() => {
+    const inicio = sessionForm.hora_inicio;
+    const fin = sessionForm.hora_fin;
+    if (inicio && fin) {
+      const [h1, m1] = inicio.split(':').map(Number);
+      const [h2, m2] = fin.split(':').map(Number);
+      if (!isNaN(h1) && !isNaN(m1) && !isNaN(h2) && !isNaN(m2)) {
+        const min1 = h1 * 60 + m1;
+        const min2 = h2 * 60 + m2;
+        let diff = min2 - min1;
+        if (diff < 0) {
+          diff += 24 * 60; // Corrección por cruce de medianoche
+        }
+        if (sessionForm.duracion_total !== diff) {
+          setSessionForm(prev => ({ ...prev, duracion_total: diff }));
+        }
+      }
+    }
+  }, [sessionForm.hora_inicio, sessionForm.hora_fin, sessionForm.duracion_total]);
 
   // Period navigation
   const handlePrevPeriod = () => {
@@ -1388,6 +1409,35 @@ export function PlanificacionClient() {
                           disabled={!isEditMode}
                           onChange={e => setSessionForm({...sessionForm, hora_inicio: e.target.value})}
                           className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-100 outline-none focus:border-[#CC0E21] disabled:opacity-60"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Fin Sesión</label>
+                      <div className="relative">
+                        <Square className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
+                        <input
+                          type="text"
+                          value={sessionForm.hora_fin || '20:00'}
+                          disabled={!isEditMode}
+                          onChange={e => setSessionForm({...sessionForm, hora_fin: e.target.value})}
+                          className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-100 outline-none focus:border-[#CC0E21] disabled:opacity-60"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Duración (Minutos)</label>
+                      <div className="relative">
+                        <Timer className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
+                        <input
+                          type="text"
+                          value={sessionForm.duracion_total !== undefined ? `${sessionForm.duracion_total} min` : '0 min'}
+                          disabled={true}
+                          className="w-full bg-slate-950 border border-slate-900 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-400 outline-none cursor-not-allowed opacity-80"
                         />
                       </div>
                     </div>
