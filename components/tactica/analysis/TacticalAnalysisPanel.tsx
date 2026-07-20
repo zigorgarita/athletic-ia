@@ -1,7 +1,8 @@
 'use client';
 
 import React from 'react';
-import { BookOpen, ArrowRight, Zap, ShieldAlert, HelpCircle, Award, Layout } from 'lucide-react';
+import { BookOpen, ArrowRight, Zap, ShieldAlert, HelpCircle, Award, Layout, Sparkles, Loader2 } from 'lucide-react';
+import { useEditMode } from '@/context/EditModeContext';
 
 interface TacticalAnalysisPanelProps {
   selectedFormation: string;
@@ -16,6 +17,8 @@ interface TacticalAnalysisPanelProps {
   onDueloClaveChange: (val: string) => void;
   tareasLineas: string;
   onTareasLineasChange: (val: string) => void;
+  onAnalyze?: () => void;
+  isAnalyzing?: boolean;
 }
 
 export function TacticalAnalysisPanel({
@@ -31,18 +34,43 @@ export function TacticalAnalysisPanel({
   onDueloClaveChange,
   tareasLineas,
   onTareasLineasChange,
+  onAnalyze,
+  isAnalyzing = false,
 }: TacticalAnalysisPanelProps) {
+  const { isEditMode } = useEditMode();
+
   return (
     <div className="p-6 bg-slate-900/40 border border-slate-800/80 rounded-3xl space-y-6 mt-6">
-      <div className="flex items-center justify-between pb-3 border-b border-slate-800/60">
+      <div className="flex items-center justify-between pb-3 border-b border-slate-800/60 flex-wrap gap-2">
         <div className="flex items-center gap-2">
           <BookOpen className="h-5 w-5 text-[#CC0E21]" />
           <h3 className="text-sm font-bold text-slate-200 uppercase tracking-widest">
             Comparador Táctico (Análisis Estratégico)
           </h3>
         </div>
-        <div className="text-[10px] text-slate-400 font-bold bg-slate-950 border border-slate-850/60 px-3 py-1 rounded-xl">
-          {selectedFormation} <ArrowRight className="inline-block h-3.5 w-3.5 mx-1 text-slate-500" /> {rivalFormation}
+        <div className="flex items-center gap-3">
+          <div className="text-[10px] text-slate-400 font-bold bg-slate-950 border border-slate-850/60 px-3 py-1 rounded-xl">
+            {selectedFormation} <ArrowRight className="inline-block h-3.5 w-3.5 mx-1 text-slate-500" /> {rivalFormation}
+          </div>
+          {onAnalyze && isEditMode && (
+            <button
+              onClick={onAnalyze}
+              disabled={isAnalyzing}
+              className="px-3.5 py-1.5 bg-gradient-to-r from-[#CC0E21] to-red-700 hover:from-red-700 hover:to-[#CC0E21] disabled:from-slate-800 disabled:to-slate-800 text-white disabled:text-slate-500 border border-slate-800/40 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-md active:scale-95 disabled:scale-100 disabled:shadow-none shrink-0"
+            >
+              {isAnalyzing ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  <span>Analizando...</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+                  <span>Analizar Partido</span>
+                </>
+              )}
+            </button>
+          )}
         </div>
       </div>
 

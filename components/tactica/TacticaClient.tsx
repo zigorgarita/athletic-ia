@@ -14,6 +14,7 @@ import {
 import { useEditMode } from '@/context/EditModeContext';
 import { useTacticalSystems } from '@/hooks/useTacticalSystems';
 import { useTacticalRoleCards } from '@/hooks/useTacticalRoleCards';
+import { useTacticalAnalyst } from '@/hooks/useTacticalAnalyst';
 import { exportToPDF, buildTacticaFilename } from '@/lib/exportPdf';
 import { TacticalField } from './TacticalField';
 import { TacticalFieldExport } from './TacticalFieldExport';
@@ -56,6 +57,9 @@ export function TacticaClient() {
     saveRoleCard,
     error: roleCardsError
   } = useTacticalRoleCards();
+
+  // Módulo 1: Analista Táctico hook
+  const { analyzeMatch, isAnalyzing, error: analystError } = useTacticalAnalyst();
 
   // Selected lineup / ID for update
   const [currentLineupId, setCurrentLineupId] = useState<string | null>(null);
@@ -339,6 +343,66 @@ export function TacticaClient() {
     customName: n.customName || undefined,
     customNumber: n.customNumber || undefined
   });
+
+  // --- IA Tactical Analyst ---
+  const handleAnalyzeMatch = async () => {
+    if (!selectedMatchId) {
+      setErrorMsg('Debes seleccionar un partido para realizar el análisis táctico.');
+      return;
+    }
+
+    const assignedPlayerIds = getAssignedPlayerIds();
+    if (assignedPlayerIds.length !== 11) {
+      setErrorMsg('Para realizar el análisis se requiere colocar el once inicial completo (11 jugadores) en la pizarra táctica.');
+      return;
+    }
+
+    setErrorMsg(null);
+    setSuccessMsg(null);
+
+    const onceInicial = nodesPropio
+      .filter(n => !!n.player_id)
+      .map(n => {
+        const player = players.find(p => p.id === n.player_id);
+        return {
+          id: n.player_id!,
+          nombre: player?.nombre || 'Jugador',
+          apellidos: player?.apellidos || '',
+          dorsal: player?.dorsal || 0,
+          demarcacion: player?.demarcacion || 'Sin definir',
+          label_posicion: n.label,
+          x: n.x,
+          y: n.y
+        };
+      });
+
+    const nodosRival = nodesRival.map(n => ({
+      id: n.id.toString(),
+      label: n.label,
+      x: n.x,
+      y: n.y
+    }));
+
+    const match = matches.find(m => m.id === selectedMatchId);
+    const payload = {
+      matchId: selectedMatchId,
+      rivalName: match?.rival || 'Rival',
+      sistemaPropio: selectedFormation,
+      sistemaRival: rivalFormation,
+      onceInicial,
+      nodosRival
+    };
+
+    const report = await analyzeMatch(payload);
+    if (report) {
+      setVentajas(report.ventajas);
+      setDesventajas(report.desventajas);
+      setZonaConflicto(report.zona_conflicto);
+      setDueloClave(report.duelo_clave);
+      setTareasLineas(report.tareas_lineas);
+      setSuccessMsg('Análisis táctico estructural generado con éxito por el Analista Táctico de IA.');
+    }
+  };
 
   // --- Save Tactical Lineup ---
   async function handleSaveLineup() {
@@ -748,7 +812,7 @@ export function TacticaClient() {
     );
   }
 
-  const finalError = errorMsg || systemsError || roleCardsError;
+  const finalError = errorMsg || systemsError || roleCardsError || analystError;
   const activeRoleCard = selectedRoleNode ? (roleCards.find(c => c.posicion_label === selectedRoleNode.label) || null) : null;
   const assignedPlayerToDrawer = selectedRoleNode ? (players.find(p => p.id === selectedRoleNode.player_id) || null) : null;
 
@@ -988,6 +1052,8 @@ export function TacticaClient() {
         onDueloClaveChange={setDueloClave}
         tareasLineas={tareasLineas}
         onTareasLineasChange={setTareasLineas}
+        onAnalyze={handleAnalyzeMatch}
+        isAnalyzing={isAnalyzing}
       />
 
       {/* Briefing Táctico agrupado por Línea y Posición (Subblock 4C) */}
