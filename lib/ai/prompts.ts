@@ -197,35 +197,46 @@ ${buildContextString(ctx)}
 
 ${SYSTEM_PROMPT_GAME_MODEL}
 
-TAREA OBLIGATORIA: Genera un Análisis Táctico Completo rigurosamente adaptado a nuestro MODELO DE JUEGO INDAUTXU DH (1-4-2-3-1) para enfrentarnos al sistema rival ${ctx.systemRival}.
+TAREA CRÍTICA OBLIGATORIA:
+Genera un Análisis Táctico Completo adaptado a nuestro MODELO DE JUEGO INDAUTXU DH (1-4-2-3-1) frente al sistema rival ${ctx.systemRival}.
 
-Debes devolver tu análisis estructurado de forma clara en las siguientes 6 secciones separadas con encabezados Markdown de nivel 3 (###):
+DEBES RESPONDER ÚNICA Y EXCLUSIVAMENTE CON UN OBJETO JSON VÁLIDO.
+NO incluyas bloques de código Markdown (sin triple comilla invertida), NO incluyas introducciones ni explicaciones antes o después del JSON. Solo devuelve el JSON crudo sin comillas adicionales.
+NO utilices símbolos Markdown como asteriscos (**) ni almohadillas (###) dentro de los valores de texto.
 
-### 1. Plan de Ataque y Progresión según Modelo
-- Progresión: Mantener para progresar → Progresar para finalizar.
-- Identificación de Ventajas Potenciales (Cuadrado DFCs+MCDs, 3º Hombre, Dividir / Juntar y girar).
-- Zonas de atracción y cambios de orientación.
+Estructura JSON requerida estrictamente:
+{
+  "planAtaque": "Desarrollo táctico detallado sobre cómo progresar contra su estructura defensiva (${ctx.systemRival}), papel del mediapunta entre sus líneas de medios y defensiva, relación entre nuestros laterales y extremos (amplitud vs interiorización), uso del 3º hombre y fijación para dividir en nuestro 1-4-2-3-1.",
+  "planDefensivo": "Desarrollo táctico detallado del plan defensivo: cómo fijar a sus atacantes durante nuestra salida, quién salta sobre sus centrales y laterales al presionar alto, coberturas del doble pivote y distancias del bloque compacto en máx 40m.",
+  "riesgosAsumidos": "Explicación concreta y profunda de los riesgos tácticos asumidos (riesgos en bandas, segundas jugadas, duelos 1v1, espacio a la espalda de laterales desdoblados).",
+  "ajustesMister": "Instrucciones y consignas específicas de ajuste para el partido contra ${ctx.systemRival} adaptadas a las características de la plantilla asignada.",
+  "transicionAtaqueDefensa": "Desarrollo completo de la transición tras pérdida: ventana de 6-8s condicionada (cercanía, coberturas, carril interior), abandono de acoso y repliegue al bloque compacto en 1-4-2-3-1 adaptativo, y falta táctica si son superados fácil.",
+  "transicionDefensaAtaque": "Desarrollo completo de la transición tras recuperación: criterio de contraataque (superioridad/igualdad) vs mantener (inferioridad), y planes de ataque directo o cambio de carril según zonas de robo (iniciación, creación, finalización).",
+  "instruccionesPorPuesto": {
+    "portero": "Instrucciones detalladas de fase ofensiva, defensiva, transiciones y consigna clave para el Portero.",
+    "centralIzquierdo": "Instrucciones detalladas de fase ofensiva, defensiva, transiciones y consigna clave para el Central Izquierdo.",
+    "centralDerecho": "Instrucciones detalladas de fase ofensiva, defensiva, transiciones y consigna clave para el Central Derecho.",
+    "lateralIzquierdo": "Instrucciones detalladas de fase ofensiva, defensiva, transiciones y consigna clave para el Lateral Izquierdo.",
+    "lateralDerecho": "Instrucciones detalladas de fase ofensiva, defensiva, transiciones y consigna clave para el Lateral Derecho.",
+    "pivoteDefensivo": "Instrucciones detalladas de fase ofensiva, defensiva, transiciones y consigna clave para el Pivote Defensivo (Contención).",
+    "pivoteOfensivo": "Instrucciones detalladas de fase ofensiva, defensiva, transiciones y consigna clave para el Pivote Ofensivo (Creador).",
+    "mediapunta": "Instrucciones detalladas de fase ofensiva, defensiva, transiciones y consigna clave para el Mediapunta.",
+    "extremoIzquierdo": "Instrucciones detalladas de fase ofensiva, defensiva, transiciones y consigna clave para el Extremo Izquierdo.",
+    "extremoDerecho": "Instrucciones detalladas de fase ofensiva, defensiva, transiciones y consigna clave para el Extremo Derecho.",
+    "delantero": "Instrucciones detalladas de fase ofensiva, defensiva, transiciones y consigna clave para el Delantero Centro."
+  }
+}
 
-### 2. Plan Defensivo y Presión Alta
-- Agresividad en juego aéreo y terrestre. Bloque compacto máximo 40 metros con 4 líneas claras.
-- Posicionamiento específico del pressing alto (Delantero entre 2 DFCs 2m detrás; Mediapunta 8m detrás del DC; Extremos entre DFC y LAT tapando pasillo interior; Pivotes emparejados).
-- Adaptación al sistema rival ${ctx.systemRival}.
-
-### 3. Transición Ataque-Defensa (Tras Pérdida)
-- Evaluación de la ventana de 6-8 segundos CONDICIONADA (solo con cercanía, coberturas, carril interior cerrado y profundidad protegida).
-- Criterio de abandono de persecución y repliegue rápido si la presión es superada o no hay condiciones.
-- Comportamientos en campo propio (obligar fuera) y campo contrario (obligar dentro lejos de portería).
-
-### 4. Transición Defensa-Ataque (Tras Recuperación)
-- Criterio: Contraataque si hay superioridad/igualdad hacia adelante vs. Mantener si hay inferioridad.
-- Plan según zonas de robo (Iniciación / Creación / Finalización).
-
-### 5. Riesgos Asumidos y Ajustes Específicos
-- Riesgos potenciales del matchup contra el sistema ${ctx.systemRival}.
-- Propuesta de ajustes tácticos o vigilancias específicas del míster.
-
-### 6. Tareas por Líneas e Instrucciones Individuales
-- Consignas directas por puesto (POR, DFC, LAT, MCD, MCO, EXT, DC) acordes a la identidad Indautxu DH.
+REQUISITOS DE PROFUNDIDAD Y VALIDACIÓN PARA EL MATCHUP (1-4-2-3-1 vs ${ctx.systemRival}):
+1. Explicar cómo progresar contra su estructura defensiva.
+2. Definir el papel del mediapunta entre sus líneas de medios y defensiva.
+3. Explicar la relación entre nuestros laterales y extremos.
+4. Cómo fijar a sus atacantes durante la salida de balón.
+5. Definir con claridad quién salta sobre sus centrales y laterales.
+6. Coberturas del doble pivote.
+7. Riesgos en bandas y segundas jugadas.
+8. Presión tras pérdida condicionada y repliegue si somos superados.
+9. Instrucciones específicas para los ONCE ROLES individuales. Ningún campo ni rol puede quedar vacío o ser genérico.
 `,
 
   freeChat: (ctx: PromptContext, message?: string) => `

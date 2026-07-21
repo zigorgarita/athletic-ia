@@ -28,7 +28,7 @@ import { MatchPlanSelector } from './analysis/MatchPlanSelector';
 import { TacticalAnalysisPanel } from './analysis/TacticalAnalysisPanel';
 import { GameModelAnalysisPanel } from './analysis/GameModelAnalysisPanel';
 import { useTacticalAI } from '@/hooks/useTacticalAI';
-import { GameModelAnalysis, TacticalAIContext } from '@/types';
+import { GameModelAnalysis, GameModelRoleInstructions, TacticalAIContext } from '@/types';
 
 // Subblock 4C Components
 import { RoleCardDrawer } from './roles/RoleCardDrawer';
@@ -412,7 +412,7 @@ export function TacticaClient() {
     }
   };
 
-  // Generar Análisis según nuestro Modelo de Juego
+  // Generar Análisis según nuestro Modelo de Juego con validación obligatoria
   const handleAnalyzeGameModel = async () => {
     setIsAnalyzingModeloJuego(true);
     setErrorMsg(null);
@@ -435,35 +435,121 @@ export function TacticaClient() {
       };
 
       const res = await analyzeGameModel(ctx);
-      if (res && res.content) {
-        const text = res.content;
-        const extractSec = (titlePattern: string): string => {
-          const regex = new RegExp(`###\\s*\\d*\\.?\\s*${titlePattern}[\\s\\S]*?\\n([\\s\\S]*?)(?=(?:###|\\n\\n###|$))`, 'i');
-          const m = text.match(regex);
-          return m ? m[1].trim() : '';
-        };
-
-        const updated: GameModelAnalysis = {
-          ataque_posicional: extractSec('Plan de Ataque') || extractSec('Ataque'),
-          defensa_posicional: extractSec('Plan Defensivo') || extractSec('Defensa'),
-          transicion_perdida: extractSec('Transición Ataque-Defensa') || extractSec('Pérdida'),
-          transicion_recuperacion: extractSec('Transición Defensa-Ataque') || extractSec('Recuperación'),
-          riesgos_asumidos: extractSec('Riesgos Asumidos') || extractSec('Riesgos'),
-          ajustes_especificos: extractSec('Ajustes Específicos') || extractSec('Ajustes'),
-          tareas_roles_modelo: extractSec('Tareas por Líneas') || extractSec('Instrucciones')
-        };
-
-        setAnalisisModeloJuego(updated);
-        setSuccessMsg('Análisis según el Modelo de Juego Indautxu generado con éxito.');
+      if (!res || !res.content) {
+        throw new Error('El proveedor de IA no devolvió ninguna respuesta.');
       }
+
+      // Limpiar y validar estructura JSON estricta
+      const validation = validateAndCleanGameModelAnalysis(res.content);
+      if (!validation.valid || !validation.data) {
+        throw new Error(validation.error || 'La respuesta de la IA no cumplió con el esquema táctico completo.');
+      }
+
+      setAnalisisModeloJuego(validation.data);
+      setSuccessMsg('Análisis completo según el Modelo de Juego Indautxu generado y validado con éxito.');
     } catch (err: unknown) {
       console.error('Error al analizar según Modelo de Juego:', err);
       const msg = err instanceof Error ? err.message : String(err);
-      setErrorMsg('Error al analizar modelo de juego: ' + msg);
+      setErrorMsg('Error en análisis del Modelo de Juego: ' + msg);
     } finally {
       setIsAnalyzingModeloJuego(false);
     }
   };
+
+  function validateAndCleanGameModelAnalysis(rawContent: string): { valid: boolean; data?: GameModelAnalysis; error?: string } {
+    let cleanText = rawContent.trim();
+    if (cleanText.startsWith('```json')) {
+      cleanText = cleanText.replace(/^```json\s*/i, '').replace(/```\s*$/, '');
+    } else if (cleanText.startsWith('```')) {
+      cleanText = cleanText.replace(/^```\s*/, '').replace(/```\s*$/, '');
+    }
+
+    let parsed: Record<string, unknown>;
+    try {
+      parsed = JSON.parse(cleanText);
+    } catch {
+      const firstBrace = cleanText.indexOf('{');
+      const lastBrace = cleanText.lastIndexOf('}');
+      if (firstBrace !== -1 && lastBrace > firstBrace) {
+        try {
+          parsed = JSON.parse(cleanText.substring(firstBrace, lastBrace + 1));
+        } catch {
+          return { valid: false, error: 'La respuesta de la IA no contiene una estructura JSON válida.' };
+        }
+      } else {
+        return { valid: false, error: 'No se detectó un objeto JSON estructurado en la respuesta de la IA.' };
+      }
+    }
+
+    const cleanField = (str?: unknown): string => {
+      if (typeof str !== 'string') return '';
+      return str
+        .replace(/\*\*(.*?)\*\*/g, '$1')
+        .replace(/\*(.*?)\*/g, '$1')
+        .replace(/#{1,6}\s?/g, '')
+        .replace(/`/g, '')
+        .trim();
+    };
+
+    const mainFields = [
+      { key: 'planAtaque', name: 'Plan de Ataque y Progresión' },
+      { key: 'planDefensivo', name: 'Plan Defensivo y Presión' },
+      { key: 'riesgosAsumidos', name: 'Riesgos Asumidos' },
+      { key: 'ajustesMister', name: 'Ajustes Específicos del Míster' },
+      { key: 'transicionAtaqueDefensa', name: 'Transición Ataque-Defensa' },
+      { key: 'transicionDefensaAtaque', name: 'Transición Defensa-Ataque' }
+    ];
+
+    const placeholders = ['desarrollo táctico', 'añade o edita', 'texto aquí', 'sin definir', 'placeholder'];
+
+    for (const field of mainFields) {
+      const val = cleanField(parsed[field.key]);
+      if (!val || val.length < 15) {
+        return { valid: false, error: `El campo "${field.name}" no contiene un desarrollo suficiente.` };
+      }
+      const lower = val.toLowerCase();
+      if (placeholders.some(p => lower.includes(p) && val.length < 50)) {
+        return { valid: false, error: `El campo "${field.name}" conservó texto de plantilla.` };
+      }
+    }
+
+    const rolesObj = parsed.instruccionesPorPuesto as Record<string, unknown> | undefined;
+    if (!rolesObj || typeof rolesObj !== 'object') {
+      return { valid: false, error: 'Falta la sección "instruccionesPorPuesto" para los 11 roles.' };
+    }
+
+    const requiredRoles: (keyof GameModelRoleInstructions)[] = [
+      'portero', 'centralIzquierdo', 'centralDerecho', 'lateralIzquierdo', 'lateralDerecho',
+      'pivoteDefensivo', 'pivoteOfensivo', 'mediapunta', 'extremoIzquierdo', 'extremoDerecho', 'delantero'
+    ];
+
+    const cleanedRoles = {} as GameModelRoleInstructions;
+    for (const rKey of requiredRoles) {
+      const rVal = cleanField(rolesObj[rKey as string]);
+      if (!rVal || rVal.length < 10) {
+        return { valid: false, error: `Falta la instrucción individual válida para el puesto "${rKey}".` };
+      }
+      cleanedRoles[rKey] = rVal;
+    }
+
+    const resultData: GameModelAnalysis = {
+      planAtaque: cleanField(parsed.planAtaque),
+      planDefensivo: cleanField(parsed.planDefensivo),
+      riesgosAsumidos: cleanField(parsed.riesgosAsumidos),
+      ajustesMister: cleanField(parsed.ajustesMister),
+      transicionAtaqueDefensa: cleanField(parsed.transicionAtaqueDefensa),
+      transicionDefensaAtaque: cleanField(parsed.transicionDefensaAtaque),
+      instruccionesPorPuesto: cleanedRoles,
+      ataque_posicional: cleanField(parsed.planAtaque),
+      defensa_posicional: cleanField(parsed.planDefensivo),
+      transicion_perdida: cleanField(parsed.transicionAtaqueDefensa),
+      transicion_recuperacion: cleanField(parsed.transicionDefensaAtaque),
+      riesgos_asumidos: cleanField(parsed.riesgosAsumidos),
+      ajustes_especificos: cleanField(parsed.ajustesMister)
+    };
+
+    return { valid: true, data: resultData };
+  }
 
   // --- Save Tactical Lineup ---
   async function handleSaveLineup() {

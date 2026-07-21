@@ -324,7 +324,30 @@ export interface MatchABPPlayerAssignment {
   player?: Player;
 }
 
+export interface GameModelRoleInstructions {
+  portero: string;
+  centralIzquierdo: string;
+  centralDerecho: string;
+  lateralIzquierdo: string;
+  lateralDerecho: string;
+  pivoteDefensivo: string;
+  pivoteOfensivo: string;
+  mediapunta: string;
+  extremoIzquierdo: string;
+  extremoDerecho: string;
+  delantero: string;
+}
+
 export interface GameModelAnalysis {
+  planAtaque?: string;
+  planDefensivo?: string;
+  riesgosAsumidos?: string;
+  ajustesMister?: string;
+  transicionAtaqueDefensa?: string;
+  transicionDefensaAtaque?: string;
+  instruccionesPorPuesto?: GameModelRoleInstructions;
+
+  // Aliases de compatibilidad
   ataque_posicional?: string;
   defensa_posicional?: string;
   transicion_perdida?: string;

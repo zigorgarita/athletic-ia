@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Shield, Sparkles, Loader2, Target, ArrowRight, Zap, ShieldAlert, RefreshCw, ChevronDown, ChevronUp, BookOpen, Layers } from 'lucide-react';
+import { Shield, Sparkles, Loader2, Target, ArrowRight, Zap, ShieldAlert, RefreshCw, ChevronDown, ChevronUp, BookOpen, Layers, UserCheck } from 'lucide-react';
 import { useEditMode } from '@/context/EditModeContext';
-import { GameModelAnalysis } from '@/types';
+import { GameModelAnalysis, GameModelRoleInstructions } from '@/types';
 
 interface GameModelAnalysisPanelProps {
   selectedFormation: string;
@@ -13,6 +13,31 @@ interface GameModelAnalysisPanelProps {
   onAnalyze?: () => void;
   isAnalyzing?: boolean;
 }
+
+// Sanitizar Markdown innecesario (asteriscos, almohadillas) para mostrar texto limpio
+export function sanitizeMarkdownText(text?: string): string {
+  if (!text) return '';
+  return text
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\*(.*?)\*/g, '$1')
+    .replace(/#{1,6}\s?/g, '')
+    .replace(/`/g, '')
+    .trim();
+}
+
+const ROLE_LABELS: { key: keyof GameModelRoleInstructions; label: string; badge: string; line: string }[] = [
+  { key: 'portero', label: 'Portero', badge: 'POR', line: 'Portería' },
+  { key: 'centralIzquierdo', label: 'Central Izquierdo', badge: 'DCI', line: 'Defensa' },
+  { key: 'centralDerecho', label: 'Central Derecho', badge: 'DCD', line: 'Defensa' },
+  { key: 'lateralIzquierdo', label: 'Lateral Izquierdo', badge: 'LI', line: 'Defensa' },
+  { key: 'lateralDerecho', label: 'Lateral Derecho', badge: 'LD', line: 'Defensa' },
+  { key: 'pivoteDefensivo', label: 'Pivote Defensivo (Contención)', badge: 'MCD', line: 'Mediocampo' },
+  { key: 'pivoteOfensivo', label: 'Pivote Ofensivo (Creador)', badge: 'MC/MCD', line: 'Mediocampo' },
+  { key: 'mediapunta', label: 'Mediapunta', badge: 'MCO', line: 'Mediocampo' },
+  { key: 'extremoIzquierdo', label: 'Extremo Izquierdo', badge: 'EI', line: 'Delantera' },
+  { key: 'extremoDerecho', label: 'Extremo Derecho', badge: 'ED', line: 'Delantera' },
+  { key: 'delantero', label: 'Delantero Centro', badge: 'DC', line: 'Delantera' },
+];
 
 export function GameModelAnalysisPanel({
   selectedFormation,
@@ -32,6 +57,32 @@ export function GameModelAnalysisPanel({
       [field]: value
     });
   };
+
+  const updateRoleInstruction = (roleKey: keyof GameModelRoleInstructions, value: string) => {
+    const currentRoles = analysisData.instruccionesPorPuesto || {
+      portero: '',
+      centralIzquierdo: '',
+      centralDerecho: '',
+      lateralIzquierdo: '',
+      lateralDerecho: '',
+      pivoteDefensivo: '',
+      pivoteOfensivo: '',
+      mediapunta: '',
+      extremoIzquierdo: '',
+      extremoDerecho: '',
+      delantero: ''
+    };
+
+    onChange({
+      ...analysisData,
+      instruccionesPorPuesto: {
+        ...currentRoles,
+        [roleKey]: value
+      }
+    });
+  };
+
+  const rolesObj = analysisData.instruccionesPorPuesto;
 
   return (
     <div className="p-6 bg-slate-900/40 border border-slate-800/80 rounded-3xl space-y-6 mt-6 shadow-xl transition-all">
@@ -128,7 +179,7 @@ export function GameModelAnalysisPanel({
               }`}
             >
               <Layers className="h-3.5 w-3.5" />
-              <span>Instrucciones por Puesto</span>
+              <span>Instrucciones por Puesto (11 Roles)</span>
             </button>
           </div>
 
@@ -136,35 +187,35 @@ export function GameModelAnalysisPanel({
           {activeTab === 'plan' && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-4">
-                {/* Ataque Posicional & Progresión */}
+                {/* Plan de Ataque & Progresión */}
                 <div className="bg-slate-950/40 border border-slate-800/80 p-4.5 rounded-2xl space-y-2">
                   <div className="flex items-center justify-between">
                     <label className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
-                      <Zap className="h-3.5 w-3.5 text-emerald-400" /> 1. Plan de Ataque y Progresión
+                      <Zap className="h-3.5 w-3.5 text-emerald-400" /> Plan de Ataque y Progresión
                     </label>
-                    <span className="text-[9px] text-slate-500 font-semibold">Progresar para Finalizar</span>
+                    <span className="text-[9px] text-slate-500 font-semibold">1-4-2-3-1 Posicional</span>
                   </div>
                   <textarea
-                    value={analysisData.ataque_posicional || ''}
-                    onChange={(e) => updateField('ataque_posicional', e.target.value)}
-                    placeholder="Mecanismos de ataque: 3º hombre, Cuadrado de superioridad, Dividir, Juntar y girar..."
-                    className="w-full min-h-[120px] bg-slate-950/90 border border-slate-800 focus:border-emerald-500/50 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none transition-colors"
+                    value={sanitizeMarkdownText(analysisData.planAtaque || analysisData.ataque_posicional || '')}
+                    onChange={(e) => updateField('planAtaque', e.target.value)}
+                    placeholder="Cómo progresar contra su estructura, papel del mediapunta entre líneas, relación laterales-extremos, 3º hombre..."
+                    className="w-full min-h-[140px] bg-slate-950/90 border border-slate-800 focus:border-emerald-500/50 rounded-xl px-3.5 py-2.5 text-xs text-slate-200 focus:outline-none transition-colors leading-relaxed"
                   />
                 </div>
 
-                {/* Defensa Posicional & Presión Alta */}
+                {/* Plan Defensivo & Presión Alta */}
                 <div className="bg-slate-950/40 border border-slate-800/80 p-4.5 rounded-2xl space-y-2">
                   <div className="flex items-center justify-between">
                     <label className="text-xs font-bold text-red-400 flex items-center gap-1.5">
-                      <ShieldAlert className="h-3.5 w-3.5 text-red-400" /> 2. Defensa Posicional & Presión Alta
+                      <ShieldAlert className="h-3.5 w-3.5 text-red-400" /> Plan Defensivo & Presión Alta
                     </label>
                     <span className="text-[9px] text-slate-500 font-semibold">Bloque Máx 40m</span>
                   </div>
                   <textarea
-                    value={analysisData.defensa_posicional || ''}
-                    onChange={(e) => updateField('defensa_posicional', e.target.value)}
-                    placeholder="Estructura de presión: Delantero entre DFCs, MCO a 8m, Extremos en diagonal..."
-                    className="w-full min-h-[120px] bg-slate-950/90 border border-slate-800 focus:border-red-500/50 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none transition-colors"
+                    value={sanitizeMarkdownText(analysisData.planDefensivo || analysisData.defensa_posicional || '')}
+                    onChange={(e) => updateField('planDefensivo', e.target.value)}
+                    placeholder="Cómo fijar atacantes en salida, quién salta sobre sus centrales y laterales, coberturas del doble pivote..."
+                    className="w-full min-h-[140px] bg-slate-950/90 border border-slate-800 focus:border-red-500/50 rounded-xl px-3.5 py-2.5 text-xs text-slate-200 focus:outline-none transition-colors leading-relaxed"
                   />
                 </div>
               </div>
@@ -173,26 +224,26 @@ export function GameModelAnalysisPanel({
                 {/* Riesgos Asumidos */}
                 <div className="bg-slate-950/40 border border-slate-800/80 p-4.5 rounded-2xl space-y-2">
                   <label className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
-                    <Shield className="h-3.5 w-3.5 text-amber-400" /> 3. Riesgos Asumidos
+                    <Shield className="h-3.5 w-3.5 text-amber-400" /> Riesgos Asumidos
                   </label>
                   <textarea
-                    value={analysisData.riesgos_asumidos || ''}
-                    onChange={(e) => updateField('riesgos_asumidos', e.target.value)}
-                    placeholder="Riesgos potenciales del matchup contra el sistema rival..."
-                    className="w-full min-h-[100px] bg-slate-950/90 border border-slate-800 focus:border-amber-500/50 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none transition-colors"
+                    value={sanitizeMarkdownText(analysisData.riesgosAsumidos || analysisData.riesgos_asumidos || '')}
+                    onChange={(e) => updateField('riesgosAsumidos', e.target.value)}
+                    placeholder="Riesgos concretos asumidos: bandas, segundas jugadas, duelos 1v1, espaldas de laterales..."
+                    className="w-full min-h-[120px] bg-slate-950/90 border border-slate-800 focus:border-amber-500/50 rounded-xl px-3.5 py-2.5 text-xs text-slate-200 focus:outline-none transition-colors leading-relaxed"
                   />
                 </div>
 
-                {/* Ajustes Tácticos Específicos */}
+                {/* Ajustes Específicos del Míster */}
                 <div className="bg-slate-950/40 border border-slate-800/80 p-4.5 rounded-2xl space-y-2">
                   <label className="text-xs font-bold text-blue-400 flex items-center gap-1.5">
-                    <Target className="h-3.5 w-3.5 text-blue-400" /> 4. Ajustes Específicos del Míster
+                    <Target className="h-3.5 w-3.5 text-blue-400" /> Ajustes Específicos del Míster
                   </label>
                   <textarea
-                    value={analysisData.ajustes_especificos || ''}
-                    onChange={(e) => updateField('ajustes_especificos', e.target.value)}
-                    placeholder="Ajustes específicos según el sistema rival..."
-                    className="w-full min-h-[120px] bg-slate-950/90 border border-slate-800 focus:border-blue-500/50 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none transition-colors"
+                    value={sanitizeMarkdownText(analysisData.ajustesMister || analysisData.ajustes_especificos || '')}
+                    onChange={(e) => updateField('ajustesMister', e.target.value)}
+                    placeholder="Consignas directas y ajustes específicos para contrarrestar las fortalezas del rival..."
+                    className="w-full min-h-[140px] bg-slate-950/90 border border-slate-800 focus:border-blue-500/50 rounded-xl px-3.5 py-2.5 text-xs text-slate-200 focus:outline-none transition-colors leading-relaxed"
                   />
                 </div>
               </div>
@@ -211,10 +262,10 @@ export function GameModelAnalysisPanel({
                   <span className="text-[9px] text-slate-500 font-semibold">6-8&apos;&apos; Condicionada</span>
                 </div>
                 <textarea
-                  value={analysisData.transicion_perdida || ''}
-                  onChange={(e) => updateField('transicion_perdida', e.target.value)}
-                  placeholder="Presión 6-8'' condicionada a cercanía y coberturas. Si superados: abandonar y repliegue 40m..."
-                  className="w-full min-h-[160px] bg-slate-950/90 border border-slate-800 focus:border-orange-500/50 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none transition-colors"
+                  value={sanitizeMarkdownText(analysisData.transicionAtaqueDefensa || analysisData.transicion_perdida || '')}
+                  onChange={(e) => updateField('transicionAtaqueDefensa', e.target.value)}
+                  placeholder="Presión 6-8'' condicionada a cercanía, coberturas y carril interior. Si superados: abandono y repliegue al bloque compacto..."
+                  className="w-full min-h-[180px] bg-slate-950/90 border border-slate-800 focus:border-orange-500/50 rounded-xl px-3.5 py-2.5 text-xs text-slate-200 focus:outline-none transition-colors leading-relaxed"
                 />
               </div>
 
@@ -227,30 +278,69 @@ export function GameModelAnalysisPanel({
                   <span className="text-[9px] text-slate-500 font-semibold">Contraataque vs Mantener</span>
                 </div>
                 <textarea
-                  value={analysisData.transicion_recuperacion || ''}
-                  onChange={(e) => updateField('transicion_recuperacion', e.target.value)}
-                  placeholder="Contraataque si superioridad/igualdad. Mantener si inferioridad. Robo en iniciación/creación/finalización..."
-                  className="w-full min-h-[160px] bg-slate-950/90 border border-slate-800 focus:border-cyan-500/50 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none transition-colors"
+                  value={sanitizeMarkdownText(analysisData.transicionDefensaAtaque || analysisData.transicion_recuperacion || '')}
+                  onChange={(e) => updateField('transicionDefensaAtaque', e.target.value)}
+                  placeholder="Contraataque si superioridad/igualdad hacia adelante. Mantener para progresar si inferioridad. Plan según zonas de robo..."
+                  className="w-full min-h-[180px] bg-slate-950/90 border border-slate-800 focus:border-cyan-500/50 rounded-xl px-3.5 py-2.5 text-xs text-slate-200 focus:outline-none transition-colors leading-relaxed"
                 />
               </div>
             </div>
           )}
 
-          {/* TAB 3: Instrucciones por Puesto */}
+          {/* TAB 3: Instrucciones por Puesto para los 11 Roles */}
           {activeTab === 'roles' && (
-            <div className="bg-slate-950/40 border border-slate-800/80 p-4.5 rounded-2xl space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-purple-400 flex items-center gap-1.5">
-                  <BookOpen className="h-3.5 w-3.5 text-purple-400" /> Tareas por Líneas e Instrucciones Individuales
-                </label>
-                <span className="text-[9px] text-slate-500 font-semibold">Identidad 1-4-2-3-1</span>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-800/60">
+                <div className="flex items-center gap-2">
+                  <UserCheck className="h-4 w-4 text-purple-400" />
+                  <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
+                    Instrucciones Individuales para los 11 Roles del Once Inicial
+                  </h4>
+                </div>
+                <span className="text-[10px] text-slate-400 font-semibold bg-slate-950 px-3 py-1 rounded-xl border border-slate-800">
+                  Modelo 1-4-2-3-1 vs {rivalFormation}
+                </span>
               </div>
-              <textarea
-                value={analysisData.tareas_roles_modelo || ''}
-                onChange={(e) => updateField('tareas_roles_modelo', e.target.value)}
-                placeholder="Instrucciones específicas por puesto (POR, DFC, LAT, MCD, MCO, EXT, DC) según nuestro modelo..."
-                className="w-full min-h-[220px] bg-slate-950/90 border border-slate-800 focus:border-purple-500/50 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none transition-colors font-mono leading-relaxed"
-              />
+
+              {rolesObj ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {ROLE_LABELS.map((item) => {
+                    const textVal = sanitizeMarkdownText(rolesObj[item.key] || '');
+                    return (
+                      <div key={item.key} className="bg-slate-950/60 border border-slate-800/80 p-3.5 rounded-2xl space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                            <span className="text-[10px] font-extrabold px-1.5 py-0.5 bg-purple-950 border border-purple-500/30 text-purple-300 rounded-md">
+                              {item.badge}
+                            </span>
+                            {item.label}
+                          </span>
+                          <span className="text-[9px] font-semibold text-slate-500">{item.line}</span>
+                        </div>
+                        <textarea
+                          value={textVal}
+                          onChange={(e) => updateRoleInstruction(item.key, e.target.value)}
+                          placeholder={`Instrucciones específicas para ${item.label}...`}
+                          className="w-full min-h-[90px] bg-slate-950 border border-slate-800/80 focus:border-purple-500/50 rounded-xl px-2.5 py-2 text-[11px] text-slate-200 focus:outline-none transition-colors leading-relaxed"
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                /* Compatibilidad si es texto genérico sin desglosar */
+                <div className="bg-slate-950/40 border border-slate-800/80 p-4.5 rounded-2xl space-y-2">
+                  <label className="text-xs font-bold text-purple-400 flex items-center gap-1.5">
+                    <BookOpen className="h-3.5 w-3.5 text-purple-400" /> Tareas por Líneas e Instrucciones
+                  </label>
+                  <textarea
+                    value={sanitizeMarkdownText(analysisData.tareas_roles_modelo || '')}
+                    onChange={(e) => updateField('tareas_roles_modelo', e.target.value)}
+                    placeholder="Instrucciones específicas por puesto (POR, DFC, LAT, MCD, MCO, EXT, DC) según nuestro modelo..."
+                    className="w-full min-h-[220px] bg-slate-950/90 border border-slate-800 focus:border-purple-500/50 rounded-xl px-3.5 py-2.5 text-xs text-slate-200 focus:outline-none transition-colors leading-relaxed"
+                  />
+                </div>
+              )}
             </div>
           )}
         </>
