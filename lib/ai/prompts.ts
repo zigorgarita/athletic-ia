@@ -78,7 +78,8 @@ ${ctx.matchupData || 'No hay datos de matchup teórico guardados entre estos dos
   if (ctx.rivalPlayerThreats && ctx.rivalPlayerThreats.length > 0) {
     text += `\n=== AMENAZAS INDIVIDUALES DE JUGADORES RIVALES DETECTADAS ===\n`;
     ctx.rivalPlayerThreats.forEach((threat: RivalPlayerThreat) => {
-      text += `- [Dorsal ${threat.dorsal || 'S/N'}] ${threat.nombre || 'Jugador Rival'} (${threat.posicionHabitual || 'Posición'}): Peligro ${threat.nivelPeligro}. ${threat.observaciones}. Consigna: ${threat.consignaEspecifica || ''}\n`;
+      const fortalezasStr = Array.isArray(threat.fortalezas) ? threat.fortalezas.join(', ') : (threat.fortalezas || '');
+      text += `- [Dorsal ${threat.dorsal || 'S/N'}] ${threat.nombre || 'Jugador Rival'} (${threat.posicionHabitual || 'Posición'}): Peligro ${threat.nivelPeligro}. ${threat.observaciones}. ${fortalezasStr ? `Fortalezas: ${fortalezasStr}.` : ''} Consigna: ${threat.consignaEspecifica || ''}\n`;
     });
   }
 

@@ -1,27 +1,16 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse } from 'next/server';
 import { createProvider } from '@/lib/ai/provider';
 import { supabase } from '@/lib/supabase';
 import { FlexibleReportExtraction } from '@/types';
+import { downloadFileFromUrl, validateDocumentBuffer } from '@/lib/ai/document-parser';
 
 export const maxDuration = 60; // 60 segundos tiempo límite
-
-const ALLOWED_MIME_TYPES = [
-  'application/pdf',
-  'image/png',
-  'image/jpeg',
-  'image/jpg',
-  'image/webp',
-  'text/plain',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-];
-
-const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024; // 25 MB
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
     const { documentId, rivalName, season, fileUrl, fileBase64, mimeType: providedMime } = body;
+    const targetSeason = season || '2026/2027';
 
     if (!documentId && !fileUrl && !fileBase64) {
       return NextResponse.json({ error: 'Faltan parámetros del documento (documentId, fileUrl o fileBase64)' }, { status: 400 });
@@ -46,40 +35,25 @@ export async function POST(req: Request) {
     }
 
     let fileBuffer: Buffer | null = null;
-    let mimeType = providedMime || 'application/pdf';
+    let initialMime = providedMime || 'application/pdf';
 
     if (fileBase64) {
       fileBuffer = Buffer.from(fileBase64, 'base64');
     } else if (targetUrl) {
-      const response = await fetch(targetUrl);
-      if (!response.ok) {
-        throw new Error(`No se pudo descargar el documento desde ${targetUrl}`);
-      }
-      const fetchedBuffer = await response.arrayBuffer();
-      fileBuffer = Buffer.from(fetchedBuffer);
-      const headerMime = response.headers.get('content-type');
-      if (headerMime) {
-        mimeType = headerMime.split(';')[0].trim();
+      const downloaded = await downloadFileFromUrl(targetUrl);
+      fileBuffer = downloaded.buffer;
+      if (downloaded.contentType) {
+        initialMime = downloaded.contentType.split(';')[0].trim();
       }
     }
 
-    if (!fileBuffer || fileBuffer.length === 0) {
+    if (!fileBuffer) {
       return NextResponse.json({ error: 'No se pudo obtener el contenido del archivo' }, { status: 400 });
     }
 
-    if (fileBuffer.length > MAX_FILE_SIZE_BYTES) {
-      return NextResponse.json({ error: `El archivo supera el tamaño máximo permitido (25 MB)` }, { status: 400 });
-    }
-
-    // Normalizar MIME
-    if (targetUrl?.endsWith('.pdf')) mimeType = 'application/pdf';
-    else if (targetUrl?.endsWith('.png')) mimeType = 'image/png';
-    else if (targetUrl?.endsWith('.jpg') || targetUrl?.endsWith('.jpeg')) mimeType = 'image/jpeg';
-    else if (targetUrl?.endsWith('.webp')) mimeType = 'image/webp';
-
-    if (!ALLOWED_MIME_TYPES.includes(mimeType) && !mimeType.startsWith('image/')) {
-      mimeType = 'application/pdf'; // Fallback por defecto si es compatible
-    }
+    // Validación rigurosa de Bytes, Tamaño y Firma de Formato (%PDF-)
+    const validated = validateDocumentBuffer(fileBuffer, initialMime);
+    const mimeType = validated.mimeType;
 
     const provider = createProvider();
 
@@ -100,53 +74,58 @@ DEVUELVE ÚNICAMENTE UN OBJETO JSON VÁLIDO CON ESTE ESQUEMA EXACTO:
 
 {
   "metadatos": {
-    "tipoInformeDetectado": ["completo" | "salida_balon" | "balon_parado" | "jugadores" | "audio_visual" | "notas_rapidas"],
-    "temporada": "${season || '2026-27'}",
+    "tituloDocumento": "${targetDocName}",
     "fechaInforme": "${targetDocDate}",
-    "autorDocumento": "Desconocido",
-    "partidosObservados": [],
-    "seccionesDetectadas": [],
-    "seccionesNoEncontradas": []
+    "autor": "Analista / Cuerpotécnico",
+    "rivalAnalizado": "${rivalName || 'Rival'}",
+    "temporada": "${targetSeason}",
+    "sistemaRivalObservado": "1-4-3-3",
+    "partidosObservados": ["Último partido vs Rival"],
+    "resumenEjecutivo": "Breve resumen de 2 frases"
   },
   "observacionesRival": {
-    "sistemaPrincipal": [{ "id": "obs_1", "contenido": "...", "fuente": "texto", "pagina": 1, "evidenciaOriginal": "...", "confianza": "alta", "estado": "pendiente", "prioridad": "normal", "categoria": "sistemaPrincipal", "esPropuestaAnalista": false }],
-    "sistemasAlternativos": [],
-    "salidaBalon": [],
-    "construccion": [],
-    "ataqueOrganizado": [],
-    "ataqueBandas": [],
-    "ataqueInterior": [],
-    "finalizacion": [],
-    "transicionOfensiva": [],
+    "salidaBalon": [
+      {
+        "id": "obs_1",
+        "categoria": "salidaBalon",
+        "contenido": "Descripción concreta del comportamiento observado",
+        "fuente": "texto",
+        "pagina": 1,
+        "evidenciaOriginal": "Cita exacta o contexto",
+        "confianza": "alta",
+        "estado": "pendiente",
+        "prioridad": "alta"
+      }
+    ],
     "transicionDefensiva": [],
-    "presion": [],
-    "bloqueDefensivo": [],
-    "fortalezas": [],
-    "debilidades": [],
-    "jugadoresClave": [],
     "balonParadoOfensivo": [],
-    "balonParadoDefensivo": [],
-    "saquesBanda": [],
-    "tendenciasCompetitivas": []
+    "balonParadoDefensivo": []
   },
   "propuestasDelAnalista": {
-    "queAtacar": [],
-    "queProteger": [],
-    "planPresion": [],
-    "planOfensivo": [],
-    "consignas": [],
-    "aspectosPsicologicos": []
+    "planAtaque": [
+      {
+        "id": "prop_1",
+        "categoria": "planAtaque",
+        "contenido": "Propuesta táctica recomendada por el analista",
+        "fuente": "texto",
+        "pagina": 1,
+        "confianza": "alta",
+        "estado": "pendiente",
+        "prioridad": "alta",
+        "esPropuestaAnalista": true
+      }
+    ]
   },
   "amenazasJugadores": [
     {
-      "nombre": "Nombre si figura",
       "dorsal": "17",
-      "posicionHabitual": "Extremo derecho",
-      "nivelPeligro": "alto",
-      "fortalezas": ["Velocidad", "1v1 en banda", "Diagonal hacia dentro"],
-      "movimientosFrecuentes": "Recibe perfilado en banda y busca diagonal a pierna cambiada",
-      "observaciones": "Jugador muy desequilibrante en transiciones ofensivas",
-      "nuestroPuestoAfectadoDirecto": "lateralIzquierdo",
+      "nombre": "Extremo Derecho",
+      "posicionHabitual": "extremoDerecho",
+      "nivelPeligro": "critico",
+      "fortalezas": ["1v1", "velocidad", "diagonal interior"],
+      "observaciones": "Jugador más desequilibrante en banda derecha",
+      "movimientosFrecuentes": "Recibe al pie abierto en banda e inicia diagonal hacia dentro buscando disparo o pase filtrado",
+      "nuestrosPuestosDirectos": ["lateralIzquierdo"],
       "nuestrosPuestosCobertura": ["extremoIzquierdo", "pivoteDefensivo", "centralIzquierdo"],
       "consignaEspecifica": "Mantener distancia de intervención, orientarlo hacia fuera y exigir cobertura del pivote del lado izquierdo"
     }
@@ -255,11 +234,12 @@ DEVUELVE ÚNICAMENTE UN OBJETO JSON VÁLIDO CON ESTE ESQUEMA EXACTO:
       documentDate: targetDocDate,
       extraction: extractedData,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error en API analyze-document:', error);
+    const msg = error instanceof Error ? error.message : String(error);
     return NextResponse.json(
-      { error: error.message || 'Error inesperado al procesar el documento' },
-      { status: 500 }
+      { error: msg || 'Error inesperado al procesar el documento' },
+      { status: 400 }
     );
   }
 }
