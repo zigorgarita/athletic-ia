@@ -166,6 +166,7 @@ export async function POST(request: Request) {
     else if (actionType === 'recommend_session') actionKey = 'recommendSession';
     else if (actionType === 'search_knowledge') actionKey = 'searchKnowledge';
     else if (actionType === 'explain_concept') actionKey = 'explainConcept';
+    else if (actionType === 'analyze_game_model') actionKey = 'analyzeGameModel';
 
     const promptFn = actionKey ? PROMPTS[actionKey as keyof typeof PROMPTS] : null;
 

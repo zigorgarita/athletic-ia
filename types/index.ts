@@ -324,6 +324,16 @@ export interface MatchABPPlayerAssignment {
   player?: Player;
 }
 
+export interface GameModelAnalysis {
+  ataque_posicional?: string;
+  defensa_posicional?: string;
+  transicion_perdida?: string;
+  transicion_recuperacion?: string;
+  riesgos_asumidos?: string;
+  ajustes_especificos?: string;
+  tareas_roles_modelo?: string;
+}
+
 export interface TacticalLineup {
   id: string;
   nombre_sistema: string;
@@ -338,6 +348,7 @@ export interface TacticalLineup {
   zona_conflicto: string | null;
   duelo_clave: string | null;
   orientaciones_individuales: string | null;
+  analisis_modelo_juego?: GameModelAnalysis | string | null;
   created_at: string;
 }
 

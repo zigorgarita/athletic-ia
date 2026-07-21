@@ -26,6 +26,9 @@ import { PlayerAssignmentSidebar } from './shared/PlayerAssignmentSidebar';
 import { LineupManager } from './shared/LineupManager';
 import { MatchPlanSelector } from './analysis/MatchPlanSelector';
 import { TacticalAnalysisPanel } from './analysis/TacticalAnalysisPanel';
+import { GameModelAnalysisPanel } from './analysis/GameModelAnalysisPanel';
+import { useTacticalAI } from '@/hooks/useTacticalAI';
+import { GameModelAnalysis, TacticalAIContext } from '@/types';
 
 // Subblock 4C Components
 import { RoleCardDrawer } from './roles/RoleCardDrawer';
@@ -81,6 +84,11 @@ export function TacticaClient() {
   const [zonaConflicto, setZonaConflicto] = useState<string>('');
   const [dueloClave, setDueloClave] = useState<string>('');
   const [tareasLineas, setTareasLineas] = useState<string>('');
+
+  // Nuevo análisis según Modelo de Juego Indautxu DH
+  const [analisisModeloJuego, setAnalisisModeloJuego] = useState<GameModelAnalysis>({});
+  const [isAnalyzingModeloJuego, setIsAnalyzingModeloJuego] = useState<boolean>(false);
+  const { analyzeGameModel } = useTacticalAI();
 
   // Subblock 4C Role Cards states
   const [roleCards, setRoleCards] = useState<TacticalRoleCard[]>([]);
@@ -404,6 +412,58 @@ export function TacticaClient() {
     }
   };
 
+  // Generar Análisis según nuestro Modelo de Juego
+  const handleAnalyzeGameModel = async () => {
+    setIsAnalyzingModeloJuego(true);
+    setErrorMsg(null);
+    setSuccessMsg(null);
+
+    try {
+      const ctx: TacticalAIContext = {
+        systemOwn: selectedFormation,
+        systemRival: rivalFormation,
+        matchupId: activeMatchup?.id || null,
+        matchId: selectedMatchId || null,
+        matchRival: matches.find(m => m.id === selectedMatchId)?.rival || null,
+        assignedPlayerIds: getAssignedPlayerIds(),
+        roleCards,
+        ventajas,
+        desventajas,
+        zonaConflicto,
+        dueloClave,
+        tareasLineas
+      };
+
+      const res = await analyzeGameModel(ctx);
+      if (res && res.content) {
+        const text = res.content;
+        const extractSec = (titlePattern: string): string => {
+          const regex = new RegExp(`###\\s*\\d*\\.?\\s*${titlePattern}[\\s\\S]*?\\n([\\s\\S]*?)(?=(?:###|\\n\\n###|$))`, 'i');
+          const m = text.match(regex);
+          return m ? m[1].trim() : '';
+        };
+
+        const updated: GameModelAnalysis = {
+          ataque_posicional: extractSec('Plan de Ataque') || extractSec('Ataque'),
+          defensa_posicional: extractSec('Plan Defensivo') || extractSec('Defensa'),
+          transicion_perdida: extractSec('Transición Ataque-Defensa') || extractSec('Pérdida'),
+          transicion_recuperacion: extractSec('Transición Defensa-Ataque') || extractSec('Recuperación'),
+          riesgos_asumidos: extractSec('Riesgos Asumidos') || extractSec('Riesgos'),
+          ajustes_especificos: extractSec('Ajustes Específicos') || extractSec('Ajustes'),
+          tareas_roles_modelo: extractSec('Tareas por Líneas') || extractSec('Instrucciones')
+        };
+
+        setAnalisisModeloJuego(updated);
+        setSuccessMsg('Análisis según el Modelo de Juego Indautxu generado con éxito.');
+      }
+    } catch (err: any) {
+      console.error('Error al analizar según Modelo de Juego:', err);
+      setErrorMsg('Error al analizar modelo de juego: ' + (err.message || String(err)));
+    } finally {
+      setIsAnalyzingModeloJuego(false);
+    }
+  };
+
   // --- Save Tactical Lineup ---
   async function handleSaveLineup() {
     if (!lineupName.trim()) {
@@ -430,7 +490,8 @@ export function TacticaClient() {
         desventajas: desventajas || null,
         zona_conflicto: zonaConflicto || null,
         duelo_clave: dueloClave || null,
-        orientaciones_individuales: tareasLineas || null
+        orientaciones_individuales: tareasLineas || null,
+        analisis_modelo_juego: analisisModeloJuego && Object.keys(analisisModeloJuego).length > 0 ? analisisModeloJuego : null
       };
 
       const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
@@ -581,6 +642,20 @@ export function TacticaClient() {
     setZonaConflicto(lineup.zona_conflicto || '');
     setDueloClave(lineup.duelo_clave || '');
     setTareasLineas(lineup.orientaciones_individuales || '');
+    
+    if (lineup.analisis_modelo_juego) {
+      if (typeof lineup.analisis_modelo_juego === 'object') {
+        setAnalisisModeloJuego(lineup.analisis_modelo_juego as GameModelAnalysis);
+      } else {
+        try {
+          setAnalisisModeloJuego(JSON.parse(lineup.analisis_modelo_juego as string));
+        } catch {
+          setAnalisisModeloJuego({});
+        }
+      }
+    } else {
+      setAnalisisModeloJuego({});
+    }
     
     // Load position nodes with backward compatibility
     if (lineup.posiciones && typeof lineup.posiciones === 'object') {
@@ -1094,6 +1169,16 @@ export function TacticaClient() {
         onTareasLineasChange={setTareasLineas}
         onAnalyze={handleAnalyzeMatch}
         isAnalyzing={isAnalyzing}
+      />
+
+      {/* Nuevo Análisis basado en el Modelo de Juego del Indautxu */}
+      <GameModelAnalysisPanel
+        selectedFormation={selectedFormation}
+        rivalFormation={rivalFormation}
+        analysisData={analisisModeloJuego}
+        onChange={setAnalisisModeloJuego}
+        onAnalyze={handleAnalyzeGameModel}
+        isAnalyzing={isAnalyzingModeloJuego}
       />
 
       {/* Briefing Táctico del Equipo */}

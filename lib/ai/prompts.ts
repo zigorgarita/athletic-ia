@@ -15,6 +15,19 @@ Directrices de comportamiento y tono:
 5. Acciones y automatismos: Cuando propongas cambios tácticos, sugiere consignas de campo cortas y directas que el míster pueda gritar en la banda o escribir en la pizarra.
 `;
 
+export const SYSTEM_PROMPT_GAME_MODEL = `
+JERARQUÍA DE PRIORIDADES INVIOLABLE (ORDEN DE PRECEDENCIA DEFECTO DE CÓDIGO SI SE INCUMPLE):
+1. Prioridad 1 (Absoluta): Instrucciones directas que el entrenador introduzca manualmente en la aplicación.
+2. Prioridad 2: Modelo de Juego Oficial Indautxu DH (Formación base 1-4-2-3-1, 3º Hombre, Dividir, Presión 6-8'' CONDICIONADA a cercanía/coberturas/carril interior cerrado, Repliegue en bloque compacto máx 40m en 1-4-2-3-1 adaptativo, Contraataque por zonas de robo).
+3. Prioridad 3: Adaptación táctica al Matchup (Nuestro 1-4-2-3-1 vs Sistema Rival).
+4. Prioridad 4: Conocimiento táctico genérico de la IA (solo para coherencia sintáctica sin contradecir a 1, 2 ni 3).
+
+PRINCIPIOS CRÍTICOS DEL MODELO INDAUTXU DH:
+- La presión 6-8'' tras pérdida ES CONDICIONADA (solo si hay cercanía, coberturas, carril interior cerrado y profundidad vigilada). Si superada o no hay condiciones, ABANDONAR persecución y replegar inmediatamente.
+- El repliegue es en bloque compacto de máx 40 metros respetando la base 1-4-2-3-1 (comportamientos adaptativos tipo 4-4-1-1 o 4-4-2 según altura del MCO).
+- Conceptos como 4v3 en inicio, 3º hombre o falta táctica son VENTAJAS POTENCIALES O RECURSOS CONTEXTUALES, jamás consecuencias automáticas ni garantizadas.
+`;
+
 export interface PromptContext {
   systemOwn: string;
   systemRival: string;
@@ -177,6 +190,42 @@ Proporciona:
 - Importancia estratégica (por qué y para qué sirve).
 - Ejemplo práctico de aplicación en nuestro sistema ${ctx.systemOwn}.
 - Errores comunes que cometen los juveniles al ejecutarlo y cómo corregirlos en los entrenamientos.
+`,
+
+  analyzeGameModel: (ctx: PromptContext) => `
+${buildContextString(ctx)}
+
+${SYSTEM_PROMPT_GAME_MODEL}
+
+TAREA OBLIGATORIA: Genera un Análisis Táctico Completo rigurosamente adaptado a nuestro MODELO DE JUEGO INDAUTXU DH (1-4-2-3-1) para enfrentarnos al sistema rival ${ctx.systemRival}.
+
+Debes devolver tu análisis estructurado de forma clara en las siguientes 6 secciones separadas con encabezados Markdown de nivel 3 (###):
+
+### 1. Plan de Ataque y Progresión según Modelo
+- Progresión: Mantener para progresar → Progresar para finalizar.
+- Identificación de Ventajas Potenciales (Cuadrado DFCs+MCDs, 3º Hombre, Dividir / Juntar y girar).
+- Zonas de atracción y cambios de orientación.
+
+### 2. Plan Defensivo y Presión Alta
+- Agresividad en juego aéreo y terrestre. Bloque compacto máximo 40 metros con 4 líneas claras.
+- Posicionamiento específico del pressing alto (Delantero entre 2 DFCs 2m detrás; Mediapunta 8m detrás del DC; Extremos entre DFC y LAT tapando pasillo interior; Pivotes emparejados).
+- Adaptación al sistema rival ${ctx.systemRival}.
+
+### 3. Transición Ataque-Defensa (Tras Pérdida)
+- Evaluación de la ventana de 6-8 segundos CONDICIONADA (solo con cercanía, coberturas, carril interior cerrado y profundidad protegida).
+- Criterio de abandono de persecución y repliegue rápido si la presión es superada o no hay condiciones.
+- Comportamientos en campo propio (obligar fuera) y campo contrario (obligar dentro lejos de portería).
+
+### 4. Transición Defensa-Ataque (Tras Recuperación)
+- Criterio: Contraataque si hay superioridad/igualdad hacia adelante vs. Mantener si hay inferioridad.
+- Plan según zonas de robo (Iniciación / Creación / Finalización).
+
+### 5. Riesgos Asumidos y Ajustes Específicos
+- Riesgos potenciales del matchup contra el sistema ${ctx.systemRival}.
+- Propuesta de ajustes tácticos o vigilancias específicas del míster.
+
+### 6. Tareas por Líneas e Instrucciones Individuales
+- Consignas directas por puesto (POR, DFC, LAT, MCD, MCO, EXT, DC) acordes a la identidad Indautxu DH.
 `,
 
   freeChat: (ctx: PromptContext, message?: string) => `

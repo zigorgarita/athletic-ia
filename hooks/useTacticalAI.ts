@@ -131,6 +131,11 @@ export function useTacticalAI() {
     await callAIAPI(triggerMsg, 'explain_concept', context);
   }, [callAIAPI]);
 
+  const analyzeGameModel = useCallback(async (context: TacticalAIContext): Promise<AIMessage | null> => {
+    const triggerMsg = `Genera el análisis táctico completo según nuestro Modelo de Juego Indautxu DH (1-4-2-3-1) frente a la formación rival ${context.systemRival}.`;
+    return await callAIAPI(triggerMsg, 'analyze_game_model', context);
+  }, [callAIAPI]);
+
   // Métodos para aplicar las acciones de la IA a la BD / Estado
 
   // Guardar sugerencia de la IA en la biblioteca de conocimiento
@@ -254,6 +259,7 @@ export function useTacticalAI() {
     recommendSession,
     searchKnowledge,
     explainConcept,
+    analyzeGameModel,
     saveToLibrary,
     applyToRoleCards
   };
