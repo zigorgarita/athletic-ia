@@ -5,6 +5,8 @@ import { Observation, FlexibleReportExtraction, RivalPlayerThreat } from '@/type
 import { Button } from '@/components/ui/Button';
 import { useEditMode } from '@/context/EditModeContext';
 import { CheckCircle2, XCircle, AlertCircle, ShieldAlert, UserCheck, Sparkles, Compass } from 'lucide-react';
+import { getStaffPasskey, setStaffPasskey, clearStaffPasskey } from '@/lib/passkey';
+import { StaffPasskeyModal } from '@/components/common/StaffPasskeyModal';
 
 interface ReviewExtractedReportModalProps {
   isOpen: boolean;
@@ -31,17 +33,21 @@ export function ReviewExtractedReportModal({
   season = '2026-27',
   onSuccess,
 }: ReviewExtractedReportModalProps) {
-  const { isEditMode, verifyWritePermission } = useEditMode();
+  const { verifyWritePermission } = useEditMode();
   const [activeTab, setActiveTab] = useState<'all' | 'rival' | 'analyst' | 'players'>('all');
   const [isSaving, setIsSaving] = useState(false);
   const [feedbackMsg, setFeedbackMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Modal de autorización StaffPasskey
+  const [isPasskeyModalOpen, setIsPasskeyModalOpen] = useState(false);
+  const [passkeyErrorMsg, setPasskeyErrorMsg] = useState<string | null>(null);
 
   // Estado editable para observaciones (SIEMPRE 'pendiente' por defecto)
   const [observations, setObservations] = useState<Observation[]>([]);
   const [threats, setThreats] = useState<RivalPlayerThreat[]>([]);
 
   useEffect(() => {
-    if (!extraction) {
+    if (!extraction || !isOpen) {
       setObservations([]);
       setThreats([]);
       return;
@@ -122,13 +128,6 @@ export function ReviewExtractedReportModal({
 
   if (!isOpen || !extraction) return null;
 
-  // Filtrado por pestaña
-  const filteredObservations = observations.filter(obs => {
-    if (activeTab === 'rival') return !obs.esPropuestaAnalista;
-    if (activeTab === 'analyst') return obs.esPropuestaAnalista;
-    return true;
-  });
-
   const handleStatusChange = (id: string, newStatus: 'pendiente' | 'aprobado' | 'rechazado') => {
     setObservations(prev =>
       prev.map(obs => (obs.id === id ? { ...obs, estado: newStatus } : obs))
@@ -157,7 +156,7 @@ export function ReviewExtractedReportModal({
     setObservations(prev => prev.map(obs => ({ ...obs, estado: 'aprobado' })));
   };
 
-  const handleConfirmAndIntegrate = async () => {
+  const handleConfirmAndIntegrate = async (overridePasskey?: string) => {
     try {
       setIsSaving(true);
       setFeedbackMsg(null);
@@ -172,7 +171,15 @@ export function ReviewExtractedReportModal({
         return;
       }
 
-      const passkey = process.env.COACH_STAFF_PASSKEY || '';
+      const passkey = overridePasskey || getStaffPasskey();
+
+      if (!passkey) {
+        setIsSaving(false);
+        setPasskeyErrorMsg(null);
+        setIsPasskeyModalOpen(true);
+        return; // MANTENER ReviewExtractedReportModal ABIERTO Y TODAS LAS OBSERVACIONES INTACTAS
+      }
+
       const today = new Date().toISOString().split('T')[0];
 
       // Convertir cada observación aprobada al esquema de Supabase club_report_observations
@@ -181,7 +188,7 @@ export function ReviewExtractedReportModal({
         club_id: clubId || null,
         club_season_id: clubSeasonId || null,
         document_name: documentName,
-        document_date: extraction.metadatos.fechaInforme || today,
+        document_date: extraction.metadatos?.fechaInforme || today,
         rival_name: rivalName,
         season: season,
         category: obs.categoria,
@@ -209,14 +216,14 @@ export function ReviewExtractedReportModal({
             club_id: clubId || null,
             club_season_id: clubSeasonId || null,
             document_name: documentName,
-            document_date: extraction.metadatos.fechaInforme || today,
+            document_date: extraction.metadatos?.fechaInforme || today,
             rival_name: rivalName,
             season: season,
             category: 'jugadorRival',
             content: `[Dorsal ${t.dorsal || 'S/N'}] ${t.nombre || 'Jugador Rival'} (${t.posicionHabitual || 'Posición'}): ${t.observaciones}. Fortalezas: ${Array.isArray(t.fortalezas) ? t.fortalezas.join(', ') : t.fortalezas}. ${t.consignaEspecifica || ''}`,
             source_type: 'texto',
             page: t.pagina || 11,
-            original_evidence: t.movimientosFrecuentes || null,
+            original_evidence: t.evidenciaOriginal || t.movimientosFrecuentes || null,
             confidence: 'alta',
             status: 'aprobado',
             priority: t.nivelPeligro === 'critico' || t.nivelPeligro === 'alto' ? 'clave' : 'alta',
@@ -236,6 +243,7 @@ export function ReviewExtractedReportModal({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'x-coach-staff-passkey': passkey,
           'x-staff-passkey': passkey,
         },
         body: JSON.stringify({
@@ -247,10 +255,20 @@ export function ReviewExtractedReportModal({
       });
 
       const data = await res.json();
+      if (res.status === 401 || res.status === 403) {
+        clearStaffPasskey();
+        setIsSaving(false);
+        setPasskeyErrorMsg(data.error || 'Clave de acceso del cuerpo técnico incorrecta.');
+        setIsPasskeyModalOpen(true);
+        return; // MANTENER ReviewExtractedReportModal ABIERTO Y CONSERVACIONES INTACTAS
+      }
+
       if (!res.ok || !data.success) {
         throw new Error(data.error || 'Error al guardar observaciones aprobadas en servidor.');
       }
 
+      setStaffPasskey(passkey);
+      setIsPasskeyModalOpen(false);
       setFeedbackMsg({ type: 'success', text: `¡Éxito! ${payloadRows.length} observaciones aprobadas e integradas en la ficha de ${rivalName}.` });
       setTimeout(() => {
         if (onSuccess) onSuccess();
@@ -265,327 +283,386 @@ export function ReviewExtractedReportModal({
     }
   };
 
+  // Filtrado por pestaña
+  const filteredObservations = observations.filter(obs => {
+    if (activeTab === 'rival') return !obs.esPropuestaAnalista;
+    if (activeTab === 'analyst') return obs.esPropuestaAnalista;
+    return true;
+  });
+
   const totalAprobadas = observations.filter(o => o.estado === 'aprobado').length;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-5xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+    <>
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-5xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
 
-        {/* Cabecera Modal */}
-        <div className="p-6 bg-slate-900/90 border-b border-slate-800 flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-[#CC0E21]/10 rounded-2xl border border-[#CC0E21]/30">
-              <UserCheck className="h-6 w-6 text-[#CC0E21]" />
-            </div>
-            <div>
-              <h2 className="text-xl font-extrabold text-slate-100 flex items-center gap-2">
-                Revisión Humana del Informe
-                <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-950/80 border border-amber-800 text-amber-400 font-semibold">
-                  Estado: Pendiente de Validación
-                </span>
-              </h2>
-              <p className="text-xs text-slate-400 mt-0.5">
-                {documentName} · Rival: <span className="text-slate-200 font-medium">{rivalName}</span> ({season})
-              </p>
-            </div>
-          </div>
-          <button onClick={onClose} className="p-2 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors">
-            ✕
-          </button>
-        </div>
-
-        {/* Feedback Alert */}
-        {feedbackMsg && (
-          <div className={`px-6 py-3 text-xs font-semibold flex items-center gap-2 ${feedbackMsg.type === 'success' ? 'bg-emerald-950/90 border-b border-emerald-800 text-emerald-300' : 'bg-red-950/90 border-b border-red-800 text-red-300'}`}>
-            {feedbackMsg.type === 'success' ? <CheckCircle2 className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
-            {feedbackMsg.text}
-          </div>
-        )}
-
-        {/* Filtros por pestaña */}
-        <div className="px-6 py-3 bg-slate-950/50 border-b border-slate-800/80 flex items-center justify-between flex-wrap gap-3">
-          <div className="flex gap-2">
-            <button
-              onClick={() => setActiveTab('all')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'all' ? 'bg-[#CC0E21] text-white shadow-md' : 'bg-slate-800/60 text-slate-400 hover:bg-slate-800'}`}
-            >
-              Todas ({observations.length})
-            </button>
-            <button
-              onClick={() => setActiveTab('rival')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'rival' ? 'bg-[#CC0E21] text-white shadow-md' : 'bg-slate-800/60 text-slate-400 hover:bg-slate-800'}`}
-            >
-              Hechos del Rival ({observations.filter(o => !o.esPropuestaAnalista).length})
-            </button>
-            <button
-              onClick={() => setActiveTab('analyst')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'analyst' ? 'bg-[#CC0E21] text-white shadow-md' : 'bg-slate-800/60 text-slate-400 hover:bg-slate-800'}`}
-            >
-              Propuestas del Autor ({observations.filter(o => o.esPropuestaAnalista).length})
-            </button>
-            <button
-              onClick={() => setActiveTab('players')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'players' ? 'bg-[#CC0E21] text-white shadow-md' : 'bg-slate-800/60 text-slate-400 hover:bg-slate-800'}`}
-            >
-              Amenazas Jugadores ({threats.length})
-            </button>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-slate-400">
-              Aprobadas por el Entrenador: <strong className="text-emerald-400">{totalAprobadas}</strong> / {observations.length}
-            </span>
-            <Button onClick={handleApproveAll} variant="secondary" className="text-xs py-1 px-3">
-              Marcar Todas Aprobadas
-            </Button>
-          </div>
-        </div>
-
-        {/* Cuerpo Principal del Modal */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-4">
-
-          {activeTab !== 'players' ? (
-            filteredObservations.length === 0 ? (
-              <div className="p-8 text-center text-slate-500 text-sm">
-                No hay observaciones en esta categoría.
+          {/* Cabecera Modal */}
+          <div className="p-6 bg-slate-900/90 border-b border-slate-800 flex justify-between items-center">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-[#CC0E21]/10 rounded-2xl border border-[#CC0E21]/30">
+                <UserCheck className="h-6 w-6 text-[#CC0E21]" />
               </div>
-            ) : (
-              filteredObservations.map(obs => (
-                <div
-                  key={obs.id}
-                  className={`p-4 rounded-2xl border transition-all duration-200 ${
-                    obs.estado === 'aprobado'
-                      ? 'bg-slate-900/90 border-emerald-500/50 shadow-md'
-                      : obs.estado === 'rechazado'
-                      ? 'bg-slate-950/40 border-red-900/30 opacity-60'
-                      : 'bg-slate-900/60 border-amber-500/30'
-                  }`}
-                >
-                  <div className="flex justify-between items-start gap-4 mb-2">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-slate-800 text-slate-300 border border-slate-700">
-                        {obs.categoria}
-                      </span>
-
-                      {obs.esPropuestaAnalista ? (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-950/70 border border-amber-800 text-amber-300">
-                          Propuesta del Autor del Informe
-                        </span>
-                      ) : (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-950/70 border border-blue-800 text-blue-300">
-                          Capa A: Dato Extraído (Literal)
-                        </span>
-                      )}
-
-                      <span className="text-[10px] text-slate-400 font-mono">Pág. {obs.pagina || 1} ({obs.fuente})</span>
-                    </div>
-
-                    {/* Selector de Estado Humano */}
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        onClick={() => handleStatusChange(obs.id, 'aprobado')}
-                        className={`px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1 transition-all ${
-                          obs.estado === 'aprobado' ? 'bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-400/50' : 'bg-slate-800 text-slate-400 hover:text-emerald-400'
-                        }`}
-                      >
-                        <CheckCircle2 className="h-3.5 w-3.5" />
-                        Aprobar
-                      </button>
-                      <button
-                        onClick={() => handleStatusChange(obs.id, 'rechazado')}
-                        className={`px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1 transition-all ${
-                          obs.estado === 'rechazado' ? 'bg-red-600 text-white shadow-sm ring-2 ring-red-400/50' : 'bg-slate-800 text-slate-400 hover:text-red-400'
-                        }`}
-                      >
-                        <XCircle className="h-3.5 w-3.5" />
-                        Rechazar
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* CAPA A: Dato Extraído Literalmente */}
-                  <div className="space-y-1 mb-2">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                      Capa A — Dato Literal del Informe:
-                    </label>
-                    <textarea
-                      value={obs.contenido}
-                      onChange={e => handleContentEdit(obs.id, e.target.value)}
-                      disabled={!isEditMode}
-                      rows={2}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-[#CC0E21]/50 transition-all resize-y"
-                    />
-                  </div>
-
-                  {/* Visualización Separada de Capa B y Capa C */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
-                    {obs.deduccionIA && (
-                      <div className="p-2.5 rounded-xl bg-blue-950/30 border border-blue-900/40 text-[11px] text-blue-200 flex flex-col gap-0.5">
-                        <span className="font-bold text-blue-400 flex items-center gap-1 text-[10px] uppercase">
-                          <Sparkles className="h-3 w-3" /> Capa B — Deducción IA:
-                        </span>
-                        <span>{obs.deduccionIA}</span>
-                      </div>
-                    )}
-
-                    {obs.propuestaIndautxu && (
-                      <div className="p-2.5 rounded-xl bg-emerald-950/30 border border-emerald-900/40 text-[11px] text-emerald-200 flex flex-col gap-0.5">
-                        <span className="font-bold text-emerald-400 flex items-center gap-1 text-[10px] uppercase">
-                          <Compass className="h-3 w-3" /> Capa C — Propuesta Modelo Indautxu:
-                        </span>
-                        <span>{obs.propuestaIndautxu}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Ajustes de Confianza y Evidencia */}
-                  <div className="mt-3 pt-2.5 border-t border-slate-800/60 flex justify-between items-center text-xs text-slate-400 flex-wrap gap-2">
-                    <div className="flex items-center gap-4">
-                      <label className="flex items-center gap-1 text-[11px]">
-                        Confianza:
-                        <select
-                          value={obs.confianza}
-                          onChange={e => handleConfidenceChange(obs.id, e.target.value as 'alta' | 'media' | 'baja')}
-                          className="bg-slate-950 border border-slate-800 rounded-lg px-2 py-0.5 text-[11px] text-slate-200"
-                        >
-                          <option value="alta">Alta</option>
-                          <option value="media">Media</option>
-                          <option value="baja">Baja</option>
-                        </select>
-                      </label>
-
-                      <label className="flex items-center gap-1 text-[11px]">
-                        Prioridad:
-                        <select
-                          value={obs.prioridad || 'normal'}
-                          onChange={e => handlePriorityChange(obs.id, e.target.value as 'baja' | 'normal' | 'alta' | 'clave')}
-                          className="bg-slate-950 border border-slate-800 rounded-lg px-2 py-0.5 text-[11px] text-slate-200"
-                        >
-                          <option value="baja">Baja</option>
-                          <option value="normal">Normal</option>
-                          <option value="alta">Alta</option>
-                          <option value="clave">Clave ⭐</option>
-                        </select>
-                      </label>
-                    </div>
-
-                    {obs.evidencias && obs.evidencias.length > 0 ? (
-                      <div className="flex flex-wrap gap-1.5 w-full mt-1">
-                        {obs.evidencias.map((ev, i) => (
-                          <span key={i} className="text-[10px] px-2 py-0.5 rounded-md bg-slate-950 border border-slate-800 text-slate-400 font-mono">
-                            Pág. {ev.pagina} ({ev.fuente}): &quot;{ev.evidenciaOriginal}&quot; [{ev.confianza}]
-                          </span>
-                        ))}
-                      </div>
-                    ) : (
-                      obs.evidenciaOriginal && (
-                        <span className="text-[10px] text-slate-500 italic max-w-md truncate">
-                          Evidencia original: &quot;{obs.evidenciaOriginal}&quot;
-                        </span>
-                      )
-                    )}
-                  </div>
-                </div>
-              ))
-            )
-          ) : (
-            /* Sección de Amenazas de Jugadores Rival con Capas A, B y C */
-            <div className="space-y-4">
-              <div className="bg-slate-950/60 border border-slate-800 rounded-2xl p-4 text-xs text-slate-300">
-                <h4 className="font-bold text-slate-100 flex items-center gap-2 mb-1">
-                  <ShieldAlert className="h-4 w-4 text-amber-500" />
-                  Amenazas de Jugadores Rivales Detectadas (Estado Literal Respetado)
-                </h4>
-                <p className="text-slate-400 text-[11px]">
-                  Datos extraídos literalmente del informe y aislados de las propuestas tácticas del Modelo Indautxu.
+              <div>
+                <h2 className="text-xl font-bold text-slate-100 flex items-center gap-2">
+                  Revisión Humana del Informe Táctico
+                  <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 font-medium">
+                    Validación Pendiente
+                  </span>
+                </h2>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  {documentName} • Rival: <strong className="text-slate-200">{rivalName}</strong> ({season})
                 </p>
               </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-xl transition-colors"
+            >
+              ✕
+            </button>
+          </div>
 
-              {threats.map((t, idx) => (
-                <div key={idx} className="bg-slate-900 border border-amber-500/30 rounded-2xl p-4 space-y-3">
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-2">
-                      <span className="px-2.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-bold">
-                        Dorsal {t.dorsal || 'S/N'}
-                      </span>
-                      <h4 className="font-bold text-slate-100">{t.nombre || 'Jugador Rival'}</h4>
-                      <span className="text-xs text-slate-400">({t.posicionHabitual})</span>
-                      <span className="text-[10px] text-slate-500 font-mono">Pág. {t.pagina || 11}</span>
-                    </div>
-                    <span className="px-2.5 py-0.5 rounded-full bg-amber-950 border border-amber-700 text-amber-300 text-[10px] font-bold uppercase">
-                      Peligro {t.nivelPeligro} (Literal)
-                    </span>
-                  </div>
+          {/* Subcabecera de Pestañas y Acciones */}
+          <div className="px-6 py-3 bg-slate-950/60 border-b border-slate-800/80 flex flex-wrap justify-between items-center gap-3">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setActiveTab('all')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                  activeTab === 'all'
+                    ? 'bg-slate-800 text-slate-100 border border-slate-700 shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Todas ({observations.length})
+              </button>
+              <button
+                onClick={() => setActiveTab('rival')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                  activeTab === 'rival'
+                    ? 'bg-slate-800 text-slate-100 border border-slate-700 shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Hechos del Rival ({observations.filter(o => !o.esPropuestaAnalista).length})
+              </button>
+              <button
+                onClick={() => setActiveTab('analyst')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                  activeTab === 'analyst'
+                    ? 'bg-slate-800 text-slate-100 border border-slate-700 shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Propuestas del Autor ({observations.filter(o => o.esPropuestaAnalista).length})
+              </button>
+              {threats.length > 0 && (
+                <button
+                  onClick={() => setActiveTab('players')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                    activeTab === 'players'
+                      ? 'bg-slate-800 text-slate-100 border border-slate-700 shadow-sm'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  Amenazas Jugadores ({threats.length})
+                </button>
+              )}
+            </div>
 
-                  {/* CAPA A: Dato Extraído Literal */}
-                  <div>
-                    <strong className="text-slate-400 text-[10px] uppercase block mb-1">Capa A — Dato Literal del Documento:</strong>
-                    <p className="text-xs text-slate-200 bg-slate-950/80 p-2.5 rounded-xl border border-slate-800">{t.observaciones}</p>
-                  </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleApproveAll}
+                className="px-3 py-1.5 text-xs font-medium text-emerald-400 bg-emerald-950/40 hover:bg-emerald-900/40 border border-emerald-800/40 rounded-xl transition-all flex items-center gap-1.5"
+              >
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                Aprobar Todas ({observations.length})
+              </button>
+            </div>
+          </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs bg-slate-950/50 p-3 rounded-xl border border-slate-800">
-                    <div>
-                      <strong className="text-slate-400 text-[10px] uppercase block mb-1">Fortalezas Literales del Informe:</strong>
-                      <div className="flex flex-wrap gap-1">
-                        {Array.isArray(t.fortalezas) ? t.fortalezas.map((f, i) => (
-                          <span key={i} className="px-2 py-0.5 rounded-md bg-slate-800 text-slate-200 text-[10px]">
-                            {f}
-                          </span>
-                        )) : <span className="text-slate-400 text-[10px]">{t.fortalezas}</span>}
-                      </div>
-                    </div>
-                    <div>
-                      <strong className="text-slate-400 text-[10px] uppercase block mb-1">Puesto Afectado Directo:</strong>
-                      <span className="text-emerald-400 font-medium">{t.nuestroPuestoAfectadoDirecto || 'Central Izquierdo'}</span>
-                    </div>
-                  </div>
-
-                  {/* Visualización de Capa B y Capa C */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    {t.deduccionIA && (
-                      <div className="p-2.5 rounded-xl bg-blue-950/30 border border-blue-900/40 text-[11px] text-blue-200">
-                        <strong className="text-blue-400 block text-[10px] uppercase mb-0.5 flex items-center gap-1">
-                          <Sparkles className="h-3 w-3" /> Capa B — Deducción IA:
-                        </strong>
-                        {t.deduccionIA}
-                      </div>
-                    )}
-                    {(t.propuestaIndautxu || t.consignaEspecifica) && (
-                      <div className="p-2.5 rounded-xl bg-emerald-950/30 border border-emerald-900/40 text-[11px] text-emerald-200">
-                        <strong className="text-emerald-400 block text-[10px] uppercase mb-0.5 flex items-center gap-1">
-                          <Compass className="h-3 w-3" /> Capa C — Propuesta Modelo Indautxu:
-                        </strong>
-                        {t.propuestaIndautxu || t.consignaEspecifica}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
+          {/* Mensajes de Feedback */}
+          {feedbackMsg && (
+            <div
+              className={`mx-6 mt-4 p-3 rounded-2xl border text-xs flex items-center gap-2 ${
+                feedbackMsg.type === 'success'
+                  ? 'bg-emerald-950/50 border-emerald-800/50 text-emerald-300'
+                  : 'bg-rose-950/50 border-rose-800/50 text-rose-300'
+              }`}
+            >
+              {feedbackMsg.type === 'success' ? (
+                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
+              ) : (
+                <AlertCircle className="h-4 w-4 shrink-0 text-rose-400" />
+              )}
+              <span>{feedbackMsg.text}</span>
             </div>
           )}
 
-        </div>
+          {/* Cuerpo Modal: Lista de Observaciones en 3 Capas */}
+          <div className="p-6 overflow-y-auto flex-1 space-y-4 custom-scrollbar">
+            {activeTab !== 'players' ? (
+              filteredObservations.length === 0 ? (
+                <div className="text-center py-12 text-slate-500 text-xs">
+                  No hay observaciones registradas en esta pestaña.
+                </div>
+              ) : (
+                filteredObservations.map((obs) => (
+                  <div
+                    key={obs.id}
+                    className={`p-4 rounded-2xl border transition-all space-y-3 ${
+                      obs.estado === 'aprobado'
+                        ? 'bg-slate-900/90 border-emerald-600/50 shadow-md shadow-emerald-950/20'
+                        : obs.estado === 'rechazado'
+                        ? 'bg-slate-950/40 border-rose-900/30 opacity-60'
+                        : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'
+                    }`}
+                  >
+                    {/* Fila Superior: Categoria, Pagina, Badge Estado y Controles */}
+                    <div className="flex justify-between items-center gap-2 flex-wrap">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-lg bg-slate-800 text-slate-300 border border-slate-700">
+                          {obs.categoria}
+                        </span>
+                        {obs.pagina && (
+                          <span className="text-[10px] text-slate-400 font-mono">
+                            Pág. {obs.pagina}
+                          </span>
+                        )}
+                        {obs.fuente && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-md bg-slate-950 border border-slate-800 text-slate-400 font-mono">
+                            {obs.fuente}
+                          </span>
+                        )}
+                        {obs.esPropuestaAnalista && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-md bg-purple-950/50 text-purple-300 border border-purple-800/40 font-semibold">
+                            Propuesta del Autor
+                          </span>
+                        )}
+                      </div>
 
-        {/* Footer Acciones */}
-        <div className="p-4 bg-slate-900 border-t border-slate-800 flex justify-between items-center">
-          <div className="text-xs text-slate-400">
-            Paso obligatorio de <strong className="text-slate-200">Validación Humana por el Entrenador</strong> antes de integrar datos en la Pizarra.
-          </div>
-          <div className="flex gap-3">
-            <Button variant="ghost" onClick={onClose} disabled={isSaving}>
-              Cancelar
-            </Button>
-            <Button
-              onClick={handleConfirmAndIntegrate}
-              disabled={isSaving || totalAprobadas === 0}
-              className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold"
-            >
-              {isSaving ? 'Guardando Integración...' : `Confirmar e Integrar (${totalAprobadas} Aprobadas)`}
-            </Button>
-          </div>
-        </div>
+                      {/* Botones de Aprobar / Rechazar */}
+                      <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
+                        <button
+                          onClick={() => handleStatusChange(obs.id, 'aprobado')}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1 ${
+                            obs.estado === 'aprobado'
+                              ? 'bg-emerald-600 text-white shadow-sm'
+                              : 'text-slate-400 hover:text-emerald-400 hover:bg-slate-900'
+                          }`}
+                        >
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          Aprobar
+                        </button>
+                        <button
+                          onClick={() => handleStatusChange(obs.id, 'pendiente')}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
+                            obs.estado === 'pendiente'
+                              ? 'bg-amber-600/30 text-amber-400 border border-amber-500/30'
+                              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                          }`}
+                        >
+                          Pendiente
+                        </button>
+                        <button
+                          onClick={() => handleStatusChange(obs.id, 'rechazado')}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1 ${
+                            obs.estado === 'rechazado'
+                              ? 'bg-rose-600 text-white shadow-sm'
+                              : 'text-slate-400 hover:text-rose-400 hover:bg-slate-900'
+                          }`}
+                        >
+                          <XCircle className="h-3.5 w-3.5" />
+                          Descartar
+                        </button>
+                      </div>
+                    </div>
 
+                    {/* renderizado de las 3 Capas */}
+                    <div className="space-y-2 pt-1">
+                      {/* Capa A: Dato Literal del Informe */}
+                      <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-xs text-slate-100 font-medium">
+                        <div className="text-[10px] uppercase font-bold text-slate-400 mb-1 flex items-center gap-1">
+                          <ShieldAlert className="h-3 w-3 text-slate-400" /> Capa A — Dato Literal del Informe:
+                        </div>
+                        <textarea
+                          value={obs.contenido}
+                          onChange={e => handleContentEdit(obs.id, e.target.value)}
+                          rows={2}
+                          className="w-full bg-transparent text-slate-100 text-xs focus:outline-none resize-none"
+                        />
+                      </div>
+
+                      {/* Capa B: Deducción de la IA */}
+                      {obs.deduccionIA && (
+                        <div className="p-2.5 rounded-xl bg-blue-950/30 border border-blue-900/40 text-[11px] text-blue-200 flex flex-col gap-0.5">
+                          <span className="font-bold text-blue-400 flex items-center gap-1 text-[10px] uppercase">
+                            <Sparkles className="h-3 w-3" /> Capa B — Deducción IA:
+                          </span>
+                          <span>{obs.deduccionIA}</span>
+                        </div>
+                      )}
+
+                      {/* Capa C: Propuesta Modelo Indautxu */}
+                      {obs.propuestaIndautxu && (
+                        <div className="p-2.5 rounded-xl bg-emerald-950/30 border border-emerald-900/40 text-[11px] text-emerald-200 flex flex-col gap-0.5">
+                          <span className="font-bold text-emerald-400 flex items-center gap-1 text-[10px] uppercase">
+                            <Compass className="h-3 w-3" /> Capa C — Propuesta Modelo Indautxu:
+                          </span>
+                          <span>{obs.propuestaIndautxu}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Ajustes de Confianza, Prioridad y Evidencia */}
+                    <div className="mt-3 pt-2.5 border-t border-slate-800/60 flex justify-between items-center text-xs text-slate-400 flex-wrap gap-2">
+                      <div className="flex items-center gap-4">
+                        <label className="flex items-center gap-1 text-[11px]">
+                          Confianza:
+                          <select
+                            value={obs.confianza}
+                            onChange={e => handleConfidenceChange(obs.id, e.target.value as 'alta' | 'media' | 'baja')}
+                            className="bg-slate-950 border border-slate-800 rounded-lg px-2 py-0.5 text-[11px] text-slate-200"
+                          >
+                            <option value="alta">Alta</option>
+                            <option value="media">Media</option>
+                            <option value="baja">Baja</option>
+                          </select>
+                        </label>
+
+                        <label className="flex items-center gap-1 text-[11px]">
+                          Prioridad:
+                          <select
+                            value={obs.prioridad || 'normal'}
+                            onChange={e => handlePriorityChange(obs.id, e.target.value as 'baja' | 'normal' | 'alta' | 'clave')}
+                            className="bg-slate-950 border border-slate-800 rounded-lg px-2 py-0.5 text-[11px] text-slate-200"
+                          >
+                            <option value="baja">Baja</option>
+                            <option value="normal">Normal</option>
+                            <option value="alta">Alta</option>
+                            <option value="clave">Clave ⭐</option>
+                          </select>
+                        </label>
+                      </div>
+
+                      {obs.evidencias && obs.evidencias.length > 0 ? (
+                        <div className="flex flex-wrap gap-1.5 w-full mt-1">
+                          {obs.evidencias.map((ev, i) => (
+                            <span key={i} className="text-[10px] px-2 py-0.5 rounded-md bg-slate-950 border border-slate-800 text-slate-400 font-mono">
+                              Pág. {ev.pagina} ({ev.fuente}): &quot;{ev.evidenciaOriginal}&quot; [{ev.confianza}]
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        obs.evidenciaOriginal && (
+                          <span className="text-[10px] text-slate-500 italic max-w-md truncate">
+                            Evidencia original: &quot;{obs.evidenciaOriginal}&quot;
+                          </span>
+                        )
+                      )}
+                    </div>
+                  </div>
+                ))
+              )
+            ) : (
+              /* Sección de Amenazas de Jugadores Rival con Capas A, B y C */
+              threats.map((t, idx) => (
+                <div key={idx} className="p-4 rounded-2xl bg-slate-900 border border-rose-900/40 space-y-3">
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                      <span className="px-2.5 py-1 rounded-xl bg-rose-950 text-rose-300 font-bold text-xs border border-rose-800">
+                        Dorsal {t.dorsal || 'S/N'}
+                      </span>
+                      <span className="font-bold text-slate-100 text-sm">{t.nombre || 'Jugador Rival'}</span>
+                      <span className="text-xs text-slate-400 font-mono">({t.posicionHabitual})</span>
+                      <span className="text-[10px] text-slate-400 font-mono">Pág. {t.pagina || 11}</span>
+                    </div>
+
+                    <span className={`text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-lg border ${
+                      t.nivelPeligro === 'critico' || t.nivelPeligro === 'alto'
+                        ? 'bg-rose-950 text-rose-400 border-rose-800'
+                        : 'bg-amber-950 text-amber-400 border-amber-800'
+                    }`}>
+                      Amenaza {t.nivelPeligro}
+                    </span>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-200">
+                      <strong className="text-slate-400 block text-[10px] uppercase mb-0.5">Capa A — Dato Literal del Documento:</strong>
+                      {t.observaciones}
+                    </div>
+
+                    {t.deduccionIA && (
+                      <div className="p-2.5 rounded-xl bg-blue-950/30 border border-blue-900/40 text-xs text-blue-200">
+                        <strong className="text-blue-400 block text-[10px] uppercase mb-0.5">Capa B — Deducción IA:</strong>
+                        {t.deduccionIA}
+                      </div>
+                    )}
+
+                    {t.propuestaIndautxu && (
+                      <div className="p-2.5 rounded-xl bg-emerald-950/30 border border-emerald-900/40 text-xs text-emerald-200">
+                        <strong className="text-emerald-400 block text-[10px] uppercase mb-0.5">Capa C — Propuesta Modelo Indautxu:</strong>
+                        {t.propuestaIndautxu}
+                      </div>
+                    )}
+                  </div>
+
+                  {t.evidenciaOriginal && (
+                    <div className="text-[10px] text-slate-500 italic">
+                      Evidencia original exactísima: &quot;{t.evidenciaOriginal}&quot;
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Pie de Modal y Botón Principal Confirmar e Integrar */}
+          <div className="p-6 bg-slate-900/90 border-t border-slate-800 flex flex-wrap justify-between items-center gap-4">
+            <div className="text-xs text-slate-400">
+              Aprobadas para guardar: <strong className="text-emerald-400 text-sm font-bold">{totalAprobadas}</strong> de {observations.length} observaciones.
+            </div>
+
+            <div className="flex items-center gap-3">
+              <Button
+                variant="secondary"
+                onClick={onClose}
+                disabled={isSaving}
+                className="rounded-xl border-slate-700 text-slate-300 hover:bg-slate-800"
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={() => handleConfirmAndIntegrate()}
+                disabled={isSaving}
+                className="bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl shadow-lg shadow-emerald-950/40 transition-all flex items-center gap-2"
+              >
+                {isSaving ? (
+                  <>Procesando...</>
+                ) : (
+                  <>
+                    <CheckCircle2 className="h-4 w-4" />
+                    Confirmar e Integrar ({totalAprobadas} aprobadas)
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+
+        </div>
       </div>
-    </div>
+
+      {/* Modal de Solicitud de Clave de Cuerpo Técnico */}
+      <StaffPasskeyModal
+        isOpen={isPasskeyModalOpen}
+        onClose={() => setIsPasskeyModalOpen(false)}
+        onSuccess={(enteredKey) => {
+          setIsPasskeyModalOpen(false);
+          handleConfirmAndIntegrate(enteredKey);
+        }}
+        errorMsg={passkeyErrorMsg}
+      />
+    </>
   );
 }

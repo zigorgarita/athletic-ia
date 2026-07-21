@@ -3,7 +3,7 @@ import { getSupabaseServerClient } from '@/lib/supabase-server';
 
 export async function POST(req: Request) {
   try {
-    const passkeyHeader = req.headers.get('x-staff-passkey');
+    const passkeyHeader = req.headers.get('x-coach-staff-passkey') || req.headers.get('x-staff-passkey');
     const validPasskey = process.env.COACH_STAFF_PASSKEY;
 
     if (!validPasskey || passkeyHeader !== validPasskey) {
@@ -61,9 +61,6 @@ export async function POST(req: Request) {
   } catch (error: unknown) {
     console.error('Error en API manage-observations:', error);
     const msg = error instanceof Error ? error.message : String(error);
-    return NextResponse.json(
-      { error: msg || 'Error en la operación de gestión de informes.' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: msg || 'Error procesando solicitud.' }, { status: 500 });
   }
 }

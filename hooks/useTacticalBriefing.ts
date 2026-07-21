@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useEditMode } from '@/context/EditModeContext';
+import { getStaffPasskey } from '@/lib/passkey';
 
 export interface BriefingPlayerPayload {
   id: string;
@@ -59,7 +60,6 @@ export function useTacticalBriefing() {
   const [isGeneratingPlayers, setIsGeneratingPlayers] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { verifyWritePermission } = useEditMode();
-  const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
 
   const synthesizeLines = useCallback(async (payload: TacticalBriefingPayload): Promise<SynthesizedLinesResponse | null> => {
     setIsGeneratingLines(true);
@@ -67,10 +67,12 @@ export function useTacticalBriefing() {
     try {
       verifyWritePermission();
 
+      const passkey = getStaffPasskey() || process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
       const response = await fetch('/api/tactical-briefing', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'x-coach-staff-passkey': passkey,
           'x-staff-passkey': passkey
         },
         body: JSON.stringify({
@@ -86,14 +88,15 @@ export function useTacticalBriefing() {
 
       const data = await response.json();
       return data as SynthesizedLinesResponse;
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error in synthesizeLines hook:', err);
-      setError(err.message || 'Error al comunicarse con el preparador de briefing.');
+      const msg = err instanceof Error ? err.message : String(err);
+      setError(msg || 'Error al comunicarse con el preparador de briefing.');
       return null;
     } finally {
       setIsGeneratingLines(false);
     }
-  }, [verifyWritePermission, passkey]);
+  }, [verifyWritePermission]);
 
   const synthesizePlayers = useCallback(async (payload: TacticalBriefingPayload): Promise<SynthesizedPlayersResponse | null> => {
     setIsGeneratingPlayers(true);
@@ -101,10 +104,12 @@ export function useTacticalBriefing() {
     try {
       verifyWritePermission();
 
+      const passkey = getStaffPasskey() || process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
       const response = await fetch('/api/tactical-briefing', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'x-coach-staff-passkey': passkey,
           'x-staff-passkey': passkey
         },
         body: JSON.stringify({
@@ -127,7 +132,7 @@ export function useTacticalBriefing() {
     } finally {
       setIsGeneratingPlayers(false);
     }
-  }, [verifyWritePermission, passkey]);
+  }, [verifyWritePermission]);
 
   return {
     synthesizeLines,

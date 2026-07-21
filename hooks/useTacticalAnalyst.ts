@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useEditMode } from '@/context/EditModeContext';
+import { getStaffPasskey } from '@/lib/passkey';
 
 export interface TacticalAnalystPlayer {
   id: string;
@@ -47,14 +48,14 @@ export function useTacticalAnalyst() {
     setError(null);
 
     try {
-      // 1. Verify edit mode and coach passkey write permission
       verifyWritePermission();
 
-      // 2. Perform fetch to the analyst API endpoint
+      const passkey = getStaffPasskey() || process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
       const response = await fetch('/api/tactical-analyst', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'x-coach-staff-passkey': passkey,
           'x-staff-passkey': passkey
         },
         body: JSON.stringify(payload)

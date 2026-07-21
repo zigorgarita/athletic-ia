@@ -4,7 +4,7 @@ import { TacticalLineupReportSelection } from '@/types';
 
 export async function POST(req: Request) {
   try {
-    const passkeyHeader = req.headers.get('x-staff-passkey');
+    const passkeyHeader = req.headers.get('x-coach-staff-passkey') || req.headers.get('x-staff-passkey');
     const validPasskey = process.env.COACH_STAFF_PASSKEY;
 
     if (!validPasskey || passkeyHeader !== validPasskey) {
@@ -41,65 +41,50 @@ export async function POST(req: Request) {
       obsQuery = obsQuery.eq('club_season_id', seasonId);
     }
 
-    const { data: obsData, error: obsErr } = await obsQuery.order('created_at', { ascending: false });
-
+    const { data: obsData, error: obsErr } = await obsQuery;
     if (obsErr) {
-      throw obsErr;
+      console.warn('Advertencia consultando observaciones aprobadas:', obsErr);
     }
 
-    const rawObsList = obsData || [];
+    const rawObs = obsData || [];
 
-    // 3. Filtrar según selecciones de la pizarra si existen
-    const selectedDocIds = new Set(
-      selections.filter(s => s.selected && s.document_id).map(s => s.document_id)
-    );
-
-    let finalObsList = rawObsList;
-    if (selections.length > 0) {
-      finalObsList = rawObsList.filter(obs => obs.document_id && selectedDocIds.has(obs.document_id));
-    }
-
-    // 4. Mapear observaciones aprobadas y etiquetas de fuentes (sin exponer RAW)
-    const approvedObservations = finalObsList.map(item => ({
-      id: item.id,
-      contenido: item.content,
-      fuente: item.source_type,
-      pagina: item.page || 1,
-      evidenciaOriginal: item.original_evidence || undefined,
-      confianza: item.confidence,
-      estado: item.status,
-      prioridad: item.priority,
-      categoria: item.category,
-      fechaObservacion: item.observation_date || undefined,
-      esPropuestaAnalista: item.is_analyst_proposal,
-      rivalPlayerName: item.rival_player_name || undefined,
-      rivalPlayerDorsal: item.rival_player_dorsal || undefined,
-      rivalPlayerPosition: item.rival_player_position || undefined,
-      rivalPlayerThreatLevel: item.rival_player_threat_level || undefined,
-      documentId: item.document_id || undefined,
-      documentName: item.document_name,
-      documentDate: item.document_date || undefined,
+    // Mapear observaciones al tipo Observation para el frontend
+    const approvedObservations = rawObs.map((r: Record<string, unknown>) => ({
+      id: r.id as string,
+      contenido: r.content as string,
+      deduccionIA: undefined,
+      propuestaIndautxu: undefined,
+      fuente: (r.source_type as 'texto' | 'imagen' | 'tabla' | 'nota') || 'texto',
+      pagina: (r.page as number) || 1,
+      evidenciaOriginal: (r.original_evidence as string) || undefined,
+      confianza: (r.confidence as 'alta' | 'media' | 'baja') || 'alta',
+      estado: 'aprobado' as const,
+      prioridad: (r.priority as 'baja' | 'normal' | 'alta' | 'clave') || 'normal',
+      categoria: (r.category as string) || 'general',
+      esPropuestaAnalista: Boolean(r.is_analyst_proposal),
+      rivalPlayerName: (r.rival_player_name as string) || undefined,
+      rivalPlayerDorsal: (r.rival_player_dorsal as string) || undefined,
+      rivalPlayerPosition: (r.rival_player_position as string) || undefined,
+      rivalPlayerThreatLevel: (r.rival_player_threat_level as 'bajo' | 'medio' | 'alto' | 'critico') || undefined,
+      documentId: (r.document_id as string) || undefined,
+      documentName: (r.document_name as string) || undefined,
+      documentDate: (r.document_date as string) || undefined,
     }));
 
-    const sourcesSet = new Set<string>();
-    approvedObservations.forEach(o => {
-      if (o.documentName) {
-        sourcesSet.add(o.documentDate ? `${o.documentName} (${o.documentDate})` : o.documentName);
-      }
-    });
+    // Obtener nombres de documentos fuente para etiquetas
+    const documentNames = Array.from(
+      new Set(rawObs.map((r: Record<string, unknown>) => r.document_name as string).filter(Boolean))
+    );
 
     return NextResponse.json({
       success: true,
       selections,
       approvedObservations,
-      reportSourcesLabels: Array.from(sourcesSet),
+      reportSourcesLabels: documentNames,
     });
   } catch (error: unknown) {
     console.error('Error en API report-context:', error);
     const msg = error instanceof Error ? error.message : String(error);
-    return NextResponse.json(
-      { error: msg || 'Error al obtener contexto seguro de informes.' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: msg || 'Error procesando consulta de informe.' }, { status: 500 });
   }
 }

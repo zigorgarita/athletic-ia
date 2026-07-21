@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { AIMessage, AIAction, TacticalAIContext, TacticalRoleCard, KnowledgeEntry } from '@/types';
 import { useEditMode } from '@/context/EditModeContext';
 import { supabase } from '@/lib/supabase';
+import { getStaffPasskey } from '@/lib/passkey';
 
 export function useTacticalAI() {
   const [messages, setMessages] = useState<AIMessage[]>([]);
@@ -35,10 +36,12 @@ export function useTacticalAI() {
     setMessages(prev => [...prev, userMessage]);
 
     try {
+      const passkey = getStaffPasskey();
       const response = await fetch('/api/tactical-ai', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'x-coach-staff-passkey': passkey,
           'x-staff-passkey': passkey
         },
         body: JSON.stringify({
@@ -66,14 +69,15 @@ export function useTacticalAI() {
 
       setMessages(prev => [...prev, assistantMessage]);
       return assistantMessage;
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error al llamar al Asistente IA:', err);
-      setError(err.message || 'Ocurrió un error al comunicarse con la IA.');
+      const msg = err instanceof Error ? err.message : String(err);
+      setError(msg || 'Ocurrió un error al comunicarse con la IA.');
       return null;
     } finally {
       setIsThinking(false);
     }
-  }, [messages, passkey]);
+  }, [messages]);
 
   // Enviar un mensaje libre de chat
   const sendMessage = useCallback(async (message: string, context: TacticalAIContext) => {
