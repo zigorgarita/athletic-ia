@@ -68,7 +68,10 @@ export async function POST(request: Request) {
       systemOwn: context.systemOwn,
       systemRival: context.systemRival,
       matchRival: context.matchRival || null,
-      systemNodes: context.systemNodes
+      systemNodes: context.systemNodes,
+      validatedRivalInsights: context.validatedRivalInsights || [],
+      rivalPlayerThreats: context.rivalPlayerThreats || [],
+      reportSourcesLabels: context.reportSourcesLabels || [],
     };
 
     // A) Cargar datos de jugadores asignados

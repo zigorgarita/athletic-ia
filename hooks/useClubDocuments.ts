@@ -12,6 +12,8 @@ export interface ClubDocument {
   url: string;
   comentario: string | null;
   fecha: string | null;
+  estado_analisis?: 'pendiente' | 'analizado' | 'error' | null;
+  extraccion_json?: any | null;
   created_at: string;
 }
 

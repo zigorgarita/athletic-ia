@@ -18,13 +18,26 @@ export class GeminiProvider implements AIProvider {
     const systemMessage = messages.find(m => m.role === 'system');
     const systemInstruction = systemMessage ? systemMessage.content : undefined;
 
-    // Mapear los mensajes de usuario y asistente
+    // Mapear los mensajes de usuario y asistente con soporte para mediaParts (PDFs, imágenes, etc.)
     const contents = messages
       .filter(m => m.role !== 'system')
-      .map(m => ({
-        role: m.role === 'assistant' ? 'model' : 'user',
-        parts: [{ text: m.content }]
-      }));
+      .map(m => {
+        const parts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = [{ text: m.content }];
+        if (m.mediaParts && m.mediaParts.length > 0) {
+          for (const media of m.mediaParts) {
+            parts.push({
+              inlineData: {
+                mimeType: media.mimeType,
+                data: media.data
+              }
+            });
+          }
+        }
+        return {
+          role: m.role === 'assistant' ? 'model' : 'user',
+          parts
+        };
+      });
 
     try {
       const response = await ai.models.generateContent({

@@ -146,6 +146,48 @@ export function GameModelAnalysisPanel({
 
       {isExpanded && (
         <>
+          {/* Insignia de Fuentes Utilizadas & Trazabilidad */}
+          {((analysisData.fuentesUtilizadas && analysisData.fuentesUtilizadas.length > 0) || (analysisData.principiosIndautxuAplicados && analysisData.principiosIndautxuAplicados.length > 0)) && (
+            <div className="bg-slate-950/60 border border-slate-800 rounded-2xl p-4 space-y-3 text-xs text-slate-300">
+              {analysisData.fuentesUtilizadas && analysisData.fuentesUtilizadas.length > 0 && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <BookOpen className="h-4 w-4 text-[#CC0E21]" />
+                  <span className="font-bold text-slate-200">Fuentes del Análisis:</span>
+                  <div className="flex flex-wrap gap-1">
+                    {analysisData.fuentesUtilizadas.map((src, i) => (
+                      <span key={i} className="px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-[10px] font-semibold text-slate-200">
+                        {src}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {analysisData.principiosIndautxuAplicados && analysisData.principiosIndautxuAplicados.length > 0 && (
+                <div className="pt-2 border-t border-slate-800/60 flex items-start gap-2 flex-wrap">
+                  <Shield className="h-4 w-4 text-emerald-400 mt-0.5 shrink-0" />
+                  <div>
+                    <strong className="text-emerald-400 text-xs block mb-1">Principios Indautxu Aplicados en este Matchup:</strong>
+                    <div className="flex flex-wrap gap-1.5">
+                      {analysisData.principiosIndautxuAplicados.map((prin, idx) => (
+                        <span key={idx} className="px-2.5 py-0.5 rounded-lg bg-emerald-950/60 border border-emerald-800/80 text-emerald-300 text-[10px] font-semibold">
+                          {prin}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {analysisData.avisoIncertidumbre && (
+                <div className="pt-2 border-t border-slate-800/60 text-[11px] text-amber-400 font-semibold flex items-center gap-1">
+                  <ShieldAlert className="h-3.5 w-3.5" />
+                  {analysisData.avisoIncertidumbre}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Sub-navigation tabs */}
           <div className="flex items-center gap-2 border-b border-slate-800/40 pb-2">
             <button

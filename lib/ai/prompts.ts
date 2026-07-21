@@ -28,6 +28,8 @@ PRINCIPIOS CRÍTICOS DEL MODELO INDAUTXU DH:
 - Conceptos como 4v3 en inicio, 3º hombre o falta táctica son VENTAJAS POTENCIALES O RECURSOS CONTEXTUALES, jamás consecuencias automáticas ni garantizadas.
 `;
 
+import { Observation, RivalPlayerThreat } from '@/types';
+
 export interface PromptContext {
   systemOwn: string;
   systemRival: string;
@@ -40,13 +42,16 @@ export interface PromptContext {
   recentEvaluations?: string;
   recentTrainingAbsences?: string;
   recentGPSData?: string;
+  validatedRivalInsights?: Observation[];
+  rivalPlayerThreats?: RivalPlayerThreat[];
+  reportSourcesLabels?: string[];
 }
 
 export function buildContextString(ctx: PromptContext): string {
-  return `
+  let text = `
 === CONTEXTO TÁCTICO ACTUAL ===
 - Sistema Propio: ${ctx.systemOwn}
-- Sistema Rival: ${ctx.systemRival}
+- Sistema Rival Seleccionado para el Partido: ${ctx.systemRival}
 ${ctx.matchRival ? `- Rival del Partido: ${ctx.matchRival}` : ''}
 
 === PIZARRA Y ALINEACIÓN DE POSICIONES ===
@@ -59,7 +64,25 @@ ${ctx.roleCardsList || 'No hay fichas de rol guardadas para este matchup.'}
 
 === COMPARACIÓN TEÓRICA DEL MATCHUP ===
 ${ctx.matchupData || 'No hay datos de matchup teórico guardados entre estos dos sistemas.'}
+`;
 
+  if (ctx.validatedRivalInsights && ctx.validatedRivalInsights.length > 0) {
+    text += `\n=== INFORMACIÓN REAL Y VALIDADA DEL RIVAL (OBSERVACIONES DE INFORMES APROBADOS POR EL ENTRENADOR) ===\n`;
+    ctx.validatedRivalInsights.forEach((obs: Observation, idx: number) => {
+      text += `[${idx + 1}] (${obs.categoria || 'Táctica'}) ${obs.contenido} (Fuente: ${obs.documentName || 'Informe'}, Pág. ${obs.pagina || 1}, Confianza: ${obs.confianza || 'alta'})\n`;
+    });
+  } else {
+    text += `\n=== INFORMACIÓN REAL Y VALIDADA DEL RIVAL ===\nNo existe informe específico validado para este rival. Realizar el análisis exclusivamente con Modelo Indautxu DH y emparejamiento posicional.\n`;
+  }
+
+  if (ctx.rivalPlayerThreats && ctx.rivalPlayerThreats.length > 0) {
+    text += `\n=== AMENAZAS INDIVIDUALES DE JUGADORES RIVALES DETECTADAS ===\n`;
+    ctx.rivalPlayerThreats.forEach((threat: RivalPlayerThreat) => {
+      text += `- [Dorsal ${threat.dorsal || 'S/N'}] ${threat.nombre || 'Jugador Rival'} (${threat.posicionHabitual || 'Posición'}): Peligro ${threat.nivelPeligro}. ${threat.observaciones}. Consigna: ${threat.consignaEspecifica || ''}\n`;
+    });
+  }
+
+  text += `
 === CONOCIMIENTO TÁCTICO DE REFERENCIA (BIBLIOTECA) ===
 ${ctx.relevantKnowledge || 'No se ha encontrado conocimiento táctico específico en la biblioteca para este contexto.'}
 
@@ -69,6 +92,7 @@ ${ctx.recentTrainingAbsences ? `\n=== AUSENCIAS RECIENTES EN ENTRENAMIENTO ===\n
 ${ctx.recentGPSData ? `\n=== DATOS GPS DE RENDIMIENTO ===\n${ctx.recentGPSData}` : ''}
 ================================
 `;
+  return text;
 }
 
 export const PROMPTS: Record<string, (ctx: PromptContext, option?: string) => string> = {
@@ -197,8 +221,22 @@ ${buildContextString(ctx)}
 
 ${SYSTEM_PROMPT_GAME_MODEL}
 
-TAREA CRÍTICA OBLIGATORIA:
-Genera un Análisis Táctico Completo adaptado a nuestro MODELO DE JUEGO INDAUTXU DH (1-4-2-3-1) frente al sistema rival ${ctx.systemRival}.
+JERARQUÍA DEFINITIVA INVIOLABLE DE PRIORIDADES:
+1. Instrucciones directas introducidas por el Entrenador.
+2. Modelo de Juego Indautxu DH (1-4-2-3-1).
+3. Contexto actual del partido: Nuestro sistema ${ctx.systemOwn}, Sistema Rival Seleccionado para el Partido ${ctx.systemRival}, alineación y posiciones reales.
+4. Información validada de los informes seleccionados (${ctx.validatedRivalInsights?.length || 0} observaciones aprobadas).
+5. Conocimiento táctico general como complemento.
+
+REGLA DE PREVALENCIA DE SISTEMA:
+Si un informe antiguo o de scouting observó al rival en un sistema distinto (ej. 1-4-3-3), pero para el partido el entrenador ha seleccionado el sistema ${ctx.systemRival}, DEBES ANALIZAR EL CHOQUE SOBRE EL SISTEMA SELECCIONADO ${ctx.systemRival} Y NOTIFICAR EN "ajustesMister" O "riesgosAsumidos" QUE EL INFORME CONTIENE DATOS PROCEDENTES DE OTRO DIBUJO. El informe JAMÁS puede cambiar el sistema rival seleccionado para el partido.
+
+REGLA DE AMENAZAS INDIVIDUALES DE JUGADORES RIVALES:
+Si existen amenazas detectadas de jugadores rivales (ej. extremo derecho dorsal 17, delantero de 1.90m, pivote organizador), DEBES RELACIONAR AUTOMÁTICAMENTE LA AMENAZA CON NUESTROS PUESTOS AFECTADOS:
+- Extremo derecho rival ➔ lateralIzquierdo (atención directa en 1v1), extremoIzquierdo (retorno defensivo), pivoteOfensivo/Defensivo del lado izquierdo (cobertura interior) y centralIzquierdo (vigilancia a la espalda).
+- Extremo izquierdo rival ➔ lateralDerecho, extremoDerecho, pivote del lado derecho y centralDerecho.
+- Delantero centro rival ➔ centralIzquierdo y centralDerecho (fijación/duelo aéreo), portero (salidas en centro) y pivoteDefensivo (rebote).
+- Mediapunta rival ➔ pivoteDefensivo, pivoteOfensivo y centrales.
 
 DEBES RESPONDER ÚNICA Y EXCLUSIVAMENTE CON UN OBJETO JSON VÁLIDO.
 NO incluyas bloques de código Markdown (sin triple comilla invertida), NO incluyas introducciones ni explicaciones antes o después del JSON. Solo devuelve el JSON crudo sin comillas adicionales.
@@ -206,37 +244,34 @@ NO utilices símbolos Markdown como asteriscos (**) ni almohadillas (###) dentro
 
 Estructura JSON requerida estrictamente:
 {
-  "planAtaque": "Desarrollo táctico detallado sobre cómo progresar contra su estructura defensiva (${ctx.systemRival}), papel del mediapunta entre sus líneas de medios y defensiva, relación entre nuestros laterales y extremos (amplitud vs interiorización), uso del 3º hombre y fijación para dividir en nuestro 1-4-2-3-1.",
-  "planDefensivo": "Desarrollo táctico detallado del plan defensivo: cómo fijar a sus atacantes durante nuestra salida, quién salta sobre sus centrales y laterales al presionar alto, coberturas del doble pivote y distancias del bloque compacto en máx 40m.",
-  "riesgosAsumidos": "Explicación concreta y profunda de los riesgos tácticos asumidos (riesgos en bandas, segundas jugadas, duelos 1v1, espacio a la espalda de laterales desdoblados).",
-  "ajustesMister": "Instrucciones y consignas específicas de ajuste para el partido contra ${ctx.systemRival} adaptadas a las características de la plantilla asignada.",
+  "planAtaque": "Desarrollo táctico detallado sobre cómo progresar contra su estructura defensiva (${ctx.systemRival}), papel del mediapunta entre sus líneas de medios y defensiva, relación entre nuestros laterales y extremos (amplitud vs interiorización), uso del 3º hombre y fijación para dividir en nuestro 1-4-2-3-1. Si hay informes validados seleccionados, incorpora las debilidades observadas de su salida o transiciones.",
+  "planDefensivo": "Desarrollo táctico detallado del plan defensivo: cómo fijar a sus atacantes durante nuestra salida, quién salta sobre sus centrales y laterales al presionar alto, coberturas del doble pivote y distancias del bloque compacto en máx 40m. Incorporar fortalezas u observaciones validadas del rival.",
+  "riesgosAsumidos": "Explicación concreta y profunda de los riesgos tácticos asumidos (riesgos en bandas, segundas jugadas, duelos 1v1, espacio a la espalda de laterales desdoblados, o desajustes si el informe proviene de otro sistema).",
+  "ajustesMister": "Instrucciones y consignas específicas de ajuste para el partido contra ${ctx.systemRival} adaptadas a las características de la plantilla asignada y las alertas de informes validados.",
   "transicionAtaqueDefensa": "Desarrollo completo de la transición tras pérdida: ventana de 6-8s condicionada (cercanía, coberturas, carril interior), abandono de acoso y repliegue al bloque compacto en 1-4-2-3-1 adaptativo, y falta táctica si son superados fácil.",
   "transicionDefensaAtaque": "Desarrollo completo de la transición tras recuperación: criterio de contraataque (superioridad/igualdad) vs mantener (inferioridad), y planes de ataque directo o cambio de carril según zonas de robo (iniciación, creación, finalización).",
+  "fuentesUtilizadas": ["Modelo Indautxu DH (1-4-2-3-1)", "Matchup vs ${ctx.systemRival}", ...${JSON.stringify(ctx.reportSourcesLabels || [])}],
+  "principiosIndautxuAplicados": [
+    "Innegociable: Base estructural 1-4-2-3-1 adaptativa",
+    "Innegociable: Presión 6-8s condicionada a carril interior cerrado y coberturas",
+    "Innegociable: Repliegue compacto en bloque de máx 40m en 1-4-4-2 o 1-4-2-3-1",
+    "Preferente: Salida en 4v3 con 3º hombre y fijación para dividir",
+    "Roles Oficiales: Tareas e instrucciones individuales para los 11 puestos"
+  ],
   "instruccionesPorPuesto": {
     "portero": "Instrucciones detalladas de fase ofensiva, defensiva, transiciones y consigna clave para el Portero.",
-    "centralIzquierdo": "Instrucciones detalladas de fase ofensiva, defensiva, transiciones y consigna clave para el Central Izquierdo.",
-    "centralDerecho": "Instrucciones detalladas de fase ofensiva, defensiva, transiciones y consigna clave para el Central Derecho.",
-    "lateralIzquierdo": "Instrucciones detalladas de fase ofensiva, defensiva, transiciones y consigna clave para el Lateral Izquierdo.",
+    "centralIzquierdo": "Instrucciones detalladas de fase ofensiva, defensiva, transiciones, vigilar amenazas rivales en su zona y consigna clave para el Central Izquierdo.",
+    "centralDerecho": "Instrucciones detalladas de fase ofensiva, defensiva, transiciones, vigilar amenazas rivales en su zona y consigna clave para el Central Derecho.",
+    "lateralIzquierdo": "Instrucciones detalladas de fase ofensiva, defensiva (ej. si su extremo derecho es peligroso, indicarlo explícitamente), transiciones y consigna clave para el Lateral Izquierdo.",
     "lateralDerecho": "Instrucciones detalladas de fase ofensiva, defensiva, transiciones y consigna clave para el Lateral Derecho.",
-    "pivoteDefensivo": "Instrucciones detalladas de fase ofensiva, defensiva, transiciones y consigna clave para el Pivote Defensivo (Contención).",
-    "pivoteOfensivo": "Instrucciones detalladas de fase ofensiva, defensiva, transiciones y consigna clave para el Pivote Ofensivo (Creador).",
-    "mediapunta": "Instrucciones detalladas de fase ofensiva, defensiva, transiciones y consigna clave para el Mediapunta.",
-    "extremoIzquierdo": "Instrucciones detalladas de fase ofensiva, defensiva, transiciones y consigna clave para el Extremo Izquierdo.",
+    "pivoteDefensivo": "Instrucciones detalladas de fase ofensiva, defensiva, coberturas a banda y carril interior, transiciones y consigna clave para el Pivote Defensivo (Contención).",
+    "pivoteOfensivo": "Instrucciones detalladas de fase ofensiva, defensiva, apoyo en salida y llegadas, transiciones y consigna clave para el Pivote Ofensivo (Creador).",
+    "mediapunta": "Instrucciones detalladas de fase ofensiva, defensiva (cerrar al mediocentro rival), transiciones y consigna clave para el Mediapunta.",
+    "extremoIzquierdo": "Instrucciones detalladas de fase ofensiva, defensiva (retorno para ayuda al lateral), transiciones y consigna clave para el Extremo Izquierdo.",
     "extremoDerecho": "Instrucciones detalladas de fase ofensiva, defensiva, transiciones y consigna clave para el Extremo Derecho.",
-    "delantero": "Instrucciones detalladas de fase ofensiva, defensiva, transiciones y consigna clave para el Delantero Centro."
+    "delantero": "Instrucciones detalladas de fase ofensiva, defensiva (orientar salida de centrales), transiciones y consigna clave para el Delantero Centro."
   }
 }
-
-REQUISITOS DE PROFUNDIDAD Y VALIDACIÓN PARA EL MATCHUP (1-4-2-3-1 vs ${ctx.systemRival}):
-1. Explicar cómo progresar contra su estructura defensiva.
-2. Definir el papel del mediapunta entre sus líneas de medios y defensiva.
-3. Explicar la relación entre nuestros laterales y extremos.
-4. Cómo fijar a sus atacantes durante la salida de balón.
-5. Definir con claridad quién salta sobre sus centrales y laterales.
-6. Coberturas del doble pivote.
-7. Riesgos en bandas y segundas jugadas.
-8. Presión tras pérdida condicionada y repliegue si somos superados.
-9. Instrucciones específicas para los ONCE ROLES individuales. Ningún campo ni rol puede quedar vacío o ser genérico.
 `,
 
   freeChat: (ctx: PromptContext, message?: string) => `

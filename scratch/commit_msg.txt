@@ -1,0 +1,8 @@
+fix(escudos): corregir escudo Cultural Leonesa y aumentar tamano en Partido Semana
+
+- Escudo Cultural Leonesa descargado localmente en /public/logos/cultural_leonesa.png
+  (la URL de Wikipedia devolvia 403 Forbidden en el navegador)
+- BD actualizada: clubs.escudo_url apunta a ruta local /logos/cultural_leonesa.png
+- Sin excepciones hardcodeadas: usa exactamente la misma fuente (tabla clubs) que el resto de equipos
+- Tamano escudos widget Partido de la Semana: h-9 -> h-11 (+22% aprox.)
+- Logica partido semana ya era correcta: muestra rival automatico desde tabla matches

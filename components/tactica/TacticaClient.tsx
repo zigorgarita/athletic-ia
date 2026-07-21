@@ -37,6 +37,9 @@ import { BriefingView } from './roles/BriefingView';
 // Subblock 4D Components (Biblioteca de Conocimiento + Asistente IA)
 import { KnowledgePanel } from './knowledge/KnowledgePanel';
 import { TacticalAIPanel } from './ai/TacticalAIPanel';
+import { MatchReportSelector } from './MatchReportSelector';
+import { useTacticalReportSelections } from '@/hooks/useTacticalReportSelections';
+import { useClubDocuments } from '@/hooks/useClubDocuments';
 
 const POSITION_ROLES = ['POR', 'LD', 'LI', 'DFC', 'MCD', 'MC', 'MCO', 'ED', 'EI', 'DC'];
 
@@ -90,12 +93,6 @@ export function TacticaClient() {
   const [isAnalyzingModeloJuego, setIsAnalyzingModeloJuego] = useState<boolean>(false);
   const { analyzeGameModel } = useTacticalAI();
 
-  // Subblock 4C Role Cards states
-  const [roleCards, setRoleCards] = useState<TacticalRoleCard[]>([]);
-  const [selectedRoleNode, setSelectedRoleNode] = useState<PositionNode | null>(null);
-  const [isRoleDrawerOpen, setIsRoleDrawerOpen] = useState(false);
-  const [isSavingRoleCard, setIsSavingRoleCard] = useState(false);
-
   // Database Load states
   const [savedLineups, setSavedLineups] = useState<TacticalLineup[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
@@ -104,6 +101,24 @@ export function TacticaClient() {
   const [isPdfExporting, setIsPdfExporting] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Integración de Informes de Scouting y Observaciones Validadas
+  const currentMatch = matches.find(m => m.id === selectedMatchId);
+  const rivalClubId = currentMatch?.rival_id || null;
+
+  const { documents: availableRivalDocs } = useClubDocuments(rivalClubId || undefined, undefined);
+  const {
+    selections: reportSelections,
+    approvedObservations: approvedReportObservations,
+    reportSourcesLabels: activeSourcesLabels,
+    toggleDocumentSelection
+  } = useTacticalReportSelections(currentLineupId, rivalClubId, undefined);
+
+  // Subblock 4C Role Cards states
+  const [roleCards, setRoleCards] = useState<TacticalRoleCard[]>([]);
+  const [selectedRoleNode, setSelectedRoleNode] = useState<PositionNode | null>(null);
+  const [isRoleDrawerOpen, setIsRoleDrawerOpen] = useState(false);
+  const [isSavingRoleCard, setIsSavingRoleCard] = useState(false);
 
   // Multi-lineup selector modal: shown when a match has >1 saved pizarra
   const [matchLineupsModal, setMatchLineupsModal] = useState<TacticalLineup[] | null>(null);
@@ -431,7 +446,9 @@ export function TacticaClient() {
         desventajas,
         zonaConflicto,
         dueloClave,
-        tareasLineas
+        tareasLineas,
+        validatedRivalInsights: approvedReportObservations,
+        reportSourcesLabels: activeSourcesLabels,
       };
 
       const res = await analyzeGameModel(ctx);
@@ -540,6 +557,8 @@ export function TacticaClient() {
       transicionAtaqueDefensa: cleanField(parsed.transicionAtaqueDefensa),
       transicionDefensaAtaque: cleanField(parsed.transicionDefensaAtaque),
       instruccionesPorPuesto: cleanedRoles,
+      fuentesUtilizadas: Array.isArray(parsed.fuentesUtilizadas) ? parsed.fuentesUtilizadas.map(cleanField) : [],
+      principiosIndautxuAplicados: Array.isArray(parsed.principiosIndautxuAplicados) ? parsed.principiosIndautxuAplicados.map(cleanField) : [],
       ataque_posicional: cleanField(parsed.planAtaque),
       defensa_posicional: cleanField(parsed.planDefensivo),
       transicion_perdida: cleanField(parsed.transicionAtaqueDefensa),
@@ -1256,6 +1275,16 @@ export function TacticaClient() {
         onTareasLineasChange={setTareasLineas}
         onAnalyze={handleAnalyzeMatch}
         isAnalyzing={isAnalyzing}
+      />
+
+      {/* Selector de Informes de Scouting Validados para la Pizarra */}
+      <MatchReportSelector
+        documents={availableRivalDocs}
+        selections={reportSelections}
+        selectedRivalSystem={rivalFormation}
+        onToggleSelection={toggleDocumentSelection}
+        approvedCount={approvedReportObservations.length}
+        sourcesLabels={activeSourcesLabels}
       />
 
       {/* Nuevo Análisis basado en el Modelo de Juego del Indautxu */}

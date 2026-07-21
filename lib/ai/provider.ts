@@ -7,9 +7,15 @@ export interface AIProviderConfig {
   temperature?: number;
 }
 
+export interface AIMediaPart {
+  mimeType: string;
+  data: string; // base64 string
+}
+
 export interface AIMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
+  mediaParts?: AIMediaPart[];
 }
 
 export interface AIResponse {

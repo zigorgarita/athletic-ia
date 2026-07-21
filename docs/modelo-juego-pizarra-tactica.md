@@ -143,3 +143,71 @@ El modelo de juego no se procesa como un PDF dinámico e impredecible en tiempo 
 | **Componente Visual** | `components/tactica/analysis/GameModelAnalysisPanel.tsx` |
 | **Tipos y Persistencia** | `types/index.ts`, `components/tactica/TacticaClient.tsx`, `app/api/tactical-ai/route.ts`, `hooks/useTacticalAI.ts` |
 | **Pruebas de Validación** | `scratch/test_game_model_matchups.js` |
+| **Extractor de Informes** | `app/api/rivales/analyze-document/route.ts` |
+| **Revisión Humana** | `components/rivales/modals/ReviewExtractedReportModal.tsx` |
+| **Tabla Observaciones** | `club_report_observations` (Supabase) |
+
+---
+
+## 9. Integración Flexible de Informes de Scouting del Rival
+
+### A. Jerarquía Inviolable de Prioridades Definitiva
+1. 🥇 **Prioridad 1 (Máxima)**: Instrucciones directas del Entrenador.
+2. 🥈 **Prioridad 2**: Doctrina del Modelo de Juego Indautxu DH 1-4-2-3-1 (`lib/ai/gameModel.ts`).
+3. 🥉 **Prioridad 3**: Contexto Actual del Partido (Nuestro sistema, sistema rival seleccionado en la Pizarra, alineación, posiciones y roles).
+4. 🏅 **Prioridad 4**: Información Validada de los Informes Seleccionados para el Partido (`status = 'aprobado'`).
+5. 🎖️ **Prioridad 5**: Conocimiento Táctico General de la IA (únicamente como complemento sintáctico).
+
+> *Ejemplo*: Si un informe indica sistema 1-4-3-3 pero el entrenador selecciona el 1-4-4-2 para el partido, la IA analiza sobre el **1-4-4-2 elegido** y advierte que el informe contiene datos observados bajo un dibujo diferente. El informe jamás puede cambiar el sistema rival seleccionado para el partido.
+
+### B. Esquema DDL Definitivo y Relaciones en Supabase
+
+#### 1. Tabla de Observaciones (`club_report_observations`)
+```sql
+CREATE TABLE IF NOT EXISTS club_report_observations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  document_id UUID REFERENCES club_documents(id) ON DELETE SET NULL,
+  club_id UUID REFERENCES clubs(id) ON DELETE CASCADE,
+  club_season_id UUID REFERENCES club_seasons(id) ON DELETE CASCADE,
+  document_name TEXT NOT NULL,
+  document_date DATE,
+  rival_name TEXT,
+  season TEXT,
+  category TEXT NOT NULL,
+  content TEXT NOT NULL,
+  source_type TEXT NOT NULL CHECK (source_type IN ('texto', 'imagen', 'tabla', 'nota')),
+  page INTEGER,
+  original_evidence TEXT,
+  confidence TEXT NOT NULL CHECK (confidence IN ('alta', 'media', 'baja')),
+  status TEXT NOT NULL DEFAULT 'pendiente' CHECK (status IN ('pendiente', 'aprobado', 'rechazado')),
+  priority TEXT NOT NULL DEFAULT 'normal' CHECK (priority IN ('baja', 'normal', 'alta', 'clave')),
+  is_analyst_proposal BOOLEAN DEFAULT false,
+  observed_match_id UUID REFERENCES scouting_matches(id) ON DELETE SET NULL,
+  observation_date DATE,
+  approved_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  approved_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+```
+
+#### 2. Tabla Relacional de Selección de Informes por Pizarra (`tactical_lineup_report_selections`)
+```sql
+CREATE TABLE IF NOT EXISTS tactical_lineup_report_selections (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tactical_lineup_id UUID NOT NULL REFERENCES tactical_lineups(id) ON DELETE CASCADE,
+  report_id UUID NOT NULL REFERENCES club_reports(id) ON DELETE CASCADE,
+  selected BOOLEAN NOT NULL DEFAULT true,
+  selected_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  selected_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE (tactical_lineup_id, report_id)
+);
+```
+
+### C. Almacenamiento de Versiones y Regla de Filtrado
+1. `extraction_original`: RAW e inmutable entregado por la IA en la primera lectura (almacenado en `club_documents.extraccion_json`).
+2. `version_revisada`: Ediciones realizadas por el cuerpo técnico en el modal de revisión.
+3. `club_report_observations`: Observaciones individuales aprobadas.
+4. **Regla de Filtrado en Pizarra**: `analyzeGameModel` lee **exclusivamente** observaciones con `status = 'aprobado'` de los informes vinculados con `selected = true` en `tactical_lineup_report_selections`. Nunca se inyectan datos RAW ni no aprobados.
+
+

@@ -214,6 +214,7 @@ export interface Match {
   id: string;
   jornada: number;
   rival: string;
+  rival_id?: string | null;
   fecha: string;
   es_local: boolean;
   goles_favor: number | null;
@@ -338,6 +339,97 @@ export interface GameModelRoleInstructions {
   delantero: string;
 }
 
+export interface Observation {
+  id: string;
+  contenido: string;
+  fuente: 'texto' | 'imagen' | 'tabla' | 'nota';
+  pagina?: number;
+  evidenciaOriginal?: string;
+  confianza: 'alta' | 'media' | 'baja';
+  estado: 'pendiente' | 'aprobado' | 'rechazado';
+  prioridad?: 'baja' | 'normal' | 'alta' | 'clave';
+  categoria: string;
+  fechaObservacion?: string;
+  partidoObservado?: string;
+  esPropuestaAnalista?: boolean;
+  rivalPlayerName?: string;
+  rivalPlayerDorsal?: string;
+  rivalPlayerPosition?: string;
+  rivalPlayerThreatLevel?: 'bajo' | 'medio' | 'alto' | 'critico';
+  documentId?: string;
+  documentName?: string;
+  documentDate?: string;
+}
+
+export interface RivalPlayerThreat {
+  nombre?: string;
+  dorsal?: string;
+  posicionHabitual?: string;
+  nivelPeligro: 'bajo' | 'medio' | 'alto' | 'critico';
+  fortalezas: string[];
+  movimientosFrecuentes?: string;
+  observaciones: string;
+  estadoAlineacion?: 'confirmado' | 'probable' | 'no_confirmado' | 'no_participa';
+  nuestroPuestoAfectadoDirecto?: string; // ej. 'lateralIzquierdo' para extremo derecho rival
+  nuestrosPuestosCobertura?: string[]; // ej. ['extremoIzquierdo', 'pivoteDefensivo', 'centralIzquierdo']
+  consignaEspecifica?: string;
+}
+
+export interface FlexibleReportExtraction {
+  metadatos: {
+    tipoInformeDetectado: string[];
+    temporada?: string;
+    fechaInforme?: string;
+    autorDocumento?: string;
+    partidosObservados?: string[];
+    seccionesDetectadas: string[];
+    seccionesNoEncontradas: string[];
+  };
+  observacionesRival: Record<string, Observation[]>;
+  propuestasDelAnalista?: Record<string, Observation[]>;
+  amenazasJugadores?: RivalPlayerThreat[];
+}
+
+export interface ClubReportObservation {
+  id: string;
+  document_id: string | null;
+  club_id: string;
+  club_season_id: string;
+  document_name: string;
+  document_date: string | null;
+  rival_name: string | null;
+  season: string | null;
+  category: string;
+  content: string;
+  source_type: 'texto' | 'imagen' | 'tabla' | 'nota';
+  page: number | null;
+  original_evidence: string | null;
+  confidence: 'alta' | 'media' | 'baja';
+  status: 'pendiente' | 'aprobado' | 'rechazado';
+  priority: 'baja' | 'normal' | 'alta' | 'clave';
+  is_analyst_proposal: boolean;
+  rival_player_name?: string | null;
+  rival_player_dorsal?: string | null;
+  rival_player_position?: string | null;
+  rival_player_threat_level?: 'bajo' | 'medio' | 'alto' | 'critico' | null;
+  observed_match_id?: string | null;
+  observation_date?: string | null;
+  approved_by?: string | null;
+  approved_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TacticalLineupReportSelection {
+  id: string;
+  tactical_lineup_id: string;
+  report_id?: string | null;
+  document_id?: string | null;
+  selected: boolean;
+  selected_by?: string | null;
+  selected_at: string;
+}
+
 export interface GameModelAnalysis {
   planAtaque?: string;
   planDefensivo?: string;
@@ -346,6 +438,10 @@ export interface GameModelAnalysis {
   transicionAtaqueDefensa?: string;
   transicionDefensaAtaque?: string;
   instruccionesPorPuesto?: GameModelRoleInstructions;
+  fuentesUtilizadas?: string[];
+  principiosIndautxuAplicados?: string[];
+  amenazasJugadoresRival?: RivalPlayerThreat[];
+  avisoIncertidumbre?: string;
 
   // Aliases de compatibilidad
   ataque_posicional?: string;
@@ -858,6 +954,10 @@ export interface TacticalAIContext {
   zonaConflicto: string;
   dueloClave: string;
   tareasLineas: string;
+  validatedRivalInsights?: Observation[];
+  rivalPlayerThreats?: RivalPlayerThreat[];
+  selectedReportIds?: string[];
+  reportSourcesLabels?: string[];
 }
 
 export interface PlayerFine {

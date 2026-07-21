@@ -5,7 +5,9 @@ import { useClubDocuments, ClubDocument } from '@/hooks/useClubDocuments';
 import { useEditMode } from '@/context/EditModeContext';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
-import { FolderOpen, Plus, Trash2, Search, ExternalLink, Calendar, File, FileText, Image as ImageIcon, Link as LinkIcon } from 'lucide-react';
+import { ReviewExtractedReportModal } from '../modals/ReviewExtractedReportModal';
+import { FlexibleReportExtraction } from '@/types';
+import { FolderOpen, Plus, Trash2, Search, ExternalLink, Calendar, File, FileText, Image as ImageIcon, Link as LinkIcon, Sparkles } from 'lucide-react';
 
 interface DocumentsTabProps {
   club: Club | null;
@@ -15,13 +17,63 @@ interface DocumentsTabProps {
 const TIPOS_DOCUMENTO = ['PDF', 'Informe', 'PowerPoint', 'Word', 'Excel', 'Imagen', 'Enlace'];
 
 export function DocumentsTab({ club, season }: DocumentsTabProps) {
-  const { documents, loading, saveDocument, deleteDocument } = useClubDocuments(club?.id, season?.id);
+  const { documents, loading, saveDocument, deleteDocument, refetch } = useClubDocuments(club?.id, season?.id);
   const { isEditMode } = useEditMode();
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDoc, setEditingDoc] = useState<Partial<ClubDocument> | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Estados para Análisis e Ingestión con IA
+  const [analyzingDocId, setAnalyzingDocId] = useState<string | null>(null);
+  const [activeExtraction, setActiveExtraction] = useState<FlexibleReportExtraction | null>(null);
+  const [activeDocForReview, setActiveDocForReview] = useState<ClubDocument | null>(null);
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+
+  const handleAnalyzeDocument = async (doc: ClubDocument) => {
+    try {
+      setAnalyzingDocId(doc.id);
+
+      // Si ya fue analizado previamente y tiene la extracción original guardada
+      if (doc.extraccion_json) {
+        setActiveExtraction(doc.extraccion_json as FlexibleReportExtraction);
+        setActiveDocForReview(doc);
+        setIsReviewModalOpen(true);
+        setAnalyzingDocId(null);
+        return;
+      }
+
+      // Llamar al endpoint genérico multimodal /api/rivales/analyze-document
+      const res = await fetch('/api/rivales/analyze-document', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          documentId: doc.id,
+          clubId: club?.id,
+          clubSeasonId: season?.id,
+          rivalName: club?.nombre,
+          season: season?.temporada,
+          fileUrl: doc.url,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Error al analizar documento con IA.');
+      }
+
+      setActiveExtraction(data.extraction);
+      setActiveDocForReview(doc);
+      setIsReviewModalOpen(true);
+      await refetch();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      alert(`Error al procesar informe táctico: ${msg}`);
+    } finally {
+      setAnalyzingDocId(null);
+    }
+  };
 
   const filteredDocs = documents.filter(d => {
     if (!searchTerm) return true;
@@ -179,6 +231,32 @@ export function DocumentsTab({ club, season }: DocumentsTabProps) {
                   </p>
                 )}
               </div>
+
+              {/* Acciones de Análisis IA */}
+              <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between">
+                <span className="text-[10px] font-semibold text-slate-500 flex items-center gap-1">
+                  {doc.extraccion_json ? (
+                    <span className="text-emerald-400 font-bold flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      Analizado & Validado
+                    </span>
+                  ) : (
+                    <span>Sin analizar</span>
+                  )}
+                </span>
+
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleAnalyzeDocument(doc);
+                  }}
+                  disabled={analyzingDocId === doc.id}
+                  className="px-3 py-1.5 rounded-xl bg-[#CC0E21]/10 hover:bg-[#CC0E21] text-[#CC0E21] hover:text-white border border-[#CC0E21]/30 text-xs font-bold transition-all flex items-center gap-1.5"
+                >
+                  <Sparkles className={`h-3.5 w-3.5 ${analyzingDocId === doc.id ? 'animate-spin' : ''}`} />
+                  {analyzingDocId === doc.id ? 'Analizando...' : doc.extraccion_json ? 'Revisar Ingestión' : 'Analizar informe con IA'}
+                </button>
+              </div>
             </div>
           ))}
         </div>
@@ -224,6 +302,19 @@ export function DocumentsTab({ club, season }: DocumentsTabProps) {
           </form>
         )}
       </Modal>
+
+      {/* Modal de Revisión Humana Obligatoria */}
+      <ReviewExtractedReportModal
+        isOpen={isReviewModalOpen}
+        onClose={() => setIsReviewModalOpen(false)}
+        extraction={activeExtraction}
+        documentId={activeDocForReview?.id}
+        documentName={activeDocForReview?.nombre}
+        clubId={club?.id}
+        clubSeasonId={season?.id}
+        rivalName={club?.nombre}
+        season={season?.temporada}
+      />
 
     </div>
   );
