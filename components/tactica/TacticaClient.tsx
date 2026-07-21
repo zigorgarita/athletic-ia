@@ -456,9 +456,10 @@ export function TacticaClient() {
         setAnalisisModeloJuego(updated);
         setSuccessMsg('Análisis según el Modelo de Juego Indautxu generado con éxito.');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error al analizar según Modelo de Juego:', err);
-      setErrorMsg('Error al analizar modelo de juego: ' + (err.message || String(err)));
+      const msg = err instanceof Error ? err.message : String(err);
+      setErrorMsg('Error al analizar modelo de juego: ' + msg);
     } finally {
       setIsAnalyzingModeloJuego(false);
     }
