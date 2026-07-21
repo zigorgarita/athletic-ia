@@ -63,6 +63,26 @@ export function DocumentsTab({ club, season }: DocumentsTabProps) {
         throw new Error(data.error || 'Error al analizar documento con IA.');
       }
 
+      const extraction = data.extraction;
+      let totalObs = 0;
+      if (extraction?.observacionesRival) {
+        Object.values(extraction.observacionesRival).forEach((arr: unknown) => {
+          if (Array.isArray(arr)) totalObs += arr.length;
+        });
+      }
+      if (extraction?.propuestasDelAnalista) {
+        Object.values(extraction.propuestasDelAnalista).forEach((arr: unknown) => {
+          if (Array.isArray(arr)) totalObs += arr.length;
+        });
+      }
+      if (Array.isArray(extraction?.amenazasJugadores)) {
+        totalObs += extraction.amenazasJugadores.length;
+      }
+
+      if (totalObs === 0) {
+        throw new Error('La IA no ha podido extraer observaciones tácticas del documento. Comprueba que el archivo contiene información deportiva comprensible y reinténtalo.');
+      }
+
       setActiveExtraction(data.extraction);
       setActiveDocForReview(doc);
       setIsReviewModalOpen(true);

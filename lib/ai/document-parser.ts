@@ -1,3 +1,5 @@
+import { FlexibleReportExtraction, Observation, RivalPlayerThreat } from '@/types';
+
 const ALLOWED_MIME_TYPES = [
   'application/pdf',
   'image/png',
@@ -134,4 +136,155 @@ export function validateDocumentBuffer(buffer: Buffer, requestedMime?: string): 
   }
 
   return { mimeType: requestedMime };
+}
+
+/**
+ * Normaliza y sanea de forma flexible la estructura JSON devuelta por la IA.
+ * Garantiza que estado = 'pendiente' para toda extracción RAW.
+ */
+export function normalizeExtractionJson(rawJson: Record<string, unknown>): {
+  extraction: FlexibleReportExtraction;
+  totalObs: number;
+  countRival: number;
+  countAnalyst: number;
+  countThreats: number;
+} {
+  if (!rawJson || typeof rawJson !== 'object') {
+    return {
+      extraction: {
+        metadatos: { tituloDocumento: 'Informe' },
+        observacionesRival: {},
+        propuestasDelAnalista: {},
+        amenazasJugadores: [],
+      },
+      totalObs: 0,
+      countRival: 0,
+      countAnalyst: 0,
+      countThreats: 0,
+    };
+  }
+
+  const metadatos = (rawJson.metadatos || rawJson.metadata || {}) as Record<string, unknown>;
+
+  // Helper de saneamiento de cada observación (estado SIEMPRE 'pendiente')
+  const sanitizeObsItem = (item: Record<string, unknown>, defaultCat: string, isAnalyst: boolean): Observation => {
+    return {
+      ...(item as unknown as Observation),
+      categoria: (item.categoria as string) || defaultCat,
+      contenido: (item.contenido as string) || (item.observacion as string) || (item.datoLiteral as string) || '',
+      deduccionIA: (item.deduccionIA as string) || (item.deduccion as string) || (item.analisisIA as string) || undefined,
+      propuestaIndautxu: (item.propuestaIndautxu as string) || (item.propuesta_indautxu as string) || undefined,
+      fuente: ((item.fuente as string) || 'texto') as Observation['fuente'],
+      pagina: (item.pagina as number) || 1,
+      evidenciaOriginal: (item.evidenciaOriginal as string) || (item.evidencia as string) || undefined,
+      evidencias: item.evidencias as Observation['evidencias'],
+      confianza: ((item.confianza as string) || 'alta') as Observation['confianza'],
+      estado: 'pendiente', // OBLIGATORIO: Ningún dato llega aprobado automáticamente
+      prioridad: ((item.prioridad as string) || 'normal') as Observation['prioridad'],
+      esPropuestaAnalista: isAnalyst,
+    };
+  };
+
+  // 1. Extraer Observaciones del Rival
+  const rawRival =
+    rawJson.observacionesRival ||
+    rawJson.observaciones_rival ||
+    rawJson.hechosRival ||
+    rawJson.hechos_rival ||
+    rawJson.observaciones ||
+    rawJson.observaciones_del_rival;
+
+  const observacionesRival: Record<string, Observation[]> = {};
+  let countRival = 0;
+
+  if (rawRival && typeof rawRival === 'object' && !Array.isArray(rawRival)) {
+    Object.entries(rawRival as Record<string, unknown>).forEach(([cat, items]) => {
+      if (Array.isArray(items)) {
+        observacionesRival[cat] = items.map(item => sanitizeObsItem(item as Record<string, unknown>, cat, false));
+        countRival += items.length;
+      }
+    });
+  } else if (Array.isArray(rawRival)) {
+    rawRival.forEach(item => {
+      const rec = item as Record<string, unknown>;
+      const cat = (rec.categoria as string) || 'salidaBalon';
+      if (!observacionesRival[cat]) observacionesRival[cat] = [];
+      observacionesRival[cat].push(sanitizeObsItem(rec, cat, false));
+      countRival++;
+    });
+  }
+
+  // 2. Extraer Propuestas del Analista
+  const rawAnalyst =
+    rawJson.propuestasDelAnalista ||
+    rawJson.propuestas_del_analista ||
+    rawJson.propuestasAnalista ||
+    rawJson.propuestas_analista ||
+    rawJson.recomendaciones ||
+    rawJson.recomendacionesAnalista;
+
+  const propuestasDelAnalista: Record<string, Observation[]> = {};
+  let countAnalyst = 0;
+
+  if (rawAnalyst && typeof rawAnalyst === 'object' && !Array.isArray(rawAnalyst)) {
+    Object.entries(rawAnalyst as Record<string, unknown>).forEach(([cat, items]) => {
+      if (Array.isArray(items)) {
+        propuestasDelAnalista[cat] = items.map(item => sanitizeObsItem(item as Record<string, unknown>, cat, true));
+        countAnalyst += items.length;
+      }
+    });
+  } else if (Array.isArray(rawAnalyst)) {
+    rawAnalyst.forEach(item => {
+      const rec = item as Record<string, unknown>;
+      const cat = (rec.categoria as string) || 'planAtaque';
+      if (!propuestasDelAnalista[cat]) propuestasDelAnalista[cat] = [];
+      propuestasDelAnalista[cat].push(sanitizeObsItem(rec, cat, true));
+      countAnalyst++;
+    });
+  }
+
+  // 3. Extraer Amenazas de Jugadores
+  const rawThreats =
+    rawJson.amenazasJugadores ||
+    rawJson.amenazas_jugadores ||
+    rawJson.jugadoresPeligrosos ||
+    rawJson.amenazas_individuales ||
+    rawJson.amenazas ||
+    rawJson.jugadoresPeligros ||
+    rawJson.jugadoresDestacados;
+
+  let rawThreatList: Record<string, unknown>[] = [];
+  if (Array.isArray(rawThreats)) {
+    rawThreatList = rawThreats as Record<string, unknown>[];
+  } else if (rawThreats && typeof rawThreats === 'object') {
+    Object.values(rawThreats as Record<string, unknown>).forEach(val => {
+      if (Array.isArray(val)) rawThreatList.push(...(val as Record<string, unknown>[]));
+      else if (val && typeof val === 'object') rawThreatList.push(val as Record<string, unknown>);
+    });
+  }
+
+  const amenazasJugadores: RivalPlayerThreat[] = rawThreatList.map((t) => ({
+    ...(t as unknown as RivalPlayerThreat),
+    observaciones: (t.observaciones as string) || (t.contenido as string) || (t.datoLiteral as string) || '',
+    deduccionIA: (t.deduccionIA as string) || (t.deduccion as string) || undefined,
+    propuestaIndautxu: (t.propuestaIndautxu as string) || (t.consignaEspecifica as string) || undefined,
+    nivelPeligro: ((t.nivelPeligro as string) || 'alto') as RivalPlayerThreat['nivelPeligro'],
+    pagina: (t.pagina as number) || 11,
+  }));
+
+  const countThreats = amenazasJugadores.length;
+  const totalObs = countRival + countAnalyst + countThreats;
+
+  return {
+    extraction: {
+      metadatos: metadatos as FlexibleReportExtraction['metadatos'],
+      observacionesRival,
+      propuestasDelAnalista,
+      amenazasJugadores,
+    },
+    totalObs,
+    countRival,
+    countAnalyst,
+    countThreats,
+  };
 }

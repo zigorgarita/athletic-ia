@@ -339,12 +339,22 @@ export interface GameModelRoleInstructions {
   delantero: string;
 }
 
+export interface ObservationEvidence {
+  pagina: number;
+  fuente: 'texto' | 'imagen' | 'tabla' | 'nota';
+  evidenciaOriginal: string;
+  confianza: 'alta' | 'media' | 'baja';
+}
+
 export interface Observation {
   id: string;
-  contenido: string;
+  contenido: string; // Capa A: Dato extraído literalmente del informe
+  deduccionIA?: string; // Capa B: Deducción analítica de la IA
+  propuestaIndautxu?: string; // Capa C: Propuesta adaptada al Modelo Indautxu
   fuente: 'texto' | 'imagen' | 'tabla' | 'nota';
   pagina?: number;
   evidenciaOriginal?: string;
+  evidencias?: ObservationEvidence[]; // Soporte multi-evidencia
   confianza: 'alta' | 'media' | 'baja';
   estado: 'pendiente' | 'aprobado' | 'rechazado';
   prioridad?: 'baja' | 'normal' | 'alta' | 'clave';
@@ -362,28 +372,40 @@ export interface Observation {
 }
 
 export interface RivalPlayerThreat {
+  id?: string;
   nombre?: string;
   dorsal?: string;
   posicionHabitual?: string;
   nivelPeligro: 'bajo' | 'medio' | 'alto' | 'critico';
   fortalezas: string[];
   movimientosFrecuentes?: string;
-  observaciones: string;
+  observaciones: string; // Capa A: Dato literal extraído del documento
+  deduccionIA?: string; // Capa B: Deducción analítica de la IA
+  propuestaIndautxu?: string; // Capa C: Consigna adaptada al Modelo Indautxu
+  pagina?: number;
+  evidenciaOriginal?: string;
+  evidencias?: ObservationEvidence[]; // Soporte multi-evidencia
   estadoAlineacion?: 'confirmado' | 'probable' | 'no_confirmado' | 'no_participa';
-  nuestroPuestoAfectadoDirecto?: string; // ej. 'lateralIzquierdo' para extremo derecho rival
-  nuestrosPuestosCobertura?: string[]; // ej. ['extremoIzquierdo', 'pivoteDefensivo', 'centralIzquierdo']
+  nuestroPuestoAfectadoDirecto?: string;
+  nuestrosPuestosCobertura?: string[];
   consignaEspecifica?: string;
 }
 
 export interface FlexibleReportExtraction {
   metadatos: {
-    tipoInformeDetectado: string[];
+    tipoInformeDetectado?: string[];
     temporada?: string;
     fechaInforme?: string;
     autorDocumento?: string;
+    autor?: string;
+    tituloDocumento?: string;
+    rivalAnalizado?: string;
+    sistemaRivalObservado?: string;
     partidosObservados?: string[];
-    seccionesDetectadas: string[];
-    seccionesNoEncontradas: string[];
+    seccionesDetectadas?: string[];
+    seccionesNoEncontradas?: string[];
+    resumenEjecutivo?: string;
+    [key: string]: any;
   };
   observacionesRival: Record<string, Observation[]>;
   propuestasDelAnalista?: Record<string, Observation[]>;
