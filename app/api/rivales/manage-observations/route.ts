@@ -1,13 +1,12 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseServerClient } from '@/lib/supabase-server';
+import { verifyServerAuthorization } from '@/lib/auth-server';
 
 export async function POST(req: Request) {
   try {
-    const passkeyHeader = req.headers.get('x-coach-staff-passkey') || req.headers.get('x-staff-passkey');
-    const validPasskey = process.env.COACH_STAFF_PASSKEY;
-
-    if (!validPasskey || passkeyHeader !== validPasskey) {
-      return NextResponse.json({ error: 'Acceso no autorizado a operaciones del cuerpo técnico.' }, { status: 401 });
+    const authCheck = await verifyServerAuthorization(req);
+    if (!authCheck.authorized) {
+      return NextResponse.json({ error: authCheck.error || 'Acceso no autorizado a operaciones del cuerpo técnico.' }, { status: 401 });
     }
 
     const body = await req.json();
@@ -38,23 +37,49 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'Faltan parámetros requeridos (lineupId, documentId).' }, { status: 400 });
       }
 
-      const { data, error } = await supabaseServer
+      // 1. Comprobar si existe la combinación tactical_lineup_id + document_id
+      const { data: existing, error: findErr } = await supabaseServer
         .from('tactical_lineup_report_selections')
-        .upsert(
-          {
+        .select('id')
+        .eq('tactical_lineup_id', lineupId)
+        .eq('document_id', documentId)
+        .maybeSingle();
+
+      if (findErr) throw findErr;
+
+      let resData;
+      if (existing && existing.id) {
+        // 2. Hacer update si existe
+        const { data: updateData, error: updateErr } = await supabaseServer
+          .from('tactical_lineup_report_selections')
+          .update({
+            selected,
+            selected_via: 'staff_passkey_server',
+            selected_at: new Date().toISOString(),
+          })
+          .eq('id', existing.id)
+          .select('id');
+
+        if (updateErr) throw updateErr;
+        resData = updateData;
+      } else {
+        // 3. Hacer insert si no existe
+        const { data: insertData, error: insertErr } = await supabaseServer
+          .from('tactical_lineup_report_selections')
+          .insert({
             tactical_lineup_id: lineupId,
             document_id: documentId,
             selected,
             selected_via: 'staff_passkey_server',
             selected_at: new Date().toISOString(),
-          },
-          { onConflict: 'tactical_lineup_id,document_id' }
-        )
-        .select('id');
+          })
+          .select('id');
 
-      if (error) throw error;
+        if (insertErr) throw insertErr;
+        resData = insertData;
+      }
 
-      return NextResponse.json({ success: true, data });
+      return NextResponse.json({ success: true, data: resData });
     }
 
     return NextResponse.json({ error: 'Acción no soportada.' }, { status: 400 });
