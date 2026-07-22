@@ -37,7 +37,7 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'Faltan parámetros requeridos (lineupId, documentId).' }, { status: 400 });
       }
 
-      // 1. Comprobar si existe la combinación tactical_lineup_id + document_id
+      // 1. Comprobar si existe la combinación (tactical_lineup_id + document_id)
       const { data: existing, error: findErr } = await supabaseServer
         .from('tactical_lineup_report_selections')
         .select('id')
@@ -45,38 +45,68 @@ export async function POST(req: Request) {
         .eq('document_id', documentId)
         .maybeSingle();
 
-      if (findErr) throw findErr;
+      if (findErr) {
+        console.error('Error al consultar selección existente (SELECT):', findErr);
+        return NextResponse.json({ error: `Error en la base de datos (SELECT): ${findErr.message}` }, { status: 500 });
+      }
 
       let resData;
       if (existing && existing.id) {
-        // 2. Hacer update si existe
+        // 2. Ejecutar UPDATE si la fila ya existe
         const { data: updateData, error: updateErr } = await supabaseServer
           .from('tactical_lineup_report_selections')
           .update({
             selected,
-            selected_via: 'staff_passkey_server',
+            selected_via: authCheck.authMethod || 'server_verification',
             selected_at: new Date().toISOString(),
           })
           .eq('id', existing.id)
           .select('id');
 
-        if (updateErr) throw updateErr;
+        if (updateErr) {
+          console.error('Error al actualizar selección (UPDATE):', updateErr);
+          return NextResponse.json({ error: `Error al actualizar la selección (UPDATE): ${updateErr.message}` }, { status: 500 });
+        }
         resData = updateData;
       } else {
-        // 3. Hacer insert si no existe
+        // 3. Ejecutar INSERT si la fila no existe
         const { data: insertData, error: insertErr } = await supabaseServer
           .from('tactical_lineup_report_selections')
           .insert({
             tactical_lineup_id: lineupId,
             document_id: documentId,
             selected,
-            selected_via: 'staff_passkey_server',
+            selected_via: authCheck.authMethod || 'server_verification',
             selected_at: new Date().toISOString(),
           })
           .select('id');
 
-        if (insertErr) throw insertErr;
-        resData = insertData;
+        if (insertErr) {
+          // Manejar posible condición de carrera por inserción simultánea (duplicado SQL 23505)
+          if (insertErr.code === '23505' || insertErr.message?.includes('duplicate key')) {
+            const { data: retryUpdateData, error: retryErr } = await supabaseServer
+              .from('tactical_lineup_report_selections')
+              .update({
+                selected,
+                selected_via: authCheck.authMethod || 'server_verification',
+                selected_at: new Date().toISOString(),
+              })
+              .eq('tactical_lineup_id', lineupId)
+              .eq('document_id', documentId)
+              .select('id');
+
+            if (retryErr) {
+              console.error('Error reintentando UPDATE tras conflicto:', retryErr);
+              return NextResponse.json({ error: `Error reintentando actualización tras conflicto: ${retryErr.message}` }, { status: 500 });
+            }
+            resData = retryUpdateData;
+          } else {
+            console.error('Error al insertar selección (INSERT):', insertErr);
+            return NextResponse.json({ error: `Error al crear la selección (INSERT): ${insertErr.message}` }, { status: 500 });
+          }
+        } else {
+          resData = insertData;
+        }
       }
 
       return NextResponse.json({ success: true, data: resData });
