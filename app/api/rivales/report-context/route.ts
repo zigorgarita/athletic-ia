@@ -2,13 +2,13 @@ import { NextResponse } from 'next/server';
 import { getSupabaseServerClient } from '@/lib/supabase-server';
 import { TacticalLineupReportSelection } from '@/types';
 
+import { verifyServerAuthorization } from '@/lib/auth-server';
+
 export async function POST(req: Request) {
   try {
-    const passkeyHeader = req.headers.get('x-coach-staff-passkey') || req.headers.get('x-staff-passkey');
-    const validPasskey = process.env.COACH_STAFF_PASSKEY;
-
-    if (!validPasskey || passkeyHeader !== validPasskey) {
-      return NextResponse.json({ error: 'Acceso no autorizado a informes de scouting.' }, { status: 401 });
+    const authCheck = await verifyServerAuthorization(req);
+    if (!authCheck.authorized) {
+      return NextResponse.json({ error: authCheck.error || 'Acceso no autorizado a informes de scouting.' }, { status: 401 });
     }
 
     const body = await req.json();
