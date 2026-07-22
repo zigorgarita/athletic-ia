@@ -175,11 +175,21 @@ export function ReviewExtractedReportModal({
 
       const today = new Date().toISOString().split('T')[0];
 
+      // Helper para verificar UUIDs válidos antes de enviar a PostgreSQL
+      const safeUuid = (val?: string) => {
+        if (!val || typeof val !== 'string') return null;
+        return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val) ? val : null;
+      };
+
+      const validDocId = safeUuid(documentId);
+      const validClubId = safeUuid(clubId);
+      const validClubSeasonId = safeUuid(clubSeasonId);
+
       // Convertir cada observación aprobada al esquema de Supabase club_report_observations
       const payloadRows = approvedObs.map(obs => ({
-        document_id: documentId || null,
-        club_id: clubId || null,
-        club_season_id: clubSeasonId || null,
+        document_id: validDocId,
+        club_id: validClubId,
+        club_season_id: validClubSeasonId,
         document_name: documentName,
         document_date: extraction.metadatos?.fechaInforme || today,
         rival_name: rivalName,
@@ -205,9 +215,9 @@ export function ReviewExtractedReportModal({
       threats.forEach(t => {
         if (t.dorsal || t.nombre) {
           payloadRows.push({
-            document_id: documentId || null,
-            club_id: clubId || null,
-            club_season_id: clubSeasonId || null,
+            document_id: validDocId,
+            club_id: validClubId,
+            club_season_id: validClubSeasonId,
             document_name: documentName,
             document_date: extraction.metadatos?.fechaInforme || today,
             rival_name: rivalName,
@@ -247,9 +257,13 @@ export function ReviewExtractedReportModal({
         }),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({ error: `Error HTTP ${res.status}: Respuesta no válida del servidor` }));
       if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Error al guardar observaciones aprobadas en servidor.');
+        const rawErr = data.error || data.message || data;
+        const errMsg = typeof rawErr === 'string'
+          ? rawErr
+          : (rawErr.message || rawErr.error || (typeof rawErr === 'object' ? JSON.stringify(rawErr) : String(rawErr)));
+        throw new Error(errMsg || `Error HTTP ${res.status} al guardar observaciones aprobadas en servidor.`);
       }
 
       setFeedbackMsg({ type: 'success', text: `¡Éxito! ${payloadRows.length} observaciones aprobadas e integradas en la ficha de ${rivalName}.` });
@@ -259,8 +273,12 @@ export function ReviewExtractedReportModal({
       }, 1200);
     } catch (err: unknown) {
       console.error('Error al guardar observaciones aprobadas:', err);
-      const msg = err instanceof Error ? err.message : String(err);
-      setFeedbackMsg({ type: 'error', text: msg || 'Error al guardar la revisión humana.' });
+      const errObj = err as Record<string, unknown> | null;
+      const rawMsg = errObj && typeof errObj.message === 'string'
+        ? errObj.message
+        : (typeof err === 'object' && err !== null ? JSON.stringify(err) : String(err));
+      const msg = rawMsg && rawMsg !== '[object Object]' ? rawMsg : 'Error inesperado al guardar la revisión humana.';
+      setFeedbackMsg({ type: 'error', text: msg });
     } finally {
       setIsSaving(false);
     }

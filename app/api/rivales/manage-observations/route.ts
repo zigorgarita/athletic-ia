@@ -2,6 +2,23 @@ import { NextResponse } from 'next/server';
 import { getSupabaseServerClient } from '@/lib/supabase-server';
 import { verifyServerAuthorization } from '@/lib/auth-server';
 
+function formatErrorMessage(err: unknown): string {
+  if (!err) return 'Error desconocido en servidor';
+  if (typeof err === 'string') return err;
+  if (typeof err === 'object' && err !== null) {
+    const obj = err as Record<string, unknown>;
+    if (typeof obj.message === 'string') return obj.message;
+    if (typeof obj.error_description === 'string') return obj.error_description;
+    if (typeof obj.details === 'string') return obj.details;
+    if (typeof obj.hint === 'string') return `${typeof obj.message === 'string' ? obj.message : 'Error'} (hint: ${obj.hint})`;
+  }
+  try {
+    return JSON.stringify(err);
+  } catch {
+    return String(err);
+  }
+}
+
 export async function POST(req: Request) {
   try {
     const authCheck = await verifyServerAuthorization(req);
@@ -26,7 +43,10 @@ export async function POST(req: Request) {
         .insert(rows)
         .select('id');
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error al guardar observaciones en Supabase (INSERT):', error);
+        return NextResponse.json({ error: `Error en base de datos al guardar observaciones: ${formatErrorMessage(error)}` }, { status: 500 });
+      }
 
       return NextResponse.json({ success: true, count: data?.length || 0 });
     }
@@ -47,7 +67,7 @@ export async function POST(req: Request) {
 
       if (findErr) {
         console.error('Error al consultar selección existente (SELECT):', findErr);
-        return NextResponse.json({ error: `Error en la base de datos (SELECT): ${findErr.message}` }, { status: 500 });
+        return NextResponse.json({ error: `Error en la base de datos (SELECT): ${formatErrorMessage(findErr)}` }, { status: 500 });
       }
 
       let resData;
@@ -65,7 +85,7 @@ export async function POST(req: Request) {
 
         if (updateErr) {
           console.error('Error al actualizar selección (UPDATE):', updateErr);
-          return NextResponse.json({ error: `Error al actualizar la selección (UPDATE): ${updateErr.message}` }, { status: 500 });
+          return NextResponse.json({ error: `Error al actualizar la selección (UPDATE): ${formatErrorMessage(updateErr)}` }, { status: 500 });
         }
         resData = updateData;
       } else {
@@ -97,12 +117,12 @@ export async function POST(req: Request) {
 
             if (retryErr) {
               console.error('Error reintentando UPDATE tras conflicto:', retryErr);
-              return NextResponse.json({ error: `Error reintentando actualización tras conflicto: ${retryErr.message}` }, { status: 500 });
+              return NextResponse.json({ error: `Error reintentando actualización tras conflicto: ${formatErrorMessage(retryErr)}` }, { status: 500 });
             }
             resData = retryUpdateData;
           } else {
             console.error('Error al insertar selección (INSERT):', insertErr);
-            return NextResponse.json({ error: `Error al crear la selección (INSERT): ${insertErr.message}` }, { status: 500 });
+            return NextResponse.json({ error: `Error al crear la selección (INSERT): ${formatErrorMessage(insertErr)}` }, { status: 500 });
           }
         } else {
           resData = insertData;
@@ -115,7 +135,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Acción no soportada.' }, { status: 400 });
   } catch (error: unknown) {
     console.error('Error en API manage-observations:', error);
-    const msg = error instanceof Error ? error.message : String(error);
+    const msg = formatErrorMessage(error);
     return NextResponse.json({ error: msg || 'Error procesando solicitud.' }, { status: 500 });
   }
 }
