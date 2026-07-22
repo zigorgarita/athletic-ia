@@ -1,60 +1,66 @@
 import { getSupabaseServerClient } from './supabase-server';
 
-const AUTHORIZED_EDITORS: Record<string, string> = {
-  zigor: process.env.NEXT_PUBLIC_EDIT_PASSWORD_ZIGOR || 'indautxuzigor2026',
-  aitor: process.env.NEXT_PUBLIC_EDIT_PASSWORD_AITOR || 'indautxuaitor2026',
-  nacho: process.env.NEXT_PUBLIC_EDIT_PASSWORD_NACHO || 'indautxunacho2026',
-};
-
 export interface AuthVerificationResult {
   authorized: boolean;
   user?: string;
-  authMethod?: 'supabase_token' | 'editor_credentials' | 'staff_passkey';
+  authMethod: 'supabase_token' | 'editor_credentials' | 'unauthorized';
   error?: string;
 }
 
 /**
- * Verifica en el servidor la sesión o token real de Supabase Auth o credenciales secretas
- * contra el grupo de usuarios autorizados de edición (Zigor, Aitor, Nacho).
+ * Módulo de verificación de autorización exclusivo del servidor para rutas de Rivales.
+ * NUNCA utiliza valores por defecto escritos en código ni autoriza mediante passkeys antiguas.
  */
 export async function verifyServerAuthorization(req: Request): Promise<AuthVerificationResult> {
-  const supabase = getSupabaseServerClient();
-
-  // 1. Verificación primaria: Token de sesión real con Supabase Auth
+  // 1. Verificación por Token JWT de Supabase Auth
   const authHeader = req.headers.get('authorization');
   if (authHeader && authHeader.startsWith('Bearer ')) {
     const token = authHeader.substring(7).trim();
     if (token) {
       try {
+        const supabase = getSupabaseServerClient();
         const { data: { user }, error } = await supabase.auth.getUser(token);
         if (!error && user) {
-          const userEmail = user.email?.toLowerCase() || '';
-          const username = (user.user_metadata?.username as string)?.toLowerCase() || userEmail.split('@')[0];
+          const userEmail = user.email?.toLowerCase().trim() || '';
+          
+          // Lista de emails autorizados exactos desde variables del servidor
+          const allowedEmails = [
+            process.env.AUTHORIZED_EMAIL_ZIGOR?.toLowerCase().trim(),
+            process.env.AUTHORIZED_EMAIL_AITOR?.toLowerCase().trim(),
+            process.env.AUTHORIZED_EMAIL_NACHO?.toLowerCase().trim(),
+          ].filter((email): email is string => Boolean(email));
 
-          const isAuthorizedUser = ['zigor', 'aitor', 'nacho'].some(
-            u => username === u || userEmail.startsWith(u + '@')
-          );
+          const isAuthorized = allowedEmails.length > 0 && allowedEmails.includes(userEmail);
 
-          if (isAuthorizedUser) {
+          if (isAuthorized) {
+            console.log(`[AUTH] Resultado: AUTORIZADO (metodo: supabase_token, usuario_id: ${user.id})`);
             return {
               authorized: true,
-              user: username,
+              user: userEmail,
               authMethod: 'supabase_token',
             };
           }
         }
       } catch (err) {
-        console.warn('Advertencia verificando token Supabase Auth:', err);
+        console.warn('[AUTH] Error verificando token Supabase Auth:', err);
       }
     }
   }
 
-  // 2. Verificación secundaria: Credenciales secretas de usuario editor (Zigor, Aitor, Nacho)
+  // 2. Verificación por credenciales de usuario editor mediante variables de servidor privadas
   const editorUser = req.headers.get('x-editor-user')?.trim().toLowerCase();
   const editorPass = req.headers.get('x-editor-pass')?.trim();
 
-  if (editorUser && editorPass && AUTHORIZED_EDITORS[editorUser]) {
-    if (AUTHORIZED_EDITORS[editorUser] === editorPass) {
+  const serverPasswords: Record<string, string | undefined> = {
+    zigor: process.env.EDIT_PASSWORD_ZIGOR,
+    aitor: process.env.EDIT_PASSWORD_AITOR,
+    nacho: process.env.EDIT_PASSWORD_NACHO,
+  };
+
+  if (editorUser && editorPass && serverPasswords[editorUser]) {
+    const validServerPass = serverPasswords[editorUser];
+    if (validServerPass && editorPass === validServerPass) {
+      console.log(`[AUTH] Resultado: AUTORIZADO (metodo: editor_credentials, usuario: ${editorUser})`);
       return {
         authorized: true,
         user: editorUser,
@@ -63,20 +69,10 @@ export async function verifyServerAuthorization(req: Request): Promise<AuthVerif
     }
   }
 
-  // 3. Verificación de compatibilidad temporal: Passkey de cuerpo técnico
-  const passkeyHeader = req.headers.get('x-coach-staff-passkey') || req.headers.get('x-staff-passkey');
-  const validPasskey = process.env.COACH_STAFF_PASSKEY || 'indautxu2026';
-
-  if (passkeyHeader && (passkeyHeader === validPasskey || passkeyHeader === 'indautxu2026')) {
-    return {
-      authorized: true,
-      user: 'staff_passkey',
-      authMethod: 'staff_passkey',
-    };
-  }
-
+  console.log('[AUTH] Resultado: DENEGADO (metodo: unauthorized)');
   return {
     authorized: false,
-    error: 'Acceso no autorizado en servidor: La petición no proviene de un token de Supabase Auth verificado ni de una credencial autorizada (Zigor, Aitor, Nacho).',
+    authMethod: 'unauthorized',
+    error: 'Acceso no autorizado en servidor: Credenciales o token de usuario no válidos.',
   };
 }

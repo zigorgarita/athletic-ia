@@ -16,17 +16,14 @@ export function useTacticalReportSelections(
   const { verifyWritePermission, currentUser } = useEditMode();
 
   const buildAuthHeaders = useCallback(() => {
-    const passkey = getStaffPasskey() || process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
     const editorUser = currentUser?.id || '';
-    const editorPass = editorUser === 'zigor' ? (process.env.NEXT_PUBLIC_EDIT_PASSWORD_ZIGOR || 'indautxuzigor2026')
-      : editorUser === 'aitor' ? (process.env.NEXT_PUBLIC_EDIT_PASSWORD_AITOR || 'indautxuaitor2026')
-      : editorUser === 'nacho' ? (process.env.NEXT_PUBLIC_EDIT_PASSWORD_NACHO || 'indautxunacho2026')
+    const editorPass = editorUser === 'zigor' ? (process.env.NEXT_PUBLIC_EDIT_PASSWORD_ZIGOR || '')
+      : editorUser === 'aitor' ? (process.env.NEXT_PUBLIC_EDIT_PASSWORD_AITOR || '')
+      : editorUser === 'nacho' ? (process.env.NEXT_PUBLIC_EDIT_PASSWORD_NACHO || '')
       : '';
 
     return {
       'Content-Type': 'application/json',
-      'x-coach-staff-passkey': passkey,
-      'x-staff-passkey': passkey,
       'x-editor-user': editorUser,
       'x-editor-pass': editorPass,
     };
