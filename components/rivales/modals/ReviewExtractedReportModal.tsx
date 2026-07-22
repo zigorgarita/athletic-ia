@@ -5,8 +5,6 @@ import { Observation, FlexibleReportExtraction, RivalPlayerThreat } from '@/type
 import { Button } from '@/components/ui/Button';
 import { useEditMode } from '@/context/EditModeContext';
 import { CheckCircle2, XCircle, AlertCircle, ShieldAlert, UserCheck, Sparkles, Compass } from 'lucide-react';
-import { getStaffPasskey, setStaffPasskey, clearStaffPasskey } from '@/lib/passkey';
-import { StaffPasskeyModal } from '@/components/common/StaffPasskeyModal';
 
 interface ReviewExtractedReportModalProps {
   isOpen: boolean;
@@ -37,10 +35,6 @@ export function ReviewExtractedReportModal({
   const [activeTab, setActiveTab] = useState<'all' | 'rival' | 'analyst' | 'players'>('all');
   const [isSaving, setIsSaving] = useState(false);
   const [feedbackMsg, setFeedbackMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-
-  // Modal de autorización StaffPasskey
-  const [isPasskeyModalOpen, setIsPasskeyModalOpen] = useState(false);
-  const [passkeyErrorMsg, setPasskeyErrorMsg] = useState<string | null>(null);
 
   // Estado editable para observaciones (SIEMPRE 'pendiente' por defecto)
   const [observations, setObservations] = useState<Observation[]>([]);
@@ -156,7 +150,7 @@ export function ReviewExtractedReportModal({
     setObservations(prev => prev.map(obs => ({ ...obs, estado: 'aprobado' })));
   };
 
-  const handleConfirmAndIntegrate = async (overridePasskey?: string) => {
+  const handleConfirmAndIntegrate = async () => {
     try {
       setIsSaving(true);
       setFeedbackMsg(null);
@@ -639,17 +633,6 @@ export function ReviewExtractedReportModal({
 
         </div>
       </div>
-
-      {/* Modal de Solicitud de Clave de Cuerpo Técnico */}
-      <StaffPasskeyModal
-        isOpen={isPasskeyModalOpen}
-        onClose={() => setIsPasskeyModalOpen(false)}
-        onSuccess={(enteredKey) => {
-          setIsPasskeyModalOpen(false);
-          handleConfirmAndIntegrate(enteredKey);
-        }}
-        errorMsg={passkeyErrorMsg}
-      />
     </>
   );
 }
