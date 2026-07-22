@@ -1,8 +1,17 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseServerClient } from '@/lib/supabase-server';
 import { TacticalLineupReportSelection } from '@/types';
-
 import { verifyServerAuthorization } from '@/lib/auth-server';
+
+function normalizeClubName(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
+}
+
+const isGuid = (val?: string) => typeof val === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
 
 export async function POST(req: Request) {
   try {
@@ -12,13 +21,82 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { lineupId, clubId, seasonId } = body;
+    const { lineupId, clubId, seasonId, rivalName } = body;
 
     const supabaseServer = getSupabaseServerClient();
 
-    // 1. Cargar selecciones relacionales de la pizarra si existe lineupId
+    let targetClubId: string | null = isGuid(clubId) ? (clubId as string) : null;
+    let resolutionWarning: string | null = null;
+
+    // 1. Si vienen juntos clubId y rivalName, verificar incongruencias entre ambos
+    if (targetClubId && rivalName && typeof rivalName === 'string' && rivalName.trim()) {
+      const { data: targetClub, error: targetClubErr } = await supabaseServer
+        .from('clubs')
+        .select('id, nombre')
+        .eq('id', targetClubId)
+        .maybeSingle();
+
+      if (targetClubErr) {
+        console.error('Error al verificar clubId en servidor:', targetClubErr);
+        resolutionWarning = `Error verificando clubId: ${targetClubErr.message}`;
+      } else if (targetClub) {
+        const normTarget = normalizeClubName(targetClub.nombre);
+        const normRivalInput = normalizeClubName(rivalName);
+        if (normTarget !== normRivalInput) {
+          console.warn(`[AUTH/SCOUTING] Incongruencia detectada: clubId '${targetClubId}' es '${targetClub.nombre}' pero rivalName es '${rivalName}'.`);
+          targetClubId = null;
+          resolutionWarning = `Incongruencia entre clubId ('${targetClub.nombre}') y rivalName ('${rivalName}') suministrados.`;
+        }
+      } else {
+        targetClubId = null;
+        resolutionWarning = `El clubId '${clubId}' no existe en el catálogo de clubes.`;
+      }
+    }
+
+    // 2. Si no tenemos un targetClubId válido pero viene rivalName, realizar resolución exacta normalizada
+    if (!targetClubId && rivalName && typeof rivalName === 'string' && rivalName.trim()) {
+      const { data: allClubs, error: clubsErr } = await supabaseServer
+        .from('clubs')
+        .select('id, nombre');
+
+      if (clubsErr) {
+        console.error('Error al consultar catálogo de clubes en servidor:', clubsErr);
+        resolutionWarning = `Error al consultar catálogo de clubes: ${clubsErr.message}`;
+      } else {
+        const normRivalInput = normalizeClubName(rivalName);
+        const exactMatches = (allClubs || []).filter(c => normalizeClubName(c.nombre) === normRivalInput);
+
+        if (exactMatches.length === 1) {
+          targetClubId = exactMatches[0].id;
+        } else if (exactMatches.length > 1) {
+          resolutionWarning = `Múltiples coincidencias exactas (${exactMatches.length}) en catálogo de clubes para '${rivalName}'. Se omitió vinculación automática.`;
+        } else {
+          resolutionWarning = `No se encontró coincidencia exacta en el catálogo de clubes para el rival '${rivalName}'.`;
+        }
+      }
+    }
+
+    // 3. Confirmar que seasonId corresponde realmente a club_season_id del rival si ambos están presentes
+    let validSeasonId: string | null = isGuid(seasonId) ? (seasonId as string) : null;
+    if (validSeasonId && targetClubId) {
+      const { data: seasonCheck, error: seasonErr } = await supabaseServer
+        .from('club_seasons')
+        .select('id')
+        .eq('id', validSeasonId)
+        .eq('club_id', targetClubId)
+        .maybeSingle();
+
+      if (seasonErr) {
+        console.warn('Error al verificar temporada del club:', seasonErr);
+      } else if (!seasonCheck) {
+        console.warn(`[SCOUTING] La temporada '${validSeasonId}' no pertenece al club '${targetClubId}'. Se ignoró filtro por temporada.`);
+        validSeasonId = null;
+      }
+    }
+
+    // 4. Cargar selecciones relacionales de la pizarra si existe lineupId
     let selections: TacticalLineupReportSelection[] = [];
-    if (lineupId) {
+    if (lineupId && isGuid(lineupId)) {
       const { data: selData, error: selErr } = await supabaseServer
         .from('tactical_lineup_report_selections')
         .select('*')
@@ -29,24 +107,28 @@ export async function POST(req: Request) {
       }
     }
 
-    // 2. Cargar observaciones aprobadas para el club / season
-    let obsQuery = supabaseServer
-      .from('club_report_observations')
-      .select('*')
-      .eq('status', 'aprobado');
+    // 5. Cargar observaciones aprobadas únicamente si existe targetClubId o validSeasonId
+    let rawObs: Record<string, unknown>[] = [];
+    if (targetClubId || validSeasonId) {
+      let obsQuery = supabaseServer
+        .from('club_report_observations')
+        .select('*')
+        .eq('status', 'aprobado');
 
-    if (clubId) {
-      obsQuery = obsQuery.eq('club_id', clubId);
-    } else if (seasonId) {
-      obsQuery = obsQuery.eq('club_season_id', seasonId);
+      if (targetClubId) {
+        obsQuery = obsQuery.eq('club_id', targetClubId);
+      }
+      if (validSeasonId) {
+        obsQuery = obsQuery.eq('club_season_id', validSeasonId);
+      }
+
+      const { data: obsData, error: obsErr } = await obsQuery;
+      if (obsErr) {
+        console.warn('Advertencia consultando observaciones aprobadas:', obsErr);
+      } else if (obsData) {
+        rawObs = obsData as Record<string, unknown>[];
+      }
     }
-
-    const { data: obsData, error: obsErr } = await obsQuery;
-    if (obsErr) {
-      console.warn('Advertencia consultando observaciones aprobadas:', obsErr);
-    }
-
-    const rawObs = obsData || [];
 
     // Mapear observaciones al tipo Observation para el frontend
     const approvedObservations = rawObs.map((r: Record<string, unknown>) => ({
@@ -81,6 +163,8 @@ export async function POST(req: Request) {
       selections,
       approvedObservations,
       reportSourcesLabels: documentNames,
+      targetClubId,
+      resolutionWarning,
     });
   } catch (error: unknown) {
     console.error('Error en API report-context:', error);

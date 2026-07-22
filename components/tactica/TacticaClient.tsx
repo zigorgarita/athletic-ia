@@ -112,7 +112,7 @@ export function TacticaClient() {
     approvedObservations: approvedReportObservations,
     reportSourcesLabels: activeSourcesLabels,
     toggleDocumentSelection
-  } = useTacticalReportSelections(currentLineupId, rivalClubId, undefined);
+  } = useTacticalReportSelections(currentLineupId, rivalClubId, undefined, currentMatch?.rival || null);
 
   // Subblock 4C Role Cards states
   const [roleCards, setRoleCards] = useState<TacticalRoleCard[]>([]);

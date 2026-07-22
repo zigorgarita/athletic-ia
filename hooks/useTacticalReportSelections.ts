@@ -5,7 +5,8 @@ import { Observation, TacticalLineupReportSelection } from '@/types';
 export function useTacticalReportSelections(
   lineupId: string | null,
   clubId?: string | null,
-  seasonId?: string | null
+  seasonId?: string | null,
+  rivalName?: string | null
 ) {
   const [selections, setSelections] = useState<TacticalLineupReportSelection[]>([]);
   const [approvedObservations, setApprovedObservations] = useState<Observation[]>([]);
@@ -31,7 +32,7 @@ export function useTacticalReportSelections(
   }, [currentUser]);
 
   const loadSelectionsAndObservations = useCallback(async () => {
-    if (!lineupId && (!clubId || !seasonId)) return;
+    if (!lineupId && !clubId && !seasonId && !rivalName) return;
     setLoading(true);
     setError(null);
     try {
@@ -42,6 +43,7 @@ export function useTacticalReportSelections(
           lineupId,
           clubId,
           seasonId,
+          rivalName,
         }),
       });
 
