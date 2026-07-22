@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useEditMode } from '@/context/EditModeContext';
 import { Observation, TacticalLineupReportSelection } from '@/types';
-import { getStaffPasskey } from '@/lib/passkey';
 
 export function useTacticalReportSelections(
   lineupId: string | null,
