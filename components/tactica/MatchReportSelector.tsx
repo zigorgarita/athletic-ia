@@ -21,7 +21,7 @@ export function MatchReportSelector({
   approvedCount,
   sourcesLabels,
 }: MatchReportSelectorProps) {
-  if (documents.length === 0) {
+  if (documents.length === 0 && approvedCount === 0) {
     return (
       <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 flex items-center justify-between text-xs text-slate-400">
         <div className="flex items-center gap-2.5">

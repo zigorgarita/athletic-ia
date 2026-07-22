@@ -106,13 +106,15 @@ export function TacticaClient() {
   const currentMatch = matches.find(m => m.id === selectedMatchId);
   const rivalClubId = currentMatch?.rival_id || null;
 
-  const { documents: availableRivalDocs } = useClubDocuments(rivalClubId || undefined, undefined);
   const {
     selections: reportSelections,
     approvedObservations: approvedReportObservations,
     reportSourcesLabels: activeSourcesLabels,
+    targetClubId: resolvedTargetClubId,
     toggleDocumentSelection
   } = useTacticalReportSelections(currentLineupId, rivalClubId, undefined, currentMatch?.rival || null);
+
+  const { documents: availableRivalDocs } = useClubDocuments(rivalClubId || resolvedTargetClubId || undefined, undefined);
 
   // Subblock 4C Role Cards states
   const [roleCards, setRoleCards] = useState<TacticalRoleCard[]>([]);

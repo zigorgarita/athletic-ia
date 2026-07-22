@@ -11,6 +11,7 @@ export function useTacticalReportSelections(
   const [selections, setSelections] = useState<TacticalLineupReportSelection[]>([]);
   const [approvedObservations, setApprovedObservations] = useState<Observation[]>([]);
   const [reportSourcesLabels, setReportSourcesLabels] = useState<string[]>([]);
+  const [targetClubId, setTargetClubId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { verifyWritePermission, currentUser } = useEditMode();
@@ -55,6 +56,7 @@ export function useTacticalReportSelections(
       setSelections(data.selections || []);
       setApprovedObservations(data.approvedObservations || []);
       setReportSourcesLabels(data.reportSourcesLabels || []);
+      setTargetClubId(data.targetClubId || null);
     } catch (err: unknown) {
       console.error('Error cargando selecciones de informes:', err);
       const msg = err instanceof Error ? err.message : String(err);
@@ -62,7 +64,7 @@ export function useTacticalReportSelections(
     } finally {
       setLoading(false);
     }
-  }, [lineupId, clubId, seasonId, buildAuthHeaders]);
+  }, [lineupId, clubId, seasonId, rivalName, buildAuthHeaders]);
 
   useEffect(() => {
     loadSelectionsAndObservations();
@@ -103,6 +105,7 @@ export function useTacticalReportSelections(
     selections,
     approvedObservations,
     reportSourcesLabels,
+    targetClubId,
     loading,
     error,
     refresh: loadSelectionsAndObservations,
