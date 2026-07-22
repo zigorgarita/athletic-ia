@@ -17,10 +17,12 @@ export function useTacticalReportSelections(
 
   const buildAuthHeaders = useCallback(() => {
     const editorUser = currentUser?.id || '';
-    const editorPass = editorUser === 'zigor' ? (process.env.NEXT_PUBLIC_EDIT_PASSWORD_ZIGOR || '')
+    const editorPass = currentUser?.pass || (
+      editorUser === 'zigor' ? (process.env.NEXT_PUBLIC_EDIT_PASSWORD_ZIGOR || '')
       : editorUser === 'aitor' ? (process.env.NEXT_PUBLIC_EDIT_PASSWORD_AITOR || '')
       : editorUser === 'nacho' ? (process.env.NEXT_PUBLIC_EDIT_PASSWORD_NACHO || '')
-      : '';
+      : ''
+    );
 
     return {
       'Content-Type': 'application/json',

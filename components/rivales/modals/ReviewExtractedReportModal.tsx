@@ -166,10 +166,12 @@ export function ReviewExtractedReportModal({
       }
 
       const editorUser = currentUser?.id || '';
-      const editorPass = editorUser === 'zigor' ? (process.env.NEXT_PUBLIC_EDIT_PASSWORD_ZIGOR || '')
+      const editorPass = currentUser?.pass || (
+        editorUser === 'zigor' ? (process.env.NEXT_PUBLIC_EDIT_PASSWORD_ZIGOR || '')
         : editorUser === 'aitor' ? (process.env.NEXT_PUBLIC_EDIT_PASSWORD_AITOR || '')
         : editorUser === 'nacho' ? (process.env.NEXT_PUBLIC_EDIT_PASSWORD_NACHO || '')
-        : '';
+        : ''
+      );
 
       const today = new Date().toISOString().split('T')[0];
 

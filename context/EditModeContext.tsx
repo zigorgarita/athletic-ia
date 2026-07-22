@@ -9,6 +9,7 @@ export interface UserProfile {
   name: string;
   role: UserRole;
   canEdit: boolean;
+  pass?: string;
 }
 
 interface EditModeContextType {
@@ -77,6 +78,7 @@ export function EditModeProvider({ children }: { children: React.ReactNode }) {
         name: authData.name,
         role: authData.role,
         canEdit: authData.role === 'admin' || authData.role === 'editor',
+        pass: pass,
       };
       setCurrentUser(profile);
       

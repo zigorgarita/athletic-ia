@@ -60,16 +60,20 @@ export async function verifyServerAuthorization(req: Request): Promise<AuthVerif
   if (editorUser && editorPass && serverPasswords[editorUser]) {
     const validServerPass = serverPasswords[editorUser];
     if (validServerPass && editorPass === validServerPass) {
-      console.log(`[AUTH] Resultado: AUTORIZADO (metodo: editor_credentials, usuario: ${editorUser})`);
+      console.log(`[AUTH] Intento de autorización: editor_credentials | Resultado: AUTORIZADO (usuario: ${editorUser})`);
       return {
         authorized: true,
         user: editorUser,
         authMethod: 'editor_credentials',
       };
+    } else {
+      console.warn(`[AUTH] Intento de autorización: editor_credentials | Resultado: DENEGADO (usuario: ${editorUser}, clave recibida: ${editorPass ? 'presente pero no coincide' : 'vacía'})`);
     }
+  } else {
+    console.warn(`[AUTH] Intento de autorización: editor_credentials | Resultado: DENEGADO (x-editor-user: '${editorUser || ''}', x-editor-pass: '${editorPass ? 'SÍ' : 'NO'}')`);
   }
 
-  console.log('[AUTH] Resultado: DENEGADO (metodo: unauthorized)');
+  console.log('[AUTH] Resultado final: DENEGADO (metodo: unauthorized)');
   return {
     authorized: false,
     authMethod: 'unauthorized',
