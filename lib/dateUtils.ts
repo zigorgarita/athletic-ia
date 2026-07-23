@@ -21,6 +21,10 @@ export function getDaysOfWeek(monday: Date): string[] {
   const days: string[] = [];
   const start = new Date(monday);
   start.setHours(12, 0, 0, 0);
+  const day = start.getDay();
+  const diffToMonday = day === 0 ? -6 : 1 - day;
+  start.setDate(start.getDate() + diffToMonday);
+
   for (let i = 0; i < 7; i++) {
     const d = new Date(start);
     d.setDate(start.getDate() + i);

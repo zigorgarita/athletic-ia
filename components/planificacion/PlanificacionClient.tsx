@@ -10,7 +10,7 @@ import {
   Shield, Timer, Square
 } from 'lucide-react';
 import { useEditMode } from '@/context/EditModeContext';
-import { getDaysOfWeek, getDaysOfMonthGrid } from '@/lib/dateUtils';
+import { getDaysOfWeek, getDaysOfMonthGrid, parseLocalYYYYMMDD, formatLocalYYYYMMDD } from '@/lib/dateUtils';
 import { BibliotecaTareasModal } from './BibliotecaTareasModal';
 import { useClubLogos } from '@/hooks/useClubLogos';
 import { MatchBadge } from './MatchBadge';
@@ -695,11 +695,12 @@ export function PlanificacionClient() {
 
   // Helper to calculate Match Day tag dynamically
   const getMatchDayTag = (session: MockSession, allSessions: MockSession[]) => {
-    if (session.tipo_sesion === 'Partido') return 'MATCH DAY';
-    const matchSession = allSessions.find(s => s.tipo_sesion === 'Partido');
-    if (!matchSession) return '';
-    const matchDate = new Date(matchSession.fecha);
-    const currentDate = new Date(session.fecha);
+    const officialMatch = weekMatches.find(m => m.fecha === session.fecha);
+    if (officialMatch || session.tipo_sesion === 'Partido') return 'MATCH DAY';
+    const matchDateStr = weekMatches.length > 0 ? weekMatches[0].fecha : allSessions.find(s => s.tipo_sesion === 'Partido')?.fecha;
+    if (!matchDateStr) return '';
+    const matchDate = parseLocalYYYYMMDD(matchDateStr);
+    const currentDate = parseLocalYYYYMMDD(session.fecha);
     const diffTime = currentDate.getTime() - matchDate.getTime();
     const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
     if (diffDays === 0) return 'MATCH DAY';
@@ -930,11 +931,78 @@ export function PlanificacionClient() {
           <div className="grid grid-cols-1 md:grid-cols-7 gap-3.5">
             {sessions.map((session) => {
               const config = getTypeConfig(session.tipo_sesion);
-              const date = new Date(session.fecha);
-              const dayName = ['DOM', 'LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB'][date.getDay()];
-              const isToday = session.fecha === `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}`;
+              const dateObj = parseLocalYYYYMMDD(session.fecha);
+              const dayName = ['DOM', 'LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB'][dateObj.getDay()];
+              const dayNumber = dateObj.getDate();
+              const todayStr = formatLocalYYYYMMDD(new Date());
+              const isToday = session.fecha === todayStr;
               const matchDayTag = getMatchDayTag(session, sessions);
               const tasks = allTasksMap[session.id] || [];
+
+              // Direct match check using normalized YYYY-MM-DD
+              const officialMatch = weekMatches.find(m => m.fecha === session.fecha);
+              const isMatchDay = !!officialMatch || session.tipo_sesion === 'Partido';
+
+              if (isMatchDay) {
+                const matchRival = officialMatch?.rival || session.rival || 'Rival por definir';
+                const isHome = officialMatch ? officialMatch.es_local : true;
+                const matchHora = officialMatch?.hora || session.hora_inicio || null;
+                const matchCampo = officialMatch?.campo || session.campo_instalacion || null;
+                const matchJornada = officialMatch?.jornada;
+                const matchId = officialMatch?.id || session.id;
+
+                return (
+                  <div
+                    key={session.id}
+                    onClick={() => handleDayClick(session.fecha)}
+                    className={`p-3.5 rounded-xl transition-all duration-150 cursor-pointer flex flex-col justify-between min-h-[380px] border relative ${
+                      isToday 
+                        ? 'border-[#CC0E21] bg-slate-900/60 ring-2 ring-[#CC0E21]/10' 
+                        : 'border-indigo-500/40 bg-slate-950/40 hover:border-indigo-500/70'
+                    }`}
+                  >
+                    {/* Tag Superior de Hoy */}
+                    {isToday && (
+                      <span className="absolute -top-2.5 left-4 text-[8px] font-black tracking-widest bg-[#CC0E21] text-white px-2 py-0.5 rounded shadow">
+                        HOY
+                      </span>
+                    )}
+
+                    <div className="space-y-3">
+                      {/* Fila superior: Día y Nomenclatura deportiva */}
+                      <div className="flex items-center justify-between border-b border-slate-900 pb-2">
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-[10px] font-black text-slate-500">{dayName}</span>
+                          <span className="text-sm font-black text-slate-200">{dayNumber}</span>
+                        </div>
+                        <span className="text-[8px] font-black text-emerald-400 bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-500/30 uppercase">
+                          MATCH DAY
+                        </span>
+                      </div>
+
+                      <MatchBadge
+                        jornada={matchJornada}
+                        rival={matchRival}
+                        esLocal={isHome}
+                        fecha={session.fecha}
+                        hora={matchHora}
+                        campo={matchCampo}
+                        matchId={matchId}
+                      />
+                    </div>
+
+                    {/* Fila inferior: Estado */}
+                    <div className="border-t border-slate-900/60 pt-2 mt-3 flex items-center justify-between">
+                      <span className="text-[8px] px-1.5 py-0.5 rounded font-black bg-emerald-950/40 text-emerald-400 border border-emerald-500/20">
+                        {session.estado || 'Oficial'}
+                      </span>
+                      <span className="text-[8px] text-slate-500 font-bold uppercase tracking-wider">
+                        Partido
+                      </span>
+                    </div>
+                  </div>
+                );
+              }
 
               return (
                 <div
@@ -958,34 +1026,31 @@ export function PlanificacionClient() {
                     <div className="flex items-center justify-between border-b border-slate-900 pb-2">
                       <div className="flex items-baseline gap-1">
                         <span className="text-[10px] font-black text-slate-500">{dayName}</span>
-                        <span className="text-sm font-black text-slate-200">{date.getDate()}</span>
+                        <span className="text-sm font-black text-slate-200">{dayNumber}</span>
                       </div>
-                      <span className="text-[8px] font-black text-slate-500 bg-slate-950 px-1.5 py-0.5 rounded border border-slate-900 uppercase">
-                        {matchDayTag}
-                      </span>
+                      {matchDayTag && (
+                        <span className="text-[8px] font-black text-slate-500 bg-slate-950 px-1.5 py-0.5 rounded border border-slate-900 uppercase">
+                          {matchDayTag}
+                        </span>
+                      )}
                     </div>
 
                     {/* Fila Tipo de Sesión con Icono */}
                     <div className="flex items-center justify-between">
                       <span className="text-[9px] font-black tracking-wider uppercase text-slate-400">
-                        {config.icon} {session.tipo_sesion}
+                        {config.icon} {session.tipo_sesion.toUpperCase()}
                       </span>
-                      {session.duracion_total > 0 && (
-                        <span className="text-[9px] font-mono text-slate-500 font-bold">
-                          {session.duracion_total} min
-                        </span>
-                      )}
                     </div>
 
                     {/* Fila de Datos e Información del Día */}
                     {session.tipo_sesion !== 'Libre' ? (
                       <div className="space-y-3.5">
-                        {/* Horario y campo */}
-                        <div className="text-[9px] font-bold text-slate-500 flex flex-wrap items-center gap-1">
-                          <span>⏰ {session.hora_inicio}</span>
+                        {/* Horario solo inicio y campo */}
+                        <div className="text-[10px] font-bold text-slate-400 flex flex-wrap items-center gap-1.5 bg-slate-900/40 px-2.5 py-1.5 rounded-lg border border-slate-800/50">
+                          <span>⏰ {session.hora_inicio || '16:00'}</span>
                           {session.campo_instalacion && (
                             <>
-                              <span>•</span>
+                              <span className="text-slate-600">•</span>
                               <span className="truncate max-w-[90px]">📍 {session.campo_instalacion.split(' ')[0]}</span>
                             </>
                           )}
@@ -993,16 +1058,16 @@ export function PlanificacionClient() {
 
                         {/* Objetivo principal */}
                         <div className="space-y-0.5">
-                          <span className="text-[8px] font-black text-slate-650 uppercase tracking-wider block">OBJETIVO:</span>
+                          <span className="text-[8px] font-black text-slate-500 uppercase tracking-wider block">OBJETIVO:</span>
                           <p className="text-xs font-bold text-slate-200 leading-relaxed">
-                            {session.objetivo_principal}
+                            {session.objetivo_principal || 'Entrenamiento habitual'}
                           </p>
                         </div>
 
                         {/* Contenidos / Tareas Rápidas */}
                         {tasks.length > 0 && (
                           <div className="space-y-1">
-                            <span className="text-[8px] font-black text-slate-655 uppercase tracking-wider block">CONTENIDOS:</span>
+                            <span className="text-[8px] font-black text-slate-500 uppercase tracking-wider block">CONTENIDOS:</span>
                             <ul className="space-y-1 text-[10px] text-slate-400 font-medium">
                               {tasks.map(t => (
                                 <li key={t.id} className="flex items-start gap-1">
@@ -1087,7 +1152,7 @@ export function PlanificacionClient() {
           {/* CUADRÍCULA DE CELDAS ESTILO APPLE */}
           <div className="grid grid-cols-7 gap-0 border-t border-l border-slate-800/40 rounded-xl overflow-hidden bg-slate-900/5">
             {sessions.map(session => {
-              const date = new Date(session.fecha);
+              const date = parseLocalYYYYMMDD(session.fecha);
               const isCurrentMonth = date.getMonth() === currentMonday.getMonth();
               
               // Map charge colors to glows/bars
