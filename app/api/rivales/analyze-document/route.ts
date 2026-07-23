@@ -303,7 +303,7 @@ DEVUELVE ÚNICAMENTE UN OBJETO JSON VÁLIDO CON ESTE ESQUEMA EXACTO:
     };
 
     // Timeout de seguridad: devolver JSON antes de que Vercel corte con 504 texto plano
-    const TIMEOUT_MS = 55_000;
+    const TIMEOUT_MS = 240_000;
     const aiResponsePromise = provider.chat(
       [
         { role: 'system', content: systemPrompt },
@@ -312,7 +312,7 @@ DEVUELVE ÚNICAMENTE UN OBJETO JSON VÁLIDO CON ESTE ESQUEMA EXACTO:
       { temperature: 0.1 }
     );
     const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('La IA tardó demasiado en responder (>55 s). Inténtalo de nuevo.')), TIMEOUT_MS)
+      setTimeout(() => reject(new Error('La IA tardó demasiado en responder (>240 s). Inténtalo de nuevo.')), TIMEOUT_MS)
     );
     const aiResponse = await Promise.race([aiResponsePromise, timeoutPromise]);
 
