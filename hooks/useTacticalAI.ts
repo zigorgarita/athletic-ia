@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { AIMessage, AIAction, TacticalAIContext, TacticalRoleCard, KnowledgeEntry } from '@/types';
+import { AIMessage, TacticalAIContext, TacticalRoleCard, KnowledgeEntry } from '@/types';
 import { useEditMode } from '@/context/EditModeContext';
 import { supabase } from '@/lib/supabase';
 import { getStaffPasskey } from '@/lib/passkey';
@@ -8,13 +8,29 @@ export function useTacticalAI() {
   const [messages, setMessages] = useState<AIMessage[]>([]);
   const [isThinking, setIsThinking] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { verifyWritePermission } = useEditMode();
-  const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
+  const { verifyWritePermission, currentUser } = useEditMode();
 
   const clearConversation = useCallback(() => {
     setMessages([]);
     setError(null);
   }, []);
+
+  const buildAuthHeaders = useCallback(() => {
+    const editorUser = currentUser?.id?.trim() || '';
+    const editorPass = currentUser?.pass || '';
+
+    if (!editorUser || !editorPass) {
+      throw new Error(
+        'Activa el modo edición antes de utilizar la IA del Modelo Indautxu.'
+      );
+    }
+
+    return {
+      'Content-Type': 'application/json',
+      'x-editor-user': editorUser,
+      'x-editor-pass': editorPass,
+    };
+  }, [currentUser]);
 
   const callAIAPI = useCallback(async (
     message: string,
@@ -36,14 +52,9 @@ export function useTacticalAI() {
     setMessages(prev => [...prev, userMessage]);
 
     try {
-      const passkey = getStaffPasskey();
       const response = await fetch('/api/tactical-ai', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-coach-staff-passkey': passkey,
-          'x-staff-passkey': passkey
-        },
+        headers: buildAuthHeaders(),
         body: JSON.stringify({
           message,
           actionType,
@@ -53,12 +64,22 @@ export function useTacticalAI() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Error en la llamada al asistente IA.');
+        const errorData = await response.json().catch(() => ({}));
+        const statusText = response.status === 401 ? 'Error de autorización (sesión de edición no válida o no iniciada)'
+          : response.status === 404 ? 'Modelo de IA o recurso no encontrado (HTTP 404)'
+          : response.status === 429 ? 'Límite de peticiones a la IA alcanzado (HTTP 429)'
+          : `Error HTTP ${response.status} en la API de IA`;
+
+        const detailedErr = errorData.error ? `${statusText}: ${errorData.error}` : statusText;
+        throw new Error(detailedErr);
       }
 
       const data = await response.json();
       
+      if (!data || typeof data.content !== 'string' || !data.content.trim()) {
+        throw new Error('El proveedor de IA devolvió una respuesta vacía o sin contenido generado.');
+      }
+
       const assistantMessage: AIMessage = {
         id: `assistant-${Date.now()}`,
         role: 'assistant',
@@ -73,11 +94,11 @@ export function useTacticalAI() {
       console.error('Error al llamar al Asistente IA:', err);
       const msg = err instanceof Error ? err.message : String(err);
       setError(msg || 'Ocurrió un error al comunicarse con la IA.');
-      return null;
+      throw err instanceof Error ? err : new Error(msg);
     } finally {
       setIsThinking(false);
     }
-  }, [messages]);
+  }, [messages, buildAuthHeaders]);
 
   // Enviar un mensaje libre de chat
   const sendMessage = useCallback(async (message: string, context: TacticalAIContext) => {
@@ -160,7 +181,7 @@ export function useTacticalAI() {
         target_table: 'knowledge_entries',
         payload,
         conflict_columns: ['id'],
-        staff_passkey: passkey
+        staff_passkey: getStaffPasskey()
       });
 
       if (saveErr) throw saveErr;
@@ -172,7 +193,7 @@ export function useTacticalAI() {
     } finally {
       setLoading(false);
     }
-  }, [verifyWritePermission, passkey]);
+  }, [verifyWritePermission]);
 
   // Aplicar sugerencias de fichas de rol a la base de datos
   const applyToRoleCards = useCallback(async (cards: Partial<TacticalRoleCard>[]): Promise<{ success: boolean; error?: any }> => {
@@ -207,7 +228,7 @@ export function useTacticalAI() {
           target_table: 'tactical_role_cards',
           payload: cardToSave,
           conflict_columns: conflictCols,
-          staff_passkey: passkey
+          staff_passkey: getStaffPasskey()
         });
 
         console.log(`[Card ${idx}] RPC Raw Response:`, JSON.stringify(rpcRes, null, 2));
@@ -241,7 +262,7 @@ export function useTacticalAI() {
     } finally {
       setLoading(false);
     }
-  }, [verifyWritePermission, passkey]);
+  }, [verifyWritePermission]);
 
   // Helper local para setear carga
   const [loading, setLoading] = useState(false);

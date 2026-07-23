@@ -4,6 +4,8 @@ import { createProvider, AIMessage } from '@/lib/ai/provider';
 import { SYSTEM_PROMPT_BASE, PROMPTS, PromptContext } from '@/lib/ai/prompts';
 import { TacticalAIContext, AIAction, TacticalRoleCard } from '@/types';
 
+import { verifyServerAuthorization } from '@/lib/auth-server';
+
 // Rate limiting simple en memoria
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
 const LIMIT_WINDOW_MS = 60 * 1000; // 1 minuto
@@ -36,13 +38,11 @@ export async function POST(request: Request) {
     );
   }
 
-  // 2. Validar passkey del staff
-  const staffPasskey = request.headers.get('x-staff-passkey');
-  const expectedPasskey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
-  
-  if (staffPasskey !== expectedPasskey) {
+  // 2. Validar autorización del servidor mediante credenciales del editor
+  const authCheck = await verifyServerAuthorization(request);
+  if (!authCheck.authorized) {
     return NextResponse.json(
-      { error: 'No autorizado. Contraseña de staff incorrecta.' },
+      { error: authCheck.error || 'No autorizado. Se requiere sesión de edición activa.' },
       { status: 401 }
     );
   }
@@ -199,6 +199,17 @@ export async function POST(request: Request) {
 
     // 6. Consultar al proveedor de IA
     const provider = createProvider();
+
+    if (actionType === 'analyze_game_model') {
+      console.log('=== PRUEBA COMPARATIVA MINIMA [MINIMAL_PROMPT] ===');
+      try {
+        await provider.chat([{ role: 'user', content: 'Responde únicamente: OK' }]);
+      } catch (minErr) {
+        console.error('[MINIMAL_PROMPT_ERROR]', minErr);
+      }
+      console.log('=== PETICION REAL [REAL_ANALYZE_GAME_MODEL_PROMPT] ===');
+    }
+
     const response = await provider.chat(messagesForAI);
 
     // Cargar plan de partido si existe para obtener su ID real (evitando enviar el match_id que viola la FK)

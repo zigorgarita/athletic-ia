@@ -50,12 +50,47 @@ export class GeminiProvider implements AIProvider {
         }
       });
 
+      const candidate0 = response.candidates?.[0];
+      const partTypes = candidate0?.content?.parts?.map((p: unknown) => {
+        const pr = p as Record<string, unknown>;
+        return pr.text !== undefined ? 'text' : (pr.inlineData ? 'inlineData' : 'unknown');
+      }) || [];
+      const resRecord = response as unknown as Record<string, unknown>;
+      const promptFeedback = resRecord.promptFeedback as Record<string, unknown> | undefined;
+      const usageMetadata = resRecord.usageMetadata as Record<string, unknown> | undefined;
+      const candidate0Record = candidate0 as unknown as Record<string, unknown> | undefined;
+
+      console.log('[DIAGNOSTICO_GEMINI]', JSON.stringify({
+        modelRequested: modelName,
+        status: '200 OK',
+        modelVersion: (resRecord.modelVersion as string) || 'N/A',
+        responseId: (resRecord.responseId as string) || 'N/A',
+        candidatesLength: response.candidates?.length || 0,
+        promptFeedback: {
+          blockReason: promptFeedback?.blockReason || null,
+          blockReasonMessage: promptFeedback?.blockReasonMessage || null,
+        },
+        candidate0: candidate0 ? {
+          finishReason: candidate0.finishReason || null,
+          finishMessage: candidate0Record?.finishMessage || null,
+          safetyRatings: candidate0.safetyRatings || [],
+          partTypes,
+        } : null,
+        textLength: response.text?.length || 0,
+        usageMetadata: {
+          promptTokenCount: usageMetadata?.promptTokenCount || 0,
+          candidatesTokenCount: usageMetadata?.candidatesTokenCount || 0,
+          thoughtsTokenCount: usageMetadata?.thoughtsTokenCount || 0,
+          totalTokenCount: usageMetadata?.totalTokenCount || 0,
+        }
+      }, null, 2));
+
       return {
         content: response.text || '',
         model: modelName,
       };
     } catch (error: unknown) {
-      console.error('Error al llamar a Gemini API:', error);
+      console.error('[DIAGNOSTICO_GEMINI_ERROR]', error);
       const msg = error instanceof Error ? error.message : String(error);
       throw new Error(`Error en Gemini API: ${msg}`);
     }
