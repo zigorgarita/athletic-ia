@@ -3,7 +3,7 @@ import { createProvider } from '@/lib/ai/provider';
 import { supabase } from '@/lib/supabase';
 import { downloadFileFromUrl, validateDocumentBuffer, normalizeExtractionJson } from '@/lib/ai/document-parser';
 
-export const maxDuration = 60; // 60 segundos tiempo límite
+export const maxDuration = 300; // 300 segundos (plan Pro) — máximo permitido
 
 export async function POST(req: Request) {
   try {
@@ -302,13 +302,19 @@ DEVUELVE ÚNICAMENTE UN OBJETO JSON VÁLIDO CON ESTE ESQUEMA EXACTO:
       ],
     };
 
-    const aiResponse = await provider.chat(
+    // Timeout de seguridad: devolver JSON antes de que Vercel corte con 504 texto plano
+    const TIMEOUT_MS = 55_000;
+    const aiResponsePromise = provider.chat(
       [
         { role: 'system', content: systemPrompt },
         aiMessage,
       ],
       { temperature: 0.1 }
     );
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('La IA tardó demasiado en responder (>55 s). Inténtalo de nuevo.')), TIMEOUT_MS)
+    );
+    const aiResponse = await Promise.race([aiResponsePromise, timeoutPromise]);
 
     let rawJson: Record<string, unknown>;
     try {
@@ -417,7 +423,7 @@ DEVUELVE ÚNICAMENTE UN OBJETO JSON VÁLIDO CON ESTE ESQUEMA EXACTO:
     const msg = error instanceof Error ? error.message : String(error);
     return NextResponse.json(
       { error: msg || 'Error inesperado al procesar el documento' },
-      { status: 400 }
+      { status: 500 }
     );
   }
 }

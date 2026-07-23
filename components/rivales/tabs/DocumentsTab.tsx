@@ -58,12 +58,24 @@ export function DocumentsTab({ club, season }: DocumentsTabProps) {
         }),
       });
 
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Error al analizar documento con IA.');
+      // Lectura segura: primero texto, luego JSON parse — evita "Unexpected token" si Vercel devuelve texto plano (504)
+      const rawText = await res.text();
+      let data: Record<string, unknown> = {};
+      try {
+        data = JSON.parse(rawText);
+      } catch {
+        throw new Error(
+          res.ok
+            ? `Respuesta inesperada del servidor (no es JSON): ${rawText.slice(0, 200)}`
+            : `Error del servidor [${res.status}]: ${rawText.slice(0, 300)}`
+        );
       }
 
-      const extraction = data.extraction;
+      if (!res.ok || !data.success) {
+        throw new Error((data.error as string) || `Error al analizar documento [${res.status}]`);
+      }
+
+      const extraction = data.extraction as FlexibleReportExtraction | undefined;
       let totalObs = 0;
       if (extraction?.observacionesRival) {
         Object.values(extraction.observacionesRival).forEach((arr: unknown) => {
@@ -83,7 +95,7 @@ export function DocumentsTab({ club, season }: DocumentsTabProps) {
         throw new Error('La IA no ha podido extraer observaciones tácticas del documento. Comprueba que el archivo contiene información deportiva comprensible y reinténtalo.');
       }
 
-      setActiveExtraction(data.extraction);
+      setActiveExtraction(data.extraction as FlexibleReportExtraction);
       setActiveDocForReview(doc);
       setIsReviewModalOpen(true);
       await refetch();
