@@ -199,17 +199,6 @@ export async function POST(request: Request) {
 
     // 6. Consultar al proveedor de IA
     const provider = createProvider();
-
-    if (actionType === 'analyze_game_model') {
-      console.log('=== PRUEBA COMPARATIVA MINIMA [MINIMAL_PROMPT] ===');
-      try {
-        await provider.chat([{ role: 'user', content: 'Responde únicamente: OK' }]);
-      } catch (minErr) {
-        console.error('[MINIMAL_PROMPT_ERROR]', minErr);
-      }
-      console.log('=== PETICION REAL [REAL_ANALYZE_GAME_MODEL_PROMPT] ===');
-    }
-
     const response = await provider.chat(messagesForAI);
 
     // Cargar plan de partido si existe para obtener su ID real (evitando enviar el match_id que viola la FK)
