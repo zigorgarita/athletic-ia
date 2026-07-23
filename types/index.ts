@@ -222,6 +222,8 @@ export interface Match {
   jugado: boolean;
   created_at: string;
   tipo_partido?: 'LIGA' | 'AMISTOSO';
+  hora?: string | null;
+  campo?: string | null;
 }
 
 export interface MatchPlayerStats {

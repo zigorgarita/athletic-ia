@@ -11,9 +11,10 @@ import {
 } from 'lucide-react';
 import { useEditMode } from '@/context/EditModeContext';
 import { getDaysOfWeek, getDaysOfMonthGrid } from '@/lib/dateUtils';
-import { PlanningTaskLibrary } from '@/types';
 import { BibliotecaTareasModal } from './BibliotecaTareasModal';
 import { useClubLogos } from '@/hooks/useClubLogos';
+import { MatchBadge } from './MatchBadge';
+import { PlanningTaskLibrary, Match } from '@/types';
 
 // Mock material checklist interface
 interface MockChecklist {
@@ -112,7 +113,8 @@ export function PlanificacionClient() {
   const [players, setPlayers] = useState<MockPlayer[]>([]);
   const [allConceptsMap, setAllConceptsMap] = useState<Record<string, { id: string; session_id: string; categoria: string; concepto: string }[]>>({});
   const [sessionConcepts, setSessionConcepts] = useState<{ id?: string; session_id: string; categoria: string; concepto: string }[]>([]);
-  // Official match (Liga/Amistoso) falling within the visible week
+  // Official matches falling within the visible week/month range
+  const [weekMatches, setWeekMatches] = useState<Match[]>([]);
   const [weekMatch, setWeekMatch] = useState<{ rival: string; fecha: string; hora?: string; campo?: string; tipo_partido?: string } | null>(null);
   
   const [selectedDate, setSelectedDate] = useState<string>(() => {
@@ -285,16 +287,16 @@ export function PlanificacionClient() {
       setAllTasksMap(tasksMap);
       setAllConceptsMap(conceptsMap);
 
-      // Fetch official match (Liga/Amistoso) for this week range
+      // Fetch official matches (Liga/Amistoso) for this week/month range
       const { data: matchesData } = await supabase
         .from('matches')
-        .select('rival, fecha, tipo_partido')
+        .select('*')
         .gte('fecha', start)
         .lte('fecha', end)
-        .order('fecha', { ascending: true })
-        .limit(1);
+        .order('fecha', { ascending: true });
 
       if (matchesData && matchesData.length > 0) {
+        setWeekMatches(matchesData);
         const m = matchesData[0];
         setWeekMatch({
           rival: m.rival || '',
@@ -302,6 +304,7 @@ export function PlanificacionClient() {
           tipo_partido: m.tipo_partido || 'LIGA',
         });
       } else {
+        setWeekMatches([]);
         setWeekMatch(null);
       }
     } catch (err) {
@@ -1110,7 +1113,16 @@ export function PlanificacionClient() {
                 ? 'right-full top-0 mr-2' 
                 : 'left-full top-0 ml-2';
 
-              if (session.tipo_sesion === 'Partido') {
+              const officialMatch = weekMatches.find(m => m.fecha === session.fecha);
+
+              if (officialMatch || session.tipo_sesion === 'Partido') {
+                const matchRival = officialMatch?.rival || session.rival || 'Rival por definir';
+                const isHome = officialMatch ? officialMatch.es_local : true;
+                const matchHora = officialMatch?.hora || session.hora_inicio || null;
+                const matchCampo = officialMatch?.campo || session.campo_instalacion || null;
+                const matchJornada = officialMatch?.jornada;
+                const matchId = officialMatch?.id || session.id;
+
                 return (
                   <div
                     key={session.id}
@@ -1119,39 +1131,21 @@ export function PlanificacionClient() {
                       !isCurrentMonth ? 'opacity-40' : ''
                     }`}
                   >
-                    <div className="flex justify-between items-start">
+                    <div className="flex justify-between items-start mb-1">
                       <span className="text-xs font-black text-slate-400">{date.getDate()}</span>
                     </div>
 
-                    <div className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold px-2.5 py-2 rounded-lg text-[9px] tracking-wide shadow-[0_2px_8px_rgba(16,185,129,0.3)] block text-center space-y-1 transition-colors">
-                      <div className="flex items-center justify-between text-[7px] opacity-90 border-b border-emerald-500/35 pb-1 font-mono">
-                        <span>⏰ {session.hora_inicio || '12:00'}h</span>
-                        <span className="font-black text-amber-300">MATCH DAY</span>
-                      </div>
-                      <div className="flex items-center justify-center gap-1.5 py-0.5">
-                        <span className="filter drop-shadow text-xs">🛡️</span>
-                        <span className="truncate font-black max-w-[85px] uppercase">{session.rival || 'Rival por definir'}</span>
-                      </div>
-                    </div>
+                    <MatchBadge
+                      jornada={matchJornada}
+                      rival={matchRival}
+                      esLocal={isHome}
+                      fecha={session.fecha}
+                      hora={matchHora}
+                      campo={matchCampo}
+                      matchId={matchId}
+                    />
 
-                    <div className="h-2 w-full bg-transparent" />
-
-                    {/* Tooltip Táctico Flotante */}
-                    <div className={`absolute ${tooltipPos} w-60 p-4 rounded-xl bg-slate-950/95 border border-slate-800 shadow-2xl opacity-0 pointer-events-none group-hover/day:opacity-100 transition-opacity duration-200 z-30 space-y-2.5 backdrop-blur-md`}>
-                      <div className="flex items-center justify-between border-b border-slate-900 pb-1.5">
-                        <span className="text-[10px] font-black text-emerald-400 uppercase tracking-wider">🏆 Partido Oficial</span>
-                        <span className="text-[8px] px-1.5 py-0.5 rounded font-black bg-emerald-950 text-emerald-400">
-                          {session.estado}
-                        </span>
-                      </div>
-                      <div className="space-y-1.5 text-[10px] text-slate-400">
-                        <p className="font-bold text-slate-100 leading-snug">🛡️ Rival: <span className="text-white">{session.rival || 'Rival por definir'}</span></p>
-                        <p>📍 Campo: {session.campo_instalacion || 'Por definir'}</p>
-                        <p>⏰ Hora Citación: {session.hora_convocatoria || '11:00'}h</p>
-                        <p>👕 Ropa: {session.ropa_convocatoria || 'Oficial de juego'}</p>
-                        <p>⚡ Carga: <span className="font-bold text-slate-200">{session.carga}</span></p>
-                      </div>
-                    </div>
+                    <div className="h-1 w-full bg-transparent" />
                   </div>
                 );
               }
