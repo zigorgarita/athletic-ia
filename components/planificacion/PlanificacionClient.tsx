@@ -245,7 +245,7 @@ export function PlanificacionClient() {
       });
 
       const fullPeriodSessions: MockSession[] = days.map(day => {
-        const existing = dbSessions?.find(s => s.fecha === day);
+        const existing = dbSessions?.find(s => s.fecha === day && s.tipo_sesion !== 'Libre') || dbSessions?.find(s => s.fecha === day);
         if (existing) {
           return {
             id: existing.id,
@@ -941,7 +941,7 @@ export function PlanificacionClient() {
 
               // Direct match check using normalized YYYY-MM-DD
               const officialMatch = weekMatches.find(m => m.fecha === session.fecha);
-              const isMatchDay = !!officialMatch || session.tipo_sesion === 'Partido';
+              const isMatchDay = !!officialMatch || (weekMatches.length === 0 && session.tipo_sesion === 'Partido');
 
               if (isMatchDay) {
                 const matchRival = officialMatch?.rival || session.rival || 'Rival por definir';
@@ -1179,8 +1179,9 @@ export function PlanificacionClient() {
                 : 'left-full top-0 ml-2';
 
               const officialMatch = weekMatches.find(m => m.fecha === session.fecha);
+              const isMatchDay = !!officialMatch || (weekMatches.length === 0 && session.tipo_sesion === 'Partido');
 
-              if (officialMatch || session.tipo_sesion === 'Partido') {
+              if (isMatchDay) {
                 const matchRival = officialMatch?.rival || session.rival || 'Rival por definir';
                 const isHome = officialMatch ? officialMatch.es_local : true;
                 const matchHora = officialMatch?.hora || session.hora_inicio || null;
