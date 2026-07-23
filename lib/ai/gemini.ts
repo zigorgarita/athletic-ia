@@ -6,11 +6,16 @@ export class GeminiProvider implements AIProvider {
 
   async chat(messages: AIMessage[], config?: Partial<AIProviderConfig>): Promise<AIResponse> {
     const apiKey = config?.apiKey || process.env.GEMINI_API_KEY || process.env.GOOGLE_GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '';
-    const modelName = config?.model || process.env.AI_MODEL || 'gemini-2.0-flash';
+    const modelName = config?.model || process.env.AI_MODEL;
 
     if (!apiKey) {
       throw new Error('GEMINI_API_KEY o GOOGLE_GEMINI_API_KEY no está configurada.');
     }
+    if (!modelName) {
+      throw new Error('AI_MODEL no está configurada en las variables de entorno. Configura la variable AI_MODEL en Vercel.');
+    }
+
+    console.log(`[GEMINI] Modelo activo: ${modelName}`);
 
     const ai = new GoogleGenAI({ apiKey });
 
