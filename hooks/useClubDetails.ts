@@ -11,6 +11,7 @@ export function useClubDetails(clubId: string, temporada: string = '2026-27') {
   const [club, setClub] = useState<Club | null>(null);
   const [season, setSeason] = useState<ClubSeason | null>(null);
   const [completitud, setCompletitud] = useState(0);
+  const [estadoScoutingCalculado, setEstadoScoutingCalculado] = useState<string>('Sin analizar');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { verifyWritePermission } = useEditMode();
@@ -69,6 +70,33 @@ export function useClubDetails(clubId: string, temporada: string = '2026-27') {
       const filled = checks.filter(Boolean).length;
       setCompletitud(Math.round((filled / checks.length) * 100));
 
+      // Calcular estado_scouting_calculado dinámicamente desde club_documents
+      const { data: docsData } = await supabase
+        .from('club_documents')
+        .select('estado_analisis, is_current_version')
+        .eq('club_id', clubId);
+
+      const currentDocs = (docsData || []).filter(d => (d as any).is_current_version !== false);
+      let calculatedScouting = seasonData?.estado_scouting || 'Sin analizar';
+
+      if (currentDocs.length > 0) {
+        const total = currentDocs.length;
+        const analizados = currentDocs.filter(d => d.estado_analisis === 'analizado').length;
+        const pendientes = currentDocs.filter(d => d.estado_analisis === 'pendiente_confirmar').length;
+
+        if (analizados === total) {
+          calculatedScouting = 'Completo';
+        } else if (pendientes > 0) {
+          calculatedScouting = 'Pendiente de confirmar';
+        } else if (analizados > 0) {
+          calculatedScouting = 'Parcial';
+        } else {
+          calculatedScouting = 'Sin analizar';
+        }
+      }
+
+      setEstadoScoutingCalculado(calculatedScouting);
+
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error al cargar';
       setError(msg);
@@ -125,5 +153,5 @@ export function useClubDetails(clubId: string, temporada: string = '2026-27') {
     }
   };
 
-  return { club, season, completitud, loading, error, refetch: loadData, updateClub, updateSeason };
+  return { club, season, completitud, estadoScoutingCalculado, loading, error, refetch: loadData, updateClub, updateSeason };
 }

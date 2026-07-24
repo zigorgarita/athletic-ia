@@ -59,7 +59,7 @@ function TabPlaceholder({ icon: Icon, label }: { icon: any; label: string }) {
 
 export function RivalDetailsClient({ rivalId }: { rivalId: string }) {
   const router = useRouter();
-  const { club, season, completitud, loading, updateClub, updateSeason } = useClubDetails(rivalId, '2026-27');
+  const { club, season, completitud, estadoScoutingCalculado, loading, updateClub, updateSeason } = useClubDetails(rivalId, '2026-27');
   const [activeTab, setActiveTab] = useState<TabType>('GENERAL');
 
   if (loading) {
@@ -175,16 +175,18 @@ export function RivalDetailsClient({ rivalId }: { rivalId: string }) {
               <div>
                 <div className="text-[10px] uppercase font-bold text-slate-500 mb-1.5 tracking-wider">Estado Scouting</div>
                 <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border ${
-                  season?.estado_scouting === 'Completo' ? 'bg-emerald-950/50 text-emerald-400 border-emerald-900/30' :
-                  season?.estado_scouting === 'Parcial' ? 'bg-amber-950/50 text-amber-400 border-amber-900/30' :
+                  (estadoScoutingCalculado || season?.estado_scouting) === 'Completo' ? 'bg-emerald-950/50 text-emerald-400 border-emerald-900/30' :
+                  (estadoScoutingCalculado || season?.estado_scouting) === 'Pendiente de confirmar' ? 'bg-yellow-950/50 text-yellow-400 border-yellow-900/30' :
+                  (estadoScoutingCalculado || season?.estado_scouting) === 'Parcial' ? 'bg-amber-950/50 text-amber-400 border-amber-900/30' :
                   'bg-red-950/50 text-red-400 border-red-900/30'
                 }`}>
                   <span className={`w-1.5 h-1.5 rounded-full ${
-                    season?.estado_scouting === 'Completo' ? 'bg-emerald-500' :
-                    season?.estado_scouting === 'Parcial' ? 'bg-amber-500' :
+                    (estadoScoutingCalculado || season?.estado_scouting) === 'Completo' ? 'bg-emerald-500' :
+                    (estadoScoutingCalculado || season?.estado_scouting) === 'Pendiente de confirmar' ? 'bg-yellow-400' :
+                    (estadoScoutingCalculado || season?.estado_scouting) === 'Parcial' ? 'bg-amber-500' :
                     'bg-red-500'
                   } animate-pulse`} />
-                  {season?.estado_scouting || 'Sin analizar'}
+                  {estadoScoutingCalculado || season?.estado_scouting || 'Sin analizar'}
                 </span>
               </div>
 

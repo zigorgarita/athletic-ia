@@ -12,8 +12,15 @@ export interface ClubDocument {
   url: string;
   comentario: string | null;
   fecha: string | null;
-  estado_analisis?: 'pendiente' | 'analizado' | 'error' | null;
+  estado_analisis?: 'sin_analizar' | 'pendiente_confirmar' | 'analizado' | 'error' | null;
   extraccion_json?: any | null;
+  analysis_generated_at?: string | null;
+  analyzed_at?: string | null;
+  file_hash?: string | null;
+  document_group_id?: string | null;
+  version?: number;
+  parent_document_id?: string | null;
+  is_current_version?: boolean;
   created_at: string;
 }
 
@@ -21,7 +28,7 @@ export function useClubDocuments(clubId: string | undefined, seasonId: string | 
   const [documents, setDocuments] = useState<ClubDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { verifyWritePermission } = useEditMode();
+  const { verifyWritePermission, currentUser } = useEditMode();
 
   const loadDocuments = useCallback(async () => {
     if (!clubId && !seasonId) return;
@@ -55,27 +62,57 @@ export function useClubDocuments(clubId: string | undefined, seasonId: string | 
     try {
       if (!clubId) throw new Error('No club ID');
       verifyWritePermission();
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
-      
-      const isNew = !data.id;
-      const payload = { 
-        ...data, 
-        club_id: clubId,
-        club_season_id: data.club_season_id || seasonId || null 
-      };
-      
-      const { error: rpcErr } = await supabase.rpc('exec_secure_upsert', {
-        target_table: 'club_documents',
-        payload: payload,
-        conflict_columns: isNew ? null : '{id}',
-        staff_passkey: passkey,
+      setError(null);
+
+      const editorUser = currentUser?.id || 'zigor';
+      const editorPass = currentUser?.pass || (
+        editorUser === 'zigor' ? (process.env.NEXT_PUBLIC_EDIT_PASSWORD_ZIGOR || '')
+        : editorUser === 'aitor' ? (process.env.NEXT_PUBLIC_EDIT_PASSWORD_AITOR || '')
+        : editorUser === 'nacho' ? (process.env.NEXT_PUBLIC_EDIT_PASSWORD_NACHO || '')
+        : ''
+      );
+
+      const res = await fetch('/api/rivales/save-document', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-editor-user': editorUser,
+          'x-editor-pass': editorPass,
+        },
+        body: JSON.stringify({
+          clubId,
+          clubSeasonId: data.club_season_id || seasonId || null,
+          nombre: data.nombre,
+          url: data.url,
+          tipo: data.tipo,
+          fecha: data.fecha,
+          comentario: data.comentario,
+        }),
       });
 
-      if (rpcErr) throw rpcErr;
+      const resText = await res.text();
+      let resJson: Record<string, any> = {};
+      try {
+        resJson = JSON.parse(resText);
+      } catch {
+        throw new Error(`Error en respuesta del servidor [${res.status}]: ${resText.slice(0, 150)}`);
+      }
+
+      if (!res.ok) {
+        throw new Error(resJson.error || `Error al guardar documento [${res.status}]`);
+      }
+
+      if (resJson.isDuplicate) {
+        alert(resJson.message);
+        return false;
+      }
+
       await loadDocuments();
       return true;
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Error al guardar documento');
+      const msg = err instanceof Error ? err.message : 'Error al guardar documento';
+      setError(msg);
+      alert(`No se pudo guardar el documento: ${msg}`);
       return false;
     }
   };

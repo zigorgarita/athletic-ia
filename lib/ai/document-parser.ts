@@ -40,13 +40,59 @@ export function transformGoogleDriveUrl(url: string): string {
   return url;
 }
 
+const ALLOWED_DOMAINS = [
+  'drive.google.com',
+  'docs.google.com',
+  'www.dropbox.com',
+  'dl.dropboxusercontent.com',
+  'supabase.co',
+  'storage.googleapis.com',
+];
+
+const BLOCKED_PATTERNS = [
+  /^https?:\/\/localhost/i,
+  /^https?:\/\/127\./,
+  /^https?:\/\/10\./,
+  /^https?:\/\/192\.168\./,
+  /^https?:\/\/172\.(1[6-9]|2\d|3[01])\./,
+  /^https?:\/\/0\./,
+  /^https?:\/\/\[::1\]/,
+  /^https?:\/\/metadata\.google\.internal/i,
+];
+
+export function validateDownloadUrl(url: string): void {
+  if (!url || typeof url !== 'string') {
+    throw new Error('URL de documento no especificada.');
+  }
+
+  for (const pattern of BLOCKED_PATTERNS) {
+    if (pattern.test(url)) {
+      throw new Error('La URL especificada apunta a una dirección interna o no permitida.');
+    }
+  }
+
+  let hostname: string;
+  try {
+    hostname = new URL(url).hostname;
+  } catch {
+    throw new Error('La URL especificada no tiene un formato válido.');
+  }
+
+  const isAllowed = ALLOWED_DOMAINS.some(d => hostname === d || hostname.endsWith('.' + d));
+  if (!isAllowed) {
+    throw new Error(`El dominio de la URL ("${hostname}") no está en la lista de orígenes de almacenamiento autorizados.`);
+  }
+}
+
 /**
  * Descarga los bytes del archivo desde una URL y maneja reintentos de confirmación en Google Drive.
  */
 export async function downloadFileFromUrl(rawUrl: string): Promise<{ buffer: Buffer; contentType: string }> {
+  validateDownloadUrl(rawUrl);
   const targetUrl = transformGoogleDriveUrl(rawUrl);
 
   const response = await fetch(targetUrl, {
+    signal: AbortSignal.timeout(30_000),
     headers: {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     },
@@ -72,6 +118,7 @@ export async function downloadFileFromUrl(rawUrl: string): Promise<{ buffer: Buf
         : `${targetUrl}&confirm=${confirmMatch[1]}`;
 
       const retryRes = await fetch(confirmUrl, {
+        signal: AbortSignal.timeout(30_000),
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
         },

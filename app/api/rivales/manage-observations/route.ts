@@ -32,23 +32,43 @@ export async function POST(req: Request) {
     const supabaseServer = getSupabaseServerClient();
 
     if (action === 'save_approved_observations') {
-      const { rows } = payload;
+      const { rows, documentId } = payload;
       if (!Array.isArray(rows) || rows.length === 0) {
         return NextResponse.json({ error: 'No se recibieron filas de observaciones para guardar.' }, { status: 400 });
       }
 
-      // Inserción en servidor mediante Supabase Service Client
-      const { data, error } = await supabaseServer
-        .from('club_report_observations')
-        .insert(rows)
-        .select('id');
+      const targetDocId = documentId || rows.find((r: Record<string, unknown>) => r.document_id)?.document_id;
 
-      if (error) {
-        console.error('Error al guardar observaciones en Supabase (INSERT):', error);
-        return NextResponse.json({ error: `Error en base de datos al guardar observaciones: ${formatErrorMessage(error)}` }, { status: 500 });
+      if (targetDocId) {
+        // Ejecución atómica y transaccional mediante RPC PostgreSQL
+        const { data: rpcCount, error: rpcErr } = await supabaseServer.rpc('replace_document_observations', {
+          p_document_id: targetDocId,
+          p_rows: rows,
+        });
+
+        if (rpcErr) {
+          console.error('Error al reemplazar observaciones vía RPC replace_document_observations:', rpcErr);
+          return NextResponse.json(
+            { error: `Error atómico al guardar observaciones: ${formatErrorMessage(rpcErr)}` },
+            { status: 500 }
+          );
+        }
+
+        return NextResponse.json({ success: true, count: rpcCount || rows.length });
+      } else {
+        // Fallback si no viene document_id
+        const { data, error } = await supabaseServer
+          .from('club_report_observations')
+          .insert(rows)
+          .select('id');
+
+        if (error) {
+          console.error('Error al guardar observaciones sin document_id:', error);
+          return NextResponse.json({ error: `Error al guardar observaciones: ${formatErrorMessage(error)}` }, { status: 500 });
+        }
+
+        return NextResponse.json({ success: true, count: data?.length || 0 });
       }
-
-      return NextResponse.json({ success: true, count: data?.length || 0 });
     }
 
     if (action === 'toggle_report_selection') {

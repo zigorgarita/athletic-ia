@@ -54,6 +54,12 @@ export interface ClubSeason {
 export interface ClubWithSeason extends Club {
   season?: ClubSeason;
   completitud?: number;
+  estado_scouting_calculado?: string;
+  doc_stats?: {
+    total: number;
+    analizados: number;
+    pendientes: number;
+  };
 }
 
 /** Calcula el índice de completitud (0-100) en base a qué secciones tienen datos */
@@ -116,8 +122,9 @@ export function useClubs(temporada: string = '2026-27') {
         seasonMap[s.club_id] = s;
       });
 
-      // Fetch counts for completitud index
+      // Fetch counts for completitud index and document states
       const seasonIds = seasonsData?.map((s: ClubSeason) => s.id) || [];
+      const clubIds = clubsData?.map((c: Club) => c.id) || [];
 
       let playerCounts: Record<string, number> = {};
       let staffCounts: Record<string, number> = {};
@@ -125,6 +132,7 @@ export function useClubs(temporada: string = '2026-27') {
       let videoCounts: Record<string, number> = {};
       let reportCounts: Record<string, number> = {};
       let aiReportCounts: Record<string, number> = {};
+      let docStatsMap: Record<string, { total: number; analizados: number; pendientes: number }> = {};
 
       if (seasonIds.length > 0) {
         // Players count per season
@@ -174,7 +182,6 @@ export function useClubs(temporada: string = '2026-27') {
       }
 
       // Videos count per club
-      const clubIds = clubsData?.map((c: Club) => c.id) || [];
       if (clubIds.length > 0) {
         const { data: vids } = await supabase
           .from('club_videos')
@@ -182,6 +189,27 @@ export function useClubs(temporada: string = '2026-27') {
           .in('club_id', clubIds);
         vids?.forEach((v: { club_id: string }) => {
           videoCounts[v.club_id] = (videoCounts[v.club_id] || 0) + 1;
+        });
+
+        // Fetch club_documents state for current versions
+        const { data: docs } = await supabase
+          .from('club_documents')
+          .select('club_id, estado_analisis, is_current_version')
+          .in('club_id', clubIds);
+
+        docs?.forEach((d: { club_id: string; estado_analisis: string | null; is_current_version?: boolean }) => {
+          // Solo considerar versiones vigentes si la columna existe, o todas si es legacy
+          if (d.is_current_version !== false) {
+            if (!docStatsMap[d.club_id]) {
+              docStatsMap[d.club_id] = { total: 0, analizados: 0, pendientes: 0 };
+            }
+            docStatsMap[d.club_id].total += 1;
+            if (d.estado_analisis === 'analizado') {
+              docStatsMap[d.club_id].analizados += 1;
+            } else if (d.estado_analisis === 'pendiente_confirmar') {
+              docStatsMap[d.club_id].pendientes += 1;
+            }
+          }
         });
       }
 
@@ -197,10 +225,28 @@ export function useClubs(temporada: string = '2026-27') {
           reports: reportCounts[sId] || 0,
           ai_reports: aiReportCounts[sId] || 0,
         };
+
+        const dStats = docStatsMap[club.id] || { total: 0, analizados: 0, pendientes: 0 };
+
+        let estadoCalculado = season?.estado_scouting || 'Sin analizar';
+        if (dStats.total > 0) {
+          if (dStats.analizados === dStats.total) {
+            estadoCalculado = 'Completo';
+          } else if (dStats.pendientes > 0) {
+            estadoCalculado = 'Pendiente de confirmar';
+          } else if (dStats.analizados > 0) {
+            estadoCalculado = 'Parcial';
+          } else {
+            estadoCalculado = 'Sin analizar';
+          }
+        }
+
         return {
           ...club,
           season,
           completitud: calcCompletitud(club, counts),
+          estado_scouting_calculado: estadoCalculado,
+          doc_stats: dStats,
         };
       });
 

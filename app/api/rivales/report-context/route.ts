@@ -107,26 +107,46 @@ export async function POST(req: Request) {
       }
     }
 
-    // 5. Cargar observaciones aprobadas únicamente si existe targetClubId o validSeasonId
+    // 5. Cargar observaciones aprobadas únicamente de documentos cuyo estado_analisis sea 'analizado'
     let rawObs: Record<string, unknown>[] = [];
     if (targetClubId || validSeasonId) {
-      let obsQuery = supabaseServer
-        .from('club_report_observations')
-        .select('*')
-        .eq('status', 'aprobado');
+      // Obtenemos los IDs de documentos analizados para este club / temporada
+      let docQuery = supabaseServer
+        .from('club_documents')
+        .select('id, estado_analisis');
 
-      if (targetClubId) {
-        obsQuery = obsQuery.eq('club_id', targetClubId);
-      }
-      if (validSeasonId) {
-        obsQuery = obsQuery.eq('club_season_id', validSeasonId);
-      }
+      if (targetClubId) docQuery = docQuery.eq('club_id', targetClubId);
+      if (validSeasonId) docQuery = docQuery.eq('club_season_id', validSeasonId);
 
-      const { data: obsData, error: obsErr } = await obsQuery;
-      if (obsErr) {
-        console.warn('Advertencia consultando observaciones aprobadas:', obsErr);
-      } else if (obsData) {
-        rawObs = obsData as Record<string, unknown>[];
+      const { data: docs } = await docQuery;
+
+      // Documentos válidos analizados (o legacy donde estado_analisis aún sea NULL tras migración inicial)
+      const analyzedDocIds = (docs || [])
+        .filter(d => d.estado_analisis === 'analizado' || d.estado_analisis === null)
+        .map(d => d.id);
+
+      if (analyzedDocIds.length > 0 || (docs || []).length === 0) {
+        let obsQuery = supabaseServer
+          .from('club_report_observations')
+          .select('*')
+          .eq('status', 'aprobado');
+
+        if (targetClubId) {
+          obsQuery = obsQuery.eq('club_id', targetClubId);
+        }
+        if (validSeasonId) {
+          obsQuery = obsQuery.eq('club_season_id', validSeasonId);
+        }
+        if (analyzedDocIds.length > 0) {
+          obsQuery = obsQuery.in('document_id', analyzedDocIds);
+        }
+
+        const { data: obsData, error: obsErr } = await obsQuery;
+        if (obsErr) {
+          console.warn('Advertencia consultando observaciones aprobadas:', obsErr);
+        } else if (obsData) {
+          rawObs = obsData as Record<string, unknown>[];
+        }
       }
     }
 

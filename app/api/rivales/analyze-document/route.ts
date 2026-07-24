@@ -1,12 +1,21 @@
 import { NextResponse } from 'next/server';
 import { createProvider } from '@/lib/ai/provider';
-import { supabase } from '@/lib/supabase';
+import { getSupabaseServerClient } from '@/lib/supabase-server';
+import { verifyServerAuthorization } from '@/lib/auth-server';
 import { downloadFileFromUrl, validateDocumentBuffer, normalizeExtractionJson } from '@/lib/ai/document-parser';
 
 export const maxDuration = 300; // 300 segundos (plan Pro) — máximo permitido
 
 export async function POST(req: Request) {
   try {
+    const authCheck = await verifyServerAuthorization(req);
+    if (!authCheck.authorized) {
+      return NextResponse.json(
+        { error: authCheck.error || 'Acceso no autorizado a análisis de documentos.' },
+        { status: 401 }
+      );
+    }
+
     const body = await req.json();
     const { documentId, rivalName, season, fileUrl, fileBase64, mimeType: providedMime } = body;
     const targetSeason = season || '2026/2027';
@@ -19,8 +28,10 @@ export async function POST(req: Request) {
     let targetDocName = 'Documento de Scouting';
     let targetDocDate = new Date().toISOString().split('T')[0];
 
+    const supabaseServer = getSupabaseServerClient();
+
     if (documentId) {
-      const { data: doc, error: docErr } = await supabase
+      const { data: doc, error: docErr } = await supabaseServer
         .from('club_documents')
         .select('*')
         .eq('id', documentId)
@@ -391,22 +402,23 @@ DEVUELVE ÚNICAMENTE UN OBJETO JSON VÁLIDO CON ESTE ESQUEMA EXACTO:
       });
     }
 
-    // Guardar la versión RAW (extraccion_original) en Supabase de forma inmutable
+    // Guardar la versión RAW (extraccion_json) en Supabase marcando pendiente_confirmar
     if (documentId) {
-      try {
-        const passkey = process.env.COACH_STAFF_PASSKEY;
-        await supabase.rpc('exec_secure_upsert', {
-          target_table: 'club_documents',
-          payload: {
-            id: documentId,
-            estado_analisis: 'analizado',
-            extraccion_json: extraction,
-          },
-          conflict_columns: '{id}',
-          staff_passkey: passkey,
-        });
-      } catch (dbErr) {
-        console.warn('Advertencia al guardar RAW en club_documents:', dbErr);
+      const { error: dbErr } = await supabaseServer
+        .from('club_documents')
+        .update({
+          estado_analisis: 'pendiente_confirmar',
+          extraccion_json: extraction,
+          analysis_generated_at: new Date().toISOString(),
+        })
+        .eq('id', documentId);
+
+      if (dbErr) {
+        console.error('[analyze-document] Error al actualizar estado en club_documents:', dbErr);
+        return NextResponse.json(
+          { error: `El informe fue analizado por la IA pero ocurrió un error al guardar el borrador: ${dbErr.message}` },
+          { status: 500 }
+        );
       }
     }
 

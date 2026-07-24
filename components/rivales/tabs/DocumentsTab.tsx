@@ -266,14 +266,24 @@ export function DocumentsTab({ club, season }: DocumentsTabProps) {
 
               {/* Acciones de Análisis IA */}
               <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between">
-                <span className="text-[10px] font-semibold text-slate-500 flex items-center gap-1">
-                  {doc.extraccion_json ? (
+                <span className="text-[10px] font-semibold flex items-center gap-1">
+                  {doc.estado_analisis === 'analizado' ? (
                     <span className="text-emerald-400 font-bold flex items-center gap-1">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                      Analizado & Validado
+                      Analizado {doc.analyzed_at ? `(${new Date(doc.analyzed_at).toLocaleDateString('es-ES')})` : ''}
+                    </span>
+                  ) : doc.estado_analisis === 'pendiente_confirmar' || doc.extraccion_json ? (
+                    <span className="text-yellow-400 font-bold flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse" />
+                      Pendiente de confirmar
+                    </span>
+                  ) : doc.estado_analisis === 'error' ? (
+                    <span className="text-red-400 font-bold flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
+                      Error al procesar
                     </span>
                   ) : (
-                    <span>Sin analizar</span>
+                    <span className="text-slate-500">Sin analizar</span>
                   )}
                 </span>
 
@@ -286,7 +296,13 @@ export function DocumentsTab({ club, season }: DocumentsTabProps) {
                   className="px-3 py-1.5 rounded-xl bg-[#CC0E21]/10 hover:bg-[#CC0E21] text-[#CC0E21] hover:text-white border border-[#CC0E21]/30 text-xs font-bold transition-all flex items-center gap-1.5"
                 >
                   <Sparkles className={`h-3.5 w-3.5 ${analyzingDocId === doc.id ? 'animate-spin' : ''}`} />
-                  {analyzingDocId === doc.id ? 'Analizando...' : doc.extraccion_json ? 'Revisar Ingestión' : 'Analizar informe con IA'}
+                  {analyzingDocId === doc.id
+                    ? 'Analizando...'
+                    : doc.estado_analisis === 'analizado'
+                    ? 'Ver análisis'
+                    : doc.extraccion_json || doc.estado_analisis === 'pendiente_confirmar'
+                    ? 'Revisar Ingestión'
+                    : 'Analizar informe con IA'}
                 </button>
               </div>
             </div>

@@ -44,6 +44,11 @@ function ScoutingBadge({ estado }: { estado: string }) {
       text: 'text-red-400',
       bg: 'bg-red-950/50 border-red-900/30',
     },
+    'Pendiente de confirmar': {
+      dot: 'bg-yellow-500',
+      text: 'text-yellow-400',
+      bg: 'bg-yellow-950/50 border-yellow-900/30',
+    },
     Parcial: {
       dot: 'bg-amber-500',
       text: 'text-amber-400',
@@ -87,7 +92,7 @@ export function RivalesClient() {
     }
     if (scoutingFilter !== 'all') {
       result = result.filter(
-        (c) => (c.season?.estado_scouting || 'Sin analizar') === scoutingFilter
+        (c) => (c.estado_scouting_calculado || c.season?.estado_scouting || 'Sin analizar') === scoutingFilter
       );
     }
     return result;
@@ -97,10 +102,10 @@ export function RivalesClient() {
   const stats = useMemo(() => {
     const total = clubs.length;
     const completos = clubs.filter(
-      (c) => c.season?.estado_scouting === 'Completo'
+      (c) => (c.estado_scouting_calculado || c.season?.estado_scouting) === 'Completo'
     ).length;
     const parciales = clubs.filter(
-      (c) => c.season?.estado_scouting === 'Parcial'
+      (c) => (c.estado_scouting_calculado || c.season?.estado_scouting) === 'Parcial'
     ).length;
     const sinAnalizar = total - completos - parciales;
     const avgCompletitud =
@@ -254,7 +259,7 @@ export function RivalesClient() {
                 {/* Badge scouting - esquina superior derecha */}
                 <div className="absolute top-3 right-3">
                   <ScoutingBadge
-                    estado={club.season?.estado_scouting || 'Sin analizar'}
+                    estado={club.estado_scouting_calculado || club.season?.estado_scouting || 'Sin analizar'}
                   />
                 </div>
               </div>
