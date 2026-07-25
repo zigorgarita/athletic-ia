@@ -39,36 +39,28 @@ export async function POST(req: Request) {
 
       const targetDocId = documentId || rows.find((r: Record<string, unknown>) => r.document_id)?.document_id;
 
-      if (targetDocId) {
-        // Ejecución atómica y transaccional mediante RPC PostgreSQL
-        const { data: rpcCount, error: rpcErr } = await supabaseServer.rpc('replace_document_observations', {
-          p_document_id: targetDocId,
-          p_rows: rows,
-        });
-
-        if (rpcErr) {
-          console.error('Error al reemplazar observaciones vía RPC replace_document_observations:', rpcErr);
-          return NextResponse.json(
-            { error: `Error atómico al guardar observaciones: ${formatErrorMessage(rpcErr)}` },
-            { status: 500 }
-          );
-        }
-
-        return NextResponse.json({ success: true, count: rpcCount || rows.length });
-      } else {
-        // Fallback si no viene document_id
-        const { data, error } = await supabaseServer
-          .from('club_report_observations')
-          .insert(rows)
-          .select('id');
-
-        if (error) {
-          console.error('Error al guardar observaciones sin document_id:', error);
-          return NextResponse.json({ error: `Error al guardar observaciones: ${formatErrorMessage(error)}` }, { status: 500 });
-        }
-
-        return NextResponse.json({ success: true, count: data?.length || 0 });
+      if (!targetDocId) {
+        return NextResponse.json(
+          { error: 'No se pudo determinar el document_id. Las observaciones no se guardaron.' },
+          { status: 400 }
+        );
       }
+
+      // Ejecución atómica y transaccional mediante RPC PostgreSQL
+      const { data: rpcCount, error: rpcErr } = await supabaseServer.rpc('replace_document_observations', {
+        p_document_id: targetDocId,
+        p_rows: rows,
+      });
+
+      if (rpcErr) {
+        console.error('Error al reemplazar observaciones vía RPC replace_document_observations:', rpcErr);
+        return NextResponse.json(
+          { error: `Error atómico al guardar observaciones: ${formatErrorMessage(rpcErr)}` },
+          { status: 500 }
+        );
+      }
+
+      return NextResponse.json({ success: true, count: rpcCount || rows.length });
     }
 
     if (action === 'toggle_report_selection') {
