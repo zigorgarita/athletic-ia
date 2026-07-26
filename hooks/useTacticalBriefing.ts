@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useEditMode } from '@/context/EditModeContext';
 import { getStaffPasskey } from '@/lib/passkey';
+import { Observation } from '@/types';
 
 export interface BriefingPlayerPayload {
   id: string;
@@ -31,6 +32,7 @@ export interface TacticalBriefingPayload {
   zonaConflicto: string;
   dueloClave: string;
   tareasLineas: string;
+  validatedRivalInsights?: Observation[];
   onceInicial?: BriefingPlayerPayload[];
   roleCards?: BriefingRoleCardPayload[];
 }

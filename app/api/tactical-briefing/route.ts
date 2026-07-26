@@ -56,6 +56,7 @@ export async function POST(request: Request) {
       zonaConflicto,
       dueloClave,
       tareasLineas,
+      validatedRivalInsights,
       onceInicial,
       roleCards
     } = body as {
@@ -68,6 +69,12 @@ export async function POST(request: Request) {
       zonaConflicto: string;
       dueloClave: string;
       tareasLineas: string;
+      validatedRivalInsights?: Array<{
+        categoria?: string;
+        contenido?: string;
+        texto?: string;
+        origen?: string;
+      }>;
       onceInicial?: Array<{
         id: string;
         nombre: string;
@@ -103,24 +110,33 @@ CRÍTICO: Cada consigna o pauta individual que generes debe tener un MÁXIMO DE 
     let compiledPrompt = '';
 
     if (actionType === 'synthesize_lines') {
+      const obsFormatted = validatedRivalInsights && validatedRivalInsights.length > 0
+        ? `OBSERVACIONES DEL INFORME RIVAL DE SCOUTING (DOCUMENTO SELECCIONADO):
+${validatedRivalInsights.map(o => `- [${o.categoria || 'Observación'}] ${o.contenido || o.texto || ''}`).join('\n')}`
+        : 'Sin observaciones específicas del informe rival.';
+
       compiledPrompt = `
 TAREA: Genera las consignas de briefing para las 4 líneas principales del equipo (Portería, Defensa, Mediocampo, Delantera).
-Debes basarte en el enfrentamiento estructural y el análisis táctico de la Página 3.
+Debes basarte estrictamente en las observaciones del informe de scouting del rival y el enfrentamiento estructural de sistemas.
 
-DATOS DEL MATCHUP DEL PARTIDO:
+DATOS DEL INFORME RIVAL Y DEL MATCHUP DE ESTE PARTIDO:
 - Rival: vs ${rivalName || 'Rival'}
 - Sistemas: Nuestro ${sistemaPropio} contra su ${sistemaRival}
 - Ventajas detectadas: ${ventajas || 'Sin ventajas definidas'}
 - Riesgos/Desventajas: ${desventajas || 'Sin riesgos definidos'}
 - Zona de conflicto clave: ${zonaConflicto || 'Sin zona de conflicto definida'}
 - Duelo táctico principal: ${dueloClave || 'Sin duelo clave definido'}
+
+${obsFormatted}
+
 - Notas previas del entrenador por líneas:
 ${tareasLineas || 'No hay notas previas.'}
 
-INSTRUCCIONES DE FORMATO:
-- Genera EXACTAMENTE 3 consignas clave para cada una de las 4 líneas (Portería, Defensa, Mediocampo, Delantera).
+INSTRUCCIONES DE FORMATO Y CONTENIDO:
+- Analiza minuciosamente las observaciones del informe rival y traduce la información táctica clave en consignas directas por cada línea (Portería, Defensa, Mediocampo, Delantera).
+- Genera EXACTAMENTE 3 consignas clave para cada una de las 4 líneas.
 - Cada consigna debe ser una frase ultra-corta e imperativa de un MÁXIMO DE 10 PALABRAS (ej. "Vigila basculación al intervalo lateral", "Inicia en corto con apoyos escalonados").
-- Responde estrictamente con un objeto JSON, sin triple backticks de markdown ni texto externo.
+- Responde strictly con un objeto JSON, sin triple backticks de markdown ni texto externo.
 
 ESTRUCTURA DE RETORNO JSON:
 {

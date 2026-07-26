@@ -1314,6 +1314,7 @@ export function TacticaClient() {
         sistemaPropio={selectedFormation}
         sistemaRival={rivalFormation}
         isEditMode={isEditMode}
+        approvedObservations={approvedReportObservations}
         onNodeClick={(node) => handleOpenNodeEditor('propio', node)}
         onTareasLineasChange={setTareasLineas}
         onApplyRoleCards={handleApplyRoleCards}

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { TacticalRoleCard, PositionNode, Player } from '@/types';
+import { TacticalRoleCard, PositionNode, Player, Observation } from '@/types';
 import { useTacticalBriefing, BriefingPlayerPayload, BriefingRoleCardPayload } from '@/hooks/useTacticalBriefing';
 import { 
   LayoutList, Trophy, ShieldAlert, Sparkles, 
@@ -22,6 +22,7 @@ interface BriefingViewProps {
   sistemaPropio: string;
   sistemaRival: string;
   isEditMode: boolean;
+  approvedObservations?: Observation[];
   onNodeClick: (node: PositionNode) => void;
   onTareasLineasChange: (val: string) => void;
   onApplyRoleCards: (cards: Partial<TacticalRoleCard>[]) => Promise<boolean>;
@@ -42,29 +43,59 @@ function parseLineBriefing(text: string): LineBriefing {
     delantera: ['', '', '']
   };
 
-  if (!text) return result;
+  if (!text || typeof text !== 'string') return result;
 
-  const sections = text.split('\n\n');
-  sections.forEach(sec => {
-    const lines = sec.split('\n');
-    const header = lines[0]?.replace(':', '').trim().toLowerCase();
-    
-    let key: keyof LineBriefing | null = null;
-    if (header === 'portería' || header === 'porteria') key = 'porteria';
-    else if (header === 'defensa') key = 'defensa';
-    else if (header === 'mediocampo' || header === 'medios') key = 'mediocampo';
-    else if (header === 'delantera' || header === 'ataque') key = 'delantera';
+  const getLineKey = (str: string): keyof LineBriefing | null => {
+    const s = str.trim().toLowerCase();
+    if (s.startsWith('portería') || s.startsWith('porteria') || s.startsWith('por')) return 'porteria';
+    if (s.startsWith('defensa') || s.startsWith('def')) return 'defensa';
+    if (s.startsWith('mediocampo') || s.startsWith('medios') || s.startsWith('med')) return 'mediocampo';
+    if (s.startsWith('delantera') || s.startsWith('delanteros') || s.startsWith('ataque') || s.startsWith('del')) return 'delantera';
+    return null;
+  };
 
-    if (key) {
-      const bulletLines = lines.slice(1)
-        .map(l => l.replace(/^[-*•]\s*/, '').trim())
-        .filter(l => !!l);
-      
-      for (let i = 0; i < 3; i++) {
-        result[key][i] = bulletLines[i] || '';
+  const rawLines = text.split('\n');
+  let currentKey: keyof LineBriefing | null = null;
+  const collected: Record<keyof LineBriefing, string[]> = {
+    porteria: [],
+    defensa: [],
+    mediocampo: [],
+    delantera: []
+  };
+
+  for (const rawLine of rawLines) {
+    const line = rawLine.trim();
+    if (!line) continue;
+
+    const colonIdx = line.indexOf(':');
+    let isHeaderLine = false;
+
+    if (colonIdx !== -1) {
+      const possibleHeader = line.substring(0, colonIdx);
+      const matchedKey = getLineKey(possibleHeader);
+      if (matchedKey) {
+        currentKey = matchedKey;
+        isHeaderLine = true;
+        const remainder = line.substring(colonIdx + 1).replace(/^[-*•\d.]+\s*/, '').trim();
+        if (remainder) {
+          collected[currentKey].push(remainder);
+        }
       }
     }
-  });
+
+    if (!isHeaderLine && currentKey) {
+      const cleanBullet = line.replace(/^[-*•\d.]+\s*/, '').trim();
+      if (cleanBullet) {
+        collected[currentKey].push(cleanBullet);
+      }
+    }
+  }
+
+  for (const k of ['porteria', 'defensa', 'mediocampo', 'delantera'] as const) {
+    for (let i = 0; i < 3; i++) {
+      result[k][i] = collected[k][i] || '';
+    }
+  }
 
   return result;
 }
@@ -100,6 +131,7 @@ export function BriefingView({
   sistemaPropio,
   sistemaRival,
   isEditMode,
+  approvedObservations,
   onNodeClick,
   onTareasLineasChange,
   onApplyRoleCards
@@ -147,7 +179,8 @@ export function BriefingView({
       desventajas,
       zonaConflicto,
       dueloClave,
-      tareasLineas
+      tareasLineas,
+      validatedRivalInsights: approvedObservations
     };
 
     const result = await synthesizeLines(payload);
