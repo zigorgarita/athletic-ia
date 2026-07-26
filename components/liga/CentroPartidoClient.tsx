@@ -361,8 +361,25 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
     setIsVideoModalOpen(true);
   };
 
-  // Helper function to upload files to Supabase Storage
+  // Helper function to upload files preferring Google Drive (5 TB) with Supabase Storage fallback
   const uploadFile = async (file: File, folder: string): Promise<string> => {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch('/api/google-drive/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      if (res.ok) {
+        const driveData = await res.json();
+        if (driveData.url) {
+          return driveData.url;
+        }
+      }
+    } catch (driveErr) {
+      console.warn('[uploadFile] Google Drive upload notice/fallback:', driveErr);
+    }
+
     const fileExt = file.name.split('.').pop();
     const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
     const filePath = `${folder}/${fileName}`;

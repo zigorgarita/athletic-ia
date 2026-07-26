@@ -17,6 +17,7 @@ export interface ClubVideo {
   categoria: 'Salida de balón' | 'Presión' | 'Ataque organizado' | 'Defensa organizada' | 'Transición ofensiva' | 'Transición defensiva' | 'ABP' | 'Finalización' | 'Jugadores' | null;
   etiquetas: string[];
   fecha: string | null;
+  drive_file_id?: string | null;
   created_at: string;
 }
 

@@ -12,69 +12,48 @@ interface VideoPlayerModalProps {
   tipoOrigen?: 'Enlace' | 'Archivo';
 }
 
-export function parseEmbedVideoUrl(url: string): { embedUrl: string | null; isIframe: boolean } {
-  if (!url) return { embedUrl: null, isIframe: false };
+import { parseVideoUrl, VideoInfo } from '@/lib/video';
 
-  const cleanUrl = url.trim();
+export function parseEmbedVideoUrl(url: string): { embedUrl: string | null; isIframe: boolean; isVertical: boolean; type: string } {
+  if (!url) return { embedUrl: null, isIframe: false, isVertical: false, type: 'direct' };
 
-  // YouTube
-  // https://www.youtube.com/watch?v=dQw4w9WgXcQ
-  // https://youtu.be/dQw4w9WgXcQ
-  // https://www.youtube.com/embed/dQw4w9WgXcQ
-  const ytMatch = cleanUrl.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i);
-  if (ytMatch && ytMatch[1]) {
+  const info: VideoInfo = parseVideoUrl(url);
+
+  if (info.type === 'youtube' || info.type === 'shorts' || info.type === 'vimeo' || info.type === 'gdrive') {
     return {
-      embedUrl: `https://www.youtube.com/embed/${ytMatch[1]}`,
-      isIframe: true
+      embedUrl: info.embedUrl,
+      isIframe: true,
+      isVertical: !!info.isVertical,
+      type: info.type
     };
   }
 
-  // Vimeo
-  // https://vimeo.com/123456789
-  const vimeoMatch = cleanUrl.match(/(?:vimeo\.com\/|player\.vimeo\.com\/video\/)(\d+)/i);
-  if (vimeoMatch && vimeoMatch[1]) {
+  // Direct video file
+  if (url.match(/\.(mp4|webm|ogg|mov|m4v)(?:\?|$)/i) || url.includes('supabase.co/storage/')) {
     return {
-      embedUrl: `https://player.vimeo.com/video/${vimeoMatch[1]}`,
-      isIframe: true
+      embedUrl: url.trim(),
+      isIframe: false,
+      isVertical: false,
+      type: 'direct'
     };
   }
 
-  // Google Drive
-  // https://drive.google.com/file/d/FILE_ID/view?usp=sharing
-  // https://drive.google.com/file/d/FILE_ID/preview
-  if (cleanUrl.includes('drive.google.com')) {
-    const gdMatch = cleanUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/i);
-    if (gdMatch && gdMatch[1]) {
-      return {
-        embedUrl: `https://drive.google.com/file/d/${gdMatch[1]}/preview`,
-        isIframe: true
-      };
-    }
-  }
-
-  // Direct Video files (mp4, webm, ogg, etc. or Supabase Storage links)
-  const isDirectVideo = 
-    cleanUrl.match(/\.(mp4|webm|ogg|mov|m4v)(?:\?|$)/i) || 
-    cleanUrl.includes('supabase.co/storage/v1/object/public/');
-    
-  if (isDirectVideo) {
-    return {
-      embedUrl: cleanUrl,
-      isIframe: false
-    };
-  }
-
-  // Fallback (e.g. Hudl, Veo, or general links that we can't embed reliably)
   return {
     embedUrl: null,
-    isIframe: false
+    isIframe: false,
+    isVertical: false,
+    type: 'unknown'
   };
 }
 
 export function VideoPlayerModal({ isOpen, onClose, title, videoUrl, tipoOrigen = 'Enlace' }: VideoPlayerModalProps) {
   if (!isOpen) return null;
 
-  const { embedUrl, isIframe } = videoUrl ? parseEmbedVideoUrl(videoUrl) : { embedUrl: null, isIframe: false };
+  const { embedUrl, isIframe, isVertical, type } = videoUrl
+    ? parseEmbedVideoUrl(videoUrl)
+    : { embedUrl: null, isIframe: false, isVertical: false, type: 'direct' };
+
+  const isGDrive = type === 'gdrive';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -85,13 +64,15 @@ export function VideoPlayerModal({ isOpen, onClose, title, videoUrl, tipoOrigen 
       />
 
       {/* Modal Container */}
-      <div className="relative bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-4xl shadow-2xl overflow-hidden z-10 transition-all duration-300 animate-in fade-in zoom-in-95 duration-200">
+      <div className={`relative bg-slate-900 border border-slate-800 rounded-2xl w-full ${
+        isVertical ? 'max-w-md' : 'max-w-4xl'
+      } shadow-2xl overflow-hidden z-10 transition-all duration-300 animate-in fade-in zoom-in-95 duration-200`}>
         
         {/* Cabecera */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-950/30">
           <div className="flex items-center gap-2">
             <Play className="h-5 w-5 text-[#CC0E21]" />
-            <h2 className="text-lg font-bold text-slate-100">{title}</h2>
+            <h2 className="text-lg font-bold text-slate-100 truncate max-w-md">{title}</h2>
           </div>
           <button
             onClick={onClose}
@@ -104,8 +85,17 @@ export function VideoPlayerModal({ isOpen, onClose, title, videoUrl, tipoOrigen 
           </button>
         </div>
 
-        {/* Reproductor / Visor */}
-        <div className="bg-slate-950 aspect-video flex flex-col items-center justify-center p-1 relative">
+        {/* Aviso de procesamiento de Google Drive */}
+        {isGDrive && (
+          <div className="bg-amber-950/40 border-b border-amber-800/40 px-4 py-2 text-[11px] text-amber-300 flex items-center justify-between">
+            <span>ℹ️ Si el vídeo de Google Drive se ha subido recientemente, es posible que tarde unos minutos en procesar la vista previa.</span>
+          </div>
+        )}
+
+        {/* Reproductor / Visor Adaptativo */}
+        <div className={`bg-slate-950 flex flex-col items-center justify-center p-1 relative ${
+          isVertical ? 'aspect-[9/16] max-h-[75vh]' : 'aspect-video max-h-[80vh]'
+        }`}>
           {videoUrl ? (
             embedUrl ? (
               isIframe ? (
@@ -121,7 +111,7 @@ export function VideoPlayerModal({ isOpen, onClose, title, videoUrl, tipoOrigen 
                   src={embedUrl}
                   controls
                   controlsList="nodownload"
-                  className="w-full h-full rounded-lg object-contain"
+                  className="w-full h-full rounded-lg object-contain max-h-[75vh]"
                   autoPlay
                 />
               )

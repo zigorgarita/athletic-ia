@@ -6,13 +6,14 @@ import { MatchVideo } from '@/types';
 import { isValidVideoUrl } from '@/lib/video';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { VideoUploader } from '@/components/ui/VideoUploader';
 
 const videoSchema = zod.object({
   titulo: zod.string().min(1, 'El título es requerido').max(100, 'El título no puede superar los 100 caracteres'),
   video_url: zod.string()
     .min(1, 'La URL del video es requerida')
     .refine((url) => isValidVideoUrl(url), {
-      message: 'Ingrese una URL válida de YouTube, Vimeo o enlace directo a video (.mp4/.webm)',
+      message: 'Ingrese una URL válida de YouTube, Shorts, Google Drive o enlace directo a video',
     }),
   fecha_partido: zod.string().min(1, 'La fecha del partido es requerida'),
   descripcion: zod.string().optional(),
@@ -46,6 +47,8 @@ export function VideoFormModal({
   const {
     register,
     handleSubmit,
+    setValue,
+    watch,
     formState: { errors },
     reset,
   } = useForm<VideoFormData>({
@@ -57,6 +60,8 @@ export function VideoFormModal({
       descripcion: '',
     },
   });
+
+  const currentVideoUrl = watch('video_url');
 
   // Resetear el formulario cuando cambie el video (modo edición o creación)
   useEffect(() => {
@@ -95,12 +100,21 @@ export function VideoFormModal({
         {...register('titulo')}
       />
 
-      <Input
-        label="URL del Video"
-        placeholder="https://www.youtube.com/watch?... o https://vimeo.com/..."
-        error={errors.video_url?.message}
-        {...register('video_url')}
-      />
+      <div className="space-y-1">
+        <VideoUploader
+          initialUrl={currentVideoUrl}
+          onVideoSelected={({ url, fileName }) => {
+            setValue('video_url', url, { shouldValidate: true });
+            const currentTitle = watch('titulo');
+            if (!currentTitle && fileName) {
+              setValue('titulo', fileName, { shouldValidate: true });
+            }
+          }}
+        />
+        {errors.video_url?.message && (
+          <p className="text-xs text-red-400 font-medium px-1">{errors.video_url.message}</p>
+        )}
+      </div>
 
       <Input
         label="Fecha del Partido"
@@ -115,7 +129,7 @@ export function VideoFormModal({
         </label>
         <textarea
           placeholder="Escribe comentarios sobre las jugadas clave, errores cometidos o el análisis táctico..."
-          className="w-full min-h-[100px] px-4 py-3 rounded-xl bg-slate-900/60 border border-slate-755 text-slate-100 placeholder-slate-500 outline-none transition-all duration-200 focus:border-green-500 focus:ring-1 focus:ring-green-500 text-sm"
+          className="w-full min-h-[100px] px-4 py-3 rounded-xl bg-slate-900/60 border border-slate-755 text-slate-100 placeholder-slate-500 outline-none transition-all duration-200 focus:border-[#CC0E21] focus:ring-1 focus:ring-[#CC0E21] text-sm"
           {...register('descripcion')}
         />
       </div>
@@ -124,7 +138,7 @@ export function VideoFormModal({
         <Button type="button" variant="secondary" onClick={onCancel}>
           Cancelar
         </Button>
-        <Button type="submit" loading={isSubmitting} className="px-6">
+        <Button type="submit" loading={isSubmitting} className="px-6 bg-[#CC0E21] hover:bg-[#b00c1c]">
           {isEditMode ? 'Guardar Cambios' : 'Añadir Video'}
         </Button>
       </div>

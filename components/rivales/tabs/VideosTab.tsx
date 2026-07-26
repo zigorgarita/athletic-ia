@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { Film, Plus, Search } from 'lucide-react';
 import { VideoCard } from '@/components/videos/VideoCard';
+import { VideoUploader } from '@/components/ui/VideoUploader';
+import { VideoPlayerModal } from '@/components/liga/VideoPlayerModal';
 import { MatchVideo } from '@/types';
 
 interface VideosTabProps {
@@ -73,8 +75,10 @@ export function VideosTab({ club, season }: VideosTabProps) {
     created_at: cv.created_at,
   });
 
+  const [selectedPlayVideo, setSelectedPlayVideo] = useState<MatchVideo | null>(null);
+
   const handlePlayAdapter = (video: MatchVideo) => {
-    window.open(video.video_url, '_blank');
+    setSelectedPlayVideo(video);
   };
 
   const handleEditAdapter = (video: MatchVideo) => {
@@ -83,7 +87,7 @@ export function VideosTab({ club, season }: VideosTabProps) {
   };
 
   const handleDeleteAdapter = async (id: string) => {
-    if (confirm('¿Estás seguro de que deseas eliminar este vídeo?')) {
+    if (confirm('¿Estás seguro de que deseas eliminar la asociación de este vídeo? (El archivo en Google Drive se conservará)')) {
       await deleteVideo(id);
     }
   };
@@ -164,10 +168,19 @@ export function VideosTab({ club, season }: VideosTabProps) {
               <input required type="text" name="titulo" value={editingVideo.titulo || ''} onChange={handleChange} className={inputClass} placeholder="Ej: Salida de balón presionados" />
             </div>
 
-            <div>
-              <label className={labelClass}>URL del Vídeo (YouTube, Hudl, Drive...) <span className="text-red-500">*</span></label>
-              <input required type="url" name="url" value={editingVideo.url || ''} onChange={handleChange} className={inputClass} placeholder="https://..." />
-            </div>
+            {/* Incorporador Universal de Vídeos (Drag & Drop + URL + FileInput) */}
+            <VideoUploader
+              initialUrl={editingVideo.url || ''}
+              onVideoSelected={({ url, driveFileId, fileType, fileName }) => {
+                setEditingVideo(prev => prev ? {
+                  ...prev,
+                  url,
+                  drive_file_id: driveFileId || prev.drive_file_id,
+                  tipo_origen: fileType,
+                  titulo: prev.titulo || fileName || ''
+                } : null);
+              }}
+            />
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
@@ -202,6 +215,14 @@ export function VideosTab({ club, season }: VideosTabProps) {
           </form>
         )}
       </Modal>
+
+      {/* Reproductor de Vídeos Adaptativo */}
+      <VideoPlayerModal
+        isOpen={!!selectedPlayVideo}
+        onClose={() => setSelectedPlayVideo(null)}
+        title={selectedPlayVideo?.titulo || ''}
+        videoUrl={selectedPlayVideo?.video_url}
+      />
 
     </div>
   );
