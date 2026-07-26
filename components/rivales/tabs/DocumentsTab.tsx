@@ -246,10 +246,20 @@ export function DocumentsTab({ club, season }: DocumentsTabProps) {
               
               <div className="flex-1">
                 <h4 className="font-bold text-slate-200 line-clamp-2 leading-snug group-hover:text-[#CC0E21] transition-colors">{doc.nombre}</h4>
-                <div className="flex items-center gap-2 mt-2 text-xs font-medium text-slate-500">
+                <div className="flex items-center flex-wrap gap-2 mt-2 text-xs font-medium text-slate-500">
                   <span className="bg-slate-800 px-2 py-0.5 rounded text-[10px] uppercase text-slate-300">
                     {doc.tipo || 'Doc'}
                   </span>
+                  {doc.version && (
+                    <span className="bg-blue-950/80 text-blue-300 border border-blue-800/50 px-1.5 py-0.5 rounded text-[10px] font-bold">
+                      v{doc.version}
+                    </span>
+                  )}
+                  {doc.is_current_version === false && (
+                    <span className="bg-amber-950/80 text-amber-400 border border-amber-800/50 px-1.5 py-0.5 rounded text-[10px] font-semibold">
+                      Histórica
+                    </span>
+                  )}
                   {doc.fecha && (
                     <span className="flex items-center gap-1">
                       <Calendar className="h-3 w-3" />
