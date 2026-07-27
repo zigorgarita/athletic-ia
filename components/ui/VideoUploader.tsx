@@ -1,12 +1,20 @@
 'use client';
 
 import React, { useState, useRef } from 'react';
-import { Upload, Link as LinkIcon, Film, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
+import { Upload, Link as LinkIcon, Film, AlertCircle, CheckCircle2, Loader2, Pause, Play, X } from 'lucide-react';
 import { isValidVideoUrl, parseVideoUrl } from '@/lib/video';
+import { DriveResumableUploader, UploadProgressInfo } from '@/lib/drive-resumable';
 
 interface VideoUploaderProps {
   initialUrl?: string;
-  onVideoSelected: (data: { url: string; driveFileId?: string; fileType: 'Enlace' | 'Archivo'; fileName?: string }) => void;
+  onVideoSelected: (data: {
+    url: string;
+    driveFileId?: string;
+    fileType: 'Enlace' | 'Archivo';
+    fileName?: string;
+    mimeType?: string;
+    tamanoBytes?: number;
+  }) => void;
   className?: string;
 }
 
@@ -15,16 +23,15 @@ export function VideoUploader({ initialUrl = '', onVideoSelected, className = ''
   const [urlInput, setUrlInput] = useState(initialUrl);
   const [urlError, setUrlError] = useState<string | null>(null);
   
-  // Upload states
+  // Resumable Upload states
   const [isDragging, setIsDragging] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [uploadStatus, setUploadStatus] = useState<string | null>(null);
+  const [uploader, setUploader] = useState<DriveResumableUploader | null>(null);
+  const [progressInfo, setProgressInfo] = useState<UploadProgressInfo | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
-  
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Real-time URL validation
+  // Validar URL en tiempo real
   const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setUrlInput(val);
@@ -33,7 +40,7 @@ export function VideoUploader({ initialUrl = '', onVideoSelected, className = ''
     if (!val.trim()) return;
 
     if (!isValidVideoUrl(val.trim())) {
-      setUrlError('URL de vídeo no reconocida. Introduce un enlace válido de YouTube, YouTube Shorts, Google Drive o archivo mp4.');
+      setUrlError('URL de vídeo no reconocida. Introduce un enlace válido de YouTube, YouTube Shorts, Google Drive o MP4.');
     } else {
       setUrlError(null);
       onVideoSelected({
@@ -43,54 +50,56 @@ export function VideoUploader({ initialUrl = '', onVideoSelected, className = ''
     }
   };
 
+  // Subida por bloques reanudables a Google Drive
   const handleFileUpload = async (file: File) => {
     if (!file) return;
 
-    if (!file.type.startsWith('video/')) {
-      setUploadError('Por favor, selecciona un archivo de vídeo válido (MP4, MOV, WEBM, etc.).');
+    if (!file.type.startsWith('video/') && !file.name.match(/\.(mp4|mov|webm|mkv|avi|m4v)$/i)) {
+      setUploadError('Por favor, selecciona un archivo de vídeo válido (MP4, MOV, WEBM, MKV, etc.).');
       return;
     }
 
-    setIsUploading(true);
-    setUploadProgress(10);
     setUploadError(null);
-    setUploadStatus('Preparando envío a Google Drive (5 TB)...');
+    const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
 
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
+    const newUploader = new DriveResumableUploader({
+      file,
+      passkey,
+      onProgress: (info) => {
+        setProgressInfo(info);
+        if (info.status === 'completado' && info.driveFileId) {
+          onVideoSelected({
+            url: info.videoUrl || `https://drive.google.com/file/d/${info.driveFileId}/preview`,
+            driveFileId: info.driveFileId,
+            fileType: 'Archivo',
+            fileName: file.name,
+            mimeType: file.type || 'video/mp4',
+            tamanoBytes: file.size,
+          });
+        }
+      },
+    });
 
-      // Intentar subir mediante API de servidor de Google Drive
-      const res = await fetch('/api/google-drive/upload', {
-        method: 'POST',
-        body: formData
-      });
+    setUploader(newUploader);
+    const result = await newUploader.start();
 
-      setUploadProgress(70);
-
-      const data = await res.json();
-
-      if (res.ok && data.url) {
-        setUploadProgress(100);
-        setUploadStatus('Vídeo subido con éxito a Google Drive.');
-        onVideoSelected({
-          url: data.url,
-          driveFileId: data.driveFileId,
-          fileType: 'Archivo',
-          fileName: file.name
-        });
-      } else {
-        // Si las credenciales de Google Drive no están configuradas en .env.local, mostrar aviso claro
-        const errMsg = data.error || 'Configuración de Google Drive pendiente en el servidor.';
-        setUploadError(errMsg);
-      }
-    } catch (err: unknown) {
-      console.error('Error al subir vídeo:', err);
-      const msg = err instanceof Error ? err.message : String(err);
-      setUploadError(`Error de red al subir el vídeo: ${msg}`);
-    } finally {
-      setIsUploading(false);
+    if (result.status === 'fallido') {
+      setUploadError(result.errorMessage || 'Error durante la subida por bloques a Google Drive.');
     }
+  };
+
+  const handlePause = () => {
+    if (uploader) uploader.pause();
+  };
+
+  const handleResume = () => {
+    if (uploader) uploader.start();
+  };
+
+  const handleCancel = () => {
+    if (uploader) uploader.cancel();
+    setUploader(null);
+    setProgressInfo(null);
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -112,11 +121,12 @@ export function VideoUploader({ initialUrl = '', onVideoSelected, className = ''
   };
 
   const parsedInfo = urlInput.trim() ? parseVideoUrl(urlInput.trim()) : null;
+  const isUploading = progressInfo?.status === 'subiendo' || progressInfo?.status === 'pausado';
 
   return (
     <div className={`space-y-4 bg-slate-950/60 border border-slate-850 p-4.5 rounded-2xl ${className}`}>
       
-      {/* Selector de Modalidad (Pestañas Conjuntas) */}
+      {/* Selector de Modalidad */}
       <div className="flex items-center justify-between border-b border-slate-800 pb-3">
         <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
           <Film className="h-3.5 w-3.5 text-[#CC0E21]" /> Método de Incorporación de Vídeo
@@ -148,7 +158,7 @@ export function VideoUploader({ initialUrl = '', onVideoSelected, className = ''
         <div className="space-y-3">
           <div>
             <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
-              URL del Vídeo (YouTube, YouTube Shorts, Google Drive, MP4 Directo) <span className="text-red-500">*</span>
+              URL del Vídeo (YouTube, Shorts, Drive o MP4 Directo) <span className="text-red-500">*</span>
             </label>
             <input
               type="url"
@@ -175,56 +185,115 @@ export function VideoUploader({ initialUrl = '', onVideoSelected, className = ''
         </div>
       )}
 
-      {/* MODALIDAD B: Arrastrar o Seleccionar Archivo a Google Drive */}
+      {/* MODALIDAD B: Arrastrar o Seleccionar Archivo (Google Drive Resumable API) */}
       {activeTab === 'upload' && (
         <div className="space-y-3">
-          <div
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-            onClick={() => fileInputRef.current?.click()}
-            className={`border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all duration-200 ${
-              isDragging
-                ? 'border-[#CC0E21] bg-[#CC0E21]/10 scale-[1.01]'
-                : 'border-slate-800 bg-slate-900/40 hover:border-slate-700 hover:bg-slate-900/60'
-            }`}
-          >
-            <input
-              type="file"
-              ref={fileInputRef}
-              accept="video/*"
-              className="hidden"
-              onChange={(e) => {
-                if (e.target.files && e.target.files[0]) {
-                  handleFileUpload(e.target.files[0]);
-                }
-              }}
-            />
-            
-            <div className="h-12 w-12 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center mx-auto mb-3 text-slate-400">
-              <Upload className="h-6 w-6 text-[#CC0E21]" />
+          {!isUploading && progressInfo?.status !== 'completado' && (
+            <div
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              onClick={() => fileInputRef.current?.click()}
+              className={`border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all duration-200 ${
+                isDragging
+                  ? 'border-[#CC0E21] bg-[#CC0E21]/10 scale-[1.01]'
+                  : 'border-slate-800 bg-slate-900/40 hover:border-slate-700 hover:bg-slate-900/60'
+              }`}
+            >
+              <input
+                type="file"
+                ref={fileInputRef}
+                accept="video/*"
+                className="hidden"
+                onChange={(e) => {
+                  if (e.target.files && e.target.files[0]) {
+                    handleFileUpload(e.target.files[0]);
+                  }
+                }}
+              />
+              
+              <div className="h-12 w-12 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center mx-auto mb-3 text-slate-400">
+                <Upload className="h-6 w-6 text-[#CC0E21]" />
+              </div>
+
+              <p className="text-xs font-bold text-slate-200 mb-1">
+                Arrastra y suelta tu archivo de vídeo aquí, o <span className="text-[#CC0E21] underline">examina tus archivos</span>
+              </p>
+              <p className="text-[11px] text-slate-500">
+                Soporta partidos enteros (500 MB a 2 GB+). Subida reanudable directa a Google Drive por bloques de 8 MB.
+              </p>
             </div>
+          )}
 
-            <p className="text-xs font-bold text-slate-200 mb-1">
-              Arrastra y suelta tu archivo de vídeo aquí, o <span className="text-[#CC0E21] underline">examina tus archivos</span>
-            </p>
-            <p className="text-[11px] text-slate-500">
-              Soporta vídeos horizontales (16:9) y verticales (9:16 Shorts/Reels). Almacenamiento directo en Google Drive (5 TB).
-            </p>
-          </div>
-
-          {isUploading && (
-            <div className="space-y-2 p-3 bg-slate-900 rounded-xl border border-slate-800">
-              <div className="flex justify-between text-xs text-slate-300">
-                <span className="flex items-center gap-1.5">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin text-[#CC0E21]" />
-                  {uploadStatus || 'Subiendo archivo...'}
+          {/* Panel de Progreso Activo */}
+          {isUploading && progressInfo && (
+            <div className="space-y-3 p-4 bg-slate-900 rounded-xl border border-slate-800 animate-in fade-in duration-300">
+              <div className="flex items-center justify-between text-xs text-slate-300">
+                <span className="flex items-center gap-2 font-semibold">
+                  <Loader2 className="h-4 w-4 animate-spin text-[#CC0E21]" />
+                  {progressInfo.status === 'pausado' ? 'Subida en Pausa' : 'Subiendo a Google Drive...'}
                 </span>
-                <span className="font-bold">{uploadProgress}%</span>
+                <span className="font-bold text-[#CC0E21] text-sm">{progressInfo.percent}%</span>
               </div>
-              <div className="w-full bg-slate-950 rounded-full h-1.5 overflow-hidden">
-                <div className="bg-[#CC0E21] h-full transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
+
+              <div className="w-full bg-slate-950 rounded-full h-2 overflow-hidden border border-slate-800">
+                <div
+                  className="bg-[#CC0E21] h-full transition-all duration-300 rounded-full shadow-[0_0_10px_rgba(204,14,33,0.5)]"
+                  style={{ width: `${progressInfo.percent}%` }}
+                />
               </div>
+
+              <div className="flex items-center justify-between text-[11px] text-slate-400">
+                <span>
+                  {(progressInfo.bytesUploaded / (1024 * 1024)).toFixed(1)} MB de {(progressInfo.totalBytes / (1024 * 1024)).toFixed(1)} MB
+                  {progressInfo.speedMBps > 0 && ` (${progressInfo.speedMBps} MB/s)`}
+                </span>
+
+                <div className="flex items-center gap-2">
+                  {progressInfo.status === 'subiendo' ? (
+                    <button
+                      type="button"
+                      onClick={handlePause}
+                      className="px-2 py-1 bg-slate-800 hover:bg-slate-750 text-slate-200 rounded flex items-center gap-1 text-[10px]"
+                    >
+                      <Pause className="h-3 w-3" /> Pausar
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleResume}
+                      className="px-2 py-1 bg-[#CC0E21] hover:bg-[#b00c1c] text-white rounded flex items-center gap-1 text-[10px]"
+                    >
+                      <Play className="h-3 w-3" /> Reanudar
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={handleCancel}
+                    className="px-2 py-1 bg-slate-800 hover:bg-red-950 text-red-400 rounded flex items-center gap-1 text-[10px]"
+                  >
+                    <X className="h-3 w-3" /> Cancelar
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Estado de Finalización */}
+          {progressInfo?.status === 'completado' && (
+            <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-xl text-xs text-green-400 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
+                <span>Vídeo subido y registrado con éxito en Google Drive.</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setProgressInfo(null); setUploader(null); }}
+                className="text-xs text-slate-400 hover:text-slate-200 underline"
+              >
+                Subir otro
+              </button>
             </div>
           )}
 
@@ -232,7 +301,7 @@ export function VideoUploader({ initialUrl = '', onVideoSelected, className = ''
             <div className="p-3.5 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-300 space-y-1">
               <div className="font-bold flex items-center gap-1.5">
                 <AlertCircle className="h-4 w-4 text-amber-400 shrink-0" />
-                <span>Aviso de Configuración de Google Drive</span>
+                <span>Aviso de Subida</span>
               </div>
               <p className="text-[11px] text-slate-350 leading-relaxed">
                 {uploadError}

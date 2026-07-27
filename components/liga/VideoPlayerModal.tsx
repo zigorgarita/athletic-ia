@@ -1,8 +1,9 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/Button';
-import { ExternalLink, Play, AlertCircle } from 'lucide-react';
+import { ExternalLink, Play, AlertCircle, Shield, Eye } from 'lucide-react';
+import { parseVideoUrl, VideoInfo } from '@/lib/video';
 
 interface VideoPlayerModalProps {
   isOpen: boolean;
@@ -10,16 +11,25 @@ interface VideoPlayerModalProps {
   title: string;
   videoUrl: string | null | undefined;
   tipoOrigen?: 'Enlace' | 'Archivo';
+  driveFileId?: string | null;
 }
 
-import { parseVideoUrl, VideoInfo } from '@/lib/video';
-
-export function parseEmbedVideoUrl(url: string): { embedUrl: string | null; isIframe: boolean; isVertical: boolean; type: string } {
+export function parseEmbedVideoUrl(url: string): { embedUrl: string | null; isIframe: boolean; isVertical: boolean; type: string; driveFileId?: string } {
   if (!url) return { embedUrl: null, isIframe: false, isVertical: false, type: 'direct' };
 
   const info: VideoInfo = parseVideoUrl(url);
 
-  if (info.type === 'youtube' || info.type === 'shorts' || info.type === 'vimeo' || info.type === 'gdrive') {
+  if (info.type === 'gdrive' && info.id) {
+    return {
+      embedUrl: `https://drive.google.com/file/d/${info.id}/preview`,
+      isIframe: true,
+      isVertical: false,
+      type: 'gdrive',
+      driveFileId: info.id
+    };
+  }
+
+  if (info.type === 'youtube' || info.type === 'shorts' || info.type === 'vimeo') {
     return {
       embedUrl: info.embedUrl,
       isIframe: true,
@@ -28,8 +38,8 @@ export function parseEmbedVideoUrl(url: string): { embedUrl: string | null; isIf
     };
   }
 
-  // Direct video file
-  if (url.match(/\.(mp4|webm|ogg|mov|m4v)(?:\?|$)/i) || url.includes('supabase.co/storage/')) {
+  // Direct video stream / file
+  if (url.startsWith('/api/google-drive/stream/') || url.match(/\.(mp4|webm|ogg|mov|m4v)(?:\?|$)/i) || url.includes('supabase.co/storage/')) {
     return {
       embedUrl: url.trim(),
       isIframe: false,
@@ -46,14 +56,17 @@ export function parseEmbedVideoUrl(url: string): { embedUrl: string | null; isIf
   };
 }
 
-export function VideoPlayerModal({ isOpen, onClose, title, videoUrl, tipoOrigen = 'Enlace' }: VideoPlayerModalProps) {
+export function VideoPlayerModal({ isOpen, onClose, title, videoUrl, tipoOrigen = 'Enlace', driveFileId: propDriveId }: VideoPlayerModalProps) {
+  const [playMode, setPlayMode] = useState<'stream' | 'iframe'>('stream');
+
   if (!isOpen) return null;
 
-  const { embedUrl, isIframe, isVertical, type } = videoUrl
-    ? parseEmbedVideoUrl(videoUrl)
-    : { embedUrl: null, isIframe: false, isVertical: false, type: 'direct' };
+  const parsed = videoUrl ? parseEmbedVideoUrl(videoUrl) : { embedUrl: null, isIframe: false, isVertical: false, type: 'direct' };
+  const effectiveDriveId = propDriveId || parsed.driveFileId;
+  const isGDrive = parsed.type === 'gdrive' || !!effectiveDriveId;
 
-  const isGDrive = type === 'gdrive';
+  const streamUrl = effectiveDriveId ? `/api/google-drive/stream/${effectiveDriveId}` : (parsed.type === 'direct' ? parsed.embedUrl : null);
+  const iframeUrl = effectiveDriveId ? `https://drive.google.com/file/d/${effectiveDriveId}/preview` : (parsed.isIframe ? parsed.embedUrl : null);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -65,7 +78,7 @@ export function VideoPlayerModal({ isOpen, onClose, title, videoUrl, tipoOrigen 
 
       {/* Modal Container */}
       <div className={`relative bg-slate-900 border border-slate-800 rounded-2xl w-full ${
-        isVertical ? 'max-w-md' : 'max-w-4xl'
+        parsed.isVertical ? 'max-w-md' : 'max-w-4xl'
       } shadow-2xl overflow-hidden z-10 transition-all duration-300 animate-in fade-in zoom-in-95 duration-200`}>
         
         {/* Cabecera */}
@@ -74,47 +87,75 @@ export function VideoPlayerModal({ isOpen, onClose, title, videoUrl, tipoOrigen 
             <Play className="h-5 w-5 text-[#CC0E21]" />
             <h2 className="text-lg font-bold text-slate-100 truncate max-w-md">{title}</h2>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors duration-200"
-            aria-label="Cerrar reproductor"
-          >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
+          
+          <div className="flex items-center gap-3">
+            {/* Conmutador de Modo de Reproducción para Vídeos de Drive */}
+            {isGDrive && (
+              <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setPlayMode('stream')}
+                  className={`px-2.5 py-1 rounded-lg font-semibold flex items-center gap-1 transition-all ${
+                    playMode === 'stream' ? 'bg-[#CC0E21] text-white shadow' : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                  title="Streaming Privado Autenticado mediante HTTP Range"
+                >
+                  <Shield className="h-3 w-3" /> Stream Privado (Proxy)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPlayMode('iframe')}
+                  className={`px-2.5 py-1 rounded-lg font-semibold flex items-center gap-1 transition-all ${
+                    playMode === 'iframe' ? 'bg-[#CC0E21] text-white shadow' : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                  title="Vista previa mediante iframe oficial de Google Drive"
+                >
+                  <Eye className="h-3 w-3" /> Vista Previa (Iframe)
+                </button>
+              </div>
+            )}
 
-        {/* Aviso de procesamiento de Google Drive */}
-        {isGDrive && (
-          <div className="bg-amber-950/40 border-b border-amber-800/40 px-4 py-2 text-[11px] text-amber-300 flex items-center justify-between">
-            <span>ℹ️ Si el vídeo de Google Drive se ha subido recientemente, es posible que tarde unos minutos en procesar la vista previa.</span>
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors duration-200"
+              aria-label="Cerrar reproductor"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
           </div>
-        )}
+        </div>
 
         {/* Reproductor / Visor Adaptativo */}
         <div className={`bg-slate-950 flex flex-col items-center justify-center p-1 relative ${
-          isVertical ? 'aspect-[9/16] max-h-[75vh]' : 'aspect-video max-h-[80vh]'
+          parsed.isVertical ? 'aspect-[9/16] max-h-[75vh]' : 'aspect-video max-h-[80vh]'
         }`}>
-          {videoUrl ? (
-            embedUrl ? (
-              isIframe ? (
-                <iframe
-                  src={embedUrl}
-                  className="w-full h-full border-0 rounded-lg"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                  allowFullScreen
-                  title={title}
-                />
-              ) : (
-                <video
-                  src={embedUrl}
-                  controls
-                  controlsList="nodownload"
-                  className="w-full h-full rounded-lg object-contain max-h-[75vh]"
-                  autoPlay
-                />
-              )
+          {videoUrl || streamUrl ? (
+            isGDrive && playMode === 'stream' && streamUrl ? (
+              <video
+                src={streamUrl}
+                controls
+                controlsList="nodownload"
+                className="w-full h-full rounded-lg object-contain max-h-[75vh]"
+                autoPlay
+              />
+            ) : iframeUrl && (playMode === 'iframe' || parsed.isIframe) ? (
+              <iframe
+                src={iframeUrl}
+                className="w-full h-full border-0 rounded-lg"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+                title={title}
+              />
+            ) : parsed.type === 'direct' && parsed.embedUrl ? (
+              <video
+                src={parsed.embedUrl}
+                controls
+                controlsList="nodownload"
+                className="w-full h-full rounded-lg object-contain max-h-[75vh]"
+                autoPlay
+              />
             ) : (
               <div className="text-center p-8 flex flex-col items-center gap-4 max-w-md">
                 <div className="h-14 w-14 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center">
@@ -123,11 +164,11 @@ export function VideoPlayerModal({ isOpen, onClose, title, videoUrl, tipoOrigen 
                 <div>
                   <h3 className="text-base font-bold text-slate-200">Reproductor no incrustable</h3>
                   <p className="text-xs text-slate-400 mt-1">
-                    Este origen de vídeo ({tipoOrigen}) o proveedor (ej. Hudl, Veo) no permite su visualización dentro de otras aplicaciones por motivos de seguridad.
+                    Este origen de vídeo ({tipoOrigen}) o proveedor no permite su visualización directa.
                   </p>
                 </div>
                 <Button
-                  onClick={() => window.open(videoUrl, '_blank', 'noopener,noreferrer')}
+                  onClick={() => window.open(videoUrl || '', '_blank', 'noopener,noreferrer')}
                   className="flex items-center gap-2 mt-2 bg-[#CC0E21] hover:bg-[#b00c1c]"
                 >
                   <ExternalLink className="h-4 w-4" />
