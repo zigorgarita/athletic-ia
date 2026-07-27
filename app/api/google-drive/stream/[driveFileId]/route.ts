@@ -1,4 +1,3 @@
-import { NextResponse } from 'next/server';
 import { getGoogleDriveAccessToken } from '@/lib/google-drive';
 
 export async function GET(
