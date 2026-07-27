@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { Film, Plus, Search, RefreshCw, AlertCircle } from 'lucide-react';
+import { Film, Plus, Search, RefreshCw, AlertCircle, UploadCloud } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useMatchVideos } from '@/hooks/useMatchVideos';
 import { useUpdateMatchVideo } from '@/hooks/useUpdateMatchVideo';
@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { VideoUploader } from '@/components/ui/VideoUploader';
 import { useEditMode } from '@/context/EditModeContext';
 
 // Lazy load modales pesados
@@ -48,7 +49,7 @@ const MESES = [
 
 export function VideosClient() {
   const { isEditMode } = useEditMode();
-  const { videos, loading, creating, error: fetchError, createVideo, refetch } = useMatchVideos();
+  const { videos, loading, error: fetchError, createVideo, refetch } = useMatchVideos();
   const { updateVideo, loading: updating } = useUpdateMatchVideo();
   const { deleteVideo } = useDeleteMatchVideo();
 
@@ -57,6 +58,7 @@ export function VideosClient() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingVideo, setEditingVideo] = useState<MatchVideo | null>(null);
+  const [showQuickUploader, setShowQuickUploader] = useState(true);
 
   // Estados de filtrado
   const [searchQuery, setSearchQuery] = useState('');
@@ -65,7 +67,15 @@ export function VideosClient() {
 
   const [actionError, setActionError] = useState<string | null>(null);
 
-  // Obtener los años únicos disponibles en los videos para el filtro, más años base
+  const getTodayString = () => {
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
+  // Obtener los años únicos disponibles
   const yearOptions = useMemo(() => {
     const years = new Set<string>();
     videos.forEach((v) => {
@@ -74,7 +84,6 @@ export function VideosClient() {
         if (year) years.add(year);
       }
     });
-    // Asegurar que al menos el año actual y anterior estén
     const currentYear = new Date().getFullYear().toString();
     const prevYear = (new Date().getFullYear() - 1).toString();
     years.add(currentYear);
@@ -87,7 +96,7 @@ export function VideosClient() {
     ];
   }, [videos]);
 
-  // Filtrado de videos en el cliente
+  // Filtrado de videos
   const filteredVideos = useMemo(() => {
     return videos.filter((video) => {
       const matchesSearch = video.titulo.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -103,64 +112,90 @@ export function VideosClient() {
     });
   }, [videos, searchQuery, selectedMonth, selectedYear]);
 
-  // Manejar el submit del formulario (Creación y Edición)
+  // Manejador de subida rápida directa desde la zona de arrastre de la Videoteca
+  const handleQuickVideoUploaded = async (data: {
+    url: string;
+    driveFileId?: string;
+    fileType: 'Enlace' | 'Archivo';
+    fileName?: string;
+    mimeType?: string;
+    tamanoBytes?: number;
+  }) => {
+    if (!data.url) return;
+    try {
+      const cleanTitle = data.fileName
+        ? data.fileName.replace(/\.[^/.]+$/, '').replace(/_/g, ' ')
+        : 'Vídeo de Partido';
+
+      await createVideo({
+        titulo: cleanTitle,
+        descripcion: `Vídeo subido mediante infraestructura de Google Drive 5 TB (${data.fileType}).`,
+        video_url: data.url,
+        fecha_partido: getTodayString(),
+        drive_file_id: data.driveFileId || null,
+        tamano_bytes: data.tamanoBytes || null,
+        tipo_origen: data.fileType,
+        estado: 'completado',
+      });
+
+      refetch();
+    } catch (err) {
+      console.error('Error al guardar vídeo subido en la Videoteca:', err);
+    }
+  };
+
+  // Manejar submit del formulario (Edición o Creación con Formulario Completo)
   const handleFormSubmit = async (data: Omit<MatchVideo, 'id' | 'created_at'>) => {
     setActionError(null);
     try {
       if (editingVideo) {
-        // Modo Edición
         const updated = await updateVideo(editingVideo.id, data);
         if (updated) {
           setIsFormOpen(false);
           setEditingVideo(null);
           refetch();
         } else {
-          setActionError('Error al actualizar el video.');
+          setActionError('Error al actualizar el vídeo.');
         }
       } else {
-        // Modo Creación
         const created = await createVideo(data);
         if (created) {
           setIsFormOpen(false);
           refetch();
         } else {
-          setActionError('Error al registrar el video.');
+          setActionError('Error al registrar el vídeo.');
         }
       }
     } catch (err) {
       console.error(err);
-      setActionError('Ocurrió un error inesperado al guardar el video.');
+      setActionError('Ocurrió un error inesperado al guardar el vídeo.');
     }
   };
 
-  // Abrir reproductor
   const handlePlayVideo = (video: MatchVideo) => {
     setActiveVideo(video);
     setIsPlaying(true);
   };
 
-  // Abrir formulario de edición
   const handleEditVideo = (video: MatchVideo) => {
     setEditingVideo(video);
     setIsFormOpen(true);
   };
 
-  // Abrir formulario de creación
   const handleCreateVideoClick = () => {
     setEditingVideo(null);
     setIsFormOpen(true);
   };
 
-  // Eliminar video
   const handleDeleteVideo = async (id: string) => {
-    const confirmDelete = window.confirm('¿Estás seguro de que deseas eliminar este video de análisis de partido?');
+    const confirmDelete = window.confirm('¿Estás seguro de que deseas eliminar este vídeo de análisis de partido?');
     if (!confirmDelete) return;
 
     const success = await deleteVideo(id);
     if (success) {
       refetch();
     } else {
-      alert('Error al intentar eliminar el video.');
+      alert('Error al intentar eliminar el vídeo.');
     }
   };
 
@@ -171,23 +206,44 @@ export function VideosClient() {
         <div className="flex flex-col gap-1">
           <h1 className="text-3xl font-extrabold tracking-tight text-slate-100 flex items-center gap-2">
             <Film className="h-8 w-8 text-[#CC0E21]" />
-            Videos de Partidos
+            Videoteca de Partidos
           </h1>
           <p className="text-slate-400 text-sm">
-            Visualiza, añade y analiza resúmenes de partidos y análisis tácticos en video.
+            Arrastra tus vídeos pesados de partidos o pega enlaces externos (YouTube, Drive, MP4).
           </p>
         </div>
-        {isEditMode && (
-          <Button onClick={handleCreateVideoClick} className="flex items-center gap-1.5 self-start sm:self-auto">
-            <Plus className="h-4 w-4" />
-            Añadir Video
+        
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          <Button
+            variant="secondary"
+            onClick={() => setShowQuickUploader(!showQuickUploader)}
+            className="flex items-center gap-1.5 text-xs py-2"
+          >
+            <UploadCloud className="h-4 w-4 text-[#CC0E21]" />
+            {showQuickUploader ? 'Ocultar Zona de Carga' : 'Mostrar Zona de Carga'}
           </Button>
-        )}
+
+          {isEditMode && (
+            <Button onClick={handleCreateVideoClick} className="flex items-center gap-1.5 text-xs py-2 bg-[#CC0E21] hover:bg-[#b00c1c]">
+              <Plus className="h-4 w-4" />
+              Añadir Vídeo
+            </Button>
+          )}
+        </div>
       </div>
+
+      {/* Zona de Arrastre y Soltado Rápido de Vídeos (Infraestructura Bloque 1) */}
+      {showQuickUploader && (
+        <div className="p-1 bg-gradient-to-r from-[#CC0E21]/20 via-slate-800/40 to-slate-900/60 rounded-3xl border border-slate-800">
+          <VideoUploader
+            onVideoSelected={handleQuickVideoUploaded}
+            className="bg-slate-950/80 backdrop-blur-md border-0 rounded-2.5xl"
+          />
+        </div>
+      )}
 
       {/* Barra de Filtros */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 rounded-2xl bg-slate-900/40 border border-slate-800/80 backdrop-blur-sm shadow-md">
-        {/* Búsqueda */}
         <div className="relative">
           <Search className="absolute left-3.5 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-500" />
           <input
@@ -199,7 +255,6 @@ export function VideosClient() {
           />
         </div>
 
-        {/* Filtro Mes */}
         <Select
           label="Mes"
           value={selectedMonth}
@@ -208,7 +263,6 @@ export function VideosClient() {
           className="bg-slate-950/60 border border-slate-800 focus:border-[#CC0E21] text-sm"
         />
 
-        {/* Filtro Año */}
         <Select
           label="Año"
           value={selectedYear}
@@ -230,7 +284,7 @@ export function VideosClient() {
           <div className="flex items-center gap-3">
             <AlertCircle className="h-5 w-5" />
             <div>
-              <h4 className="font-bold">Error al cargar videos</h4>
+              <h4 className="font-bold">Error al cargar vídeos</h4>
               <p className="text-xs text-red-500 mt-0.5">{fetchError}</p>
             </div>
           </div>
@@ -243,11 +297,11 @@ export function VideosClient() {
         <div className="p-16 border border-dashed border-slate-800 rounded-3xl flex flex-col items-center justify-center text-center gap-4 bg-slate-900/10">
           <Film className="h-12 w-12 text-slate-700" />
           <div>
-            <h3 className="text-lg font-bold text-slate-300">No se encontraron videos</h3>
+            <h3 className="text-lg font-bold text-slate-300">No se encontraron vídeos</h3>
             <p className="text-sm text-slate-500 max-w-sm mt-1 mx-auto">
               {videos.length === 0
-                ? 'Aún no hay videos registrados en el sistema. Presiona "Añadir Video" arriba para comenzar.'
-                : 'No hay videos que coincidan con los filtros aplicados actualmente. Intenta cambiar los criterios de búsqueda.'}
+                ? 'Aún no hay vídeos registrados en la Videoteca. Arrastra un archivo arriba o pulsa "Añadir Vídeo" para comenzar.'
+                : 'No hay vídeos que coincidan con los filtros aplicados actualmente. Intenta cambiar los criterios de búsqueda.'}
             </p>
           </div>
         </div>
@@ -256,7 +310,6 @@ export function VideosClient() {
         <div className="relative pl-6 border-l-2 border-slate-800/80 space-y-6">
           {filteredVideos.map((video) => (
             <div key={video.id} className="relative">
-              {/* Indicador de Timeline (Punto rojo) */}
               <div className="absolute -left-[31px] top-1/2 transform -translate-y-1/2 w-4 h-4 rounded-full bg-slate-950 border-2 border-[#CC0E21] flex items-center justify-center">
                 <div className="w-1.5 h-1.5 rounded-full bg-[#CC0E21]" />
               </div>
@@ -276,7 +329,7 @@ export function VideosClient() {
       <Modal
         isOpen={isFormOpen}
         onClose={() => setIsFormOpen(false)}
-        title={editingVideo ? 'Editar Video de Análisis' : 'Añadir Video de Partido'}
+        title={editingVideo ? 'Editar Vídeo de Análisis' : 'Añadir Vídeo de Partido'}
       >
         <div className="space-y-4">
           {actionError && (
@@ -289,20 +342,20 @@ export function VideosClient() {
               video={editingVideo}
               onSubmit={handleFormSubmit}
               onCancel={() => setIsFormOpen(false)}
-              isSubmitting={creating || updating}
+              isSubmitting={updating}
             />
           )}
         </div>
       </Modal>
 
-      {/* Reproductor de Video */}
+      {/* Reproductor Modal Unificado */}
       <VideoPlayerModal
         isOpen={isPlaying}
-        onClose={() => {
-          setIsPlaying(false);
-          setActiveVideo(null);
-        }}
-        video={activeVideo}
+        onClose={() => setIsPlaying(false)}
+        title={activeVideo?.titulo || 'Vídeo de Partido'}
+        videoUrl={activeVideo?.video_url}
+        tipoOrigen={activeVideo?.tipo_origen || 'Enlace'}
+        driveFileId={activeVideo?.drive_file_id}
       />
     </div>
   );

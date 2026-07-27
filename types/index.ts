@@ -562,8 +562,13 @@ export interface MatchVideo {
   descripcion: string | null;
   video_url: string;
   fecha_partido: string;
+  drive_file_id?: string | null;
+  tamano_bytes?: number | null;
+  tipo_origen?: 'Enlace' | 'Archivo';
+  estado?: string;
   created_at: string;
 }
+
 
 export const POSICIONES_REALES = [
   'Portero',

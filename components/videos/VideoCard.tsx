@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import Image from 'next/image';
-import { Calendar, Play, Edit, Trash2, Video, Film, Eye, EyeOff } from 'lucide-react';
+import { Calendar, Play, Edit, Trash2, Video, Film, Eye, EyeOff, HardDrive } from 'lucide-react';
 import { MatchVideo } from '@/types';
 import { parseVideoUrl } from '@/lib/video';
 import { Card } from '@/components/ui/Card';
@@ -19,6 +19,18 @@ export function VideoCard({ video, onPlay, onEdit, onDelete }: VideoCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const { type, thumbnailUrl } = parseVideoUrl(video.video_url);
 
+  const isDriveVideo = !!video.drive_file_id || video.tipo_origen === 'Archivo';
+
+  // Formatear tamaño de archivo (bytes -> MB / GB)
+  const formatFileSize = (bytes?: number | null) => {
+    if (!bytes || bytes <= 0) return null;
+    const mb = bytes / (1024 * 1024);
+    if (mb >= 1024) {
+      return `${(mb / 1024).toFixed(2)} GB`;
+    }
+    return `${mb.toFixed(1)} MB`;
+  };
+
   // Formatear fecha de forma segura sin desajuste de zona horaria
   const formatDate = (dateStr: string) => {
     try {
@@ -34,7 +46,6 @@ export function VideoCard({ video, onPlay, onEdit, onDelete }: VideoCardProps) {
     }
   };
 
-  // Truncado de descripción de forma segura
   const desc = video.descripcion || '';
   const shouldTruncate = desc.length > 180;
   const displayDescription = isExpanded
@@ -43,7 +54,6 @@ export function VideoCard({ video, onPlay, onEdit, onDelete }: VideoCardProps) {
     ? `${desc.slice(0, 175)}...`
     : desc;
 
-  // Renderizar miniatura o un placeholder premium según el tipo
   const renderThumbnail = () => {
     if (thumbnailUrl) {
       return (
@@ -57,20 +67,23 @@ export function VideoCard({ video, onPlay, onEdit, onDelete }: VideoCardProps) {
       );
     }
 
-    // Placeholder premium
     return (
       <div className="w-full h-full bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 flex flex-col items-center justify-center gap-2 text-slate-500 transition-colors duration-300 group-hover:text-[#CC0E21]">
-        {type === 'vimeo' ? (
+        {isDriveVideo ? (
+          <HardDrive className="h-10 w-10 text-[#CC0E21] group-hover:scale-110 transition-transform duration-300" />
+        ) : type === 'vimeo' ? (
           <Film className="h-10 w-10 text-slate-600 group-hover:text-[#CC0E21] transition-colors duration-300" />
         ) : (
           <Video className="h-10 w-10 text-slate-600 group-hover:text-[#CC0E21] transition-colors duration-300" />
         )}
-        <span className="text-[10px] uppercase tracking-wider font-semibold opacity-60">
-          {type === 'vimeo' ? 'Vimeo Video' : 'Video Directo'}
+        <span className="text-[10px] uppercase tracking-wider font-semibold opacity-80 text-slate-400">
+          {isDriveVideo ? 'Google Drive 5 TB' : type === 'vimeo' ? 'Vimeo' : 'Enlace Vídeo'}
         </span>
       </div>
     );
   };
+
+  const sizeFormatted = formatFileSize(video.tamano_bytes);
 
   return (
     <Card className="relative overflow-hidden group border border-slate-800/80 bg-slate-900/30 backdrop-blur-sm transition-all duration-300 hover:border-[#CC0E21]/40">
@@ -81,7 +94,6 @@ export function VideoCard({ video, onPlay, onEdit, onDelete }: VideoCardProps) {
           className="relative w-full md:w-64 h-36 rounded-xl overflow-hidden cursor-pointer bg-slate-950 border border-slate-800 flex-shrink-0 group/thumb"
         >
           {renderThumbnail()}
-          {/* Overlay Oscuro y Botón Play */}
           <div className="absolute inset-0 bg-black/40 group-hover/thumb:bg-black/20 transition-colors duration-300 flex items-center justify-center">
             <div className="h-12 w-12 rounded-full bg-[#CC0E21] text-white flex items-center justify-center shadow-lg transform scale-90 opacity-90 group-hover/thumb:scale-100 group-hover/thumb:opacity-100 transition-all duration-300">
               <Play className="h-5 w-5 fill-current ml-0.5" />
@@ -93,15 +105,24 @@ export function VideoCard({ video, onPlay, onEdit, onDelete }: VideoCardProps) {
         <div className="flex-1 flex flex-col justify-between min-w-0">
           <div>
             {/* Header info */}
-            <div className="flex items-center gap-3 text-xs text-slate-500 mb-2 font-medium">
+            <div className="flex items-center gap-3 text-xs text-slate-500 mb-2 font-medium flex-wrap">
               <span className="flex items-center gap-1">
                 <Calendar className="h-3.5 w-3.5 text-[#CC0E21]" />
                 {formatDate(video.fecha_partido)}
               </span>
               <span className="w-1.5 h-1.5 rounded-full bg-slate-800" />
-              <span className="capitalize text-slate-400 bg-slate-850 px-2.5 py-0.5 rounded-full border border-slate-800 text-[10px] font-bold">
-                {type}
+              <span className="capitalize text-slate-300 bg-slate-850 px-2.5 py-0.5 rounded-full border border-slate-800 text-[10px] font-bold flex items-center gap-1">
+                {isDriveVideo && <HardDrive className="h-3 w-3 text-[#CC0E21]" />}
+                {isDriveVideo ? 'Google Drive 5 TB' : type}
               </span>
+              {sizeFormatted && (
+                <>
+                  <span className="w-1.5 h-1.5 rounded-full bg-slate-800" />
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    {sizeFormatted}
+                  </span>
+                </>
+              )}
             </div>
 
             {/* Título */}
@@ -134,7 +155,7 @@ export function VideoCard({ video, onPlay, onEdit, onDelete }: VideoCardProps) {
                 )}
               </div>
             ) : (
-              <p className="text-sm text-slate-600 italic mb-3">Sin descripción para este partido.</p>
+              <p className="text-sm text-slate-600 italic mb-3">Sin descripción para este vídeo.</p>
             )}
           </div>
 
@@ -143,7 +164,7 @@ export function VideoCard({ video, onPlay, onEdit, onDelete }: VideoCardProps) {
             <Button
               onClick={() => onPlay(video)}
               variant="primary"
-              className="flex items-center gap-1.5 font-bold py-1.5 px-3"
+              className="flex items-center gap-1.5 font-bold py-1.5 px-3 bg-[#CC0E21] hover:bg-[#b00c1c]"
             >
               <Play className="h-3.5 w-3.5 fill-current" />
               Reproducir
@@ -155,7 +176,7 @@ export function VideoCard({ video, onPlay, onEdit, onDelete }: VideoCardProps) {
                   onClick={() => onEdit(video)}
                   variant="ghost"
                   className="h-8 w-8 p-0 text-slate-400 hover:text-[#CC0E21] hover:bg-[#CC0E21]/10 rounded-lg"
-                  title="Editar video"
+                  title="Editar vídeo"
                 >
                   <Edit className="h-4 w-4" />
                 </Button>
@@ -163,7 +184,7 @@ export function VideoCard({ video, onPlay, onEdit, onDelete }: VideoCardProps) {
                   onClick={() => onDelete(video.id)}
                   variant="ghost"
                   className="h-8 w-8 p-0 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg"
-                  title="Eliminar video"
+                  title="Eliminar vídeo"
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
