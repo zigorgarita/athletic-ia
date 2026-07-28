@@ -409,7 +409,7 @@ DEVUELVE ÚNICAMENTE UN OBJETO JSON VÁLIDO CON ESTE ESQUEMA EXACTO:
         .update({
           estado_analisis: 'pendiente_confirmar',
           extraccion_json: extraction,
-          analysis_generated_at: new Date().toISOString(),
+          analyzed_at: new Date().toISOString(),
         })
         .eq('id', documentId);
 
