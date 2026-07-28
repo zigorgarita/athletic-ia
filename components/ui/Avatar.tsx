@@ -44,6 +44,7 @@ export function Avatar({ src, name, size = 'md', className = '' }: AvatarProps) 
           alt={name}
           width={currentPixelSize}
           height={currentPixelSize}
+          unoptimized
           className="absolute inset-0 h-full w-full object-cover z-10"
           onError={() => setImageError(true)}
         />
