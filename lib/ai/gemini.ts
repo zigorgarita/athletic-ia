@@ -58,88 +58,121 @@ export class GeminiProvider implements AIProvider {
       );
     }
 
-    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-      const startTime = Date.now();
-      try {
-        const response = await ai.models.generateContent({
-          model: modelName,
-          contents,
-          config: {
-            systemInstruction,
-            temperature: config?.temperature ?? 0.2,
-            maxOutputTokens: config?.maxTokens,
+    function isQuotaError(err: unknown): boolean {
+      if (!err) return false;
+      const msg = err instanceof Error ? err.message : String(err);
+      const errObj = err as Record<string, unknown>;
+      const status = errObj.status || errObj.statusCode || errObj.code;
+      return (
+        status === 429 ||
+        status === 'RESOURCE_EXHAUSTED' ||
+        msg.includes('429') ||
+        msg.includes('RESOURCE_EXHAUSTED') ||
+        msg.includes('Quota exceeded') ||
+        msg.includes('quota')
+      );
+    }
+
+    // Lista de modelos a probar (modelo principal -> fallbacks por cuota)
+    const candidateModels = Array.from(new Set([modelName, 'gemini-2.5-flash', 'gemini-1.5-flash']));
+
+    for (const currentModel of candidateModels) {
+      for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        const startTime = Date.now();
+        try {
+          console.log(`[GEMINI] Ejecutando consulta con modelo: ${currentModel} (intento ${attempt}/${MAX_ATTEMPTS})`);
+          const response = await ai.models.generateContent({
+            model: currentModel,
+            contents,
+            config: {
+              systemInstruction,
+              temperature: config?.temperature ?? 0.2,
+              maxOutputTokens: config?.maxTokens,
+            }
+          });
+
+          const duration = Date.now() - startTime;
+          const candidate0 = response.candidates?.[0];
+          const partTypes = candidate0?.content?.parts?.map((p: unknown) => {
+            const pr = p as Record<string, unknown>;
+            return pr.text !== undefined ? 'text' : (pr.inlineData ? 'inlineData' : 'unknown');
+          }) || [];
+          const resRecord = response as unknown as Record<string, unknown>;
+          const promptFeedback = resRecord.promptFeedback as Record<string, unknown> | undefined;
+          const usageMetadata = resRecord.usageMetadata as Record<string, unknown> | undefined;
+          const candidate0Record = candidate0 as unknown as Record<string, unknown> | undefined;
+
+          console.log('[TELEMETRIA_GEMINI]', JSON.stringify({
+            modelRequested: currentModel,
+            attempt,
+            status: '200 OK',
+            durationMs: duration,
+            modelVersion: (resRecord.modelVersion as string) || 'N/A',
+            responseId: (resRecord.responseId as string) || 'N/A',
+            candidatesLength: response.candidates?.length || 0,
+            promptFeedback: {
+              blockReason: promptFeedback?.blockReason || null,
+              blockReasonMessage: promptFeedback?.blockReasonMessage || null,
+            },
+            candidate0: candidate0 ? {
+              finishReason: candidate0.finishReason || null,
+              finishMessage: candidate0Record?.finishMessage || null,
+              safetyRatings: candidate0.safetyRatings || [],
+              partTypes,
+            } : null,
+            textLength: response.text?.length || 0,
+            usageMetadata: {
+              promptTokenCount: usageMetadata?.promptTokenCount || 0,
+              candidatesTokenCount: usageMetadata?.candidatesTokenCount || 0,
+              thoughtsTokenCount: usageMetadata?.thoughtsTokenCount || 0,
+              totalTokenCount: usageMetadata?.totalTokenCount || 0,
+            }
+          }, null, 2));
+
+          return {
+            content: response.text || '',
+            model: currentModel,
+          };
+        } catch (error: unknown) {
+          const duration = Date.now() - startTime;
+          const is503 = is503Error(error);
+          const isQuota = isQuotaError(error);
+
+          console.log('[TELEMETRIA_GEMINI_INTENTO]', JSON.stringify({
+            modelRequested: currentModel,
+            attempt,
+            maxAttempts: MAX_ATTEMPTS,
+            is503,
+            isQuota,
+            durationMs: duration,
+            error: error instanceof Error ? error.message : String(error),
+          }));
+
+          if (is503 && attempt < MAX_ATTEMPTS) {
+            const baseDelay = retryDelays[attempt - 1] || 2000;
+            const jitter = Math.floor(Math.random() * 400);
+            const waitMs = baseDelay + jitter;
+            console.warn(`[GEMINI_RETRY] Modelo: ${currentModel} | Intento: ${attempt}/${MAX_ATTEMPTS} | Código: 503 UNAVAILABLE | Reintentando en ${waitMs}ms...`);
+            await new Promise(res => setTimeout(res, waitMs));
+            continue;
           }
-        });
 
-        const duration = Date.now() - startTime;
-        const candidate0 = response.candidates?.[0];
-        const partTypes = candidate0?.content?.parts?.map((p: unknown) => {
-          const pr = p as Record<string, unknown>;
-          return pr.text !== undefined ? 'text' : (pr.inlineData ? 'inlineData' : 'unknown');
-        }) || [];
-        const resRecord = response as unknown as Record<string, unknown>;
-        const promptFeedback = resRecord.promptFeedback as Record<string, unknown> | undefined;
-        const usageMetadata = resRecord.usageMetadata as Record<string, unknown> | undefined;
-        const candidate0Record = candidate0 as unknown as Record<string, unknown> | undefined;
-
-        console.log('[TELEMETRIA_GEMINI]', JSON.stringify({
-          modelRequested: modelName,
-          attempt,
-          status: '200 OK',
-          durationMs: duration,
-          modelVersion: (resRecord.modelVersion as string) || 'N/A',
-          responseId: (resRecord.responseId as string) || 'N/A',
-          candidatesLength: response.candidates?.length || 0,
-          promptFeedback: {
-            blockReason: promptFeedback?.blockReason || null,
-            blockReasonMessage: promptFeedback?.blockReasonMessage || null,
-          },
-          candidate0: candidate0 ? {
-            finishReason: candidate0.finishReason || null,
-            finishMessage: candidate0Record?.finishMessage || null,
-            safetyRatings: candidate0.safetyRatings || [],
-            partTypes,
-          } : null,
-          textLength: response.text?.length || 0,
-          usageMetadata: {
-            promptTokenCount: usageMetadata?.promptTokenCount || 0,
-            candidatesTokenCount: usageMetadata?.candidatesTokenCount || 0,
-            thoughtsTokenCount: usageMetadata?.thoughtsTokenCount || 0,
-            totalTokenCount: usageMetadata?.totalTokenCount || 0,
+          // Si superó la cuota (429 RESOURCE_EXHAUSTED) y tenemos más modelos candidatos, probar el siguiente modelo
+          if (isQuota && candidateModels.indexOf(currentModel) < candidateModels.length - 1) {
+            const nextModel = candidateModels[candidateModels.indexOf(currentModel) + 1];
+            console.warn(`[GEMINI_FALLBACK] Cuota 429 superada para '${currentModel}'. Cambiando automáticamente al modelo secundario '${nextModel}'...`);
+            break; // Rompe el bucle de intentos de este modelo y pasa al siguiente en candidateModels
           }
-        }, null, 2));
 
-        return {
-          content: response.text || '',
-          model: modelName,
-        };
-      } catch (error: unknown) {
-        const duration = Date.now() - startTime;
-        const is503 = is503Error(error);
-
-        console.log('[TELEMETRIA_GEMINI_INTENTO]', JSON.stringify({
-          modelRequested: modelName,
-          attempt,
-          maxAttempts: MAX_ATTEMPTS,
-          is503,
-          durationMs: duration,
-          error: error instanceof Error ? error.message : String(error),
-        }));
-
-        if (is503 && attempt < MAX_ATTEMPTS) {
-          const baseDelay = retryDelays[attempt - 1] || 2000;
-          const jitter = Math.floor(Math.random() * 400); // 0-400ms jitter aleatorio
-          const waitMs = baseDelay + jitter;
-          console.warn(`[GEMINI_RETRY] Modelo: ${modelName} | Intento: ${attempt}/${MAX_ATTEMPTS} | Código: 503 UNAVAILABLE | Reintentando en ${waitMs}ms...`);
-          await new Promise(res => setTimeout(res, waitMs));
-          continue;
+          const msg = error instanceof Error ? error.message : String(error);
+          if (is503) {
+            throw new Error('Gemini está experimentando una alta demanda temporal. No se ha perdido ningún dato. Inténtalo de nuevo en unos minutos.');
+          }
+          if (isQuota) {
+            throw new Error('Se ha alcanzado el límite de cuota diario de la clave gratuita de Gemini API. Por favor, reintenta en unos minutos o habilita facturación en Google AI Studio.');
+          }
+          throw new Error(`Error en Gemini API: ${msg}`);
         }
-
-        const msg = error instanceof Error ? error.message : String(error);
-        if (is503) {
-          throw new Error('Gemini está experimentando una alta demanda temporal. No se ha perdido ningún dato. Inténtalo de nuevo en unos minutos.');
-        }
-        throw new Error(`Error en Gemini API: ${msg}`);
       }
     }
 
