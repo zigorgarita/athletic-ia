@@ -110,10 +110,10 @@ export async function POST(req: Request) {
     // 5. Cargar observaciones aprobadas únicamente de documentos cuyo estado_analisis sea 'analizado'
     let rawObs: Record<string, unknown>[] = [];
     if (targetClubId || validSeasonId) {
-      // Obtenemos los IDs de documentos analizados para este club / temporada
+      // Obtenemos los documentos analizados para este club / temporada con su extraccion_json
       let docQuery = supabaseServer
         .from('club_documents')
-        .select('id, estado_analisis');
+        .select('id, estado_analisis, extraccion_json, club_id, club_season_id, nombre, fecha');
 
       if (targetClubId) docQuery = docQuery.eq('club_id', targetClubId);
       if (validSeasonId) docQuery = docQuery.eq('club_season_id', validSeasonId);
@@ -121,9 +121,8 @@ export async function POST(req: Request) {
       const { data: docs } = await docQuery;
 
       // Documentos válidos analizados (o legacy donde estado_analisis aún sea NULL tras migración inicial)
-      const analyzedDocIds = (docs || [])
-        .filter(d => d.estado_analisis === 'analizado' || d.estado_analisis === null)
-        .map(d => d.id);
+      const analyzedDocs = (docs || []).filter(d => d.estado_analisis === 'analizado' || d.estado_analisis === null);
+      const analyzedDocIds = analyzedDocs.map(d => d.id);
 
       if (analyzedDocIds.length > 0 || (docs || []).length === 0) {
         let obsQuery = supabaseServer
@@ -142,10 +141,96 @@ export async function POST(req: Request) {
         }
 
         const { data: obsData, error: obsErr } = await obsQuery;
-        if (obsErr) {
-          console.warn('Advertencia consultando observaciones aprobadas:', obsErr);
-        } else if (obsData) {
+        if (!obsErr && obsData && obsData.length > 0) {
           rawObs = obsData as Record<string, unknown>[];
+        } else if (analyzedDocs.length > 0) {
+          // Fallback resiliente: Extraer las observaciones aprobadas del extraccion_json de los documentos analizados
+          analyzedDocs.forEach(doc => {
+            if (doc.extraccion_json) {
+              const ext = doc.extraccion_json as Record<string, unknown>;
+              const docName = doc.nombre || 'Documento de Scouting';
+              const metadatos = ext.metadatos as Record<string, unknown> | undefined;
+              const docDate = (metadatos?.fechaInforme as string) || doc.fecha || null;
+
+              const obsRival = ext.observacionesRival as Record<string, Record<string, unknown>[]> | undefined;
+              if (obsRival) {
+                Object.keys(obsRival).forEach(cat => {
+                  (obsRival[cat] || []).forEach((item: Record<string, unknown>) => {
+                    rawObs.push({
+                      id: item.id || `obs_${rawObs.length+1}`,
+                      document_id: doc.id,
+                      club_id: doc.club_id,
+                      club_season_id: doc.club_season_id,
+                      document_name: docName,
+                      document_date: docDate,
+                      category: cat,
+                      content: item.contenido,
+                      source_type: item.fuente || 'texto',
+                      page: item.pagina || 1,
+                      original_evidence: item.evidenciaOriginal || null,
+                      confidence: item.confianza || 'alta',
+                      status: 'aprobado',
+                      priority: item.prioridad || 'normal',
+                      is_analyst_proposal: false
+                    });
+                  });
+                });
+              }
+
+              const propsAnalista = ext.propuestasDelAnalista as Record<string, Record<string, unknown>[]> | undefined;
+              if (propsAnalista) {
+                Object.keys(propsAnalista).forEach(cat => {
+                  (propsAnalista[cat] || []).forEach((item: Record<string, unknown>) => {
+                    rawObs.push({
+                      id: item.id || `prop_${rawObs.length+1}`,
+                      document_id: doc.id,
+                      club_id: doc.club_id,
+                      club_season_id: doc.club_season_id,
+                      document_name: docName,
+                      document_date: docDate,
+                      category: cat,
+                      content: item.contenido,
+                      source_type: item.fuente || 'texto',
+                      page: item.pagina || 1,
+                      original_evidence: item.evidenciaOriginal || null,
+                      confidence: item.confianza || 'alta',
+                      status: 'aprobado',
+                      priority: item.prioridad || 'normal',
+                      is_analyst_proposal: true
+                    });
+                  });
+                });
+              }
+
+              const amenazas = ext.amenazasJugadores as Record<string, unknown>[] | undefined;
+              if (amenazas) {
+                amenazas.forEach((t: Record<string, unknown>) => {
+                  const fortalezasStr = Array.isArray(t.fortalezas) ? t.fortalezas.join(', ') : (t.fortalezas as string || '');
+                  rawObs.push({
+                    id: `threat_${t.dorsal || rawObs.length+1}`,
+                    document_id: doc.id,
+                    club_id: doc.club_id,
+                    club_season_id: doc.club_season_id,
+                    document_name: docName,
+                    document_date: docDate,
+                    category: 'jugadorRival',
+                    content: `[Dorsal ${t.dorsal || 'S/N'}] ${t.nombre || 'Jugador Rival'} (${t.posicionHabitual || 'Posición'}): ${t.observaciones}. Fortalezas: ${fortalezasStr}. ${t.consignaEspecifica || ''}`,
+                    source_type: 'texto',
+                    page: t.pagina || 11,
+                    original_evidence: t.evidenciaOriginal || null,
+                    confidence: 'alta',
+                    status: 'aprobado',
+                    priority: t.nivelPeligro === 'critico' || t.nivelPeligro === 'alto' ? 'clave' : 'alta',
+                    is_analyst_proposal: false,
+                    rival_player_name: t.nombre || null,
+                    rival_player_dorsal: t.dorsal || null,
+                    rival_player_position: t.posicionHabitual || null,
+                    rival_player_threat_level: t.nivelPeligro || 'alto'
+                  });
+                });
+              }
+            }
+          });
         }
       }
     }

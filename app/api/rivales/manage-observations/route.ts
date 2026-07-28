@@ -60,22 +60,21 @@ export async function POST(req: Request) {
 
       const staffPasskey = process.env.COACH_STAFF_PASSKEY || process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
 
-      // 2. Obtener datos del documento si existen
-      const { data: docs } = await supabaseServer
+      // 2. Obtener datos completos del documento si existen
+      const { data: fullDoc } = await supabaseServer
         .from('club_documents')
-        .select('club_id, club_season_id, nombre')
+        .select('*')
         .eq('id', targetDocId)
-        .limit(1);
-      const doc = docs?.[0];
+        .maybeSingle();
 
       // 3. Guardar las observaciones aprobadas usando exec_secure_upsert (rol staff)
       let savedCount = 0;
       for (const row of rows) {
         const obsPayload = {
           document_id: targetDocId,
-          club_id: doc?.club_id || row.club_id || null,
-          club_season_id: doc?.club_season_id || row.club_season_id || null,
-          document_name: doc?.nombre || row.document_name || 'Documento de Scouting',
+          club_id: fullDoc?.club_id || row.club_id || null,
+          club_season_id: fullDoc?.club_season_id || row.club_season_id || null,
+          document_name: fullDoc?.nombre || row.document_name || 'Documento de Scouting',
           document_date: row.document_date || null,
           rival_name: row.rival_name || null,
           season: row.season || null,
@@ -87,7 +86,7 @@ export async function POST(req: Request) {
           confidence: row.confidence || 'alta',
           status: 'aprobado',
           priority: row.priority || 'normal',
-          is_analyst_proposal: row.is_analyst_proposal || false,
+          is_analyst_proposal: Boolean(row.is_analyst_proposal),
           rival_player_name: row.rival_player_name || null,
           rival_player_dorsal: row.rival_player_dorsal || null,
           rival_player_position: row.rival_player_position || null,
@@ -111,14 +110,20 @@ export async function POST(req: Request) {
       }
 
       // 4. Actualizar estado del documento a analizado en club_documents
-      await supabaseServer.rpc('exec_secure_upsert', {
-        target_table: 'club_documents',
-        payload: { id: targetDocId, estado_analisis: 'analizado', analyzed_at: new Date().toISOString() },
-        conflict_columns: '{id}',
-        staff_passkey: staffPasskey
-      });
+      if (fullDoc) {
+        await supabaseServer.rpc('exec_secure_upsert', {
+          target_table: 'club_documents',
+          payload: {
+            ...fullDoc,
+            estado_analisis: 'analizado',
+            analyzed_at: new Date().toISOString()
+          },
+          conflict_columns: '{id}',
+          staff_passkey: staffPasskey
+        });
+      }
 
-      return NextResponse.json({ success: true, count: savedCount || rows.length });
+      return NextResponse.json({ success: true, count: savedCount || rows.length, verifiedInDb: savedCount > 0 });
     }
 
     if (action === 'toggle_report_selection') {
