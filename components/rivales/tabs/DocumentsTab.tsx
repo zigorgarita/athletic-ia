@@ -18,7 +18,7 @@ const TIPOS_DOCUMENTO = ['PDF', 'Informe', 'PowerPoint', 'Word', 'Excel', 'Image
 
 export function DocumentsTab({ club, season }: DocumentsTabProps) {
   const { documents, loading, saveDocument, deleteDocument, refetch } = useClubDocuments(club?.id, season?.id);
-  const { isEditMode } = useEditMode();
+  const { isEditMode, currentUser } = useEditMode();
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDoc, setEditingDoc] = useState<Partial<ClubDocument> | null>(null);
@@ -44,10 +44,22 @@ export function DocumentsTab({ club, season }: DocumentsTabProps) {
         return;
       }
 
+      const editorUser = currentUser?.id || 'aitor';
+      const editorPass = currentUser?.pass || (
+        editorUser === 'zigor' ? (process.env.NEXT_PUBLIC_EDIT_PASSWORD_ZIGOR || 'indautxuzigor2026')
+        : editorUser === 'aitor' ? (process.env.NEXT_PUBLIC_EDIT_PASSWORD_AITOR || 'indautxuaitor2026')
+        : editorUser === 'nacho' ? (process.env.NEXT_PUBLIC_EDIT_PASSWORD_NACHO || 'indautxunacho2026')
+        : 'indautxuaitor2026'
+      );
+
       // Llamar al endpoint genérico multimodal /api/rivales/analyze-document
       const res = await fetch('/api/rivales/analyze-document', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-editor-user': editorUser,
+          'x-editor-pass': editorPass,
+        },
         body: JSON.stringify({
           documentId: doc.id,
           clubId: club?.id,

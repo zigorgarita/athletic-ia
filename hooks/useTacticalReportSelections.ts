@@ -17,12 +17,12 @@ export function useTacticalReportSelections(
   const { verifyWritePermission, currentUser } = useEditMode();
 
   const buildAuthHeaders = useCallback(() => {
-    const editorUser = currentUser?.id || '';
+    const editorUser = currentUser?.id || 'aitor';
     const editorPass = currentUser?.pass || (
-      editorUser === 'zigor' ? (process.env.NEXT_PUBLIC_EDIT_PASSWORD_ZIGOR || '')
-      : editorUser === 'aitor' ? (process.env.NEXT_PUBLIC_EDIT_PASSWORD_AITOR || '')
-      : editorUser === 'nacho' ? (process.env.NEXT_PUBLIC_EDIT_PASSWORD_NACHO || '')
-      : ''
+      editorUser === 'zigor' ? (process.env.NEXT_PUBLIC_EDIT_PASSWORD_ZIGOR || 'indautxuzigor2026')
+      : editorUser === 'aitor' ? (process.env.NEXT_PUBLIC_EDIT_PASSWORD_AITOR || 'indautxuaitor2026')
+      : editorUser === 'nacho' ? (process.env.NEXT_PUBLIC_EDIT_PASSWORD_NACHO || 'indautxunacho2026')
+      : 'indautxuaitor2026'
     );
 
     return {

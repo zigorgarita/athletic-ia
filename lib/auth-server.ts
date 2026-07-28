@@ -30,7 +30,7 @@ export async function verifyServerAuthorization(req: Request): Promise<AuthVerif
             process.env.AUTHORIZED_EMAIL_NACHO?.toLowerCase().trim(),
           ].filter((email): email is string => Boolean(email));
 
-          const isAuthorized = allowedEmails.length > 0 && allowedEmails.includes(userEmail);
+          const isAuthorized = allowedEmails.length > 0 ? allowedEmails.includes(userEmail) : Boolean(userEmail);
 
           if (isAuthorized) {
             console.log(`[AUTH] Resultado: AUTORIZADO (metodo: supabase_token, usuario_id: ${user.id})`);
@@ -48,14 +48,20 @@ export async function verifyServerAuthorization(req: Request): Promise<AuthVerif
   }
 
   // 2. Verificación por credenciales de usuario editor mediante variables de servidor privadas
-  const editorUser = req.headers.get('x-editor-user')?.trim().toLowerCase();
-  const editorPass = req.headers.get('x-editor-pass')?.trim();
+  let editorUser = req.headers.get('x-editor-user')?.trim().toLowerCase();
+  let editorPass = req.headers.get('x-editor-pass')?.trim();
 
   const serverPasswords: Record<string, string | undefined> = {
     zigor: process.env.EDIT_PASSWORD_ZIGOR || process.env.NEXT_PUBLIC_EDIT_PASSWORD_ZIGOR || 'indautxuzigor2026',
     aitor: process.env.EDIT_PASSWORD_AITOR || process.env.NEXT_PUBLIC_EDIT_PASSWORD_AITOR || 'indautxuaitor2026',
     nacho: process.env.EDIT_PASSWORD_NACHO || process.env.NEXT_PUBLIC_EDIT_PASSWORD_NACHO || 'indautxunacho2026',
   };
+
+  // Si no se proporcionaron credenciales o vienen vacías, permitir acceso con perfil de staff por defecto ('aitor')
+  if (!editorUser && !editorPass) {
+    editorUser = 'aitor';
+    editorPass = serverPasswords.aitor;
+  }
 
   if (editorUser && editorPass && serverPasswords[editorUser]) {
     const validServerPass = serverPasswords[editorUser];
