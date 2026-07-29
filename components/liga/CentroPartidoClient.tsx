@@ -17,6 +17,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { VideoPlayerModal } from './VideoPlayerModal';
 import { MatchHeader } from './MatchHeader';
 import { MatchTabs } from './MatchTabs';
+import { AnalisisPropioTab } from './AnalisisPropioTab';
 import { useClubLogos } from '@/hooks/useClubLogos';
 import { TacticalField, PositionNode } from '@/components/tactica/TacticalField';
 import {
@@ -36,7 +37,8 @@ const MAIN_TABS = [
   { id: 'equipo', label: 'Equipo', icon: Users },
   { id: 'plan', label: 'Plan', icon: BookOpen },
   { id: 'abp', label: 'ABP', icon: Shield },
-  { id: 'partido', label: 'Partido', icon: ClipboardList }
+  { id: 'partido', label: 'Partido', icon: ClipboardList },
+  { id: 'analisis_propio', label: 'Análisis Propio', icon: Sparkles }
 ];
 
 /*
@@ -1009,6 +1011,8 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
 
       {/* Tab Contents */}
       <div className="bg-slate-900/10 border border-slate-900 rounded-2xl p-6 min-h-[500px]">
+        {/* TAB ANÁLISIS PROPIO */}
+        {activeTab === 'analisis_propio' && <AnalisisPropioTab match={match} />}
 
         {/* TAB 1: EQUIPO (CONVOCATORIA Y ESTADÍSTICAS) */}
         {activeTab === 'equipo' && (() => {

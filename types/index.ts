@@ -838,6 +838,18 @@ export interface MatchDocument {
   created_at: string;
 }
 
+export interface MatchOwnAnalysisVideo {
+  id: string;
+  match_id: string;
+  categoria: string;
+  titulo: string | null;
+  video_url: string | null;
+  drive_file_id: string | null;
+  tipo_origen: 'Enlace' | 'Archivo';
+  tamano_bytes: number | null;
+  created_at: string;
+}
+
 // --- BIBLIOTECA DE CONOCIMIENTO TÁCTICO ---
 
 export const KNOWLEDGE_CATEGORIES = [

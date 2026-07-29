@@ -57,8 +57,14 @@ export function buildPathSegments(context: DriveUploadContext): { segments: stri
   }
 
   if (context.subCategory) {
-    const cleanSubCat = sanitizeFolderName(context.subCategory);
-    if (cleanSubCat) segments.push(cleanSubCat);
+    const rawSubCats = Array.isArray(context.subCategory)
+      ? context.subCategory
+      : context.subCategory.split('/');
+
+    for (const subCat of rawSubCats) {
+      const cleanSubCat = sanitizeFolderName(subCat);
+      if (cleanSubCat) segments.push(cleanSubCat);
+    }
   }
 
   const pathKey = segments.join('/');
