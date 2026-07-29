@@ -1,13 +1,12 @@
 /**
- * Motor de Cliente para Subida Reanudable a Google Drive (Resumable Upload API)
+ * Motor de Cliente para Subida Reanudable a Google Drive via Proxy Servidor
  * Athletic IA / Indautxu 26/27
  *
  * Características:
- * - Chunks de 8 MB (múltiplos exactos de 256 KB = 262,144 bytes).
- * - Progreso real por porcentaje y cálculo de velocidad (MB/s).
- * - Consulta de estado real a Google Drive (PUT bytes con cabecera Range).
- * - Pausa, reanudación y cancelación limpia mediante AbortController.
- * - Sin almacenamiento persistente de uploadUrl (solo en memoria durante la subida).
+ * - Chunks de 4 MiB (4,194,304 bytes = múltiplo exacto de 256 KB) para cumplir con el límite seguro de Vercel (< 4.5 MB).
+ * - Proxy servidor en /api/google-drive/upload-chunk para evitar restricciones CORS del navegador.
+ * - Progreso real por porcentaje y velocidad (MB/s).
+ * - Pausa, reanudación y cancelación mediante AbortController.
  */
 
 export interface UploadProgressInfo {
@@ -25,7 +24,7 @@ export interface DriveResumableUploadOptions {
   file: File;
   passkey: string;
   onProgress?: (info: UploadProgressInfo) => void;
-  chunkSizeBytes?: number; // Por defecto 8 MB (8,388,608 bytes)
+  chunkSizeBytes?: number; // Por defecto 4 MiB (4,194,304 bytes)
 }
 
 export class DriveResumableUploader {
@@ -46,9 +45,9 @@ export class DriveResumableUploader {
     this.passkey = options.passkey;
     this.onProgress = options.onProgress;
     
-    // Asignar tamaño de chunk (múltiplo de 256 KB). Por defecto 8 MB
-    const defaultChunkSize = 8 * 1024 * 1024; // 8,388,608 bytes
-    const baseChunk = options.chunkSizeBytes || defaultChunkSize;
+    // Límite máximo seguro para Vercel Serverless (4.5 MB body limit) -> 4 MiB (4,194,304 bytes)
+    const defaultChunkSize = 4 * 1024 * 1024; // 4,194,304 bytes (16 * 256 KB)
+    const baseChunk = options.chunkSizeBytes ? Math.min(options.chunkSizeBytes, defaultChunkSize) : defaultChunkSize;
     // Redondear al múltiplo de 256 KB más cercano
     this.chunkSize = Math.max(256 * 1024, Math.floor(baseChunk / (256 * 1024)) * (256 * 1024));
   }
@@ -82,7 +81,7 @@ export class DriveResumableUploader {
           throw new Error(sessionData.error || 'Error al obtener la sesión de subida desde el servidor.');
         }
 
-        // Guardar únicamente en memoria del objeto uploader (nunca en localStorage, logs ni Supabase)
+        // Guardar únicamente en memoria del objeto uploader
         this.uploadUrl = sessionData.uploadUrl;
       }
 
@@ -90,7 +89,7 @@ export class DriveResumableUploader {
       const resumeByte = await this.queryDriveProgress();
       this.currentBytesUploaded = resumeByte;
 
-      // 3. Subir bloques secuenciales
+      // 3. Subir bloques secuenciales mediante nuestro proxy servidor /api/google-drive/upload-chunk
       const total = this.file.size;
 
       while (this.currentBytesUploaded < total) {
@@ -107,9 +106,11 @@ export class DriveResumableUploader {
 
         this.abortController = new AbortController();
 
-        const response = await fetch(this.uploadUrl!, {
+        const response = await fetch('/api/google-drive/upload-chunk', {
           method: 'PUT',
           headers: {
+            'x-upload-url': this.uploadUrl!,
+            'x-staff-passkey': this.passkey,
             'Content-Range': `bytes ${startByte}-${endByte}/${total}`,
             'Content-Type': this.file.type || 'video/mp4',
           },
@@ -117,11 +118,16 @@ export class DriveResumableUploader {
           signal: this.abortController.signal,
         });
 
-        if (response.status === 308) {
-          // Bloque recibido parcialmente, actualizar puntero
-          const rangeHeader = response.headers.get('range');
-          if (rangeHeader) {
-            const match = rangeHeader.match(/bytes=0-(\d+)/);
+        const resData = await response.json().catch(() => ({}));
+
+        if (!response.ok && resData.error) {
+          throw new Error(resData.error);
+        }
+
+        if (resData.status === 308 || resData.range) {
+          // Bloque recibido parcialmente por Google Drive
+          if (resData.range) {
+            const match = resData.range.match(/bytes=0-(\d+)/);
             if (match) {
               this.currentBytesUploaded = parseInt(match[1], 10) + 1;
             } else {
@@ -132,10 +138,9 @@ export class DriveResumableUploader {
           }
 
           this.updateProgress('subiendo', this.currentBytesUploaded);
-        } else if (response.ok || response.status === 200 || response.status === 201) {
+        } else if (resData.status === 200 || resData.driveFileId || resData.fileData?.id) {
           // Último bloque completado
-          const finalData = await response.json().catch(() => ({}));
-          const driveFileId = finalData.id;
+          const driveFileId = resData.driveFileId || resData.fileData?.id;
 
           // 4. Finalizar subida y configurar acceso en el servidor
           const finalizeRes = await fetch('/api/google-drive/finalize-upload', {
@@ -156,8 +161,7 @@ export class DriveResumableUploader {
           this.uploadUrl = null; // Limpiar URL de sesión en memoria
           return this.updateProgress('completado', total, undefined, driveFileId, videoUrl);
         } else {
-          const errText = await response.text();
-          throw new Error(`Error de Google Drive (HTTP ${response.status}): ${errText}`);
+          throw new Error(resData.error || `Error inesperado durante la transmisión del bloque (HTTP ${response.status}).`);
         }
       }
 
@@ -176,27 +180,27 @@ export class DriveResumableUploader {
   }
 
   /**
-   * Consulta a Google Drive mediante PUT bytes con cabecera Content-Range para saber exactamente cuántos bytes se han recibido.
+   * Consulta a Google Drive vía proxy servidor para saber cuántos bytes se han recibido.
    */
   public async queryDriveProgress(): Promise<number> {
     if (!this.uploadUrl) return 0;
     try {
-      const res = await fetch(this.uploadUrl, {
+      const res = await fetch('/api/google-drive/upload-chunk', {
         method: 'PUT',
         headers: {
+          'x-upload-url': this.uploadUrl,
+          'x-staff-passkey': this.passkey,
           'Content-Range': `bytes */${this.file.size}`,
         },
       });
 
-      if (res.status === 308) {
-        const rangeHeader = res.headers.get('range');
-        if (rangeHeader) {
-          const match = rangeHeader.match(/bytes=0-(\d+)/);
-          if (match) {
-            return parseInt(match[1], 10) + 1;
-          }
+      const data = await res.json().catch(() => ({}));
+      if (data.status === 308 && data.range) {
+        const match = data.range.match(/bytes=0-(\d+)/);
+        if (match) {
+          return parseInt(match[1], 10) + 1;
         }
-      } else if (res.status === 200 || res.status === 201) {
+      } else if (data.status === 200) {
         return this.file.size;
       }
     } catch (err) {
@@ -225,7 +229,7 @@ export class DriveResumableUploader {
       this.abortController.abort();
     }
     
-    this.uploadUrl = null; // Limpiar URL de memoria
+    this.uploadUrl = null;
     this.updateProgress('cancelado', this.currentBytesUploaded);
   }
 
