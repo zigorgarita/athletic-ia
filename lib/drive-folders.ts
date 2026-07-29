@@ -173,10 +173,12 @@ export async function getOrCreateDriveFolderPath(context: DriveUploadContext): P
 
         try {
           // Intentar registro atómico en DB usando RPC register_drive_folder (ON CONFLICT DO NOTHING + SELECT)
+          const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || process.env.COACH_STAFF_PASSKEY || 'indautxu2026';
           const { data: rpcCanonicalId, error: rpcErr } = await supabase.rpc('register_drive_folder', {
             p_path_key: currentPath,
             p_drive_folder_id: targetFolderId,
             p_parent_folder_id: currentParentId,
+            p_staff_passkey: passkey,
           });
 
           if (!rpcErr && rpcCanonicalId) {

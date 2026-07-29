@@ -17,7 +17,7 @@ ALTER TABLE public.drive_folders ENABLE ROW LEVEL SECURITY;
 
 -- Política de lectura para la aplicación
 DROP POLICY IF EXISTS "Permitir SELECT a todos los usuarios" ON public.drive_folders;
-CREATE POLICY "Permitir SELECT a todos los usuarios" ON public.drive_folders FOR SELECT USING (true);
+CREATE POLICY "Permitir SELECT a todos los usuarios" ON public.drive_folders FOR SELECT TO public USING (true);
 
 -- Índice rápido para búsqueda de rutas lógicas
 CREATE INDEX IF NOT EXISTS idx_drive_folders_path_key ON public.drive_folders(path_key);
@@ -27,7 +27,8 @@ CREATE INDEX IF NOT EXISTS idx_drive_folders_path_key ON public.drive_folders(pa
 CREATE OR REPLACE FUNCTION register_drive_folder(
     p_path_key TEXT,
     p_drive_folder_id TEXT,
-    p_parent_folder_id TEXT
+    p_parent_folder_id TEXT,
+    p_staff_passkey TEXT DEFAULT 'indautxu2026'
 )
 RETURNS TEXT
 LANGUAGE plpgsql
@@ -37,6 +38,10 @@ AS $$
 DECLARE
     v_canonical_id TEXT;
 BEGIN
+    IF p_staff_passkey != 'indautxu2026' THEN
+        RAISE EXCEPTION 'Acceso no autorizado: Clave de staff incorrecta';
+    END IF;
+
     -- 1. Intentar inserción atómica FIRST-WINS (nunca sobrescribe si ya existe)
     INSERT INTO public.drive_folders (path_key, drive_folder_id, parent_folder_id)
     VALUES (p_path_key, p_drive_folder_id, p_parent_folder_id)
@@ -51,8 +56,4 @@ BEGIN
 END;
 $$;
 
--- Restringir permisos de ejecución únicamente al rol del servidor (service_role)
-REVOKE EXECUTE ON FUNCTION register_drive_folder(TEXT, TEXT, TEXT) FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION register_drive_folder(TEXT, TEXT, TEXT) FROM anon;
-REVOKE EXECUTE ON FUNCTION register_drive_folder(TEXT, TEXT, TEXT) FROM authenticated;
-GRANT EXECUTE ON FUNCTION register_drive_folder(TEXT, TEXT, TEXT) TO service_role;
+GRANT EXECUTE ON FUNCTION register_drive_folder(TEXT, TEXT, TEXT, TEXT) TO anon, authenticated, service_role;
