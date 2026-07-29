@@ -9,6 +9,8 @@
  * - Pausa, reanudación y cancelación mediante AbortController.
  */
 
+import { DriveUploadContext } from '@/lib/drive-folders';
+
 export interface UploadProgressInfo {
   status: 'pendiente' | 'subiendo' | 'pausado' | 'completado' | 'fallido' | 'cancelado';
   bytesUploaded: number;
@@ -23,6 +25,7 @@ export interface UploadProgressInfo {
 export interface DriveResumableUploadOptions {
   file: File;
   passkey: string;
+  uploadContext?: DriveUploadContext;
   onProgress?: (info: UploadProgressInfo) => void;
   chunkSizeBytes?: number; // Por defecto 4 MiB (4,194,304 bytes)
 }
@@ -30,6 +33,7 @@ export interface DriveResumableUploadOptions {
 export class DriveResumableUploader {
   private file: File;
   private passkey: string;
+  private uploadContext?: DriveUploadContext;
   private onProgress?: (info: UploadProgressInfo) => void;
   private chunkSize: number;
   
@@ -43,6 +47,7 @@ export class DriveResumableUploader {
   constructor(options: DriveResumableUploadOptions) {
     this.file = options.file;
     this.passkey = options.passkey;
+    this.uploadContext = options.uploadContext;
     this.onProgress = options.onProgress;
     
     // Límite máximo seguro para Vercel Serverless (4.5 MB body limit) -> 4 MiB (4,194,304 bytes)
@@ -73,6 +78,7 @@ export class DriveResumableUploader {
             fileName: this.file.name,
             mimeType: this.file.type || 'video/mp4',
             fileSize: this.file.size,
+            uploadContext: this.uploadContext,
           }),
         });
 

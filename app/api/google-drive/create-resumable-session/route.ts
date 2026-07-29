@@ -1,10 +1,17 @@
 import { NextResponse } from 'next/server';
 import { getGoogleDriveAccessToken } from '@/lib/google-drive';
+import { getOrCreateDriveFolderPath, DriveUploadContext } from '@/lib/drive-folders';
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { passkey, fileName, mimeType, fileSize } = body;
+    const { passkey, fileName, mimeType, fileSize, uploadContext } = body as {
+      passkey: string;
+      fileName: string;
+      mimeType: string;
+      fileSize: number;
+      uploadContext?: DriveUploadContext;
+    };
 
     // 1. Validar autenticación de staff del lado servidor
     const validPasskey = process.env.NEXT_PUBLIC_COACH_PASSKEY || process.env.COACH_STAFF_PASSKEY || 'indautxu2026';
@@ -32,11 +39,16 @@ export async function POST(request: Request) {
       );
     }
 
-    // 3. Solicitar Access Token fresco a Google Drive
-    const accessToken = await getGoogleDriveAccessToken();
-    const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
+    // 3. Resolver la carpeta de destino en Drive (dinámica por contexto o fallback a la carpeta raíz)
+    let folderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
+    if (uploadContext && uploadContext.module) {
+      folderId = await getOrCreateDriveFolderPath(uploadContext);
+    }
 
-    // 4. Solicitar URL de Sesión Reanudable a Google Drive API v3
+    // 4. Solicitar Access Token fresco a Google Drive
+    const accessToken = await getGoogleDriveAccessToken();
+
+    // 5. Solicitar URL de Sesión Reanudable a Google Drive API v3
     const metadata: Record<string, unknown> = {
       name: cleanFileName,
       mimeType: mimeType || 'video/mp4',
