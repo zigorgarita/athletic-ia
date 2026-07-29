@@ -1,18 +1,23 @@
 'use client';
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 
-import React, { useState } from 'react';
-import { Match } from '@/types';
+import React, { useState, useEffect } from 'react';
+import { Match, Player } from '@/types';
 import { useMatchOwnAnalysisVideos } from '@/hooks/useMatchOwnAnalysisVideos';
+import { usePlayers } from '@/hooks/usePlayers';
 import { DriveResumableUploader } from '@/lib/drive-resumable';
 import { DriveUploadContext } from '@/lib/drive-folders';
 import { useEditMode } from '@/context/EditModeContext';
 import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { Modal } from '@/components/ui/Modal';
+import { Avatar } from '@/components/ui/Avatar';
 import { VideoPlayerModal } from './VideoPlayerModal';
+import { supabase } from '@/lib/supabase';
 import {
   Film, Link as LinkIcon, Upload, Play, Trash2, Plus, AlertCircle,
   Video, Sparkles, RefreshCw, Shield, Sword,
-  Zap, Target, Eye, User, Activity, FolderOpen
+  Zap, Target, Eye, User, Activity, FolderOpen, Users, Check
 } from 'lucide-react';
 
 interface AnalisisPropioTabProps {
@@ -137,10 +142,19 @@ const CATEGORIES: CategoryConfig[] = [
 
 export function AnalisisPropioTab({ match }: AnalisisPropioTabProps) {
   const { isEditMode } = useEditMode();
-  const { videos, loading, creating, deleting, addVideo, deleteVideo } = useMatchOwnAnalysisVideos(match.id);
+  const { videos, loading, deleting, addVideo, deleteVideo } = useMatchOwnAnalysisVideos(match.id);
+  const { players } = usePlayers();
 
   // Selected video modal player
   const [activeVideoModal, setActiveVideoModal] = useState<{ url: string; title: string; origin: 'Enlace' | 'Archivo'; driveFileId?: string | null } | null>(null);
+
+  // Assign players modal state
+  const [assignModalVideo, setAssignModalVideo] = useState<{ id: string; title: string } | null>(null);
+  const [assignedPlayerIds, setAssignedPlayerIds] = useState<string[]>([]);
+  const [initialAssignedPlayerIds, setInitialAssignedPlayerIds] = useState<string[]>([]);
+  const [loadingAssigned, setLoadingAssigned] = useState(false);
+  const [savingAssigned, setSavingAssigned] = useState(false);
+  const [videoAssignmentsCount, setVideoAssignmentsCount] = useState<Record<string, number>>({});
 
   // Forms per category
   const [activeForms, setActiveForms] = useState<Record<string, { mode: 'link' | 'file'; url: string; title: string }>>({});
@@ -148,6 +162,29 @@ export function AnalisisPropioTab({ match }: AnalisisPropioTabProps) {
   const [uploadingCategory, setUploadingCategory] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [isDraggingCategory, setIsDraggingCategory] = useState<string | null>(null);
+
+  // Fetch counts of assigned players for all videos
+  const fetchAllAssignmentsCounts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('match_own_analysis_video_players')
+        .select('video_id, player_id');
+      
+      if (error) return;
+
+      const counts: Record<string, number> = {};
+      data?.forEach(row => {
+        counts[row.video_id] = (counts[row.video_id] || 0) + 1;
+      });
+      setVideoAssignmentsCount(counts);
+    } catch (e) {
+      console.error('Error fetching video assignments counts:', e);
+    }
+  };
+
+  useEffect(() => {
+    fetchAllAssignmentsCounts();
+  }, [videos]);
 
   const getFormState = (catId: string) => {
     return activeForms[catId] || { mode: 'link', url: '', title: '' };
@@ -230,6 +267,85 @@ export function AnalisisPropioTab({ match }: AnalisisPropioTabProps) {
     }
   };
 
+  // Open Assign Players Modal
+  const handleOpenAssignModal = async (video: { id: string; titulo: string }) => {
+    setAssignModalVideo({ id: video.id, title: video.titulo });
+    setLoadingAssigned(true);
+    try {
+      const { data, error } = await supabase
+        .from('match_own_analysis_video_players')
+        .select('player_id')
+        .eq('video_id', video.id);
+
+      if (error) throw error;
+      const ids = (data || []).map(r => r.player_id);
+      setAssignedPlayerIds(ids);
+      setInitialAssignedPlayerIds(ids);
+    } catch (e) {
+      console.error('Error fetching assigned players:', e);
+      setAssignedPlayerIds([]);
+      setInitialAssignedPlayerIds([]);
+    } finally {
+      setLoadingAssigned(false);
+    }
+  };
+
+  const handleTogglePlayer = (pId: string) => {
+    setAssignedPlayerIds(prev =>
+      prev.includes(pId) ? prev.filter(id => id !== pId) : [...prev, pId]
+    );
+  };
+
+  const handleSaveAssignedPlayers = async () => {
+    if (!assignModalVideo) return;
+    setSavingAssigned(true);
+    try {
+      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
+      
+      // Players to add
+      const toAdd = assignedPlayerIds.filter(id => !initialAssignedPlayerIds.includes(id));
+      // Players to remove
+      const toRemove = initialAssignedPlayerIds.filter(id => !assignedPlayerIds.includes(id));
+
+      for (const pId of toAdd) {
+        await supabase.rpc('exec_secure_upsert', {
+          target_table: 'match_own_analysis_video_players',
+          payload: {
+            video_id: assignModalVideo.id,
+            player_id: pId
+          },
+          conflict_columns: ['video_id', 'player_id'],
+          staff_passkey: passkey
+        });
+      }
+
+      for (const pId of toRemove) {
+        const { data: rows } = await supabase
+          .from('match_own_analysis_video_players')
+          .select('id')
+          .eq('video_id', assignModalVideo.id)
+          .eq('player_id', pId);
+
+        if (rows && rows.length > 0) {
+          for (const row of rows) {
+            await supabase.rpc('exec_secure_delete', {
+              target_table: 'match_own_analysis_video_players',
+              record_id: row.id,
+              staff_passkey: passkey
+            });
+          }
+        }
+      }
+
+      setAssignModalVideo(null);
+      await fetchAllAssignmentsCounts();
+    } catch (err: any) {
+      alert(`Error al guardar asignación: ${err.message || String(err)}`);
+    } finally {
+      setSavingAssigned(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="space-y-6 p-4">
@@ -251,72 +367,62 @@ export function AnalisisPropioTab({ match }: AnalisisPropioTabProps) {
             <Sparkles className="w-6 h-6" />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-white tracking-wide">Análisis Propio — NACSPORT & Multimedia</h2>
-            <p className="text-sm text-slate-400">
-              Espacio exclusivo del analista. Vídeos exportados de NACSPORT organizados por categorías en Google Drive 5 TB.
+            <h2 className="text-lg font-bold text-slate-100 uppercase tracking-wide">
+              Análisis Propio del Partido
+            </h2>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Gestión centralizada de cortes exportados desde NACSPORT y almacenados en Google Drive (5 TB).
             </p>
           </div>
         </div>
       </div>
 
-      {/* Grid de las 13 Categorías */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Grid de 13 Categorías */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {CATEGORIES.map((category) => {
+          const CategoryIcon = category.icon;
           const categoryVideos = videos.filter((v) => v.categoria === category.id);
-          const form = getFormState(category.id);
-          const currentFile = activeFiles[category.id];
+          const formState = getFormState(category.id);
           const isCategoryUploading = uploadingCategory === category.id;
-
-          const IconComponent = category.icon;
+          const currentFile = activeFiles[category.id];
 
           return (
             <div
               key={category.id}
-              className={`bg-slate-900/80 border rounded-2xl p-5 flex flex-col justify-between transition-all duration-200 hover:border-slate-700 ${
-                category.id === 'PARTIDO_COMPLETO'
-                  ? 'border-red-500/30 bg-gradient-to-b from-red-950/10 via-slate-900 to-slate-900 lg:col-span-2'
-                  : 'border-slate-800'
-              }`}
+              className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 space-y-4 flex flex-col justify-between hover:border-slate-750 transition-all shadow-sm"
             >
-              <div>
-                {/* Header de la Categoría */}
-                <div className="flex items-center justify-between gap-3 mb-2">
-                  <div className="flex items-center gap-2.5">
-                    <div
-                      className={`p-2 rounded-lg ${
-                        category.id === 'PARTIDO_COMPLETO'
-                          ? 'bg-red-500/10 text-red-400 border border-red-500/30'
-                          : 'bg-slate-800 text-indigo-400 border border-slate-700'
-                      }`}
-                    >
-                      <IconComponent className="w-5 h-5" />
+              <div className="space-y-4">
+                {/* Cabecera de la Categoría */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 bg-slate-800 rounded-xl text-indigo-400 border border-slate-700">
+                      <CategoryIcon className="w-5 h-5" />
                     </div>
                     <div>
-                      <h3 className="text-base font-semibold text-white flex items-center gap-2">
+                      <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
                         {category.label}
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700 font-normal">
-                          {categoryVideos.length} {categoryVideos.length === 1 ? 'vídeo' : 'vídeos'}
+                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 font-semibold border border-slate-750">
+                          {categoryVideos.length}
                         </span>
                       </h3>
+                      <p className="text-xs text-slate-400 mt-0.5">{category.description}</p>
                     </div>
                   </div>
                 </div>
 
-                <p className="text-xs text-slate-400 mb-4">{category.description}</p>
-
-                {/* Formulario de Añadir (Si Modo Edición Activo) */}
+                {/* Formulario de Subida/Enlace (Modo Edición) */}
                 {isEditMode && (
-                  <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-3.5 mb-4 space-y-3">
-                    {/* Selector Pegar URL vs Arrastrar/Subir archivo */}
+                  <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-3.5 space-y-3">
+                    {/* Selector de Modo si permite Upload */}
                     {category.allowUpload ? (
-                      <div className="flex items-center gap-2 p-1 bg-slate-900 rounded-lg border border-slate-800 text-xs font-medium w-fit">
+                      <div className="flex items-center gap-2 border-b border-slate-850 pb-2">
                         <button
                           type="button"
                           onClick={() => updateFormState(category.id, { mode: 'link' })}
-                          className={`px-3 py-1.5 rounded-md flex items-center gap-1.5 transition-all ${
-                            form.mode === 'link'
-                              ? 'bg-indigo-600 text-white shadow-sm'
-                              : 'text-slate-400 hover:text-slate-200'
+                          className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors flex items-center gap-1.5 ${
+                            formState.mode === 'link'
+                              ? 'bg-indigo-600 text-white'
+                              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
                           }`}
                         >
                           <LinkIcon className="w-3.5 h-3.5" />
@@ -325,58 +431,50 @@ export function AnalisisPropioTab({ match }: AnalisisPropioTabProps) {
                         <button
                           type="button"
                           onClick={() => updateFormState(category.id, { mode: 'file' })}
-                          className={`px-3 py-1.5 rounded-md flex items-center gap-1.5 transition-all ${
-                            form.mode === 'file'
-                              ? 'bg-indigo-600 text-white shadow-sm'
-                              : 'text-slate-400 hover:text-slate-200'
+                          className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors flex items-center gap-1.5 ${
+                            formState.mode === 'file'
+                              ? 'bg-indigo-600 text-white'
+                              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
                           }`}
                         >
                           <Upload className="w-3.5 h-3.5" />
                           Arrastrar / Subir archivo
                         </button>
                       </div>
-                    ) : (
-                      <div className="flex items-center gap-1.5 text-xs text-red-400 font-medium">
-                        <LinkIcon className="w-3.5 h-3.5" />
-                        Pegar URL (YouTube / Enlace Externo)
+                    ) : null}
+
+                    {/* Campo Título Opcional */}
+                    <input
+                      type="text"
+                      placeholder="Título del vídeo (opcional)"
+                      value={formState.title}
+                      onChange={(e) => updateFormState(category.id, { title: e.target.value })}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-100 focus:border-indigo-500 outline-none"
+                    />
+
+                    {/* Modo Pegar URL */}
+                    {(formState.mode === 'link' || !category.allowUpload) && (
+                      <div className="flex gap-2">
+                        <input
+                          type="url"
+                          placeholder="https://youtube.com/... o enlace de Drive"
+                          value={formState.url}
+                          onChange={(e) => updateFormState(category.id, { url: e.target.value })}
+                          className="flex-1 bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-100 focus:border-indigo-500 outline-none"
+                        />
+                        <Button
+                          onClick={() => handleAddLink(category)}
+                          disabled={!formState.url.trim()}
+                          className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs px-3 py-1.5"
+                        >
+                          <Plus className="w-4 h-4 mr-1" /> Guardar
+                        </Button>
                       </div>
                     )}
 
-                    {/* Título opcional */}
-                    <input
-                      type="text"
-                      placeholder="Título / Descripción opcional..."
-                      value={form.title}
-                      onChange={(e) => updateFormState(category.id, { title: e.target.value })}
-                      className="w-full text-xs bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
-                    />
-
-                    {/* Input de Enlace */}
-                    {form.mode === 'link' || !category.allowUpload ? (
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="url"
-                          placeholder={
-                            category.id === 'PARTIDO_COMPLETO'
-                              ? 'https://www.youtube.com/watch?v=...'
-                              : 'URL del vídeo (YouTube, Drive, MP4)...'
-                          }
-                          value={form.url}
-                          onChange={(e) => updateFormState(category.id, { url: e.target.value })}
-                          className="flex-1 text-xs bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
-                        />
-                        <Button
-                          disabled={!form.url.trim() || creating}
-                          onClick={() => handleAddLink(category)}
-                          className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs px-3 py-2"
-                        >
-                          <Plus className="w-3.5 h-3.5 mr-1" />
-                          Añadir
-                        </Button>
-                      </div>
-                    ) : (
-                      /* Input de Archivo Drive */
-                      <div className="space-y-2">
+                    {/* Modo Subir Archivo (Drag & Drop) */}
+                    {formState.mode === 'file' && category.allowUpload && (
+                      <div className="space-y-3">
                         <div
                           onDragOver={(e) => {
                             e.preventDefault();
@@ -469,77 +567,95 @@ export function AnalisisPropioTab({ match }: AnalisisPropioTabProps) {
                   </div>
                 ) : (
                   <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
-                    {categoryVideos.map((vid) => (
-                      <div
-                        key={vid.id}
-                        className="flex items-center justify-between p-2.5 bg-slate-950/70 border border-slate-800/80 rounded-xl hover:border-indigo-500/40 transition-all group"
-                      >
-                        <div className="flex items-center gap-2.5 truncate">
-                          <button
-                            onClick={() =>
-                              setActiveVideoModal({
-                                url: vid.video_url || (vid.drive_file_id ? `/api/google-drive/stream/${vid.drive_file_id}` : ''),
-                                title: vid.titulo || category.label,
-                                origin: vid.tipo_origen,
-                                driveFileId: vid.drive_file_id
-                              })
-                            }
-                            className="p-2 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 rounded-lg transition-colors"
-                          >
-                            <Play className="w-4 h-4 fill-indigo-400" />
-                          </button>
-                          <div className="truncate text-left">
-                            <h4 className="text-xs font-semibold text-slate-200 truncate group-hover:text-indigo-300 transition-colors">
-                              {vid.titulo || category.label}
-                            </h4>
-                            <div className="flex items-center gap-2 text-[11px] text-slate-500">
-                              <span className="flex items-center gap-1">
-                                {vid.tipo_origen === 'Archivo' ? (
-                                  <>
-                                    <FolderOpen className="w-3 h-3 text-emerald-400" />
-                                    Google Drive
-                                  </>
-                                ) : (
-                                  <>
-                                    <LinkIcon className="w-3 h-3 text-blue-400" />
-                                    Enlace
-                                  </>
+                    {categoryVideos.map((vid) => {
+                      const countAssigned = videoAssignmentsCount[vid.id] || 0;
+                      return (
+                        <div
+                          key={vid.id}
+                          className="flex items-center justify-between p-2.5 bg-slate-950/70 border border-slate-800/80 rounded-xl hover:border-indigo-500/40 transition-all group"
+                        >
+                          <div className="flex items-center gap-2.5 truncate">
+                            <button
+                              onClick={() =>
+                                setActiveVideoModal({
+                                  url: vid.video_url || (vid.drive_file_id ? `/api/google-drive/stream/${vid.drive_file_id}` : ''),
+                                  title: vid.titulo || category.label,
+                                  origin: vid.tipo_origen,
+                                  driveFileId: vid.drive_file_id
+                                })
+                              }
+                              className="p-2 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 rounded-lg transition-colors"
+                            >
+                              <Play className="w-4 h-4 fill-indigo-400" />
+                            </button>
+                            <div className="truncate text-left">
+                              <h4 className="text-xs font-semibold text-slate-200 truncate group-hover:text-indigo-300 transition-colors">
+                                {vid.titulo || category.label}
+                              </h4>
+                              <div className="flex items-center gap-2 text-[11px] text-slate-500">
+                                <span className="flex items-center gap-1">
+                                  {vid.tipo_origen === 'Archivo' ? (
+                                    <>
+                                      <FolderOpen className="w-3 h-3 text-emerald-400" />
+                                      Google Drive
+                                    </>
+                                  ) : (
+                                    <>
+                                      <LinkIcon className="w-3 h-3 text-blue-400" />
+                                      Enlace
+                                    </>
+                                  )}
+                                </span>
+                                {vid.tamano_bytes && (
+                                  <span>{(vid.tamano_bytes / (1024 * 1024)).toFixed(1)} MB</span>
                                 )}
-                              </span>
-                              {vid.tamano_bytes && (
-                                <span>{(vid.tamano_bytes / (1024 * 1024)).toFixed(1)} MB</span>
-                              )}
+                              </div>
                             </div>
                           </div>
-                        </div>
 
-                        {/* Botones de Acción */}
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={() =>
-                              setActiveVideoModal({
-                                url: vid.video_url || (vid.drive_file_id ? `/api/google-drive/stream/${vid.drive_file_id}` : ''),
-                                title: vid.titulo || category.label,
-                                origin: vid.tipo_origen,
-                                driveFileId: vid.drive_file_id
-                              })
-                            }
-                            className="px-2.5 py-1 text-[11px] bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors font-medium"
-                          >
-                            Ver
-                          </button>
-                          {isEditMode && (
+                          {/* Botones de Acción */}
+                          <div className="flex items-center gap-1.5">
+                            {category.id === 'PERSONALIZADOS' && (
+                              <button
+                                onClick={() => handleOpenAssignModal({ id: vid.id, titulo: vid.titulo || category.label })}
+                                className={`px-2 py-1 text-[11px] rounded-lg border transition-colors flex items-center gap-1 font-medium ${
+                                  countAssigned > 0
+                                    ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-300 hover:bg-indigo-500/20'
+                                    : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                                }`}
+                                title="Asignar este vídeo a jugadores de la plantilla"
+                              >
+                                <Users className="w-3 h-3" />
+                                <span>{countAssigned > 0 ? `${countAssigned}` : 'Asignar'}</span>
+                              </button>
+                            )}
+
                             <button
-                              disabled={deleting === vid.id}
-                              onClick={() => deleteVideo(vid.id)}
-                              className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                              onClick={() =>
+                                setActiveVideoModal({
+                                  url: vid.video_url || (vid.drive_file_id ? `/api/google-drive/stream/${vid.drive_file_id}` : ''),
+                                  title: vid.titulo || category.label,
+                                  origin: vid.tipo_origen,
+                                  driveFileId: vid.drive_file_id
+                                })
+                              }
+                              className="px-2.5 py-1 text-[11px] bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors font-medium"
                             >
-                              <Trash2 className="w-3.5 h-3.5" />
+                              Ver
                             </button>
-                          )}
+                            {isEditMode && (
+                              <button
+                                disabled={deleting === vid.id}
+                                onClick={() => deleteVideo(vid.id)}
+                                className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -547,6 +663,74 @@ export function AnalisisPropioTab({ match }: AnalisisPropioTabProps) {
           );
         })}
       </div>
+
+      {/* Modal Asignar Jugadores a Vídeo de Partido */}
+      {assignModalVideo && (
+        <Modal
+          isOpen={!!assignModalVideo}
+          onClose={() => setAssignModalVideo(null)}
+          title={`Asignar Jugadores: ${assignModalVideo.title}`}
+        >
+          <div className="space-y-4">
+            <p className="text-xs text-slate-400">
+              Selecciona los jugadores involucrados en este corte. Aparecerá automáticamente en la pestaña **Multimedia** de su ficha individual.
+            </p>
+
+            {loadingAssigned ? (
+              <Skeleton className="h-24 bg-slate-800 rounded-xl" />
+            ) : (
+              <div className="max-h-72 overflow-y-auto space-y-1.5 pr-1 border border-slate-800 rounded-xl p-2 bg-slate-950/50">
+                {players.map((p) => {
+                  const isChecked = assignedPlayerIds.includes(p.id);
+                  return (
+                    <div
+                      key={p.id}
+                      onClick={() => handleTogglePlayer(p.id)}
+                      className={`flex items-center justify-between p-2 rounded-lg cursor-pointer border transition-colors ${
+                        isChecked
+                          ? 'bg-indigo-500/15 border-indigo-500/40 text-slate-100'
+                          : 'bg-slate-900/40 border-slate-800/80 text-slate-400 hover:border-slate-700'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <Avatar src={p.foto_url} name={p.nombre} className="h-8 w-8" />
+                        <div>
+                          <span className="text-xs font-bold text-slate-200">
+                            #{p.dorsal} {p.nombre} {p.apellidos}
+                          </span>
+                          <span className="block text-[10px] text-slate-500 uppercase">{p.demarcacion}</span>
+                        </div>
+                      </div>
+                      <div className={`w-5 h-5 rounded-md flex items-center justify-center border transition-colors ${
+                        isChecked ? 'bg-indigo-600 border-indigo-500 text-white' : 'border-slate-700 bg-slate-900'
+                      }`}>
+                        {isChecked && <Check className="w-3.5 h-3.5" />}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-2 border-t border-slate-800 pt-3">
+              <Button
+                variant="secondary"
+                onClick={() => setAssignModalVideo(null)}
+                className="text-xs"
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleSaveAssignedPlayers}
+                disabled={savingAssigned || loadingAssigned}
+                className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs"
+              >
+                {savingAssigned ? 'Guardando...' : 'Guardar Asignación'}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
 
       {/* Visor Modal de Vídeo */}
       {activeVideoModal && (

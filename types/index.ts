@@ -1017,5 +1017,56 @@ export interface PlayerFine {
   updated_at?: string;
 }
 
+export interface MatchOwnAnalysisVideoPlayer {
+  id: string;
+  video_id: string;
+  player_id: string;
+  created_at?: string;
+}
+
+export interface PlayerVideo {
+  id: string;
+  titulo: string;
+  categoria: string;
+  comentario_tecnico: string | null;
+  video_url: string | null;
+  drive_file_id: string | null;
+  tipo_origen: 'Enlace' | 'Archivo';
+  tamano_bytes?: number | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface PlayerVideoTarget {
+  id: string;
+  video_id: string;
+  player_id: string;
+  is_primary: boolean;
+  created_at?: string;
+}
+
+export interface PlayerMultimediaItem {
+  id: string;
+  tipo_origen_video: 'PARTIDO' | 'INDIVIDUAL';
+  titulo: string;
+  categoria: string;
+  comentario_tecnico?: string | null;
+  video_url: string | null;
+  drive_file_id: string | null;
+  tipo_origen: 'Enlace' | 'Archivo';
+  created_at: string;
+  matchContext?: {
+    match_id: string;
+    rival: string;
+    fecha: string;
+    jornada: string;
+    es_local: boolean;
+    tipo_partido: string;
+  };
+  player_ids: string[];
+  is_primary?: boolean;
+}
+
+
 
 

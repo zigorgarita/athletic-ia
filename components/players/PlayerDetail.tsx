@@ -26,6 +26,8 @@ import {
 } from 'lucide-react';
 import { useEditMode } from '@/context/EditModeContext';
 import { PlayerProfileViewer } from '@/components/players/PlayerProfileViewer';
+import { PlayerMultimediaTab } from '@/components/players/PlayerMultimediaTab';
+
 
 const METRICAS_ESPECIFICAS: Record<string, string[]> = {
   Portero: ['Juego aéreo', 'Blocaje', 'Reflejos', 'Juego con pies', 'Salida', 'Comunicación', 'Colocación'],
@@ -2604,11 +2606,7 @@ export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
 
         {/* Tab 10: Multimedia */}
         {activeTab === 'multimedia' && (
-          <div className="p-12 text-center bg-slate-900/40 border border-slate-800/80 rounded-2xl animate-fadeIn">
-            <User className="h-12 w-12 text-slate-600 mx-auto mb-4" />
-            <h3 className="text-lg font-bold text-slate-300">Galería Multimedia (Próximamente)</h3>
-            <p className="text-sm text-slate-500 mt-2">Este módulo almacenará vídeos, cortes de partidos e informes visuales del jugador.</p>
-          </div>
+          <PlayerMultimediaTab player={currentPlayer} />
         )}
 
         {/* Tab 11: IA */}
