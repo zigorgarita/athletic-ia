@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Match, MatchOwnAnalysisVideo } from '@/types';
+import { Match } from '@/types';
 import { useMatchOwnAnalysisVideos } from '@/hooks/useMatchOwnAnalysisVideos';
 import { DriveResumableUploader } from '@/lib/drive-resumable';
 import { DriveUploadContext } from '@/lib/drive-folders';
@@ -221,8 +221,8 @@ export function AnalisisPropioTab({ match }: AnalisisPropioTabProps) {
         setActiveFiles((prev) => ({ ...prev, [category.id]: null }));
         updateFormState(category.id, { title: '' });
       }
-    } catch (err: any) {
-      alert(`Error subiendo vídeo: ${err.message || String(err)}`);
+    } catch (err: unknown) {
+      alert(`Error subiendo vídeo: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setUploadingCategory(null);
       setUploadProgress(0);
