@@ -140,7 +140,7 @@ export function AnalisisPropioTab({ match }: AnalisisPropioTabProps) {
   const { videos, loading, creating, deleting, addVideo, deleteVideo } = useMatchOwnAnalysisVideos(match.id);
 
   // Selected video modal player
-  const [activeVideoModal, setActiveVideoModal] = useState<{ url: string; title: string; origin: 'Enlace' | 'Archivo' } | null>(null);
+  const [activeVideoModal, setActiveVideoModal] = useState<{ url: string; title: string; origin: 'Enlace' | 'Archivo'; driveFileId?: string | null } | null>(null);
 
   // Forms per category
   const [activeForms, setActiveForms] = useState<Record<string, { mode: 'link' | 'file'; url: string; title: string }>>({});
@@ -478,9 +478,10 @@ export function AnalisisPropioTab({ match }: AnalisisPropioTabProps) {
                           <button
                             onClick={() =>
                               setActiveVideoModal({
-                                url: vid.video_url || `drive://${vid.drive_file_id}`,
+                                url: vid.video_url || (vid.drive_file_id ? `/api/google-drive/stream/${vid.drive_file_id}` : ''),
                                 title: vid.titulo || category.label,
-                                origin: vid.tipo_origen
+                                origin: vid.tipo_origen,
+                                driveFileId: vid.drive_file_id
                               })
                             }
                             className="p-2 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 rounded-lg transition-colors"
@@ -517,9 +518,10 @@ export function AnalisisPropioTab({ match }: AnalisisPropioTabProps) {
                           <button
                             onClick={() =>
                               setActiveVideoModal({
-                                url: vid.video_url || `drive://${vid.drive_file_id}`,
+                                url: vid.video_url || (vid.drive_file_id ? `/api/google-drive/stream/${vid.drive_file_id}` : ''),
                                 title: vid.titulo || category.label,
-                                origin: vid.tipo_origen
+                                origin: vid.tipo_origen,
+                                driveFileId: vid.drive_file_id
                               })
                             }
                             className="px-2.5 py-1 text-[11px] bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors font-medium"
@@ -554,6 +556,7 @@ export function AnalisisPropioTab({ match }: AnalisisPropioTabProps) {
           videoUrl={activeVideoModal.url}
           title={activeVideoModal.title}
           tipoOrigen={activeVideoModal.origin}
+          driveFileId={activeVideoModal.driveFileId}
         />
       )}
     </div>

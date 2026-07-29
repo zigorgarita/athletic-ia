@@ -17,6 +17,28 @@ interface VideoPlayerModalProps {
 export function parseEmbedVideoUrl(url: string): { embedUrl: string | null; isIframe: boolean; isVertical: boolean; type: string; driveFileId?: string } {
   if (!url) return { embedUrl: null, isIframe: false, isVertical: false, type: 'direct' };
 
+  if (url.startsWith('drive://')) {
+    const fileId = url.replace('drive://', '').trim();
+    return {
+      embedUrl: `/api/google-drive/stream/${fileId}`,
+      isIframe: false,
+      isVertical: false,
+      type: 'gdrive',
+      driveFileId: fileId
+    };
+  }
+
+  if (url.startsWith('/api/google-drive/stream/')) {
+    const fileId = url.replace('/api/google-drive/stream/', '').trim();
+    return {
+      embedUrl: url.trim(),
+      isIframe: false,
+      isVertical: false,
+      type: 'gdrive',
+      driveFileId: fileId
+    };
+  }
+
   const info: VideoInfo = parseVideoUrl(url);
 
   if (info.type === 'gdrive' && info.id) {
@@ -39,7 +61,7 @@ export function parseEmbedVideoUrl(url: string): { embedUrl: string | null; isIf
   }
 
   // Direct video stream / file
-  if (url.startsWith('/api/google-drive/stream/') || url.match(/\.(mp4|webm|ogg|mov|m4v)(?:\?|$)/i) || url.includes('supabase.co/storage/')) {
+  if (url.match(/\.(mp4|webm|ogg|mov|m4v)(?:\?|$)/i) || url.includes('supabase.co/storage/')) {
     return {
       embedUrl: url.trim(),
       isIframe: false,
@@ -67,6 +89,8 @@ export function VideoPlayerModal({ isOpen, onClose, title, videoUrl, tipoOrigen 
 
   const streamUrl = effectiveDriveId ? `/api/google-drive/stream/${effectiveDriveId}` : (parsed.type === 'direct' ? parsed.embedUrl : null);
   const iframeUrl = effectiveDriveId ? `https://drive.google.com/file/d/${effectiveDriveId}/preview` : (parsed.isIframe ? parsed.embedUrl : null);
+  const externalUrl = effectiveDriveId ? `https://drive.google.com/file/d/${effectiveDriveId}/view` : (videoUrl || '');
+  const footerAddressUrl = streamUrl || videoUrl || '';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -168,7 +192,7 @@ export function VideoPlayerModal({ isOpen, onClose, title, videoUrl, tipoOrigen 
                   </p>
                 </div>
                 <Button
-                  onClick={() => window.open(videoUrl || '', '_blank', 'noopener,noreferrer')}
+                  onClick={() => window.open(externalUrl, '_blank', 'noopener,noreferrer')}
                   className="flex items-center gap-2 mt-2 bg-[#CC0E21] hover:bg-[#b00c1c]"
                 >
                   <ExternalLink className="h-4 w-4" />
@@ -182,7 +206,7 @@ export function VideoPlayerModal({ isOpen, onClose, title, videoUrl, tipoOrigen 
         </div>
 
         {/* Footer/URL details */}
-        {videoUrl && (
+        {(videoUrl || streamUrl) && (
           <div className="px-6 py-4 bg-slate-950/20 border-t border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex-1 min-w-0">
               <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block mb-1">
@@ -191,7 +215,7 @@ export function VideoPlayerModal({ isOpen, onClose, title, videoUrl, tipoOrigen 
               <input
                 type="text"
                 readOnly
-                value={videoUrl}
+                value={footerAddressUrl}
                 onClick={(e) => (e.target as HTMLInputElement).select()}
                 className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-300 font-mono focus:outline-none focus:border-slate-700"
               />
@@ -200,15 +224,15 @@ export function VideoPlayerModal({ isOpen, onClose, title, videoUrl, tipoOrigen 
               <Button
                 variant="secondary"
                 onClick={() => {
-                  navigator.clipboard.writeText(videoUrl);
+                  navigator.clipboard.writeText(footerAddressUrl);
                   alert('URL copiada al portapapeles');
                 }}
-                className="text-xs py-1.5 px-3"
+                className="text-[#CC0E21] text-xs py-1.5 px-3"
               >
                 Copiar enlace
               </Button>
               <Button
-                onClick={() => window.open(videoUrl, '_blank', 'noopener,noreferrer')}
+                onClick={() => window.open(externalUrl, '_blank', 'noopener,noreferrer')}
                 className="flex items-center gap-1 text-xs py-1.5 px-3 bg-slate-800 hover:bg-slate-700 text-slate-200"
               >
                 <ExternalLink className="h-3.5 w-3.5" />
