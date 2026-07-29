@@ -147,6 +147,7 @@ export function AnalisisPropioTab({ match }: AnalisisPropioTabProps) {
   const [activeFiles, setActiveFiles] = useState<Record<string, File | null>>({});
   const [uploadingCategory, setUploadingCategory] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const [isDraggingCategory, setIsDraggingCategory] = useState<string | null>(null);
 
   const getFormState = (catId: string) => {
     return activeForms[catId] || { mode: 'link', url: '', title: '' };
@@ -178,8 +179,8 @@ export function AnalisisPropioTab({ match }: AnalisisPropioTabProps) {
   };
 
   // Submit File Upload to Drive
-  const handleUploadFile = async (category: CategoryConfig) => {
-    const file = activeFiles[category.id];
+  const handleUploadFile = async (category: CategoryConfig, fileToUpload?: File) => {
+    const file = fileToUpload || activeFiles[category.id];
     if (!file) return;
 
     setUploadingCategory(category.id);
@@ -376,7 +377,35 @@ export function AnalisisPropioTab({ match }: AnalisisPropioTabProps) {
                     ) : (
                       /* Input de Archivo Drive */
                       <div className="space-y-2">
-                        <div className="border-2 border-dashed border-slate-800 hover:border-indigo-500/50 rounded-xl p-4 text-center transition-colors">
+                        <div
+                          onDragOver={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (isDraggingCategory !== category.id) {
+                              setIsDraggingCategory(category.id);
+                            }
+                          }}
+                          onDragLeave={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setIsDraggingCategory(null);
+                          }}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setIsDraggingCategory(null);
+                            if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                              const droppedFile = e.dataTransfer.files[0];
+                              setActiveFiles((prev) => ({ ...prev, [category.id]: droppedFile }));
+                              handleUploadFile(category, droppedFile);
+                            }
+                          }}
+                          className={`border-2 border-dashed rounded-xl p-4 text-center transition-colors ${
+                            isDraggingCategory === category.id
+                              ? 'border-indigo-400 bg-indigo-500/10'
+                              : 'border-slate-800 hover:border-indigo-500/50'
+                          }`}
+                        >
                           <input
                             type="file"
                             accept="video/*"
