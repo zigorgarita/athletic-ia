@@ -265,7 +265,8 @@ export function PlanificacionClient() {
             evaluacion_completada: existing.evaluacion_completada || false,
             evaluacion_duracion_real: existing.evaluacion_duracion_real || undefined,
             evaluacion_observaciones: existing.evaluacion_observaciones || '',
-            valoracion_media_jugadores: existing.valoracion_media_jugadores || undefined
+            valoracion_media_jugadores: existing.valoracion_media_jugadores || undefined,
+            rpe_medio: existing.valoracion_entrenador ?? undefined
           };
         } else {
           return {
@@ -518,6 +519,7 @@ export function PlanificacionClient() {
         evaluacion_completada?: boolean;
         evaluacion_duracion_real?: number | null;
         evaluacion_observaciones?: string | null;
+        valoracion_entrenador?: number | null;
         rival?: string | null;
       } = {
         fecha: sessionForm.fecha,
@@ -538,6 +540,7 @@ export function PlanificacionClient() {
       sessionPayload.evaluacion_completada = sessionForm.evaluacion_completada || false;
       sessionPayload.evaluacion_duracion_real = sessionForm.evaluacion_duracion_real ? Number(sessionForm.evaluacion_duracion_real) : null;
       sessionPayload.evaluacion_observaciones = sessionForm.evaluacion_observaciones || null;
+      sessionPayload.valoracion_entrenador = sessionForm.rpe_medio ?? null;
 
       const isNew = !sessionForm.id || sessionForm.id.startsWith('temp-');
       if (!isNew) {
@@ -2013,13 +2016,13 @@ export function PlanificacionClient() {
                     type="range"
                     min="1"
                     max="10"
-                    value={sessionForm.rpe_medio || 6}
+                    value={sessionForm.rpe_medio ?? 6}
                     disabled={!isEditMode}
                     className="flex-1 accent-[#CC0E21] bg-slate-950 rounded-lg h-2 border border-slate-800 disabled:opacity-50"
                     onChange={e => setSessionForm({...sessionForm, rpe_medio: Number(e.target.value)})}
                   />
                   <span className="text-xs font-black text-[#CC0E21] bg-[#CC0E21]/15 px-2.5 py-1 rounded-xl border border-[#CC0E21]/20 shrink-0">
-                    {sessionForm.rpe_medio || 6} / 10
+                    {sessionForm.rpe_medio ?? 6} / 10
                   </span>
                 </div>
               </div>
@@ -2027,15 +2030,16 @@ export function PlanificacionClient() {
               <div className="space-y-1.5">
                 <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Conclusiones / Notas de la Evaluación</label>
                 <textarea
-                  value={sessionForm.evaluacion_observaciones?.replace(/PDF:[\s\S]*$/, '').trim() || ''}
+                  value={sessionForm.evaluacion_observaciones?.replace(/PDF:[\s\S]*$/, '') || ''}
                   disabled={!isEditMode}
                   onChange={e => {
+                    const newText = e.target.value;
                     setSessionForm(prev => {
                       const pdfMatch = prev.evaluacion_observaciones?.match(/(PDF:[\s\S]*$)/);
                       const pdfStr = pdfMatch ? `\n${pdfMatch[1]}` : '';
                       return {
                         ...prev,
-                        evaluacion_observaciones: `${e.target.value.trim()}${pdfStr}`.trim()
+                        evaluacion_observaciones: `${newText}${pdfStr}`
                       };
                     });
                   }}
