@@ -59,7 +59,7 @@ const SANCIONES_PREDEFINIDAS = [
   { motivo: 'No venir a entrenar sin avisar', base: 20, variable: false },
   { motivo: 'Balones sin hinchar', base: 3, variable: true, labelVariable: 'Grupos de material' },
   { motivo: 'Grupo de material: olvidarse algo', base: 3, variable: true, labelVariable: 'Personas implicadas' },
-  { motivo: 'No rellenar el wellness o el Borg', base: 2, variable: false },
+  { motivo: 'No rellenar el wellness o el Borg', base: 5, variable: false },
   { motivo: 'No ducharse', base: 5, variable: false },
   { motivo: 'No usar el chándal', base: 15, variable: false },
   { motivo: 'No venir a jugar sin avisar', base: 50, variable: false },
