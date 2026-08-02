@@ -99,7 +99,7 @@ function InjuryCard({ injury }: { injury: PendienteInjury }) {
         </p>
         <p className="text-xs text-slate-400 truncate mt-0.5">
           {injury.tipo_lesion}
-          {injury.zona_afectada ? ` · ${injury.zona_afectada}` : ''}
+          {injury.diagnostico ? ` · ${injury.diagnostico}` : ''}
         </p>
         <div className="flex items-center gap-2 mt-1.5">
           <span className="text-[10px] text-slate-500">

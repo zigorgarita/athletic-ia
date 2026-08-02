@@ -15,11 +15,11 @@ export interface PendienteInjury {
   id: string;
   player_id: string;
   tipo_lesion: string;
-  diagnostico: string;
+  diagnostico: string | null;
   estado: 'Activa' | 'En recuperación' | 'Recaída';
   fecha_lesion: string;
   fecha_prevista_recuperacion: string | null;
-  zona_afectada: string | null;
+  observaciones: string | null;
   player: PendientePlayer;
 }
 
@@ -82,7 +82,6 @@ function sortMeetings(meetings: PendienteMeeting[]): PendienteMeeting[] {
   return [...meetings].sort((a, b) => {
     const classDiff = order[a.clasificacion] - order[b.clasificacion];
     if (classDiff !== 0) return classDiff;
-    // Within same class: ascending by fecha (closest first)
     return a.fecha.localeCompare(b.fecha);
   });
 }
@@ -103,79 +102,108 @@ export function usePendientes(): PendientesData {
     async function fetchAll() {
       setLoading(true);
       setError(null);
-      try {
-        const [injRes, finesRes, meetRes] = await Promise.all([
-          supabase
-            .from('player_injuries')
-            .select('id, player_id, tipo_lesion, diagnostico, estado, fecha_lesion, fecha_prevista_recuperacion, zona_afectada, players(id, nombre, apellidos, dorsal, demarcacion, foto_url)')
-            .in('estado', ['Activa', 'En recuperación', 'Recaída'])
-            .order('fecha_lesion', { ascending: false }),
+      const errors: string[] = [];
 
-          supabase
-            .from('player_fines')
-            .select('id, player_id, motivo, fecha, contexto, importe, cantidad, estado, observaciones, players(id, nombre, apellidos, dorsal, demarcacion, foto_url)')
-            .eq('estado', 'Pendiente')
-            .order('fecha', { ascending: false }),
+      const results = await Promise.allSettled([
+        // Query 1: Injuries (columnas reales de player_injuries)
+        supabase
+          .from('player_injuries')
+          .select('id, player_id, tipo_lesion, diagnostico, estado, fecha_lesion, fecha_prevista_recuperacion, observaciones, players(id, nombre, apellidos, dorsal, demarcacion, foto_url)')
+          .in('estado', ['Activa', 'En recuperación', 'Recaída'])
+          .order('fecha_lesion', { ascending: false }),
 
-          supabase
-            .from('player_meetings')
-            .select('id, player_id, motivo, fecha, estado, solicitada_por, players(id, nombre, apellidos, dorsal, demarcacion, foto_url)')
-            .in('estado', ['Pendiente', 'En seguimiento'])
-            .order('fecha', { ascending: true }),
-        ]);
+        // Query 2: Fines
+        supabase
+          .from('player_fines')
+          .select('id, player_id, motivo, fecha, contexto, importe, cantidad, estado, observaciones, players(id, nombre, apellidos, dorsal, demarcacion, foto_url)')
+          .eq('estado', 'Pendiente')
+          .order('fecha', { ascending: false }),
 
-        if (cancelled) return;
+        // Query 3: Meetings
+        supabase
+          .from('player_meetings')
+          .select('id, player_id, motivo, fecha, estado, solicitada_por, players(id, nombre, apellidos, dorsal, demarcacion, foto_url)')
+          .in('estado', ['Pendiente', 'En seguimiento'])
+          .order('fecha', { ascending: true }),
+      ]);
 
-        if (injRes.error) throw injRes.error;
-        if (finesRes.error) throw finesRes.error;
-        if (meetRes.error) throw meetRes.error;
+      if (cancelled) return;
 
-        const injuryData: PendienteInjury[] = (injRes.data ?? []).map((row: any) => ({
-          id: row.id,
-          player_id: row.player_id,
-          tipo_lesion: row.tipo_lesion,
-          diagnostico: row.diagnostico,
-          estado: row.estado,
-          fecha_lesion: row.fecha_lesion,
-          fecha_prevista_recuperacion: row.fecha_prevista_recuperacion,
-          zona_afectada: row.zona_afectada,
-          player: row.players as PendientePlayer,
-        }));
+      // Process Injuries independently
+      if (results[0].status === 'fulfilled') {
+        const res = results[0].value;
+        if (res.error) {
+          errors.push(`Lesiones: ${res.error.message}`);
+        } else {
+          const injuryData: PendienteInjury[] = (res.data ?? []).map((row: any) => ({
+            id: row.id,
+            player_id: row.player_id,
+            tipo_lesion: row.tipo_lesion,
+            diagnostico: row.diagnostico,
+            estado: row.estado,
+            fecha_lesion: row.fecha_lesion,
+            fecha_prevista_recuperacion: row.fecha_prevista_recuperacion,
+            observaciones: row.observaciones,
+            player: row.players as PendientePlayer,
+          }));
+          setInjuries(injuryData);
+        }
+      } else {
+        errors.push(`Lesiones: ${results[0].reason}`);
+      }
 
-        const fineData: PendienteFine[] = (finesRes.data ?? []).map((row: any) => ({
-          id: row.id,
-          player_id: row.player_id,
-          motivo: row.motivo,
-          fecha: row.fecha,
-          contexto: row.contexto,
-          importe: row.importe,
-          cantidad: row.cantidad,
-          estado: row.estado,
-          observaciones: row.observaciones,
-          player: row.players as PendientePlayer,
-        }));
-
-        const meetingData: PendienteMeeting[] = sortMeetings(
-          (meetRes.data ?? []).map((row: any) => ({
+      // Process Fines independently
+      if (results[1].status === 'fulfilled') {
+        const res = results[1].value;
+        if (res.error) {
+          errors.push(`Multas: ${res.error.message}`);
+        } else {
+          const fineData: PendienteFine[] = (res.data ?? []).map((row: any) => ({
             id: row.id,
             player_id: row.player_id,
             motivo: row.motivo,
             fecha: row.fecha,
+            contexto: row.contexto,
+            importe: row.importe,
+            cantidad: row.cantidad,
             estado: row.estado,
-            solicitada_por: row.solicitada_por,
-            clasificacion: classifyMeeting(row.fecha),
+            observaciones: row.observaciones,
             player: row.players as PendientePlayer,
-          }))
-        );
-
-        setInjuries(injuryData);
-        setFines(fineData);
-        setMeetings(meetingData);
-      } catch (err: any) {
-        if (!cancelled) setError(err.message ?? 'Error al cargar pendientes');
-      } finally {
-        if (!cancelled) setLoading(false);
+          }));
+          setFines(fineData);
+        }
+      } else {
+        errors.push(`Multas: ${results[1].reason}`);
       }
+
+      // Process Meetings independently
+      if (results[2].status === 'fulfilled') {
+        const res = results[2].value;
+        if (res.error) {
+          errors.push(`Reuniones: ${res.error.message}`);
+        } else {
+          const meetingData: PendienteMeeting[] = sortMeetings(
+            (res.data ?? []).map((row: any) => ({
+              id: row.id,
+              player_id: row.player_id,
+              motivo: row.motivo,
+              fecha: row.fecha,
+              estado: row.estado,
+              solicitada_por: row.solicitada_por,
+              clasificacion: classifyMeeting(row.fecha),
+              player: row.players as PendientePlayer,
+            }))
+          );
+          setMeetings(meetingData);
+        }
+      } else {
+        errors.push(`Reuniones: ${results[2].reason}`);
+      }
+
+      if (errors.length > 0) {
+        setError(errors.join(' | '));
+      }
+      setLoading(false);
     }
 
     fetchAll();
