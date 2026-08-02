@@ -3,11 +3,24 @@
 Documentación del estado del proyecto tras completar las mejoras.
 
 ## 📌 Identificación de la Versión
-- **Último Commit**: `1c9478e` — Bloque 3 cerrado: Control de Asistencia validado y desplegado
-- **Fecha**: 2026-07-02
+- **Último Commit**: `ec12251` — Pestaña Pendientes validada y desplegada a producción
+- **Fecha**: 2026-08-02
 - **Rama**: `main` → `github.com/zigorgarita/athletic-ia`
-- **Producción**: https://athletic-ia.vercel.app
-- **Estado**: Estable. Sin tareas pendientes. Listo para el Bloque 4.
+- **Producción**: https://athletic-ia.vercel.app y https://indautxu2026.vercel.app
+- **Estado**: Ready (Producción validada y backup completo generado).
+
+## 💻 Nueva Funcionalidad Verificada — Pestaña PENDIENTES (2026-08-02)
+1. **Resumen de Pendientes en Menú Principal**:
+   - Pestaña independiente `/pendientes` en el menú principal (posición 2, tras Plantilla).
+   - Badge contador dinámico en header superior, sidebar lateral y bottom tab bar móvil.
+2. **Secciones de Solo Lectura**:
+   - **Lesiones Activas**: Muestra elementos de `player_injuries` con estado `Activa`, `En recuperación` o `Recaída`.
+   - **Multas Pendientes**: Muestra elementos de `player_fines` con `estado = 'Pendiente'`. Muestra el total de `importe × cantidad`.
+   - **Reuniones Abiertas**: Muestra elementos de `player_meetings` con estado `Pendiente` o `En seguimiento`, clasificados visualmente en `Vencida`, `Hoy` y `Próxima`.
+3. **Deep-linking Directo**:
+   - Cada tarjeta redirige directamente a la ficha del jugador en la pestaña correspondiente (`?player=ID&tab=fisico`, `?tab=multas`, `?tab=reuniones`).
+4. **Resiliencia de Consultas**:
+   - 3 consultas ejecutadas con `Promise.allSettled` para procesar y mostrar los resultados de cada sección de forma 100% independiente.
 
 ## 💻 Funcionalidades Verificadas (Bloque 3 - Asistencia)
 1. **Control de Presencia por Sesión**:
