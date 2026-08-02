@@ -1,7 +1,8 @@
 'use client';
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { Plus, Users, Search, SlidersHorizontal, Eye, Star, Edit2, Trash2, Heart } from 'lucide-react';
 import { usePlayers } from '@/hooks/usePlayers';
 import { useCreatePlayer } from '@/hooks/useCreatePlayer';
@@ -18,15 +19,28 @@ import { Badge } from '@/components/ui/Badge';
 import { supabase } from '@/lib/supabase';
 import { useEditMode } from '@/context/EditModeContext';
 
+type PlayerTab = 'personal' | 'resumen' | 'rendimiento' | 'tactica' | 'fisico' | 'multimedia' | 'reuniones' | 'ia' | 'multas';
+
+const VALID_TABS: PlayerTab[] = ['personal', 'resumen', 'rendimiento', 'tactica', 'fisico', 'multimedia', 'reuniones', 'ia', 'multas'];
+
+function parseTab(value: string | null): PlayerTab | undefined {
+  if (!value) return undefined;
+  return VALID_TABS.includes(value as PlayerTab) ? (value as PlayerTab) : undefined;
+}
+
 export function PlantillaClient() {
   const { players, loading, error, refetch } = usePlayers();
   const { createPlayer, loading: creating, error: createError } = useCreatePlayer();
   const { updatePlayer, loading: updating, error: updateError } = useUpdatePlayer();
   const { deletePlayer, error: deleteError } = useDeletePlayer();
   const { isEditMode } = useEditMode();
+  const searchParams = useSearchParams();
+  const router = useRouter();
 
   // Navigation state (list vs details)
   const [activePlayerForDetail, setActivePlayerForDetail] = useState<Player | null>(null);
+  const [initialTabForDetail, setInitialTabForDetail] = useState<PlayerTab | undefined>(undefined);
+  const deepLinkHandled = useRef(false);
 
   // Form modals state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -113,6 +127,20 @@ export function PlantillaClient() {
       loadValuationsAndInjuries();
     }
   }, [players]);
+
+  // Deep-link: open player+tab from URL params (?player=ID&tab=fisico)
+  useEffect(() => {
+    if (deepLinkHandled.current || players.length === 0) return;
+    const playerId = searchParams.get('player');
+    const tabParam = parseTab(searchParams.get('tab'));
+    if (!playerId) return;
+    const target = players.find((p) => p.id === playerId);
+    if (target) {
+      deepLinkHandled.current = true;
+      setInitialTabForDetail(tabParam);
+      setActivePlayerForDetail(target);
+    }
+  }, [players, searchParams]);
 
   const handleOpenAddModal = () => {
     setSelectedPlayer(null);
@@ -240,12 +268,17 @@ export function PlantillaClient() {
 
   if (activePlayerForDetail) {
     return (
-      <PlayerDetail 
-        player={activePlayerForDetail} 
+      <PlayerDetail
+        player={activePlayerForDetail}
+        initialTab={initialTabForDetail}
         onBack={() => {
           setActivePlayerForDetail(null);
+          setInitialTabForDetail(undefined);
+          deepLinkHandled.current = false;
+          // Remove URL params when returning to the list
+          router.replace('/plantilla');
           refetch();
-        }} 
+        }}
       />
     );
   }

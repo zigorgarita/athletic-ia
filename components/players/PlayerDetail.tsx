@@ -68,14 +68,17 @@ const SANCIONES_PREDEFINIDAS = [
   { motivo: 'Tarjeta roja por hablar', base: 30, variable: false }
 ];
 
+type PlayerTab = 'personal' | 'resumen' | 'rendimiento' | 'tactica' | 'fisico' | 'multimedia' | 'reuniones' | 'ia' | 'multas';
+
 interface PlayerDetailProps {
   player: Player;
   onBack: () => void;
+  initialTab?: PlayerTab;
 }
 
-export function PlayerDetail({ player, onBack }: PlayerDetailProps) {
+export function PlayerDetail({ player, onBack, initialTab }: PlayerDetailProps) {
   const [currentPlayer, setCurrentPlayer] = useState<Player>(player);
-  const [activeTab, setActiveTab] = useState<'personal' | 'resumen' | 'rendimiento' | 'tactica' | 'fisico' | 'multimedia' | 'reuniones' | 'ia' | 'multas'>('personal');
+  const [activeTab, setActiveTab] = useState<PlayerTab>(initialTab ?? 'personal');
   const { isEditMode, verifyWritePermission } = useEditMode();
   
   // Training Attendance States

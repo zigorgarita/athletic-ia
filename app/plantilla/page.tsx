@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import { Metadata } from 'next';
 import { PlantillaClient } from '@/components/players/PlantillaClient';
 
@@ -8,5 +8,9 @@ export const metadata: Metadata = {
 };
 
 export default function Page() {
-  return <PlantillaClient />;
+  return (
+    <Suspense fallback={<div className="h-8 w-full animate-pulse rounded-xl bg-slate-900" />}>
+      <PlantillaClient />
+    </Suspense>
+  );
 }

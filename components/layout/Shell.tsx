@@ -3,10 +3,11 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Users, Shield, Trophy, BarChart3, Activity, Layout, ArrowRightLeft, Calendar, CheckSquare, HelpCircle, Unlock, LogOut } from 'lucide-react';
+import { Users, Shield, Trophy, BarChart3, Activity, Layout, ArrowRightLeft, Calendar, CheckSquare, HelpCircle, Unlock, LogOut, AlertTriangle } from 'lucide-react';
 import { LoginScreen } from './LoginScreen';
 import { useEditMode } from '@/context/EditModeContext';
 import { EditModeModal } from './EditModeModal';
+import { usePendientesCount } from '@/hooks/usePendientesCount';
 
 interface NavItem {
   name: string;
@@ -16,6 +17,7 @@ interface NavItem {
 
 const navigation: NavItem[] = [
   { name: 'Plantilla', href: '/plantilla', icon: Users },
+  { name: 'Pendientes', href: '/pendientes', icon: AlertTriangle },
   { name: 'Planificación', href: '/planificacion', icon: Calendar },
   { name: 'Asistencia', href: '/asistencia', icon: CheckSquare },
   { name: 'Pizarra Táctica', href: '/tactica', icon: Layout },
@@ -29,10 +31,13 @@ const navigation: NavItem[] = [
   { name: 'Ayuda / Guía', href: '/guia', icon: HelpCircle },
 ];
 
+const PENDIENTES_HREF = '/pendientes';
+
 export function Shell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { isEditMode, currentUser, lockEditing } = useEditMode();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const { total: pendientesTotal } = usePendientesCount();
 
   return (
     <LoginScreen>
@@ -54,11 +59,12 @@ export function Shell({ children }: { children: React.ReactNode }) {
           {navigation.map((item) => {
             const Icon = item.icon;
             const isActive = pathname.startsWith(item.href);
+            const isPendientes = item.href === PENDIENTES_HREF;
             return (
               <Link
                 key={item.name}
                 href={item.href}
-                className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 shrink-0 ${
+                className={`relative flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 shrink-0 ${
                   isActive
                     ? 'bg-slate-800 text-[#CC0E21] border border-[#CC0E21]/20'
                     : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 border border-transparent'
@@ -66,6 +72,11 @@ export function Shell({ children }: { children: React.ReactNode }) {
               >
                 <Icon className={`h-4 w-4 ${isActive ? 'text-[#CC0E21]' : 'text-slate-400'}`} />
                 {item.name}
+                {isPendientes && pendientesTotal > 0 && (
+                  <span className="ml-0.5 inline-flex items-center justify-center h-4 min-w-[16px] px-1 rounded-full text-[10px] font-bold bg-[#CC0E21] text-white leading-none">
+                    {pendientesTotal > 99 ? '99+' : pendientesTotal}
+                  </span>
+                )}
               </Link>
             );
           })}
@@ -117,6 +128,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
               {navigation.map((item) => {
                 const Icon = item.icon;
                 const isActive = pathname.startsWith(item.href);
+                const isPendientes = item.href === PENDIENTES_HREF;
                 return (
                   <Link
                     key={item.name}
@@ -132,7 +144,12 @@ export function Shell({ children }: { children: React.ReactNode }) {
                         isActive ? 'text-[#CC0E21]' : 'text-slate-400 group-hover:text-slate-300'
                       }`}
                     />
-                    {item.name}
+                    <span className="flex-1">{item.name}</span>
+                    {isPendientes && pendientesTotal > 0 && (
+                      <span className="inline-flex items-center justify-center h-5 min-w-[20px] px-1.5 rounded-full text-[10px] font-bold bg-[#CC0E21] text-white leading-none">
+                        {pendientesTotal > 99 ? '99+' : pendientesTotal}
+                      </span>
+                    )}
                   </Link>
                 );
               })}
@@ -153,15 +170,23 @@ export function Shell({ children }: { children: React.ReactNode }) {
         {navigation.map((item) => {
           const Icon = item.icon;
           const isActive = pathname.startsWith(item.href);
+          const isPendientes = item.href === PENDIENTES_HREF;
           return (
             <Link
               key={item.name}
               href={item.href}
-              className={`flex flex-col items-center justify-center gap-1 py-1 px-2.5 rounded-lg transition-colors duration-200 shrink-0 ${
+              className={`relative flex flex-col items-center justify-center gap-1 py-1 px-2.5 rounded-lg transition-colors duration-200 shrink-0 ${
                 isActive ? 'text-[#CC0E21]' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              <Icon className="h-5 w-5" />
+              <div className="relative">
+                <Icon className="h-5 w-5" />
+                {isPendientes && pendientesTotal > 0 && (
+                  <span className="absolute -top-1 -right-1.5 inline-flex items-center justify-center h-3.5 min-w-[14px] px-0.5 rounded-full text-[8px] font-bold bg-[#CC0E21] text-white leading-none">
+                    {pendientesTotal > 9 ? '9+' : pendientesTotal}
+                  </span>
+                )}
+              </div>
               <span className="text-[10px] font-medium">{item.name}</span>
             </Link>
           );
@@ -172,4 +197,3 @@ export function Shell({ children }: { children: React.ReactNode }) {
     </LoginScreen>
   );
 }
-
