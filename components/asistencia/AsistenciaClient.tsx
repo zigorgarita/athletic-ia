@@ -33,6 +33,20 @@ const METRICAS_EVAL = [
   { key: 'compromiso_ofensivo', label: 'Compromiso Ofensivo' }
 ];
 
+export function getEffectiveGlobalRating(ev: Partial<TrainingEvaluation> | undefined | null): number | undefined {
+  if (!ev) return undefined;
+  if (ev.valoracion_global !== null && ev.valoracion_global !== undefined && !isNaN(Number(ev.valoracion_global))) {
+    return Number(ev.valoracion_global);
+  }
+  const metrics = [ev.actitud, ev.intensidad, ev.comprension_tactica, ev.ejecucion_tecnica, ev.compromiso_defensivo, ev.compromiso_ofensivo];
+  const validMetrics = metrics.filter((v): v is number => typeof v === 'number' && !isNaN(v) && v >= 1 && v <= 5);
+  if (validMetrics.length > 0) {
+    const avg = validMetrics.reduce((sum, val) => sum + val, 0) / validMetrics.length;
+    return Number(avg.toFixed(1));
+  }
+  return undefined;
+}
+
 export function AsistenciaClient() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -145,10 +159,13 @@ export function AsistenciaClient() {
       const denominator = total - lesionados - bajas;
       const pct = denominator > 0 ? Math.round((attended / denominator) * 100) : 0;
 
-      // Average evaluation: only training evaluations where valoracion_global is not null
-      const ratedEvals = pEvals.filter(e => e.valoracion_global !== null && e.valoracion_global !== undefined);
-      const avgValuation = ratedEvals.length > 0
-        ? Number((ratedEvals.reduce((sum, e) => sum + Number(e.valoracion_global), 0) / ratedEvals.length).toFixed(1))
+      // Average evaluation: include effective global evaluation (direct or calculated from historical criteria)
+      const pEffectiveRatings = pEvals
+        .map(e => getEffectiveGlobalRating(e))
+        .filter((v): v is number => v !== undefined && v !== null);
+
+      const avgValuation = pEffectiveRatings.length > 0
+        ? Number((pEffectiveRatings.reduce((sum, v) => sum + v, 0) / pEffectiveRatings.length).toFixed(1))
         : null;
 
       // Last absence reason: sort all attendance records for this player by date descending
@@ -393,21 +410,11 @@ export function AsistenciaClient() {
     }));
   };
 
-  // Handle evaluation star changes
-  const handleRatingChange = (playerId: string, key: string, val: number) => {
+  // Handle global rating star changes (1 to 5 stars)
+  const handleGlobalRatingChange = (playerId: string, val: number) => {
     setEvaluationMap(prev => {
       const updated = { ...prev[playerId] };
-      (updated as any)[key] = val;
-
-      // Recalculate global average
-      const ratings = METRICAS_EVAL.map(m => (updated as any)[m.key]).filter(v => v !== undefined && v !== null);
-      if (ratings.length > 0) {
-        const avg = ratings.reduce((sum, r) => sum + r, 0) / ratings.length;
-        updated.valoracion_global = Number(avg.toFixed(1));
-      } else {
-        updated.valoracion_global = undefined;
-      }
-
+      updated.valoracion_global = val;
       return {
         ...prev,
         [playerId]: updated
@@ -422,13 +429,6 @@ export function AsistenciaClient() {
         ...prev[playerId],
         observaciones: notes
       }
-    }));
-  };
-
-  const toggleExpandEvaluation = (playerId: string) => {
-    setExpandedEvaluations(prev => ({
-      ...prev,
-      [playerId]: !prev[playerId]
     }));
   };
 
@@ -454,11 +454,8 @@ export function AsistenciaClient() {
 
   // Weekly summary calculations
   const weeklySummary = useMemo(() => {
-    // Generate dates of the last 7 days or current week sessions
     if (sessions.length === 0) return null;
-    
-    // Sort all sessions by date descending
-    const recentSessions = [...sessions].slice(0, 4); // Last 4 sessions
+    const recentSessions = [...sessions].slice(0, 4);
     return recentSessions;
   }, [sessions]);
 
@@ -500,22 +497,28 @@ export function AsistenciaClient() {
       }
 
       if (ev && att?.attendance_status === 'Asiste') {
-        const hasSomeEvaluation = METRICAS_EVAL.some(m => (ev as any)[m.key] !== undefined);
-        
-        // Only save evaluation row if some ratings are provided
-        if (hasSomeEvaluation) {
+        const effectiveVal = getEffectiveGlobalRating(ev);
+        const hasExplicitValuation = ev.valoracion_global !== undefined && ev.valoracion_global !== null;
+        const hasEffectiveValuation = effectiveVal !== undefined;
+        const hasNotes = ev.observaciones && ev.observaciones.trim().length > 0;
+        const hasHistoricalCriteria = METRICAS_EVAL.some(m => (ev as any)[m.key] !== undefined && (ev as any)[m.key] !== null);
+
+        // Only save evaluation row if global rating, notes, or historical criteria exist
+        if (hasExplicitValuation || hasEffectiveValuation || hasNotes || hasHistoricalCriteria) {
           evaluationPayload.push({
             session_id: selectedSessionId,
             player_id: p.id,
             player_full_name_backup: `${p.nombre} ${p.apellidos}`,
             player_dorsal_backup: p.dorsal,
-            actitud: ev.actitud || null,
-            intensidad: ev.intensidad || null,
-            comprension_tactica: ev.comprension_tactica || null,
-            ejecucion_tecnica: ev.ejecucion_tecnica || null,
-            compromiso_defensivo: ev.compromiso_defensivo || null,
-            compromiso_ofensivo: ev.compromiso_ofensivo || null,
-            valoracion_global: ev.valoracion_global || null,
+            // Preserve pre-existing 6 criteria if present, without clearing them
+            actitud: ev.actitud ?? null,
+            intensidad: ev.intensidad ?? null,
+            comprension_tactica: ev.comprension_tactica ?? null,
+            ejecucion_tecnica: ev.ejecucion_tecnica ?? null,
+            compromiso_defensivo: ev.compromiso_defensivo ?? null,
+            compromiso_ofensivo: ev.compromiso_ofensivo ?? null,
+            // Save global 1-5 rating (or effective fallback for historical records)
+            valoracion_global: ev.valoracion_global ?? (effectiveVal ?? null),
             observaciones: ev.observaciones || null,
             fecha_evaluacion: selectedDate,
             evaluated_by: 'Cuerpo Técnico'
@@ -722,141 +725,115 @@ export function AsistenciaClient() {
                       <th className="px-4 py-4 w-32">Posición</th>
                       <th className="px-4 py-4 w-24 text-center">Ficha</th>
                       <th className="px-4 py-4 min-w-[280px]">Asistencia</th>
-                      <th className="px-4 py-4 w-48">Valoración / Comentarios</th>
+                      <th className="px-4 py-4 min-w-[280px]">Valoración / Comentarios</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/60 text-xs">
                     {players.map(player => {
                       const att = attendanceMap[player.id] || {};
                       const ev = evaluationMap[player.id] || {};
-                      const isExpanded = !!expandedEvaluations[player.id];
+                      const effectiveGlobal = getEffectiveGlobalRating(ev);
 
                       return (
-                        <React.Fragment key={player.id}>
-                          <tr className="hover:bg-slate-800/20 transition-colors duration-150">
-                            <td className="px-4 py-3 text-center">
-                              <Avatar src={player.foto_url} name={player.nombre} size="sm" className="border border-slate-700/60 mx-auto" />
-                            </td>
-                            <td className="px-3 py-3 font-black text-slate-350">
-                              #{player.dorsal}
-                            </td>
-                            <td className="px-4 py-3 font-bold text-slate-100">
-                              {player.nombre} <span className="text-slate-400 font-medium">{player.apellidos}</span>
-                            </td>
-                            <td className="px-4 py-3">
-                              <Badge variant={player.demarcacion}>{player.demarcacion}</Badge>
-                            </td>
-                            <td className="px-4 py-3 text-center">
-                              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${
-                                player.estado === 'Disponible' ? 'bg-green-950/20 text-green-400 border-green-900/30' :
-                                player.estado === 'Lesionado' ? 'bg-red-950/20 text-red-400 border-red-900/30' :
-                                player.estado === 'Duda' ? 'bg-amber-950/20 text-amber-400 border-amber-900/30' :
-                                'bg-slate-800 text-slate-350 border-slate-700/40'
-                              }`}>
-                                {player.estado}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3">
-                              <div className="flex flex-col gap-2">
-                                {/* Chips de Asistencia */}
-                                <div className="flex flex-wrap gap-1">
-                                  {(['Asiste', 'No asiste', 'Lesionado', 'Duda', 'Sancionado', 'Baja temporal'] as AttendanceStatus[]).map(status => (
-                                    <button
-                                      key={status}
-                                      type="button"
-                                      onClick={() => handleStatusChange(player.id, status)}
-                                      className={`px-2.5 py-1 text-[10px] font-black rounded-lg border transition-all ${
-                                        att.attendance_status === status
-                                          ? status === 'Asiste' ? 'bg-green-600/20 text-green-400 border-green-600/40' :
-                                            status === 'No asiste' ? 'bg-red-600/20 text-red-400 border-red-600/40' :
-                                            status === 'Lesionado' ? 'bg-slate-700/50 text-slate-300 border-slate-600/50' :
-                                            'bg-amber-600/20 text-amber-400 border-amber-600/40'
-                                          : 'bg-slate-950/30 text-slate-450 border-slate-850 hover:text-slate-300'
-                                      }`}
-                                    >
-                                      {status === 'No asiste' ? 'Falta' : status}
-                                    </button>
-                                  ))}
-                                </div>
-
-                                {/* Motivo de ausencia */}
-                                {att.attendance_status === 'No asiste' && (
-                                  <div className="flex items-center gap-2 mt-1 animate-fadeIn">
-                                    <span className="text-[10px] text-red-400 font-bold uppercase shrink-0">Motivo *:</span>
-                                    <select
-                                      value={att.absence_reason || 'Sin justificar'}
-                                      onChange={e => handleAbsenceReasonChange(player.id, e.target.value)}
-                                      className="bg-slate-950 border border-slate-850 text-xs px-2 py-1 rounded-lg text-slate-200 outline-none w-full focus:border-red-500"
-                                    >
-                                      {ABSENCE_REASONS.map(r => (
-                                        <option key={r} value={r}>{r}</option>
-                                      ))}
-                                    </select>
-                                  </div>
-                                )}
-                              </div>
-                            </td>
-                            <td className="px-4 py-3">
-                              {att.attendance_status === 'Asiste' ? (
-                                <div className="flex flex-col gap-1.5">
+                        <tr key={player.id} className="hover:bg-slate-800/20 transition-colors duration-150">
+                          <td className="px-4 py-3 text-center">
+                            <Avatar src={player.foto_url} name={player.nombre} size="sm" className="border border-slate-700/60 mx-auto" />
+                          </td>
+                          <td className="px-3 py-3 font-black text-slate-350">
+                            #{player.dorsal}
+                          </td>
+                          <td className="px-4 py-3 font-bold text-slate-100">
+                            {player.nombre} <span className="text-slate-400 font-medium">{player.apellidos}</span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <Badge variant={player.demarcacion}>{player.demarcacion}</Badge>
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${
+                              player.estado === 'Disponible' ? 'bg-green-950/20 text-green-400 border-green-900/30' :
+                              player.estado === 'Lesionado' ? 'bg-red-950/20 text-red-400 border-red-900/30' :
+                              player.estado === 'Duda' ? 'bg-amber-950/20 text-amber-400 border-amber-900/30' :
+                              'bg-slate-800 text-slate-350 border-slate-700/40'
+                            }`}>
+                              {player.estado}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex flex-col gap-2">
+                              {/* Chips de Asistencia */}
+                              <div className="flex flex-wrap gap-1">
+                                {(['Asiste', 'No asiste', 'Lesionado', 'Duda', 'Sancionado', 'Baja temporal'] as AttendanceStatus[]).map(status => (
                                   <button
+                                    key={status}
                                     type="button"
-                                    onClick={() => toggleExpandEvaluation(player.id)}
-                                    className="flex items-center gap-1 text-[11px] font-bold text-slate-400 hover:text-white transition-colors"
+                                    onClick={() => handleStatusChange(player.id, status)}
+                                    className={`px-2.5 py-1 text-[10px] font-black rounded-lg border transition-all ${
+                                      att.attendance_status === status
+                                        ? status === 'Asiste' ? 'bg-green-600/20 text-green-400 border-green-600/40' :
+                                          status === 'No asiste' ? 'bg-red-600/20 text-red-400 border-red-600/40' :
+                                          status === 'Lesionado' ? 'bg-slate-700/50 text-slate-300 border-slate-600/50' :
+                                          'bg-amber-600/20 text-amber-400 border-amber-600/40'
+                                        : 'bg-slate-950/30 text-slate-450 border-slate-850 hover:text-slate-300'
+                                    }`}
                                   >
-                                    {isExpanded ? <ChevronUp className="h-3.5 w-3.5 text-[#CC0E21]" /> : <ChevronDown className="h-3.5 w-3.5 text-slate-500" />}
-                                    {ev.valoracion_global ? (
-                                      <span className="text-amber-400 flex items-center gap-1 font-black">
-                                        <Star className="h-3.5 w-3.5 fill-amber-400" /> {ev.valoracion_global} Global
-                                      </span>
-                                    ) : (
-                                      'Valorar entrenamiento'
-                                    )}
+                                    {status === 'No asiste' ? 'Falta' : status}
                                   </button>
-                                  <input
-                                    type="text"
-                                    placeholder="Obs: Muy activo, cansado..."
-                                    value={ev.observaciones || ''}
-                                    onChange={e => handleEvaluationNotesChange(player.id, e.target.value)}
-                                    className="bg-slate-950/70 border border-slate-850 text-[11px] px-2.5 py-1.5 rounded-lg text-slate-200 placeholder-slate-600 outline-none focus:border-[#CC0E21] w-full"
-                                  />
+                                ))}
+                              </div>
+
+                              {/* Motivo de ausencia */}
+                              {att.attendance_status === 'No asiste' && (
+                                <div className="flex items-center gap-2 mt-1 animate-fadeIn">
+                                  <span className="text-[10px] text-red-400 font-bold uppercase shrink-0">Motivo *:</span>
+                                  <select
+                                    value={att.absence_reason || 'Sin justificar'}
+                                    onChange={e => handleAbsenceReasonChange(player.id, e.target.value)}
+                                    className="bg-slate-950 border border-slate-850 text-xs px-2 py-1 rounded-lg text-slate-200 outline-none w-full focus:border-red-500"
+                                  >
+                                    {ABSENCE_REASONS.map(r => (
+                                      <option key={r} value={r}>{r}</option>
+                                    ))}
+                                  </select>
                                 </div>
-                              ) : (
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            {att.attendance_status === 'Asiste' ? (
+                              <div className="flex flex-col gap-2 min-w-[220px]">
+                                <div className="flex items-center justify-between gap-2">
+                                  <StarRating
+                                    value={effectiveGlobal ? Math.round(effectiveGlobal) : 0}
+                                    onChange={val => handleGlobalRatingChange(player.id, val)}
+                                    size={16}
+                                  />
+                                  {effectiveGlobal !== undefined ? (
+                                    <span className="text-[11px] font-black text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded-md border border-amber-400/20 shrink-0">
+                                      ★ {effectiveGlobal} / 5
+                                    </span>
+                                  ) : (
+                                    <span className="text-[10px] text-slate-500 italic shrink-0">Sin valorar</span>
+                                  )}
+                                </div>
                                 <input
                                   type="text"
-                                  placeholder="Notas: Justificó por whatsapp..."
-                                  value={att.attendance_notes || ''}
-                                  onChange={e => handleAttendanceNotesChange(player.id, e.target.value)}
-                                  className="bg-slate-950/70 border border-slate-850 text-[11px] px-2.5 py-1.5 rounded-lg text-slate-250 placeholder-slate-650 outline-none w-full"
+                                  placeholder="Comentario opcional..."
+                                  value={ev.observaciones || ''}
+                                  onChange={e => handleEvaluationNotesChange(player.id, e.target.value)}
+                                  className="bg-slate-950/70 border border-slate-850 text-[11px] px-2.5 py-1.5 rounded-lg text-slate-200 placeholder-slate-600 outline-none focus:border-[#CC0E21] w-full"
                                 />
-                              )}
-                            </td>
-                          </tr>
-
-                          {/* Expandable Stars ratings per category */}
-                          {att.attendance_status === 'Asiste' && isExpanded && (
-                            <tr className="bg-slate-950/30 border-l-2 border-l-[#CC0E21] animate-fadeIn">
-                              <td colSpan={7} className="px-6 py-4">
-                                <div className="p-4 rounded-xl bg-slate-950/50 border border-slate-850/80 space-y-4 max-w-3xl">
-                                  <h4 className="text-[10px] font-black uppercase text-[#CC0E21] tracking-wider pb-1 border-b border-slate-850">
-                                    Valoración de rendimiento en la sesión
-                                  </h4>
-                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2.5">
-                                    {METRICAS_EVAL.map(m => (
-                                      <StarRating
-                                        key={m.key}
-                                        label={m.label}
-                                        value={(ev as any)[m.key] || 3}
-                                        onChange={val => handleRatingChange(player.id, m.key, val)}
-                                        size={16}
-                                      />
-                                    ))}
-                                  </div>
-                                </div>
-                              </td>
-                            </tr>
-                          )}
-                        </React.Fragment>
+                              </div>
+                            ) : (
+                              <input
+                                type="text"
+                                placeholder="Notas: Justificó por whatsapp..."
+                                value={att.attendance_notes || ''}
+                                onChange={e => handleAttendanceNotesChange(player.id, e.target.value)}
+                                className="bg-slate-950/70 border border-slate-850 text-[11px] px-2.5 py-1.5 rounded-lg text-slate-250 placeholder-slate-650 outline-none w-full"
+                              />
+                            )}
+                          </td>
+                        </tr>
                       );
                     })}
                   </tbody>

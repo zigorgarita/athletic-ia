@@ -385,6 +385,17 @@ export function PlanificacionClient() {
   };
 
 
+  const getNotesOnly = (obs?: string | null): string => {
+    if (!obs) return '';
+    return obs.replace(/\n?PDF:[\s\S]*$/, '');
+  };
+
+  const getPdfMarker = (obs?: string | null): string => {
+    if (!obs) return '';
+    const match = obs.match(/(PDF:[\s\S]*$)/);
+    return match ? match[1] : '';
+  };
+
   const getPdfUrl = () => {
     const obs = sessionForm.evaluacion_observaciones || '';
     if (obs.includes('PDF:')) {
@@ -413,10 +424,10 @@ export function PlanificacionClient() {
       const publicUrl = data.publicUrl;
 
       setSessionForm(prev => {
-        const baseObs = prev.evaluacion_observaciones?.replace(/PDF:[\s\S]*$/, '') || '';
+        const baseObs = getNotesOnly(prev.evaluacion_observaciones);
         return {
           ...prev,
-          evaluacion_observaciones: `${baseObs.trim()}\nPDF: ${publicUrl}`.trim()
+          evaluacion_observaciones: baseObs ? `${baseObs}\nPDF: ${publicUrl}` : `PDF: ${publicUrl}`
         };
       });
       triggerToast('¡Archivo PDF subido correctamente!');
@@ -1851,10 +1862,10 @@ export function PlanificacionClient() {
                           type="button"
                           onClick={() => {
                             setSessionForm(prev => {
-                              const baseObs = prev.evaluacion_observaciones?.replace(/PDF:[\s\S]*$/, '') || '';
+                              const baseObs = getNotesOnly(prev.evaluacion_observaciones);
                               return {
                                 ...prev,
-                                evaluacion_observaciones: baseObs.trim()
+                                evaluacion_observaciones: baseObs
                               };
                             });
                             triggerToast('Documento PDF desasociado.');
@@ -1894,11 +1905,12 @@ export function PlanificacionClient() {
                           placeholder="https://enlace.com/sesion.pdf"
                           value={getPdfUrl()}
                           onChange={e => {
+                            const val = e.target.value.trim();
                             setSessionForm(prev => {
-                              const baseObs = prev.evaluacion_observaciones?.replace(/PDF:[\s\S]*$/, '') || '';
+                              const baseObs = getNotesOnly(prev.evaluacion_observaciones);
                               return {
                                 ...prev,
-                                evaluacion_observaciones: `${baseObs.trim()}\nPDF: ${e.target.value}`.trim()
+                                evaluacion_observaciones: val ? (baseObs ? `${baseObs}\nPDF: ${val}` : `PDF: ${val}`) : baseObs
                               };
                             });
                           }}
@@ -2028,23 +2040,22 @@ export function PlanificacionClient() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Conclusiones / Notas de la Evaluación</label>
+                <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">Conclusiones / Notas de la Evaluación</label>
                 <textarea
-                  value={sessionForm.evaluacion_observaciones?.replace(/PDF:[\s\S]*$/, '') || ''}
+                  value={getNotesOnly(sessionForm.evaluacion_observaciones)}
                   disabled={!isEditMode}
                   onChange={e => {
-                    const newText = e.target.value;
+                    const newNotes = e.target.value;
                     setSessionForm(prev => {
-                      const pdfMatch = prev.evaluacion_observaciones?.match(/(PDF:[\s\S]*$)/);
-                      const pdfStr = pdfMatch ? `\n${pdfMatch[1]}` : '';
+                      const pdfMarker = getPdfMarker(prev.evaluacion_observaciones);
                       return {
                         ...prev,
-                        evaluacion_observaciones: `${newText}${pdfStr}`
+                        evaluacion_observaciones: pdfMarker ? `${newNotes}\n${pdfMarker}` : newNotes
                       };
                     });
                   }}
                   placeholder="Añade valoraciones, aspectos a mejorar o incidencias destacables de esta sesión..."
-                  className="w-full h-32 bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 outline-none focus:border-[#CC0E21] resize-none disabled:opacity-60"
+                  className="w-full h-36 bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 outline-none focus:border-[#CC0E21] resize-none disabled:opacity-60 overflow-y-auto whitespace-pre-wrap break-words leading-relaxed"
                 />
               </div>
             </div>
