@@ -505,6 +505,27 @@ export function PlanificacionClient() {
     return `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
   };
 
+  const getMatchCountdownText = (matchDateStr?: string | null): string | null => {
+    if (!matchDateStr || !matchDateStr.includes('-')) return null;
+    const [mYear, mMonth, mDay] = matchDateStr.split('-').map(Number);
+    if (!mYear || !mMonth || !mDay) return null;
+    const matchDate = new Date(mYear, mMonth - 1, mDay);
+    const today = new Date();
+    const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const diffTime = matchDate.getTime() - todayMidnight.getTime();
+    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays > 1) {
+      return `FALTAN ${diffDays} DÍAS`;
+    } else if (diffDays === 1) {
+      return 'PARTIDO MAÑANA';
+    } else if (diffDays === 0) {
+      return 'PARTIDO HOY';
+    } else {
+      return 'JUGADO';
+    }
+  };
+
   const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -1023,13 +1044,18 @@ export function PlanificacionClient() {
               </div>
             </div>
             
-            {hasOfficialMatch && (
-              <div className="text-right">
-                <span className="text-[9px] font-black text-[#CC0E21] bg-[#CC0E21]/5 border border-[#CC0E21]/15 px-2 py-0.5 rounded uppercase">
-                  FALTAN DÍAS
-                </span>
-              </div>
-            )}
+            {(() => {
+              const targetMatchDate = weekMatch?.fecha || matchSession?.fecha || null;
+              const countdownText = hasOfficialMatch ? getMatchCountdownText(targetMatchDate) : null;
+              if (!countdownText) return null;
+              return (
+                <div className="text-right">
+                  <span className="text-[9px] font-black text-[#CC0E21] bg-[#CC0E21]/5 border border-[#CC0E21]/15 px-2 py-0.5 rounded uppercase">
+                    {countdownText}
+                  </span>
+                </div>
+              );
+            })()}
           </div>
 
           <div className="border-t border-slate-850 pt-2.5 mt-3 flex justify-between items-center text-[10px] font-semibold text-slate-400 z-10">
