@@ -835,11 +835,14 @@ export function PlanificacionClient() {
 
     const formattedFecha = formatDateLegible(sessionForm.fecha);
     const horaCitacion = sessionForm.hora_convocatoria || '09:30';
-    const horaInicio = sessionForm.hora_inicio || '09:45';
     const lugar = sessionForm.campo_instalacion || 'IPARRALDE';
     const ropa = sessionForm.ropa_convocatoria || 'Polo del club';
 
-    const text = `⚽ S.D. INDAUTXU DH - CONVOCATORIA ⚽\n📅 Fecha: ${formattedFecha}\n⏰ Citación: ${horaCitacion}h\n🕘 Inicio: ${horaInicio}h\n📍 Lugar: ${lugar}\n👕 Ropa: ${ropa}`;
+    const inicioLine = sessionForm.hora_inicio && sessionForm.hora_inicio.trim() !== ''
+      ? `\n🕘 Inicio: ${sessionForm.hora_inicio}h`
+      : '';
+
+    const text = `⚽ S.D. INDAUTXU DH - CONVOCATORIA ⚽\n📅 Fecha: ${formattedFecha}\n⏰ Citación: ${horaCitacion}h${inicioLine}\n📍 Lugar: ${lugar}\n👕 Ropa: ${ropa}`;
 
     try {
       await navigator.clipboard.writeText(text);
