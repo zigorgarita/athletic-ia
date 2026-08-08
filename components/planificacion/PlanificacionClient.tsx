@@ -479,10 +479,15 @@ export function PlanificacionClient() {
     return match ? match[1] : '';
   };
 
-  const getPdfUrl = () => {
+  const getPdfUrl = (): string => {
     const obs = sessionForm.evaluacion_observaciones || '';
     if (obs.includes('PDF:')) {
-      return obs.split('PDF:')[1].trim();
+      const match = obs.match(/PDF:\s*(\S+)/);
+      if (match && match[1]) {
+        return match[1].trim();
+      }
+      const parts = obs.split('PDF:');
+      return parts[parts.length - 1].trim();
     }
     return '';
   };
@@ -2165,14 +2170,22 @@ export function PlanificacionClient() {
                     <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
                     <span>✓ PDF adjunto</span>
                   </div>
-                  <a
-                    href={getPdfUrl()}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-750 border border-slate-700 text-xs font-bold text-slate-200 hover:text-white transition-colors"
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      const url = getPdfUrl();
+                      if (url) {
+                        window.open(url, '_blank', 'noopener,noreferrer');
+                      } else {
+                        triggerToast('No se encontró enlace de PDF válido.');
+                      }
+                    }}
+                    className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-750 border border-slate-700 text-xs font-bold text-slate-200 hover:text-white transition-colors cursor-pointer"
                   >
                     Abrir
-                  </a>
+                  </button>
                 </div>
               )}
 
