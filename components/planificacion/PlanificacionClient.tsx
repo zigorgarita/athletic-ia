@@ -823,10 +823,31 @@ export function PlanificacionClient() {
     triggerToast('¡Sesión duplicada! Copiada al día siguiente.');
   };
 
-  const handleCopyWhatsAppSimulated = () => {
-    const text = `⚽ S.D. INDAUTXU DH - CONVOCATORIA ⚽\n📅 Fecha: ${sessionForm.fecha}\n⏰ Citación: ${sessionForm.hora_convocatoria || '18:00'}h\n📍 Lugar: ${sessionForm.campo_instalacion || 'Iparralde'}\n👕 Ropa: ${sessionForm.ropa_convocatoria || 'Polo del club'}`;
-    navigator.clipboard.writeText(text);
-    triggerToast('¡Convocatoria de WhatsApp copiada al portapapeles!');
+  const handleCopyWhatsAppSimulated = async () => {
+    const formatDateLegible = (rawDate?: string) => {
+      if (!rawDate) return '';
+      const parts = rawDate.split('-');
+      if (parts.length === 3) {
+        return `${parts[2]}/${parts[1]}/${parts[0]}`;
+      }
+      return rawDate;
+    };
+
+    const formattedFecha = formatDateLegible(sessionForm.fecha);
+    const horaCitacion = sessionForm.hora_convocatoria || '09:30';
+    const horaInicio = sessionForm.hora_inicio || '09:45';
+    const lugar = sessionForm.campo_instalacion || 'IPARRALDE';
+    const ropa = sessionForm.ropa_convocatoria || 'Polo del club';
+
+    const text = `⚽ S.D. INDAUTXU DH - CONVOCATORIA ⚽\n📅 Fecha: ${formattedFecha}\n⏰ Citación: ${horaCitacion}h\n🕘 Inicio: ${horaInicio}h\n📍 Lugar: ${lugar}\n👕 Ropa: ${ropa}`;
+
+    try {
+      await navigator.clipboard.writeText(text);
+      triggerToast('¡Convocatoria de WhatsApp copiada al portapapeles!');
+    } catch (err) {
+      console.error('Error al copiar al portapapeles:', err);
+      triggerToast('No se pudo copiar automáticamente al portapapeles.');
+    }
   };
 
   // Helper to calculate Match Day tag dynamically
