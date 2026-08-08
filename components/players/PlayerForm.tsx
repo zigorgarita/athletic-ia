@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Button } from '@/components/ui/Button';
 import { useUploadPlayerPhoto } from '@/hooks/useUploadPlayerPhoto';
-import { Camera, Trash2, X } from 'lucide-react';
+import { Camera, Trash2, X, AlertTriangle } from 'lucide-react';
 import { compressImage } from '@/lib/image';
 
 const playerSchema = zod.object({
@@ -59,6 +59,7 @@ const playerSchema = zod.object({
   equipo: zod.string().optional().default('Indautxu Juvenil A'),
   categoria: zod.string().optional().default('Juvenil'),
   temporada: zod.string().optional().default('2026/2027'),
+  alias: zod.string().max(20, 'El alias no puede superar 20 caracteres').nullable().optional(),
 });
 
 type PlayerFormData = zod.infer<typeof playerSchema>;
@@ -66,6 +67,7 @@ type PlayerFormData = zod.infer<typeof playerSchema>;
 interface FormValues {
   nombre: string;
   apellidos: string;
+  alias?: string | null;
   dorsal: number | string;
   demarcacion: Demarcacion | '';
   posicion_secundaria: string;
@@ -96,13 +98,14 @@ const positionOptions = [
 
 interface PlayerFormProps {
   player?: Player | null;
+  allPlayers?: Player[];
   onSubmit: (data: PlayerFormData & { foto_url?: string | null }) => Promise<void>;
   onCancel?: () => void;
   onDelete?: () => void;
   isSubmitting?: boolean;
 }
 
-export function PlayerForm({ player, onSubmit, onCancel, onDelete, isSubmitting = false }: PlayerFormProps) {
+export function PlayerForm({ player, allPlayers = [], onSubmit, onCancel, onDelete, isSubmitting = false }: PlayerFormProps) {
   const { uploadPhoto, loading: uploading } = useUploadPlayerPhoto();
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
@@ -116,11 +119,13 @@ export function PlayerForm({ player, onSubmit, onCancel, onDelete, isSubmitting 
     handleSubmit,
     formState: { errors },
     reset,
+    watch,
   } = useForm<FormValues>({
     resolver: zodResolver(playerSchema) as unknown as Resolver<FormValues>,
     defaultValues: {
       nombre: '',
       apellidos: '',
+      alias: '',
       dorsal: '',
       demarcacion: '',
       posicion_secundaria: '',
@@ -138,12 +143,27 @@ export function PlayerForm({ player, onSubmit, onCancel, onDelete, isSubmitting 
     },
   });
 
+  const watchedAlias = watch('alias');
+
+  // Detectar alias duplicado (advertencia visual, no bloqueo)
+  const isDuplicateAlias = !!(
+    watchedAlias &&
+    watchedAlias.trim() !== '' &&
+    allPlayers.some(
+      (p) =>
+        p.id !== player?.id &&
+        p.alias &&
+        p.alias.trim().toLowerCase() === watchedAlias.trim().toLowerCase()
+    )
+  );
+
 
   useEffect(() => {
     if (player) {
       reset({
         nombre: player.nombre,
         apellidos: player.apellidos || '',
+        alias: player.alias || '',
         dorsal: player.dorsal,
         demarcacion: player.demarcacion,
         posicion_secundaria: player.posicion_secundaria || '',
@@ -178,6 +198,7 @@ export function PlayerForm({ player, onSubmit, onCancel, onDelete, isSubmitting 
       reset({
         nombre: '',
         apellidos: '',
+        alias: '',
         dorsal: '',
         demarcacion: '',
         posicion_secundaria: '',
@@ -261,6 +282,7 @@ export function PlayerForm({ player, onSubmit, onCancel, onDelete, isSubmitting 
       peso: values.peso === '' ? null : Number(values.peso),
       posicion_secundaria: values.posicion_secundaria === '' ? null : values.posicion_secundaria,
       rol_abp: values.rol_abp === '' ? null : values.rol_abp,
+      alias: (!values.alias || values.alias.trim() === '') ? null : values.alias.trim(),
       nacionalidad: values.nacionalidad || 'España',
       equipo: values.equipo || 'Indautxu Juvenil A',
       categoria: values.categoria || 'Juvenil',
@@ -345,6 +367,25 @@ export function PlayerForm({ player, onSubmit, onCancel, onDelete, isSubmitting 
           error={errors.apellidos?.message?.toString()}
           {...register('apellidos')}
         />
+      </div>
+
+      {/* Campo Alias */}
+      <div className="space-y-1">
+        <Input
+          label="Alias táctico (opcional)"
+          placeholder="Ej: Markel, Aritz, Iker..."
+          error={errors.alias?.message?.toString()}
+          {...register('alias')}
+        />
+        {isDuplicateAlias && (
+          <div className="flex items-center gap-1.5 text-amber-400 text-[11px] px-1">
+            <AlertTriangle className="h-3 w-3 shrink-0" />
+            <span>Este alias ya está asignado a otro jugador. Puedes seguir guardando, pero considera usar uno único.</span>
+          </div>
+        )}
+        <p className="text-[10px] text-slate-500 px-1">
+          Nombre corto para pizarras y alineaciones. Máx. 20 caracteres. Se puede dejar vacío.
+        </p>
       </div>
 
       <div className="grid grid-cols-3 gap-4">

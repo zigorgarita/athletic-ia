@@ -160,6 +160,7 @@ export function PlantillaClient() {
     const payload: Omit<Player, 'id' | 'created_at' | 'updated_at'> = {
       nombre: formData.nombre,
       apellidos: formData.apellidos,
+      alias: formData.alias !== undefined ? (formData.alias || null) : null,
       dorsal: formData.dorsal,
       demarcacion: formData.demarcacion,
       posicion_secundaria: formData.posicion_secundaria ?? null,
@@ -724,6 +725,7 @@ export function PlantillaClient() {
           )}
           <PlayerForm
             player={selectedPlayer}
+            allPlayers={players}
             onSubmit={handleFormSubmit}
             onCancel={() => setIsModalOpen(false)}
             onDelete={() => {

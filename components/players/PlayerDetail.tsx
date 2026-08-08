@@ -964,6 +964,45 @@ export function PlayerDetail({ player, onBack, initialTab }: PlayerDetailProps) 
                 <div><span className="text-slate-500">Nacionalidad:</span> <span className="text-white">{currentPlayer.nacionalidad || '-'}</span></div>
                 <div><span className="text-slate-500">Pierna Dominante:</span> <span className="text-white">{currentPlayer.pierna_dominante}</span></div>
               </div>
+
+              {/* Alias táctico */}
+              <div className="border-t border-slate-800/60 pt-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Alias Táctico</span>
+                  <span className="text-[10px] text-slate-600 italic">Para pizarras y alineaciones (futuro)</span>
+                </div>
+                {isEditMode ? (
+                  <div className="space-y-1">
+                    <input
+                      type="text"
+                      value={currentPlayer.alias || ''}
+                      maxLength={20}
+                      placeholder="Alias corto... (ej: Markel, Iker)"
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setCurrentPlayer(prev => ({ ...prev, alias: val || null }));
+                      }}
+                      onBlur={async () => {
+                        await updatePlayer(currentPlayer.id, {
+                          alias: currentPlayer.alias && currentPlayer.alias.trim() !== '' ? currentPlayer.alias.trim() : null
+                        });
+                      }}
+                      className="w-full max-w-xs bg-slate-950/60 border border-slate-800 rounded-xl px-3.5 py-2 text-sm text-slate-200 outline-none focus:border-[#CC0E21] transition-colors"
+                    />
+                    <p className="text-[10px] text-slate-500">Se guarda automáticamente al salir del campo. Máx. 20 caracteres.</p>
+                  </div>
+                ) : (
+                  <div>
+                    {currentPlayer.alias ? (
+                      <span className="inline-flex items-center px-3 py-1 rounded-lg bg-slate-800/60 border border-slate-700/40 text-sm font-medium text-slate-200">
+                        {currentPlayer.alias}
+                      </span>
+                    ) : (
+                      <span className="text-slate-600 text-sm italic">Sin alias asignado</span>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
             {isEditMode && (
               <div className="flex justify-end mt-4">

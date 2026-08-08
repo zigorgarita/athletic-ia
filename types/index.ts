@@ -22,6 +22,7 @@ export interface Player {
   id: string;
   nombre: string;
   apellidos: string;
+  alias?: string | null;
   dorsal: number;
   demarcacion: Demarcacion;
   posicion_secundaria: string | null;
