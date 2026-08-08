@@ -492,6 +492,19 @@ export function PlanificacionClient() {
     return '';
   };
 
+  const getDisplayEndTime = (horaInicio?: string | null, duracion?: number | null, horaFin?: string | null): string => {
+    if (horaFin && horaFin.trim() !== '') return horaFin;
+    if (!horaInicio || !horaInicio.includes(':')) return '';
+    const [hStr, mStr] = horaInicio.split(':');
+    const h = parseInt(hStr, 10);
+    const m = parseInt(mStr, 10);
+    if (isNaN(h) || isNaN(m)) return '';
+    const totalMin = h * 60 + m + (duracion || 90);
+    const endH = Math.floor(totalMin / 60) % 24;
+    const endM = totalMin % 60;
+    return `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+  };
+
   const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -1218,7 +1231,7 @@ export function PlanificacionClient() {
               return year === targetYear && (month - 1) === targetMonth;
             });
 
-            const monthMinutes = filteredSessions.reduce((acc, s) => acc + (s.duracion_total || 0), 0);
+            const monthMinutes = filteredSessions.reduce((acc, s) => acc + Math.max(0, s.duracion_total || 0), 0);
             const countTrainings = filteredSessions.filter(s => s.tipo_sesion === 'Entrenamiento').length;
             const countMatches = filteredSessions.filter(s => s.tipo_sesion === 'Partido').length;
             const countRecup = filteredSessions.filter(s => s.tipo_sesion === 'Recuperación').length;
@@ -1590,7 +1603,7 @@ export function PlanificacionClient() {
                         <Square className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
                         <input
                           type="text"
-                          value={sessionForm.hora_fin || '20:00'}
+                          value={getDisplayEndTime(sessionForm.hora_inicio, sessionForm.duracion_total, sessionForm.hora_fin)}
                           disabled={!isEditMode}
                           onChange={e => setSessionForm({...sessionForm, hora_fin: e.target.value})}
                           className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-100 outline-none focus:border-[#CC0E21] disabled:opacity-60"
