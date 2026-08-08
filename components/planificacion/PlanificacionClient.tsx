@@ -14,7 +14,9 @@ import { getDaysOfWeek, getDaysOfMonthGrid, parseLocalYYYYMMDD, formatLocalYYYYM
 import { BibliotecaTareasModal } from './BibliotecaTareasModal';
 import { useClubLogos } from '@/hooks/useClubLogos';
 import { MatchBadge } from './MatchBadge';
-import { PlanningTaskLibrary, Match } from '@/types';
+import { PlanningTaskLibrary, Match, TrainingAttendance, TrainingEvaluation } from '@/types';
+import { useTrainingAttendance } from '@/hooks/useTrainingAttendance';
+import { getEffectiveGlobalRating } from '@/components/asistencia/AsistenciaClient';
 
 // Mock material checklist interface
 interface MockChecklist {
@@ -138,6 +140,87 @@ export function PlanificacionClient() {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3000);
   };
+
+  const { fetchSessionAttendance } = useTrainingAttendance();
+  const [sessionAttendance, setSessionAttendance] = useState<TrainingAttendance[]>([]);
+  const [sessionEvaluations, setSessionEvaluations] = useState<TrainingEvaluation[]>([]);
+
+  const fetchSessionAttendanceAndEvals = useCallback(async (sessionId: string) => {
+    if (!sessionId || sessionId.startsWith('temp-')) {
+      setSessionAttendance([]);
+      setSessionEvaluations([]);
+      return;
+    }
+    try {
+      const { attendance, evaluations } = await fetchSessionAttendance(sessionId);
+      setSessionAttendance(attendance || []);
+      setSessionEvaluations(evaluations || []);
+    } catch (err) {
+      console.error('Error fetching session attendance and evaluations:', err);
+      setSessionAttendance([]);
+      setSessionEvaluations([]);
+    }
+  }, [fetchSessionAttendance]);
+
+  useEffect(() => {
+    if (sessionForm.id && !sessionForm.id.startsWith('temp-')) {
+      fetchSessionAttendanceAndEvals(sessionForm.id);
+    } else {
+      setSessionAttendance([]);
+      setSessionEvaluations([]);
+    }
+  }, [sessionForm.id, fetchSessionAttendanceAndEvals]);
+
+  // Dynamic calculations for Evaluation tab metrics
+  const { totalAttending, evaluatedAttendingCount, avgSessionRating, isEvaluationCompleted } = React.useMemo(() => {
+    if (!sessionForm.id || sessionForm.id.startsWith('temp-')) {
+      return {
+        totalAttending: 0,
+        evaluatedAttendingCount: 0,
+        avgSessionRating: null,
+        isEvaluationCompleted: false
+      };
+    }
+
+    // Filter attendees with status 'Asiste'
+    const attendingRecords = sessionAttendance.filter(a => a.attendance_status === 'Asiste');
+    const attendingPlayerIds = new Set(attendingRecords.map(a => a.player_id).filter((id): id is string => Boolean(id)));
+    const totalAttending = attendingPlayerIds.size;
+
+    if (totalAttending === 0) {
+      return {
+        totalAttending: 0,
+        evaluatedAttendingCount: 0,
+        avgSessionRating: null,
+        isEvaluationCompleted: false
+      };
+    }
+
+    // Count evaluated attendees with a valid rating
+    const evaluatedAttendingRatings: number[] = [];
+    sessionEvaluations.forEach(ev => {
+      if (ev.player_id && attendingPlayerIds.has(ev.player_id)) {
+        const rating = getEffectiveGlobalRating(ev);
+        if (rating !== undefined && rating !== null) {
+          evaluatedAttendingRatings.push(rating);
+        }
+      }
+    });
+
+    const evaluatedAttendingCount = evaluatedAttendingRatings.length;
+    const avgSessionRating = evaluatedAttendingCount > 0
+      ? Number((evaluatedAttendingRatings.reduce((sum, r) => sum + r, 0) / evaluatedAttendingCount).toFixed(1))
+      : null;
+
+    const isEvaluationCompleted = totalAttending > 0 && evaluatedAttendingCount === totalAttending;
+
+    return {
+      totalAttending,
+      evaluatedAttendingCount,
+      avgSessionRating,
+      isEvaluationCompleted
+    };
+  }, [sessionForm.id, sessionAttendance, sessionEvaluations]);
 
   // 1. Fetch summoned players from Supabase
   const fetchSummonedPlayers = async (sessionId: string) => {
@@ -548,7 +631,7 @@ export function PlanificacionClient() {
         rival: sessionForm.rival || null
       };
 
-      sessionPayload.evaluacion_completada = sessionForm.evaluacion_completada || false;
+      sessionPayload.evaluacion_completada = isEvaluationCompleted;
       sessionPayload.evaluacion_duracion_real = sessionForm.evaluacion_duracion_real ? Number(sessionForm.evaluacion_duracion_real) : null;
       sessionPayload.evaluacion_observaciones = sessionForm.evaluacion_observaciones || null;
       sessionPayload.valoracion_entrenador = sessionForm.rpe_medio ?? null;
@@ -2007,18 +2090,91 @@ export function PlanificacionClient() {
           {/* TAB 4: EVALUACIÓN POST-ENTRENO */}
           {activeTab === 'evaluacion' && (
             <div className="space-y-4">
-              {/* Valoración Media del Entrenamiento */}
+              {/* Header Status + Acceso Directo "Valorar jugadores" */}
+              <div className="p-4 rounded-xl bg-slate-900 border border-slate-850 flex items-center justify-between gap-3">
+                <div className="flex flex-col gap-1 text-left">
+                  <div className="flex items-center gap-2">
+                    {isEvaluationCompleted ? (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold bg-emerald-950/60 text-emerald-400 border border-emerald-800/50">
+                        <CheckCircle2 className="h-3.5 w-3.5" /> Evaluación completada
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold bg-amber-950/60 text-amber-400 border border-amber-800/50">
+                        <Clock className="h-3.5 w-3.5" /> Evaluación pendiente
+                      </span>
+                    )}
+                  </div>
+                  {totalAttending === 0 && (
+                    <span className="text-[10px] text-amber-500/90 font-medium pl-0.5">
+                      Sin asistentes registrados
+                    </span>
+                  )}
+                </div>
+
+                <button
+                  onClick={() => {
+                    if (sessionForm.id && !sessionForm.id.startsWith('temp-')) {
+                      window.location.href = `/asistencia?session_id=${sessionForm.id}`;
+                    } else {
+                      triggerToast('Guarde primero la sesión para registrar la asistencia.');
+                    }
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#CC0E21] hover:bg-[#a80b1a] text-white text-xs font-extrabold shadow-sm transition-all shrink-0"
+                >
+                  <Star className="h-3.5 w-3.5 fill-white" />
+                  Valorar jugadores
+                </button>
+              </div>
+
+              {/* Valoración Media del Entrenamiento & Contador */}
               <div className="p-5 rounded-xl bg-slate-900 border border-slate-850 flex flex-col items-center justify-center text-center space-y-2">
                 <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Valoración Media del Entrenamiento</span>
-                <div className="flex items-center gap-2">
-                  <Star className="h-6 w-6 text-amber-400 fill-amber-400" />
-                  <span className="text-3xl font-black text-slate-100">
-                    {sessionForm.valoracion_media_jugadores || 'N/A'}
-                  </span>
-                  <span className="text-slate-500 text-sm">/ 5</span>
-                </div>
-                <p className="text-[10px] text-slate-500">Calculada automáticamente a partir del pase de lista y las valoraciones individuales de los jugadores asistentes.</p>
+                
+                {evaluatedAttendingCount > 0 && avgSessionRating !== null ? (
+                  <div className="flex items-center gap-2">
+                    <Star className="h-6 w-6 text-amber-400 fill-amber-400" />
+                    <span className="text-3xl font-black text-slate-100">
+                      {avgSessionRating}
+                    </span>
+                    <span className="text-slate-500 text-sm">/ 5</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 py-1">
+                    <Star className="h-5 w-5 text-slate-600" />
+                    <span className="text-sm font-bold text-slate-400">
+                      Sin valoraciones todavía
+                    </span>
+                  </div>
+                )}
+
+                <p className="text-[10px] font-semibold text-slate-300">
+                  {totalAttending === 0
+                    ? `0 de 0 evaluados (Sin asistentes registrados)`
+                    : `${evaluatedAttendingCount} de ${totalAttending} jugadores evaluados`
+                  }
+                </p>
+                <p className="text-[9px] text-slate-550">
+                  Calculada automáticamente a partir del pase de lista y las valoraciones de los jugadores asistentes.
+                </p>
               </div>
+
+              {/* PDF Adjunto Pastilla (si existe) */}
+              {getPdfUrl() !== '' && (
+                <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-xs font-bold text-emerald-400">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+                    <span>✓ PDF adjunto</span>
+                  </div>
+                  <a
+                    href={getPdfUrl()}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-750 border border-slate-700 text-xs font-bold text-slate-200 hover:text-white transition-colors"
+                  >
+                    Abrir
+                  </a>
+                </div>
+              )}
 
               {/* RPE y Observaciones principales */}
               <div className="space-y-1.5">
