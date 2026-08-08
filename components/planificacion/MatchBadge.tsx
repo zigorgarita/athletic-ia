@@ -11,9 +11,10 @@ interface MatchBadgeProps {
   hora?: string | null;
   campo?: string | null;
   matchId?: string;
+  compact?: boolean;
 }
 
-export function MatchBadge({ jornada, rival, esLocal, fecha, hora, campo, matchId }: MatchBadgeProps) {
+export function MatchBadge({ jornada, rival, esLocal, fecha, hora, campo, matchId, compact }: MatchBadgeProps) {
   const displayHora = hora && hora.trim() !== '' ? hora : 'Hora por confirmar';
 
   // Formateo legible de fecha (ej. "06/09/2026")
@@ -27,6 +28,45 @@ export function MatchBadge({ jornada, rival, esLocal, fecha, hora, campo, matchI
   };
 
   const formattedFecha = formatDateLegible(fecha);
+
+  // Variante compacta para vista mensual
+  if (compact) {
+    const isLocalStyle = esLocal;
+    const badgeBg = isLocalStyle
+      ? 'bg-indigo-950/60 border-indigo-500/30 hover:border-indigo-500/50'
+      : 'bg-emerald-950/60 border-emerald-500/30 hover:border-emerald-500/50';
+    const tagBg = isLocalStyle
+      ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30'
+      : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30';
+    const shieldColor = isLocalStyle ? 'text-indigo-400' : 'text-emerald-400';
+    const locationLabel = esLocal ? 'LOCAL' : 'VISITANTE';
+    const timeLabel = hora && hora.trim() !== '' ? hora : null;
+
+    return (
+      <div 
+        data-match-id={matchId}
+        className={`w-full border rounded-lg p-2 transition-all shadow-sm overflow-hidden ${badgeBg}`}
+      >
+        <div className="flex items-center justify-between gap-1 overflow-hidden">
+          <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider border truncate ${tagBg}`}>
+            {locationLabel} {jornada ? `· J${jornada}` : ''}
+          </span>
+          {timeLabel && (
+            <span className="text-[9px] font-mono font-bold text-slate-300 shrink-0">
+              {timeLabel}
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-1.5 mt-1 overflow-hidden">
+          <Shield className={`w-3.5 h-3.5 ${shieldColor} shrink-0`} />
+          <span className="text-xs font-bold text-white tracking-wide truncate">
+            vs {rival}
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   if (esLocal) {
     return (

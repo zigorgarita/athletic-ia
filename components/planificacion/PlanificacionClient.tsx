@@ -1334,7 +1334,7 @@ export function PlanificacionClient() {
                   <div
                     key={session.id}
                     onClick={() => handleDayClick(session.fecha)}
-                    className={`min-h-[145px] p-3 flex flex-col justify-between hover:bg-slate-900/10 transition-all cursor-pointer relative group/day select-none border-b border-r border-slate-800/40 ${
+                    className={`min-h-[125px] h-[125px] p-2.5 flex flex-col justify-between hover:bg-slate-900/10 transition-all cursor-pointer relative group/day select-none border-b border-r border-slate-800/40 overflow-hidden ${
                       !isCurrentMonth ? 'opacity-40' : ''
                     }`}
                   >
@@ -1350,6 +1350,7 @@ export function PlanificacionClient() {
                       hora={matchHora}
                       campo={matchCampo}
                       matchId={matchId}
+                      compact={true}
                     />
 
                     <div className="h-1 w-full bg-transparent" />
@@ -1362,7 +1363,7 @@ export function PlanificacionClient() {
                   <div
                     key={session.id}
                     onClick={() => handleDayClick(session.fecha)}
-                    className={`min-h-[145px] p-3 flex flex-col justify-between hover:bg-slate-900/10 transition-all cursor-pointer relative group/day select-none border-b border-r border-slate-800/40 ${
+                    className={`min-h-[125px] h-[125px] p-2.5 flex flex-col justify-between hover:bg-slate-900/10 transition-all cursor-pointer relative group/day select-none border-b border-r border-slate-800/40 overflow-hidden ${
                       !isCurrentMonth ? 'opacity-20' : ''
                     }`}
                   >
@@ -1380,7 +1381,7 @@ export function PlanificacionClient() {
                 <div
                   key={session.id}
                   onClick={() => handleDayClick(session.fecha)}
-                  className={`min-h-[145px] p-3 flex flex-col justify-between hover:bg-slate-900/10 transition-all cursor-pointer relative group/day select-none border-b border-r border-slate-800/40 ${
+                  className={`min-h-[125px] h-[125px] p-2.5 flex flex-col justify-between hover:bg-slate-900/10 transition-all cursor-pointer relative group/day select-none border-b border-r border-slate-800/40 overflow-hidden ${
                     !isCurrentMonth ? 'opacity-30' : ''
                   }`}
                 >
@@ -1388,43 +1389,25 @@ export function PlanificacionClient() {
                     <span className="text-xs font-black text-slate-400">{date.getDate()}</span>
                   </div>
 
-                  {/* Píldora horizontal de evento */}
-                  <div className={`w-full px-2.5 py-1.5 rounded-lg border text-[9px] font-bold flex items-center justify-between shadow-sm transition-all ${
+                  {/* Píldora horizontal de evento compacta sin max-w rígido */}
+                  <div className={`w-full px-2 py-1.5 rounded-lg border text-[9.5px] font-bold flex items-center justify-between gap-1 shadow-sm transition-all overflow-hidden ${
                     session.carga === 'Muy alta' ? 'bg-red-500/10 text-red-300 border-red-500/20' :
                     session.carga === 'Alta' ? 'bg-orange-500/10 text-orange-300 border-orange-500/20' :
                     session.carga === 'Media' ? 'bg-amber-400/10 text-amber-300 border-amber-400/20' :
                     session.carga === 'Baja' ? 'bg-sky-500/10 text-sky-300 border-sky-500/20' :
                     'bg-emerald-500/10 text-emerald-300 border-emerald-500/20'
                   }`}>
-                    <span className="truncate max-w-[80px] font-mono">{session.hora_inicio || '18:30'} {shortName}</span>
-                    <span className="text-[10px]">{sessionIcon}</span>
+                    <span className="truncate flex-1 font-sans">
+                      <span className="font-mono text-slate-400 mr-1">{session.hora_inicio || '18:30'}</span>
+                      {shortName}
+                    </span>
+                    <span className="text-[10px] shrink-0">{sessionIcon}</span>
                   </div>
-
-                  {/* Contenidos globales trabajados cortos */}
-                  {(() => {
-                    const sessionConceptsList = allConceptsMap[session.id] || [];
-                    if (sessionConceptsList.length > 0) {
-                      return (
-                        <div className="mt-1.5 space-y-0.5 max-h-[50px] overflow-hidden text-left">
-                          {sessionConceptsList.slice(0, 3).map((c, cidx) => (
-                            <div 
-                              key={c.id || cidx} 
-                              className="text-[7.5px] px-1.5 py-0.2 rounded bg-slate-900 border border-slate-800 text-slate-350 truncate font-bold leading-tight"
-                              title={`${c.categoria}: ${c.concepto}`}
-                            >
-                              • {c.concepto}
-                            </div>
-                          ))}
-                        </div>
-                      );
-                    }
-                    return null;
-                  })()}
 
                   {/* LED de carga física */}
                   <div className="flex justify-between items-center mt-1">
-                    <span className="text-[8px] text-slate-500 font-mono font-bold uppercase">{session.tipo_sesion}</span>
-                    <div className={`h-1.5 w-6 rounded-full ${chargeStyles.color} ${chargeStyles.glow}`} />
+                    <span className="text-[8px] text-slate-500 font-mono font-bold uppercase truncate max-w-[80px]">{session.tipo_sesion}</span>
+                    <div className={`h-1.5 w-5 rounded-full shrink-0 ${chargeStyles.color} ${chargeStyles.glow}`} />
                   </div>
 
                   {/* Tooltip Táctico Flotante */}
