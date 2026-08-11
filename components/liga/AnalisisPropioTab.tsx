@@ -17,7 +17,8 @@ import { supabase } from '@/lib/supabase';
 import {
   Film, Link as LinkIcon, Upload, Play, Trash2, Plus, AlertCircle,
   Video, Sparkles, RefreshCw, Shield, Sword,
-  Zap, Target, Eye, User, Activity, FolderOpen, Users, Check
+  Zap, Target, Eye, User, Activity, FolderOpen, Users, Check,
+  FileText, ExternalLink
 } from 'lucide-react';
 
 interface AnalisisPropioTabProps {
@@ -162,6 +163,124 @@ export function AnalisisPropioTab({ match }: AnalisisPropioTabProps) {
   const [uploadingCategory, setUploadingCategory] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [isDraggingCategory, setIsDraggingCategory] = useState<string | null>(null);
+
+  // Informes / PDFs del partido (Aitor) state
+  interface PdfDocItem {
+    id: string;
+    match_id: string;
+    nombre_documento: string;
+    tipo_documento: string;
+    tipo_origen: string;
+    url_storage: string;
+    comentario?: string | null;
+    created_at?: string;
+  }
+
+  const [pdfDocs, setPdfDocs] = useState<PdfDocItem[]>([]);
+  const [loadingPdfDocs, setLoadingPdfDocs] = useState<boolean>(true);
+  const [selectedPdfFile, setSelectedPdfFile] = useState<File | null>(null);
+  const [isUploadingPdf, setIsUploadingPdf] = useState<boolean>(false);
+  const [pdfUploadProgress, setPdfUploadProgress] = useState<number>(0);
+  const [pdfUploadError, setPdfUploadError] = useState<string | null>(null);
+
+  // Cargar documentos PDF del partido actual
+  const fetchPdfDocs = async () => {
+    if (!match.id) return;
+    setLoadingPdfDocs(true);
+    try {
+      const { data, error } = await supabase
+        .from('match_documents')
+        .select('*')
+        .eq('match_id', match.id)
+        .eq('tipo_documento', 'Informe Aitor')
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+      setPdfDocs(data || []);
+    } catch (e) {
+      console.error('Error cargando informes PDF del partido:', e);
+    } finally {
+      setLoadingPdfDocs(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPdfDocs();
+  }, [match.id]);
+
+  // Manejador de subida de PDF a Google Drive y registro en match_documents
+  const handleUploadPdf = async () => {
+    if (!selectedPdfFile) return;
+
+    const isPdf = selectedPdfFile.type === 'application/pdf' || selectedPdfFile.name.toLowerCase().endsWith('.pdf');
+    if (!isPdf) {
+      setPdfUploadError('Solo se permiten archivos en formato PDF (.pdf)');
+      return;
+    }
+
+    setIsUploadingPdf(true);
+    setPdfUploadProgress(0);
+    setPdfUploadError(null);
+
+    try {
+      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
+      const uploadContext: DriveUploadContext = {
+        season: '2026-27',
+        module: 'PARTIDOS',
+        entityName: `${match.fecha}_J${match.jornada ? String(match.jornada).padStart(2, '0') : '00'}_${match.rival}`,
+        subCategory: 'Analisis_Propio/Informes'
+      };
+
+      const uploader = new DriveResumableUploader({
+        file: selectedPdfFile,
+        passkey,
+        uploadContext,
+        onProgress: (info) => {
+          setPdfUploadProgress(info.percent);
+        }
+      });
+
+      const info = await uploader.start();
+      let finalUrl = info.videoUrl || (info.driveFileId ? `https://drive.google.com/file/d/${info.driveFileId}/view` : '');
+
+      if (!info.driveFileId && info.status === 'fallido') {
+        throw new Error(info.errorMessage || 'Error al subir el archivo a Google Drive.');
+      }
+
+      if (!finalUrl && info.driveFileId) {
+        finalUrl = `https://drive.google.com/file/d/${info.driveFileId}/view`;
+      }
+
+      if (!finalUrl) {
+        throw new Error('No se pudo obtener la URL del archivo subido.');
+      }
+
+      const { error: rpcError } = await supabase.rpc('exec_secure_upsert', {
+        target_table: 'match_documents',
+        payload: {
+          match_id: match.id,
+          nombre_documento: selectedPdfFile.name,
+          tipo_documento: 'Informe Aitor',
+          tipo_origen: 'Archivo',
+          url_storage: finalUrl,
+          comentario: null
+        },
+        conflict_columns: null,
+        staff_passkey: passkey
+      });
+
+      if (rpcError) throw rpcError;
+
+      setSelectedPdfFile(null);
+      await fetchPdfDocs();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setPdfUploadError(`Error al subir PDF: ${msg}`);
+    } finally {
+      setIsUploadingPdf(false);
+      setPdfUploadProgress(0);
+    }
+  };
 
   // Fetch counts of assigned players for all videos
   const fetchAllAssignmentsCounts = async () => {
@@ -662,6 +781,140 @@ export function AnalisisPropioTab({ match }: AnalisisPropioTabProps) {
             </div>
           );
         })}
+      </div>
+
+      {/* Sección Informes / PDFs del partido (Aitor) */}
+      <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 space-y-4 shadow-sm">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-slate-800 rounded-xl text-red-400 border border-slate-700">
+              <FileText className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                Informes / PDFs del partido
+                <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 font-semibold border border-slate-750">
+                  {pdfDocs.length}
+                </span>
+              </h3>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Informes y documentos técnicos en PDF exportados para este partido.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Subida de PDF (Modo Edición) */}
+        {isEditMode && (
+          <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-4 space-y-3">
+            <div className="flex flex-col sm:flex-row items-center gap-3">
+              <input
+                type="file"
+                accept=".pdf,application/pdf"
+                onChange={(e) => {
+                  if (e.target.files && e.target.files[0]) {
+                    const f = e.target.files[0];
+                    if (f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf')) {
+                      setSelectedPdfFile(f);
+                      setPdfUploadError(null);
+                    } else {
+                      setSelectedPdfFile(null);
+                      setPdfUploadError('Solo se permiten archivos en formato PDF (.pdf)');
+                    }
+                  }
+                }}
+                className="hidden"
+                id="pdf-file-upload"
+              />
+              <label
+                htmlFor="pdf-file-upload"
+                className="cursor-pointer flex-1 w-full flex items-center justify-between px-3.5 py-2 bg-slate-900 border border-slate-750 hover:border-indigo-500/50 rounded-xl text-xs text-slate-300 transition-colors"
+              >
+                <div className="flex items-center gap-2 truncate">
+                  <FileText className="w-4 h-4 text-red-400 shrink-0" />
+                  <span className="truncate">
+                    {selectedPdfFile ? selectedPdfFile.name : 'Seleccionar informe PDF (.pdf)'}
+                  </span>
+                </div>
+                <span className="text-[11px] text-indigo-400 font-medium shrink-0 ml-2">Examinar</span>
+              </label>
+
+              {selectedPdfFile && !isUploadingPdf && (
+                <Button
+                  onClick={handleUploadPdf}
+                  className="w-full sm:w-auto bg-red-600 hover:bg-red-500 text-white text-xs px-4 py-2 shrink-0"
+                >
+                  <Upload className="w-3.5 h-3.5 mr-1.5" />
+                  Subir PDF
+                </Button>
+              )}
+            </div>
+
+            {/* Progreso de Subida de PDF */}
+            {isUploadingPdf && (
+              <div className="space-y-1 bg-slate-900 p-2.5 rounded-lg border border-red-500/30">
+                <div className="flex justify-between text-xs text-slate-300">
+                  <span>Subiendo PDF a Google Drive...</span>
+                  <span className="font-bold text-red-400">{pdfUploadProgress}%</span>
+                </div>
+                <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                  <div
+                    className="bg-red-500 h-full transition-all duration-300"
+                    style={{ width: `${pdfUploadProgress}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Error de validación / subida de PDF */}
+            {pdfUploadError && (
+              <div className="p-2.5 bg-red-500/10 border border-red-500/30 rounded-lg text-xs text-red-300 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
+                <span>{pdfUploadError}</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Lista de PDFs Registrados */}
+        {loadingPdfDocs ? (
+          <Skeleton className="h-16 bg-slate-800 rounded-xl" />
+        ) : pdfDocs.length === 0 ? (
+          <div className="py-6 text-center border border-dashed border-slate-800 rounded-xl text-xs text-slate-500">
+            Sin informes registrados para este partido
+          </div>
+        ) : (
+          <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+            {pdfDocs.map((doc) => (
+              <div
+                key={doc.id}
+                className="flex items-center justify-between p-3 bg-slate-950/70 border border-slate-800/80 rounded-xl hover:border-red-500/40 transition-all group"
+              >
+                <div className="flex items-center gap-3 truncate">
+                  <div className="p-2 bg-red-500/10 rounded-lg text-red-400">
+                    <FileText className="w-4 h-4" />
+                  </div>
+                  <div className="truncate text-left">
+                    <h4 className="text-xs font-semibold text-slate-200 truncate group-hover:text-red-300 transition-colors">
+                      {doc.nombre_documento}
+                    </h4>
+                    <span className="text-[11px] text-slate-500">Documento PDF</span>
+                  </div>
+                </div>
+
+                <a
+                  href={doc.url_storage}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-lg transition-colors font-medium border border-slate-700"
+                >
+                  <ExternalLink className="w-3.5 h-3.5 text-red-400" />
+                  Abrir
+                </a>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Modal Asignar Jugadores a Vídeo de Partido */}
