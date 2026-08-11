@@ -19,29 +19,29 @@ export function TacticalFieldExport({ nodes, players }: TacticalFieldExportProps
         width: '1200px',
         height: '800px',
         borderRadius: '1rem',
-        border: '4px solid #4ade80',
-        backgroundColor: '#3b8c5a',
+        border: '4px solid #166534',
+        backgroundColor: '#F0FDF4',
       }}
     >
       {/* SVG Horizontal Pitch */}
-      <svg viewBox="0 0 600 400" className="absolute inset-0 w-full h-full pointer-events-none" style={{ opacity: 0.35 }}>
+      <svg viewBox="0 0 600 400" className="absolute inset-0 w-full h-full pointer-events-none" style={{ opacity: 0.85 }}>
         {/* Core field lines */}
-        <rect x="15" y="15" width="570" height="370" fill="none" stroke="#fff" strokeWidth="2.5" />
-        <line x1="300" y1="15" x2="300" y2="385" stroke="#fff" strokeWidth="2.5" />
-        <circle cx="300" cy="200" r="45" fill="none" stroke="#fff" strokeWidth="2.5" />
-        <circle cx="300" cy="200" r="3" fill="#fff" />
+        <rect x="15" y="15" width="570" height="370" fill="none" stroke="#166534" strokeWidth="2.5" />
+        <line x1="300" y1="15" x2="300" y2="385" stroke="#166534" strokeWidth="2.5" />
+        <circle cx="300" cy="200" r="45" fill="none" stroke="#166534" strokeWidth="2.5" />
+        <circle cx="300" cy="200" r="3" fill="#166534" />
         
         {/* Left Penalty Area */}
-        <rect x="15" y="85" width="90" height="230" fill="none" stroke="#fff" strokeWidth="2.5" />
-        <rect x="15" y="140" width="30" height="120" fill="none" stroke="#fff" strokeWidth="2.5" />
-        <circle cx="65" cy="200" r="2.5" fill="#fff" />
-        <path d="M 105 155 A 50 50 0 0 1 105 245" fill="none" stroke="#fff" strokeWidth="2.5" />
+        <rect x="15" y="85" width="90" height="230" fill="none" stroke="#166534" strokeWidth="2.5" />
+        <rect x="15" y="140" width="30" height="120" fill="none" stroke="#166534" strokeWidth="2.5" />
+        <circle cx="65" cy="200" r="2.5" fill="#166534" />
+        <path d="M 105 155 A 50 50 0 0 1 105 245" fill="none" stroke="#166534" strokeWidth="2.5" />
         
         {/* Right Penalty Area */}
-        <rect x="495" y="85" width="90" height="230" fill="none" stroke="#fff" strokeWidth="2.5" />
-        <rect x="555" y="140" width="30" height="120" fill="none" stroke="#fff" strokeWidth="2.5" />
-        <circle cx="535" cy="200" r="2.5" fill="#fff" />
-        <path d="M 495 155 A 50 50 0 0 0 495 245" fill="none" stroke="#fff" strokeWidth="2.5" />
+        <rect x="495" y="85" width="90" height="230" fill="none" stroke="#166534" strokeWidth="2.5" />
+        <rect x="555" y="140" width="30" height="120" fill="none" stroke="#166534" strokeWidth="2.5" />
+        <circle cx="535" cy="200" r="2.5" fill="#166534" />
+        <path d="M 495 155 A 50 50 0 0 0 495 245" fill="none" stroke="#166534" strokeWidth="2.5" />
       </svg>
 
       {/* Render Nodes / Players */}

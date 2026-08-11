@@ -38,11 +38,13 @@ export type ExportConfig = TacticaExportConfig | ABPExportConfig;
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
+// ─── Constants ────────────────────────────────────────────────────────────────
+
 const RED = '#CC0E21';
-const WHITE = '#FFFFFF';
-const DARK = '#1E1E2E';
-const GRAY = '#94A3B8';
-const LIGHT_GRAY = '#334155';
+const PAGE_BG = '#FFFFFF';
+const TEXT_DARK = '#0F172A';
+const TEXT_MUTED = '#475569';
+const DIVIDER_COLOR = '#CBD5E1';
 
 // A4 landscape in mm
 const PAGE_W = 297;
@@ -52,7 +54,7 @@ const MARGIN = 12;
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function drawDivider(doc: jsPDF, y: number): void {
-  doc.setDrawColor(LIGHT_GRAY);
+  doc.setDrawColor(DIVIDER_COLOR);
   doc.setLineWidth(0.3);
   doc.line(MARGIN, y, PAGE_W - MARGIN, y);
 }
@@ -82,7 +84,7 @@ export async function exportToPDF(config: ExportConfig): Promise<void> {
       scale: 3,
       useCORS: true,
       allowTaint: true,
-      backgroundColor: '#3b8c5a', // lighter grass green for print
+      backgroundColor: '#F0FDF4', // light grass green mint for crisp paper print
       logging: false,
     });
   } finally {
@@ -95,8 +97,8 @@ export async function exportToPDF(config: ExportConfig): Promise<void> {
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
   doc.setFont('helvetica');
 
-  // ── Background ──
-  doc.setFillColor(DARK);
+  // ── Background (Clean White Page) ──
+  doc.setFillColor(PAGE_BG);
   doc.rect(0, 0, PAGE_W, PAGE_H, 'F');
 
   // ── Red accent bar top ──
@@ -107,7 +109,7 @@ export async function exportToPDF(config: ExportConfig): Promise<void> {
 
   if (config.mode === 'tactica') {
     // ── Logo / Title ──
-    doc.setTextColor(WHITE);
+    doc.setTextColor(TEXT_DARK);
     doc.setFontSize(16);
     doc.setFont('helvetica', 'bold');
     doc.text('PIZARRA TÁCTICA', MARGIN, cursorY);
@@ -122,7 +124,7 @@ export async function exportToPDF(config: ExportConfig): Promise<void> {
 
     // ── Alineación name ──
     doc.setFontSize(13);
-    doc.setTextColor(WHITE);
+    doc.setTextColor(TEXT_DARK);
     doc.setFont('helvetica', 'bold');
     doc.text(config.lineupName || 'Alineación sin nombre', MARGIN, cursorY);
     cursorY += 6;
@@ -130,29 +132,29 @@ export async function exportToPDF(config: ExportConfig): Promise<void> {
     // ── Partido ──
     doc.setFontSize(8);
     doc.setFont('helvetica', 'normal');
-    doc.setTextColor(GRAY);
+    doc.setTextColor(TEXT_MUTED);
     doc.text('Partido:', MARGIN, cursorY);
-    doc.setTextColor(WHITE);
+    doc.setTextColor(TEXT_DARK);
     doc.text(config.partido, MARGIN + 18, cursorY);
     cursorY += 5;
 
     // ── Sistemas ──
-    doc.setTextColor(GRAY);
+    doc.setTextColor(TEXT_MUTED);
     doc.text('Nuestro sistema:', MARGIN, cursorY);
-    doc.setTextColor(WHITE);
+    doc.setTextColor(TEXT_DARK);
     doc.text(config.sistemaPropio, MARGIN + 30, cursorY);
 
-    doc.setTextColor(GRAY);
+    doc.setTextColor(TEXT_MUTED);
     doc.text('Sistema rival:', MARGIN + 75, cursorY);
-    doc.setTextColor(WHITE);
+    doc.setTextColor(TEXT_DARK);
     doc.text(config.sistemaRival, MARGIN + 103, cursorY);
     cursorY += 5;
 
     // ── Notas ──
     if (config.notas && config.notas.trim()) {
-      doc.setTextColor(GRAY);
+      doc.setTextColor(TEXT_MUTED);
       doc.text('Notas:', MARGIN, cursorY);
-      doc.setTextColor(WHITE);
+      doc.setTextColor(TEXT_DARK);
       doc.setFontSize(7.5);
       const notasLines = wrapText(doc, config.notas.trim(), PAGE_W / 2 - MARGIN - 20, 7.5);
       const notasToShow = notasLines.slice(0, 3); // max 3 lines
@@ -184,14 +186,14 @@ export async function exportToPDF(config: ExportConfig): Promise<void> {
 
     // ── Footer ──
     doc.setFontSize(6);
-    doc.setTextColor(GRAY);
+    doc.setTextColor(TEXT_MUTED);
     const dateStr = new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
     doc.text(`Generado: ${dateStr}`, MARGIN, PAGE_H - 4);
     doc.text('Athletic Club Indautxu · Temporada 26/27', PAGE_W - MARGIN, PAGE_H - 4, { align: 'right' });
 
   } else {
     // ── ABP Mode ──
-    doc.setTextColor(WHITE);
+    doc.setTextColor(TEXT_DARK);
     doc.setFontSize(16);
     doc.setFont('helvetica', 'bold');
     doc.text('ESTRATEGIA ABP', MARGIN, cursorY);
@@ -205,23 +207,23 @@ export async function exportToPDF(config: ExportConfig): Promise<void> {
     cursorY += 5;
 
     doc.setFontSize(13);
-    doc.setTextColor(WHITE);
+    doc.setTextColor(TEXT_DARK);
     doc.setFont('helvetica', 'bold');
     doc.text(config.playName || 'Jugada sin nombre', MARGIN, cursorY);
     cursorY += 6;
 
     doc.setFontSize(8);
     doc.setFont('helvetica', 'normal');
-    doc.setTextColor(GRAY);
+    doc.setTextColor(TEXT_MUTED);
     doc.text('Tipo ABP:', MARGIN, cursorY);
-    doc.setTextColor(WHITE);
+    doc.setTextColor(TEXT_DARK);
     doc.text(config.tipoABP, MARGIN + 18, cursorY);
     cursorY += 5;
 
     if (config.instrucciones && config.instrucciones.trim()) {
-      doc.setTextColor(GRAY);
+      doc.setTextColor(TEXT_MUTED);
       doc.text('Instrucciones:', MARGIN, cursorY);
-      doc.setTextColor(WHITE);
+      doc.setTextColor(TEXT_DARK);
       doc.setFontSize(7.5);
       const lines = wrapText(doc, config.instrucciones.trim(), PAGE_W / 2 - MARGIN - 20, 7.5);
       lines.slice(0, 3).forEach((line) => {
@@ -250,12 +252,12 @@ export async function exportToPDF(config: ExportConfig): Promise<void> {
     doc.setTextColor(RED);
     doc.text('LEYENDA:', MARGIN, legendY);
     doc.setFont('helvetica', 'normal');
-    doc.setTextColor(GRAY);
+    doc.setTextColor(TEXT_MUTED);
     legendEntries.slice(0, 8).forEach(([abbr, full], i) => {
       const lx = MARGIN + 20 + i * colW;
-      doc.setTextColor(WHITE);
+      doc.setTextColor(TEXT_DARK);
       doc.text(abbr, lx, legendY);
-      doc.setTextColor(GRAY);
+      doc.setTextColor(TEXT_MUTED);
       doc.text(`=${full}`, lx + doc.getTextWidth(abbr) + 0.5, legendY);
     });
 
@@ -264,16 +266,16 @@ export async function exportToPDF(config: ExportConfig): Promise<void> {
       const row2Y = legendY + 4;
       legendEntries.slice(8, 16).forEach(([abbr, full], i) => {
         const lx = MARGIN + 20 + i * colW;
-        doc.setTextColor(WHITE);
+        doc.setTextColor(TEXT_DARK);
         doc.text(abbr, lx, row2Y);
-        doc.setTextColor(GRAY);
+        doc.setTextColor(TEXT_MUTED);
         doc.text(`=${full}`, lx + doc.getTextWidth(abbr) + 0.5, row2Y);
       });
     }
 
     // Footer
     doc.setFontSize(6);
-    doc.setTextColor(GRAY);
+    doc.setTextColor(TEXT_MUTED);
     const dateStr = new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
     doc.text(`Generado: ${dateStr}`, MARGIN, PAGE_H - 4);
     doc.text('Athletic Club Indautxu · Temporada 26/27', PAGE_W - MARGIN, PAGE_H - 4, { align: 'right' });
@@ -367,7 +369,7 @@ export async function exportABPPlanToPDF(config: ABPPlanExportConfig): Promise<v
           scale: 3,
           useCORS: true,
           allowTaint: true,
-          backgroundColor: '#3b8c5a',
+          backgroundColor: '#F0FDF4',
           logging: false,
         });
       } finally {
@@ -383,7 +385,7 @@ export async function exportABPPlanToPDF(config: ABPPlanExportConfig): Promise<v
       const imgData = canvas.toDataURL('image/jpeg', 0.95);
 
       // Fondo
-      doc.setFillColor(DARK);
+      doc.setFillColor(PAGE_BG);
       doc.rect(0, 0, PAGE_W, PAGE_H, 'F');
 
       // --- CABECERA ---
@@ -398,7 +400,7 @@ export async function exportABPPlanToPDF(config: ABPPlanExportConfig): Promise<v
       const topY = MARGIN + headerH + 5;
       
       // Título Principal (Match Info)
-      doc.setTextColor(WHITE);
+      doc.setTextColor(TEXT_DARK);
       doc.setFontSize(14);
       doc.setFont('helvetica', 'bold');
       const title = config.matchInfo.jornada === 'draft' 
@@ -408,7 +410,7 @@ export async function exportABPPlanToPDF(config: ABPPlanExportConfig): Promise<v
 
       // Subtítulo Match
       doc.setFontSize(9);
-      doc.setTextColor(GRAY);
+      doc.setTextColor(TEXT_MUTED);
       doc.setFont('helvetica', 'normal');
       let subTitle = `${config.matchInfo.equipo}`;
       if (config.matchInfo.jornada !== 'draft') {
@@ -426,7 +428,7 @@ export async function exportABPPlanToPDF(config: ABPPlanExportConfig): Promise<v
 
       // --- CAMPO ---
       const fieldX = PAGE_W - MARGIN - finalFieldW;
-      doc.setDrawColor(LIGHT_GRAY);
+      doc.setDrawColor(DIVIDER_COLOR);
       doc.setLineWidth(0.5);
       doc.rect(fieldX, topY, finalFieldW, finalFieldH);
       doc.addImage(imgData, 'JPEG', fieldX, topY, finalFieldW, finalFieldH);
@@ -440,7 +442,7 @@ export async function exportABPPlanToPDF(config: ABPPlanExportConfig): Promise<v
       doc.setFont('helvetica', 'bold');
       doc.text('TIPO DE ABP', MARGIN, textY);
       textY += 6;
-      doc.setTextColor(WHITE);
+      doc.setTextColor(TEXT_DARK);
       doc.setFontSize(12);
       doc.text(play.tipoABP.toUpperCase(), MARGIN, textY);
 
@@ -449,7 +451,7 @@ export async function exportABPPlanToPDF(config: ABPPlanExportConfig): Promise<v
       doc.setFontSize(10);
       doc.text('NOMBRE DE JUGADA', MARGIN, textY);
       textY += 6;
-      doc.setTextColor(WHITE);
+      doc.setTextColor(TEXT_DARK);
       doc.setFontSize(11);
       doc.setFont('helvetica', 'normal');
       const wrapPlayName = wrapText(doc, play.playName || 'Sin título', infoPanelW, 11);
@@ -463,7 +465,7 @@ export async function exportABPPlanToPDF(config: ABPPlanExportConfig): Promise<v
       doc.text('INSTRUCCIONES', MARGIN, textY);
       textY += 6;
       
-      doc.setTextColor(GRAY);
+      doc.setTextColor(TEXT_MUTED);
       doc.setFontSize(9);
       doc.setFont('helvetica', 'normal');
       const obs = play.instrucciones || 'Sin instrucciones adicionales.';
@@ -472,7 +474,7 @@ export async function exportABPPlanToPDF(config: ABPPlanExportConfig): Promise<v
       
       // --- PIE DE PÁGINA ---
       doc.setFontSize(6);
-      doc.setTextColor(GRAY);
+      doc.setTextColor(TEXT_MUTED);
       const dateStr = new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
       doc.text(`Generado: ${dateStr}`, MARGIN, PAGE_H - 4);
       doc.text('Athletic Club Indautxu · Temporada 26/27', PAGE_W - MARGIN, PAGE_H - 4, { align: 'right' });
