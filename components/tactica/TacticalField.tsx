@@ -4,6 +4,7 @@ import React, { useRef } from 'react';
 import { Player } from '@/types';
 import { Avatar } from '@/components/ui/Avatar';
 import { ChevronDown, X } from 'lucide-react';
+import { getPlayerDisplayName } from '@/lib/playerUtils';
 
 export interface PositionNode {
   id: number;
@@ -222,7 +223,7 @@ export function TacticalField({
 
           // Determine label details
           const displayName = assignedPlayer
-            ? assignedPlayer.nombre.split(' ')[0]
+            ? getPlayerDisplayName(assignedPlayer, 'tactical')
             : (node.customName ? node.customName.split(' ')[0] : node.label);
 
           const displayNumber = assignedPlayer

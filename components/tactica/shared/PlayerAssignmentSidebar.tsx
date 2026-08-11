@@ -1,9 +1,10 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Player } from '@/types';
-import { Users } from 'lucide-react';
+import { Users, Search, X } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
+import { getPlayerDisplayName } from '@/lib/playerUtils';
 
 interface PlayerAssignmentSidebarProps {
   players: Player[];
@@ -69,7 +70,19 @@ export function PlayerAssignmentSidebar({
   isEditMode,
   onPlayerClick,
 }: PlayerAssignmentSidebarProps) {
-  const grouped = React.useMemo(() => groupPlayers(players), [players]);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const filteredPlayers = React.useMemo(() => {
+    if (!searchTerm.trim()) return players;
+    const q = searchTerm.toLowerCase().trim();
+    return players.filter(p =>
+      (p.nombre && p.nombre.toLowerCase().includes(q)) ||
+      (p.apellidos && p.apellidos.toLowerCase().includes(q)) ||
+      (p.alias && p.alias.toLowerCase().includes(q))
+    );
+  }, [players, searchTerm]);
+
+  const grouped = React.useMemo(() => groupPlayers(filteredPlayers), [filteredPlayers]);
 
   return (
     <div className="p-5 bg-slate-900/40 border border-slate-800/80 rounded-2xl flex flex-col max-h-[600px] overflow-hidden">
@@ -77,57 +90,82 @@ export function PlayerAssignmentSidebar({
         <Users className="h-3.5 w-3.5 text-[#CC0E21]" /> Plantilla
       </h3>
 
-      <p className="text-[10px] text-slate-500 mb-3 leading-tight">
+      <p className="text-[10px] text-slate-500 mb-2 leading-tight">
         Arrastra un jugador al campo o haz clic en su ficha para colocarlo en cualquier posición libre.
       </p>
 
-      <div className="space-y-3 overflow-y-auto flex-1 pr-1">
-        {grouped.map(group => (
-          <div key={group.label} className="space-y-1">
-            <h4 className="text-[9px] font-bold text-slate-450 uppercase tracking-wider bg-slate-950 px-2 py-0.5 rounded border border-slate-900 sticky top-0 z-10">
-              {group.label} ({group.list.length})
-            </h4>
-            <div className="space-y-1.5 pt-1">
-              {group.list.map((p) => {
-                const isAssigned = assignedPlayerIds.includes(p.id);
-                return (
-                  <div
-                    key={p.id}
-                    draggable={!isAssigned && isEditMode}
-                    onDragStart={(e) => {
-                      if (!isAssigned && isEditMode) {
-                        e.dataTransfer.setData('text/plain', p.id);
-                        e.dataTransfer.effectAllowed = 'move';
-                      }
-                    }}
-                    onClick={() => onPlayerClick(p)}
-                    className={`flex items-center justify-between p-2 rounded-xl text-xs border transition-all select-none active:cursor-grabbing ${
-                      isAssigned
-                        ? 'bg-slate-900/20 border-slate-850/40 text-slate-500 opacity-60'
-                        : isEditMode
-                          ? 'bg-slate-950/60 border-slate-850/60 text-slate-200 hover:border-slate-800 hover:bg-slate-950 cursor-grab'
-                          : 'bg-slate-950/30 border-slate-900 text-slate-400 cursor-not-allowed'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 truncate">
-                      <Avatar src={p.foto_url} name={p.nombre} size="sm" />
-                      <div className="truncate">
-                        <span className="block font-semibold truncate leading-none mb-0.5">{p.nombre}</span>
-                        <span className="text-[9px] text-slate-500 font-medium">#{p.dorsal} - {p.demarcacion}</span>
-                      </div>
-                    </div>
+      {/* Buscador por nombre, apellidos o alias */}
+      <div className="relative mb-3">
+        <input
+          type="text"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          placeholder="Buscar por nombre, apellidos o alias..."
+          className="w-full bg-slate-950/80 border border-slate-800 rounded-xl pl-8 pr-7 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-[#CC0E21]/50 transition-colors"
+        />
+        <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-slate-500" />
+        {searchTerm && (
+          <button
+            onClick={() => setSearchTerm('')}
+            className="absolute right-2 top-2 text-slate-500 hover:text-slate-300"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
 
-                    {isAssigned && (
-                      <span className="text-[8px] bg-[#CC0E21]/10 text-[#CC0E21] px-1 py-0.2 rounded border border-[#CC0E21]/15 shrink-0">
-                        PUESTO
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
+      <div className="space-y-3 overflow-y-auto flex-1 pr-1 custom-scrollbar">
+        {grouped.length === 0 ? (
+          <p className="text-xs text-slate-500 italic py-4 text-center">No se encontraron jugadores.</p>
+        ) : (
+          grouped.map(group => (
+            <div key={group.label} className="space-y-1">
+              <h4 className="text-[9px] font-bold text-slate-450 uppercase tracking-wider bg-slate-950 px-2 py-0.5 rounded border border-slate-900 sticky top-0 z-10">
+                {group.label} ({group.list.length})
+              </h4>
+              <div className="space-y-1.5 pt-1">
+                {group.list.map((p) => {
+                  const isAssigned = assignedPlayerIds.includes(p.id);
+                  const displayName = getPlayerDisplayName(p, 'tactical');
+                  return (
+                    <div
+                      key={p.id}
+                      draggable={!isAssigned && isEditMode}
+                      onDragStart={(e) => {
+                        if (!isAssigned && isEditMode) {
+                          e.dataTransfer.setData('text/plain', p.id);
+                          e.dataTransfer.effectAllowed = 'move';
+                        }
+                      }}
+                      onClick={() => onPlayerClick(p)}
+                      className={`flex items-center justify-between p-2 rounded-xl text-xs border transition-all select-none active:cursor-grabbing ${
+                        isAssigned
+                          ? 'bg-slate-900/20 border-slate-850/40 text-slate-500 opacity-60'
+                          : isEditMode
+                            ? 'bg-slate-950/60 border-slate-850/60 text-slate-200 hover:border-slate-800 hover:bg-slate-950 cursor-grab'
+                            : 'bg-slate-950/30 border-slate-900 text-slate-400 cursor-not-allowed'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 truncate">
+                        <Avatar src={p.foto_url} name={displayName} size="sm" />
+                        <div className="truncate">
+                          <span className="block font-semibold truncate leading-none mb-0.5">{displayName}</span>
+                          <span className="text-[9px] text-slate-500 font-medium">#{p.dorsal} - {p.demarcacion}</span>
+                        </div>
+                      </div>
+
+                      {isAssigned && (
+                        <span className="text-[8px] bg-[#CC0E21]/10 text-[#CC0E21] px-1 py-0.2 rounded border border-[#CC0E21]/15 shrink-0">
+                          PUESTO
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        ))}
+          ))
+        )}
       </div>
     </div>
   );

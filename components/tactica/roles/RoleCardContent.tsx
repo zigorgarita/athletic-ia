@@ -4,6 +4,7 @@ import React from 'react';
 import { TacticalRoleCard, Player } from '@/types';
 import { Shield, Zap, Sparkles, BookOpen } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
+import { getPlayerDisplayName } from '@/lib/playerUtils';
 
 interface RoleCardContentProps {
   posicion: string;
@@ -12,13 +13,15 @@ interface RoleCardContentProps {
 }
 
 export function RoleCardContent({ posicion, assignedPlayer, card }: RoleCardContentProps) {
+  const displayName = assignedPlayer ? getPlayerDisplayName(assignedPlayer, 'tactical') : 'Posición libre';
+
   return (
     <div className="p-4 bg-slate-950/40 border border-slate-850 rounded-2xl space-y-4">
       {/* Player Header */}
       <div className="flex items-center justify-between border-b border-slate-850/60 pb-2">
         <div className="flex items-center gap-2">
           {assignedPlayer ? (
-            <Avatar src={assignedPlayer.foto_url} name={assignedPlayer.nombre} size="sm" />
+            <Avatar src={assignedPlayer.foto_url} name={displayName} size="sm" />
           ) : (
             <div className="h-7 w-7 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center font-bold text-[10px] text-slate-400">
               {posicion}
@@ -26,7 +29,7 @@ export function RoleCardContent({ posicion, assignedPlayer, card }: RoleCardCont
           )}
           <div>
             <span className="font-bold text-slate-200 text-xs block leading-none">
-              {assignedPlayer ? assignedPlayer.nombre : `Posición libre`}
+              {displayName}
             </span>
             <span className="text-[8px] font-black text-[#CC0E21] bg-[#CC0E21]/15 px-1 py-0.2 rounded mt-0.5 inline-block">
               {posicion} {assignedPlayer ? `#${assignedPlayer.dorsal}` : ''}

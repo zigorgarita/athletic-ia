@@ -3,6 +3,7 @@
 import React from 'react';
 import { Player } from '@/types';
 import { PositionNode } from './TacticalField';
+import { getPlayerDisplayName } from '@/lib/playerUtils';
 
 interface TacticalFieldExportProps {
   nodes: PositionNode[];
@@ -50,7 +51,7 @@ export function TacticalFieldExport({ nodes, players }: TacticalFieldExportProps
 
         // Label logic
         const displayName = assignedPlayer
-          ? assignedPlayer.nombre.split(' ')[0]
+          ? getPlayerDisplayName(assignedPlayer, 'tactical')
           : (node.customName ? node.customName.split(' ')[0] : node.label);
 
         const displayNumber = assignedPlayer

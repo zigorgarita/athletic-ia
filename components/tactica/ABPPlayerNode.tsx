@@ -13,6 +13,7 @@
 
 import React from 'react';
 import { Player, ABPPlayerRole } from '@/types';
+import { getPlayerDisplayName } from '@/lib/playerUtils';
 
 export type LabelPosition = 'top' | 'bottom' | 'left' | 'right';
 
@@ -75,9 +76,9 @@ export function ABPPlayerNode({
   const player = role.player;
   const labelPos: LabelPosition = (role.label_position as LabelPosition) ?? 'bottom';
 
-  // Nombre del jugador (primer nombre) o abreviatura si no hay jugador
+  // Nombre del jugador (alias táctico) o abreviatura si no hay jugador
   const circleContent = player
-    ? player.nombre.split(' ')[0]
+    ? getPlayerDisplayName(player, 'tactical')
     : roleLabel;
 
   const hasPlayer = !!player;

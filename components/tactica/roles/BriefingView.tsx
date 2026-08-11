@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { TacticalRoleCard, PositionNode, Player, Observation } from '@/types';
 import { useTacticalBriefing, BriefingPlayerPayload, BriefingRoleCardPayload } from '@/hooks/useTacticalBriefing';
+import { getPlayerDisplayName } from '@/lib/playerUtils';
 import { 
   LayoutList, Trophy, ShieldAlert, Sparkles, 
   Loader2, Award, Zap, HelpCircle, UserCheck
@@ -517,7 +518,7 @@ export function BriefingView({
                           {node.label}
                         </span>
                         <h5 className="text-[11px] font-bold text-slate-200 truncate mt-0.5">
-                          {assignedPlayer?.nombre} {assignedPlayer?.apellidos}
+                          {assignedPlayer ? getPlayerDisplayName(assignedPlayer, 'tactical') : ''}
                         </h5>
                       </div>
                     </div>

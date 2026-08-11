@@ -3,9 +3,10 @@
 import React, { useState } from 'react';
 import { Player, ABPPlayerRole, MatchABPPlayerAssignment, ABPType } from '@/types';
 import { Avatar } from '@/components/ui/Avatar';
-import { X } from 'lucide-react';
+import { X, Search } from 'lucide-react';
 import { ABPPlayerNode, LabelPosition } from './ABPPlayerNode';
 import { normalizeRoleLabel } from '@/lib/abpUtils';
+import { getPlayerDisplayName } from '@/lib/playerUtils';
 
 interface RoleWithAssignment extends ABPPlayerRole {
   assignment?: MatchABPPlayerAssignment;
@@ -70,6 +71,7 @@ export function ABPPlanField({
 }: ABPPlanFieldProps) {
   const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
   const abpType = getABPType(tipo);
   const view = getFieldView(abpType, zona);
@@ -103,12 +105,26 @@ export function ABPPlanField({
   const starters = players.filter(p => lineupPlayerIds.includes(p.id));
   const bench = players.filter(p => !lineupPlayerIds.includes(p.id));
 
+  const filterBySearch = (list: Player[]) => {
+    if (!searchTerm.trim()) return list;
+    const q = searchTerm.toLowerCase().trim();
+    return list.filter(p => 
+      (p.nombre && p.nombre.toLowerCase().includes(q)) ||
+      (p.apellidos && p.apellidos.toLowerCase().includes(q)) ||
+      (p.alias && p.alias.toLowerCase().includes(q))
+    );
+  };
+
+  const filteredStarters = filterBySearch(starters);
+  const filteredBench = filterBySearch(bench);
+
   const assignedCount = roles.filter(r => r.assignedPlayer || r.player_id).length;
 
   // Render player list item
   const renderPlayerRow = (p: Player) => {
     const assignment = getPlayerAssignment(p.id);
     const isSelected = selectedPlayerId === p.id;
+    const displayName = getPlayerDisplayName(p, 'tactical');
     
     return (
       <button
@@ -124,10 +140,10 @@ export function ABPPlanField({
         }`}
       >
         <div className="flex items-center gap-2 truncate">
-          <Avatar src={p.foto_url} name={p.nombre.substring(0, 2)} className="w-7 h-7 text-[10px]" />
+          <Avatar src={p.foto_url} name={displayName.substring(0, 2)} className="w-7 h-7 text-[10px]" />
           <div className="truncate">
             <div className="font-bold truncate text-slate-200">
-              {p.nombre} {p.apellidos || ''}
+              {displayName}
             </div>
             <div className="text-[9px] text-slate-400 font-semibold">
               #{p.dorsal || '-'} • {p.demarcacion || 'Jugador'}
@@ -337,7 +353,7 @@ export function ABPPlanField({
               </button>
             </div>
             <p className="text-[11px] text-slate-200 leading-relaxed font-semibold">
-              Jugador seleccionado: <span className="font-bold text-green-300">{players.find(p => p.id === selectedPlayerId)?.nombre}</span>. Ahora pulsa una posición del campo.
+              Jugador seleccionado: <span className="font-bold text-green-300">{players.find(p => p.id === selectedPlayerId) ? getPlayerDisplayName(players.find(p => p.id === selectedPlayerId), 'tactical') : ''}</span>. Ahora pulsa una posición del campo.
             </p>
           </div>
         ) : (
@@ -352,6 +368,26 @@ export function ABPPlanField({
           </div>
         )}
 
+        {/* Buscador de Jugadores */}
+        <div className="relative mb-3">
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Buscar por nombre, apellidos o alias..."
+            className="w-full bg-slate-950/80 border border-slate-800 rounded-xl pl-8 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-[#CC0E21]/50 transition-colors"
+          />
+          <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-slate-500" />
+          {searchTerm && (
+            <button
+              onClick={() => setSearchTerm('')}
+              className="absolute right-2 top-2 text-slate-500 hover:text-slate-300"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+
         {/* Listado de Jugadores */}
         <div className="flex-1 overflow-y-auto space-y-4 max-h-[350px] xl:max-h-[420px] pr-1 custom-scrollbar">
           {/* Once Inicial */}
@@ -359,14 +395,16 @@ export function ABPPlanField({
             <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest bg-slate-950 px-2 py-1.5 rounded-lg border border-slate-900/60 flex justify-between items-center sticky top-0 z-10">
               <span>ONCE INICIAL</span>
               <span className="bg-green-500/10 border border-green-500/20 text-green-400 px-1 py-0.2 rounded text-[7px]">
-                {starters.length} TITULARES
+                {filteredStarters.length} / {starters.length} TITULARES
               </span>
             </div>
-            {starters.length === 0 ? (
-              <p className="text-[10px] text-slate-550 italic py-2 pl-2">No hay once guardado para esta jornada.</p>
+            {filteredStarters.length === 0 ? (
+              <p className="text-[10px] text-slate-550 italic py-2 pl-2">
+                {searchTerm ? 'No hay titulares que coincidan con la búsqueda.' : 'No hay once guardado para esta jornada.'}
+              </p>
             ) : (
               <div className="space-y-1.5 pt-1">
-                {starters.map(renderPlayerRow)}
+                {filteredStarters.map(renderPlayerRow)}
               </div>
             )}
           </div>
@@ -376,14 +414,16 @@ export function ABPPlanField({
             <div className="text-[9px] font-black text-slate-450 uppercase tracking-widest bg-slate-950 px-2 py-1.5 rounded-lg border border-slate-900/60 flex justify-between items-center sticky top-0 z-10">
               <span>SUPLENTES / PLANTILLA</span>
               <span className="bg-slate-800 text-slate-400 px-1 py-0.2 rounded text-[7px]">
-                {bench.length} JUGADORES
+                {filteredBench.length} / {bench.length} JUGADORES
               </span>
             </div>
-            {bench.length === 0 ? (
-              <p className="text-[10px] text-slate-550 italic py-2 pl-2">No hay suplentes cargados.</p>
+            {filteredBench.length === 0 ? (
+              <p className="text-[10px] text-slate-550 italic py-2 pl-2">
+                {searchTerm ? 'No hay suplentes que coincidan con la búsqueda.' : 'No hay suplentes cargados.'}
+              </p>
             ) : (
               <div className="space-y-1.5 pt-1">
-                {bench.map(renderPlayerRow)}
+                {filteredBench.map(renderPlayerRow)}
               </div>
             )}
           </div>

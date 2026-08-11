@@ -5,6 +5,7 @@ import { TacticalRoleCard, PositionNode, Player } from '@/types';
 import { X, Save, Edit3, Shield, Zap, Sparkles, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Avatar } from '@/components/ui/Avatar';
+import { getPlayerDisplayName } from '@/lib/playerUtils';
 
 interface RoleCardDrawerProps {
   isOpen: boolean;
@@ -76,7 +77,7 @@ export function RoleCardDrawer({
         <div className="p-6 border-b border-slate-800/80 flex items-center justify-between bg-slate-950/20">
           <div className="flex items-center gap-3">
             {assignedPlayer ? (
-              <Avatar src={assignedPlayer.foto_url} name={assignedPlayer.nombre} size="md" className="border border-slate-800" />
+              <Avatar src={assignedPlayer.foto_url} name={getPlayerDisplayName(assignedPlayer, 'tactical')} size="md" className="border border-slate-800" />
             ) : (
               <div className="h-10 w-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-slate-300">
                 {node.label}
@@ -84,7 +85,7 @@ export function RoleCardDrawer({
             )}
             <div>
               <h3 className="text-sm font-bold text-slate-200 block">
-                {assignedPlayer ? assignedPlayer.nombre : `Posición: ${node.label}`}
+                {assignedPlayer ? getPlayerDisplayName(assignedPlayer, 'tactical') : `Posición: ${node.label}`}
               </h3>
               <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 block">
                 Línea: {line} ({node.label}) {assignedPlayer ? `#${assignedPlayer.dorsal}` : ''}
