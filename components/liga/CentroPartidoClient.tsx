@@ -402,10 +402,25 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
   const handleSaveGeneralInfo = async () => {
     try {
       const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
+
+      // Fetch fila actual para evitar violación NOT NULL al hacer upsert parcial
+      // Mismo patrón que useUpdatePlayer.ts y usePlayerInjuries.ts
+      const { data: currentMatch, error: fetchErr } = await supabase
+        .from('matches')
+        .select('*')
+        .eq('id', matchId)
+        .single();
+
+      if (fetchErr) throw fetchErr;
+
+      const { created_at, ...mergeableMatch } = currentMatch as Record<string, unknown>;
+      void created_at; // excluido intencionalmente
+
       const { error } = await supabase
         .rpc('exec_secure_upsert', {
           target_table: 'matches',
           payload: {
+            ...mergeableMatch,
             id: matchId,
             hora: matchHora || null,
             campo: matchCampo || null,
@@ -420,7 +435,10 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
       loadAllData();
       alert('Información general guardada correctamente.');
     } catch (err: unknown) {
-      alert(`Error al guardar: ${err instanceof Error ? err.message : String(err)}`);
+      const msg = err instanceof Error
+        ? err.message
+        : (err as Record<string, unknown>)?.message as string ?? JSON.stringify(err);
+      alert(`Error al guardar: ${msg}`);
     }
   };
 
@@ -872,10 +890,25 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
     setIsSavingReport(true);
     try {
       const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
+
+      // Fetch fila actual para evitar violación NOT NULL al hacer upsert parcial
+      // Mismo patrón que useUpdatePlayer.ts y usePlayerInjuries.ts
+      const { data: currentMatch, error: fetchErr } = await supabase
+        .from('matches')
+        .select('*')
+        .eq('id', matchId)
+        .single();
+
+      if (fetchErr) throw fetchErr;
+
+      const { created_at, ...mergeableMatch } = currentMatch as Record<string, unknown>;
+      void created_at; // excluido intencionalmente
+
       const { error } = await supabase
         .rpc('exec_secure_upsert', {
           target_table: 'matches',
           payload: {
+            ...mergeableMatch,
             id: matchId,
             analisis_resumen: reportResumen || null,
             analisis_positivos: reportPositivos || null,
@@ -891,7 +924,10 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
       loadAllData();
       alert('Informe del analista guardado con éxito.');
     } catch (err: unknown) {
-      alert(`Error al guardar: ${err instanceof Error ? err.message : String(err)}`);
+      const msg = err instanceof Error
+        ? err.message
+        : (err as Record<string, unknown>)?.message as string ?? JSON.stringify(err);
+      alert(`Error al guardar: ${msg}`);
     } finally {
       setIsSavingReport(false);
     }
