@@ -11,10 +11,11 @@ import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Avatar } from '@/components/ui/Avatar';
+import { GPSComparisonView } from './GPSComparisonView';
 import { 
   Activity, Upload, Calendar, ChevronRight, 
   Trash2, AlertCircle, ArrowUpDown, Award, Lock, CheckCircle2,
-  Zap, Gauge, AlertTriangle, HelpCircle
+  Zap, Gauge, AlertTriangle, HelpCircle, ArrowRightLeft
 } from 'lucide-react';
 
 interface Match {
@@ -81,12 +82,15 @@ export function GPSClient() {
   const { players, loading: loadingPlayers } = usePlayers();
   
   // App States
+  const [activeTab, setActiveTab] = useState<'session' | 'compare'>('session');
   const [matches, setMatches] = useState<Match[]>([]);
   const [selectedMatchId, setSelectedMatchId] = useState<string>('');
   const [loadingMatches, setLoadingMatches] = useState(true);
   
   const [currentSession, setCurrentSession] = useState<GPSSession | null>(null);
   const [sessionData, setSessionData] = useState<(GPSData & { player?: Player })[]>([]);
+  const [allSessions, setAllSessions] = useState<GPSSession[]>([]);
+  const [allGpsData, setAllGpsData] = useState<(GPSData & { player?: Player })[]>([]);
   const [loadingSession, setLoadingSession] = useState(false);
   
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -182,6 +186,28 @@ export function GPSClient() {
   useEffect(() => {
     loadMatches();
   }, [loadMatches]);
+
+  // Load ALL sessions & data across all matches for Comparison View
+  const loadAllSessionsAndData = useCallback(async () => {
+    try {
+      const { data: sData } = await supabase.from('gps_sessions').select('*');
+      const { data: dData } = await supabase.from('gps_data').select('*');
+      if (sData) setAllSessions(sData);
+      if (dData) {
+        const mapped = dData.map((d: GPSData) => ({
+          ...d,
+          player: players.find(p => p.id === d.player_id)
+        }));
+        setAllGpsData(mapped);
+      }
+    } catch (err) {
+      console.error('Error loading all GPS data:', err);
+    }
+  }, [players]);
+
+  useEffect(() => {
+    loadAllSessionsAndData();
+  }, [loadAllSessionsAndData]);
 
   useEffect(() => {
     if (selectedMatchId) {
@@ -670,8 +696,49 @@ export function GPSClient() {
         </div>
       </div>
 
-      {/* Match Selector Bar */}
-      <div className="p-4 bg-slate-900/50 border border-slate-800/80 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {/* NAVIGATION SUB-TABS: PARTIDO vs COMPARAR */}
+      <div className="flex items-center gap-2 border-b border-slate-800 pb-3">
+        <button
+          onClick={() => setActiveTab('session')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${
+            activeTab === 'session'
+              ? 'bg-slate-800 text-slate-100 shadow-sm border border-slate-700'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
+          }`}
+        >
+          <Activity className="h-4 w-4 text-[#CC0E21]" />
+          <span>Detalle de Partido</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('compare')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${
+            activeTab === 'compare'
+              ? 'bg-[#CC0E21] text-white shadow-md shadow-red-950/50'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
+          }`}
+        >
+          <ArrowRightLeft className="h-4 w-4" />
+          <span>Comparar GPS</span>
+          <span className="text-[10px] bg-red-950/60 text-red-200 border border-red-800 rounded px-1.5 py-0.5 ml-1">
+            Nuevo
+          </span>
+        </button>
+      </div>
+
+      {activeTab === 'compare' ? (
+        <GPSComparisonView
+          matches={matches}
+          sessions={allSessions.length > 0 ? allSessions : (currentSession ? [currentSession] : [])}
+          gpsDataList={allGpsData.length > 0 ? allGpsData : sessionData}
+          players={players}
+          selectedMatchId={selectedMatchId}
+          onMatchChange={(mId) => setSelectedMatchId(mId)}
+        />
+      ) : (
+        <>
+          {/* Match Selector Bar */}
+          <div className="p-4 bg-slate-900/50 border border-slate-800/80 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3 w-full md:w-auto">
           <Calendar className="h-5 w-5 text-[#CC0E21] shrink-0" />
           <div className="w-full md:w-96">
@@ -927,6 +994,8 @@ export function GPSClient() {
             </table>
           </div>
         </div>
+      )}
+      </>
       )}
 
       {/* Modal Wizard Importador GPS (.xlsx / .csv) */}
