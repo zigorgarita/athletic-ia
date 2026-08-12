@@ -479,12 +479,16 @@ export function AnalisisClient({ mode }: { mode: 'dashboard' | 'comparator' }) {
                 <Clock className="h-4 w-4 text-[#CC0E21]" /> Minutos Registrados
               </h3>
               <div className="space-y-2.5">
-                {playerMinutes.slice(0, 6).map((item) => (
-                  <div key={item.player.id} className="flex items-center justify-between text-xs bg-slate-950/20 p-2 rounded-lg border border-slate-850">
-                    <span className="font-semibold text-slate-200">{item.player.nombre}</span>
-                    <span className="text-slate-400 font-bold">{item.minutos} min</span>
-                  </div>
-                ))}
+                {playerMinutes.filter((item) => item.minutos > 0).length === 0 ? (
+                  <p className="text-xs text-slate-550 italic">Sin minutos registrados en partidos.</p>
+                ) : (
+                  playerMinutes.filter((item) => item.minutos > 0).map((item) => (
+                    <div key={item.player.id} className="flex items-center justify-between text-xs bg-slate-950/20 p-2 rounded-lg border border-slate-850">
+                      <span className="font-semibold text-slate-200">{item.player.nombre} {item.player.apellidos || ''}</span>
+                      <span className="text-slate-400 font-bold">{item.minutos} min</span>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
 
