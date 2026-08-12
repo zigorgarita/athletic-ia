@@ -318,41 +318,73 @@ export function GPSClient() {
           detectedDate: fileDateDetected
         });
 
-        // Auto map columns with real PF names
+        // Auto map columns with real PF names and strict unit matching ((m) vs (#))
         const mapping = { ...columnMapping };
         headers.forEach(h => {
           const lower = h.toLowerCase();
-          if (lower.includes('nombre del jugador') || lower.includes('jugador') || lower.includes('nombre') || lower.includes('player')) {
-            if (!mapping.player_name) mapping.player_name = h;
+          const isMeterHeader = lower.includes('(m)') || lower.includes(' (m)');
+          const isCountHeader = lower.includes('(#)') || lower.includes(' (#)') || lower.includes('#');
+
+          // Player Name
+          if (!mapping.player_name) {
+            if (lower.includes('nombre del jugador') || lower.includes('player name')) {
+              mapping.player_name = h;
+            } else if (!lower.includes('id') && !lower.includes('sesión') && !lower.includes('sesion') && (lower.includes('jugador') || lower.includes('player'))) {
+              mapping.player_name = h;
+            }
           }
-          if (lower.includes('tiempo de juego') || lower.includes('min') || lower.includes('duracion') || lower.includes('duration')) {
-            if (!mapping.minutos) mapping.minutos = h;
+
+          // Minutes
+          if (!mapping.minutos) {
+            if (lower.includes('tiempo de juego') || lower.includes('duracion') || lower.includes('duration') || lower.includes('minutos')) {
+              mapping.minutos = h;
+            } else if (lower.includes('min') && !lower.includes('caminata') && !lower.includes('calorias')) {
+              mapping.minutos = h;
+            }
           }
+
+          // Total distance
           if (lower.includes('dist. recorrida') || lower.includes('distancia') || lower.includes('total distance')) {
             if (!mapping.distancia_total) mapping.distancia_total = h;
           }
+
+          // Max speed
           if (lower.includes('vel. max.') || lower.includes('vel. max') || lower.includes('velocidad') || lower.includes('max speed')) {
             if (!mapping.velocidad_maxima) mapping.velocidad_maxima = h;
           }
-          if (lower.includes('carreras de alta int. (m)') || lower.includes('alta int. (m)') || lower.includes('hsr')) {
+
+          // HSR (must be distance in meters, specifically "Carreras de Alta Int. (m)" or "hsr")
+          if (lower.includes('carreras de alta int. (m)') || lower.includes('carreras de alta int (m)') || (lower.includes('carreras') && lower.includes('alta') && isMeterHeader) || lower === 'hsr') {
             if (!mapping.hsr) mapping.hsr = h;
           }
-          if (lower.includes('carreras de máx. int. (m)') || lower.includes('carreras de max. int. (m)') || lower.includes('max. int. (m)') || lower.includes('sprint distance')) {
+
+          // Sprint distance (must be distance in meters, specifically "Carreras de Máx. Int. (m)" or "sprint distance")
+          if (lower.includes('carreras de máx. int. (m)') || lower.includes('carreras de max. int. (m)') || (lower.includes('carreras') && lower.includes('max') && isMeterHeader) || lower.includes('sprint distance')) {
             if (!mapping.sprint_distance) mapping.sprint_distance = h;
           }
-          if (lower.includes('carreras de máx. int. (#)') || lower.includes('carreras de max. int. (#)') || lower.includes('max. int. (#)') || lower.includes('sprints')) {
+
+          // Num sprints (must be count #, specifically "Carreras de Máx. Int. (#)" or "sprints")
+          if (lower.includes('carreras de máx. int. (#)') || lower.includes('carreras de max. int. (#)') || (lower.includes('carreras') && lower.includes('max') && isCountHeader) || lower === 'sprints' || lower === 'num_sprints') {
             if (!mapping.num_sprints) mapping.num_sprints = h;
           }
-          if (lower.includes('ace. alta int. (#)') || lower.includes('ace. alta int (#)') || (lower.includes('ace') && lower.includes('alta'))) {
+
+          // Aceleraciones intensas (MUST BE COUNT #, NEVER (m))
+          if (!isMeterHeader && (lower.includes('ace. alta int. (#)') || lower.includes('ace. alta int (#)') || (lower.includes('ace') && lower.includes('alta') && isCountHeader))) {
             if (!mapping.aceleraciones) mapping.aceleraciones = h;
           }
-          if (lower.includes('ace. máx. int. (#)') || lower.includes('ace. max. int. (#)') || (lower.includes('ace') && lower.includes('max'))) {
+
+          // Aceleraciones máximas (MUST BE COUNT #, NEVER (m))
+          if (!isMeterHeader && (lower.includes('ace. máx. int. (#)') || lower.includes('ace. max. int. (#)') || (lower.includes('ace') && lower.includes('max') && isCountHeader))) {
             if (!mapping.aceleraciones_max) mapping.aceleraciones_max = h;
           }
-          if (lower.includes('desac. alta int. (#)') || lower.includes('desac. alta int (#)') || (lower.includes('desac') && lower.includes('alta'))) {
+
+          // Deceleraciones intensas (MUST BE COUNT #, NEVER (m))
+          if (!isMeterHeader && (lower.includes('desac. alta int. (#)') || lower.includes('desac. alta int (#)') || (lower.includes('desac') && lower.includes('alta') && isCountHeader))) {
             if (!mapping.deceleraciones) mapping.deceleraciones = h;
           }
-          if (lower.includes('desac. máx. int. (#)') || lower.includes('desac. max. int. (#)') || (lower.includes('desac') && lower.includes('max'))) {
+
+          // Deceleraciones máximas (MUST BE COUNT #, NEVER (m))
+          if (!isMeterHeader && (lower.includes('desac. máx. int. (#)') || lower.includes('desac. max. int. (#)') || (lower.includes('desac') && lower.includes('max') && isCountHeader))) {
             if (!mapping.deceleraciones_max) mapping.deceleraciones_max = h;
           }
         });
@@ -580,6 +612,7 @@ export function GPSClient() {
       setIsModalOpen(false);
       resetImportWizard();
       await loadSessionForMatch(selectedMatch.id);
+      await loadAllSessionsAndData();
 
     } catch (err: unknown) {
       const error = err as Error;
