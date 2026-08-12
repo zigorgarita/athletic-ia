@@ -247,6 +247,7 @@ export interface MatchPlayerStats {
 
 export interface GPSSession {
   id: string;
+  match_id?: string | null;
   fecha: string;
   descripcion: string | null;
   created_at: string;
@@ -264,9 +265,21 @@ export interface GPSData {
   num_sprints: number | null;
   velocidad_maxima: number | null;
   aceleraciones: number | null;
+  aceleraciones_max?: number | null;
   deceleraciones: number | null;
+  deceleraciones_max?: number | null;
   player_load: number | null;
+  raw_data?: Record<string, unknown> | null;
   created_at: string;
+}
+
+export interface GPSPlayerMapping {
+  id: string;
+  source_name: string;
+  source_name_normalized: string;
+  player_id: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface ABPPlay {
