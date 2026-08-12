@@ -215,6 +215,13 @@ export function GPSClient() {
     }
   }, [selectedMatchId, loadSessionForMatch]);
 
+  // Force activeTab to 'session' if edit mode is disabled while on 'compare' tab
+  useEffect(() => {
+    if (!isEditMode && activeTab === 'compare') {
+      setActiveTab('session');
+    }
+  }, [isEditMode, activeTab]);
+
   const selectedMatch = matches.find(m => m.id === selectedMatchId);
 
   // Delete session for current match (Edit mode required)
@@ -710,23 +717,25 @@ export function GPSClient() {
           <span>Detalle de Partido</span>
         </button>
 
-        <button
-          onClick={() => setActiveTab('compare')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${
-            activeTab === 'compare'
-              ? 'bg-[#CC0E21] text-white shadow-md shadow-red-950/50'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
-          }`}
-        >
-          <ArrowRightLeft className="h-4 w-4" />
-          <span>Comparar GPS</span>
-          <span className="text-[10px] bg-red-950/60 text-red-200 border border-red-800 rounded px-1.5 py-0.5 ml-1">
-            Nuevo
-          </span>
-        </button>
+        {isEditMode && (
+          <button
+            onClick={() => setActiveTab('compare')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${
+              activeTab === 'compare'
+                ? 'bg-[#CC0E21] text-white shadow-md shadow-red-950/50'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
+            }`}
+          >
+            <ArrowRightLeft className="h-4 w-4" />
+            <span>Comparar GPS</span>
+            <span className="text-[10px] bg-red-950/60 text-red-200 border border-red-800 rounded px-1.5 py-0.5 ml-1">
+              Nuevo
+            </span>
+          </button>
+        )}
       </div>
 
-      {activeTab === 'compare' ? (
+      {activeTab === 'compare' && isEditMode ? (
         <GPSComparisonView
           matches={matches}
           sessions={allSessions.length > 0 ? allSessions : (currentSession ? [currentSession] : [])}
