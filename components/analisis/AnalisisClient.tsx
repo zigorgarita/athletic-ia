@@ -335,7 +335,7 @@ export function AnalisisClient({ mode }: { mode: 'dashboard' | 'comparator' }) {
           {mode === 'dashboard' ? (
             <>
               <BarChart3 className="h-8 w-8 text-[#CC0E21]" />
-              Dashboard
+              Dashboard Plantilla
             </>
           ) : (
             <>
@@ -346,7 +346,7 @@ export function AnalisisClient({ mode }: { mode: 'dashboard' | 'comparator' }) {
         </h1>
         <p className="text-slate-400 text-sm">
           {mode === 'dashboard'
-            ? 'Panel general de rendimiento, estadísticas acumuladas y rankings de la plantilla.'
+            ? 'Resumen de evaluaciones del staff, distribución de plantilla y minutos registrados.'
             : 'Comparación 1vs1 de evaluación del staff y estadísticas de temporada.'}
         </p>
       </div>
@@ -437,9 +437,16 @@ export function AnalisisClient({ mode }: { mode: 'dashboard' | 'comparator' }) {
               )}
 
               {radarPlayerId ? (
-                <div className="py-2">
-                  {renderRadarChart(radarPlayerId)}
-                </div>
+                getPlayerAverages(radarPlayerId).global > 0 ? (
+                  <div className="py-2">
+                    {renderRadarChart(radarPlayerId)}
+                  </div>
+                ) : (
+                  <div className="py-12 text-center space-y-2">
+                    <p className="text-sm font-bold text-slate-400">Sin evaluación</p>
+                    <p className="text-xs text-slate-500">Este futbolista no dispone de evaluaciones registradas por el cuerpo técnico.</p>
+                  </div>
+                )
               ) : (
                 <p className="text-xs text-slate-500 italic mt-6">Registra jugadores para ver la analítica.</p>
               )}
@@ -469,7 +476,7 @@ export function AnalisisClient({ mode }: { mode: 'dashboard' | 'comparator' }) {
             {/* Minutos por Jugador */}
             <div className="p-5 bg-slate-900/40 border border-slate-800/80 rounded-2xl space-y-4 max-h-[300px] overflow-y-auto">
               <h3 className="text-sm font-bold text-slate-350 uppercase tracking-wider flex items-center gap-2">
-                <Clock className="h-4 w-4 text-[#CC0E21]" /> Minutos Acumulados
+                <Clock className="h-4 w-4 text-[#CC0E21]" /> Minutos Registrados
               </h3>
               <div className="space-y-2.5">
                 {playerMinutes.slice(0, 6).map((item) => (
