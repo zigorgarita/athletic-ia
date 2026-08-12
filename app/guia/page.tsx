@@ -215,32 +215,14 @@ function Capitulo1Content({ isPrint = false }: { isPrint?: boolean }) {
 
       <div className="space-y-3 text-xs">
         <h3 className="text-sm font-bold text-slate-100 print:text-slate-900">Su función principal es:</h3>
-        <ul className="space-y-2 pl-2 text-slate-400 print:text-slate-700">
-          <li className="flex items-start gap-2">
-            <span className="font-bold text-[#CC0E21]">1.</span>
-            <span><strong>Centralizar información:</strong> Que ningún dato de rendimiento, físico o táctico se quede en hojas sueltas o chats de WhatsApp.</span>
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="font-bold text-[#CC0E21]">2.</span>
-            <span><strong>Evitar pérdida de datos:</strong> Preservar el histórico de toda la temporada del Juvenil A, asegurando la consistencia incluso si hay cambios en la plantilla.</span>
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="font-bold text-[#CC0E21]">3.</span>
-            <span><strong>Facilitar la comunicación interna:</strong> Que el preparador físico, el analista, el segundo y el primer entrenador visualicen la misma información en tiempo real.</span>
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="font-bold text-[#CC0E21]">4.</span>
-            <span><strong>Mantener histórico:</strong> Poder analizar la evolución física, asistencias y rendimiento a lo largo de las semanas.</span>
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="font-bold text-[#CC0E21]">5.</span>
-            <span><strong>Ayudar en la toma de decisiones:</strong> Seleccionar el plan de partido y alineaciones basándose en estadísticas objetivas (asistencias, valoraciones diarias, fatiga acumulada).</span>
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="font-bold text-[#CC0E21]">6.</span>
-            <span><strong>Ahorrar tiempo:</strong> Agilizar los procesos rutinarios de gestión para que el cuerpo técnico pueda enfocarse en el césped.</span>
-          </li>
-        </ul>
+        <ol className="list-decimal pl-4 space-y-2 text-slate-400 print:text-slate-700">
+          <li><strong>Centralizar información:</strong> Que ningún dato de rendimiento, físico o táctico se quede en hojas sueltas o chats de WhatsApp.</li>
+          <li><strong>Evitar pérdida de datos:</strong> Preservar el histórico de toda la temporada del Juvenil A, asegurando la consistencia incluso si hay cambios en la plantilla.</li>
+          <li><strong>Facilitar la comunicación interna:</strong> Que el preparador físico, el analista, el segundo y el primer entrenador visualicen la misma información en tiempo real.</li>
+          <li><strong>Mantener histórico:</strong> Poder analizar la evolución física, asistencias y rendimiento a lo largo de las semanas.</li>
+          <li><strong>Ayudar en la toma de decisiones:</strong> Seleccionar el plan de partido y alineaciones basándose en estadísticas objetivas (asistencias, valoraciones diarias, fatiga acumulada).</li>
+          <li><strong>Ahorrar tiempo:</strong> Agilizar los procesos rutinarios de gestión para que el cuerpo técnico pueda enfocarse en el césped.</li>
+        </ol>
         <p className="italic text-slate-400 print:text-slate-600 text-[11px] pt-2">
           La aplicación es un entorno colaborativo común; la rigurosidad en su actualización determina la calidad del análisis final.
         </p>
@@ -275,9 +257,10 @@ function Capitulo2Content({ isPrint = false }: { isPrint?: boolean }) {
 
         <div className={`p-4 rounded-xl border ${isPrint ? 'bg-slate-50 border-slate-200' : 'bg-slate-900/60 border-slate-800'}`}>
           <h4 className="font-bold text-slate-100 print:text-slate-900 mb-2 text-[#CC0E21]">Modo Lectura vs. Modo Edición</h4>
-          <p className="text-slate-400 print:text-slate-700 leading-relaxed">
-            Permite alternar entre la consulta segura de la información y la edición o guardado activo de datos en la aplicación.
-          </p>
+          <ul className="text-slate-400 print:text-slate-700 space-y-1.5">
+            <li>• <strong>Modo Lectura:</strong> Consulta rápida y segura sin riesgo de alteración accidental de datos durante partidos o en movilidad.</li>
+            <li>• <strong>Modo Edición:</strong> Permite modificar datos, guardar evaluaciones, ajustar alineaciones, actualizar lesiones o registrar asistencia.</li>
+          </ul>
         </div>
       </div>
     </div>
@@ -312,7 +295,7 @@ function Capitulo3Content({ isPrint = false }: { isPrint?: boolean }) {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
         <div className={`p-4 rounded-xl border ${isPrint ? 'bg-slate-50 border-slate-200' : 'bg-slate-900/60 border-slate-800'}`}>
-          <h4 className="font-bold text-slate-100 print:text-slate-900 mb-1">Última valoración vigente</h4>
+          <h4 className="font-bold text-slate-100 print:text-slate-900 mb-1">Trazabilidad y Estado de Forma</h4>
           <p className="text-slate-400 print:text-slate-700 leading-relaxed">
             La ficha muestra siempre la última valoración vigente guardada (trazabilidad temporal real), no un promedio histórico, lo cual permite ver el estado de forma exacto actual del jugador.
           </p>
@@ -321,7 +304,7 @@ function Capitulo3Content({ isPrint = false }: { isPrint?: boolean }) {
         <div className={`p-4 rounded-xl border ${isPrint ? 'bg-slate-50 border-slate-200' : 'bg-slate-900/60 border-slate-800'}`}>
           <h4 className="font-bold text-slate-100 print:text-slate-900 mb-1">Gestión de Lesiones</h4>
           <p className="text-slate-400 print:text-slate-700 leading-relaxed">
-            Control en tiempo real del estado de salud de la plantilla, registrando las bajas médicas, el periodo de readaptación y los estados: <em>Activa</em>, <em>En recuperación</em> y <em>Alta médica</em>.
+            Control en tiempo real del estado de salud de la plantilla, registrando las bajas médicas, el periodo de readaptación y los estados: <code>Activa</code>, <code>En recuperación</code> y <code>Alta médica</code>.
           </p>
         </div>
       </div>
@@ -351,7 +334,7 @@ function Capitulo4Content({ isPrint = false }: { isPrint?: boolean }) {
             Pase de lista diario en vestuario. Estados: <code>Asiste</code>, <code>No asiste</code>, <code>Lesionado</code>, <code>Duda</code>, <code>Sancionado</code>, <code>Baja temporal</code>.
           </p>
           <p className="text-slate-500 text-[11px]">
-            Motivos de ausencia: Lesión, Enfermedad, Estudios, Trabajo, Viaje, Motivo personal, Decisión técnica, Sin justificar, Otro.
+            Motivos obligatorios de ausencia: Lesión, Enfermedad, Estudios, Trabajo, Viaje, Motivo personal, Decisión técnica, Sin justificar, Otro.
           </p>
         </div>
 
@@ -391,7 +374,7 @@ function Capitulo5Content({ isPrint = false }: { isPrint?: boolean }) {
             Estrategia ABP
           </h3>
           <p className="text-slate-400 print:text-slate-700 leading-relaxed">
-            Diseñar y almacenar de forma visual las jugadas ensayadas a balón parado (córners, faltas, saques de banda), asignando roles y puestos en el campo (Lanzador, Primer Palo, Rematador, Vigilancia, etc.).
+            Diseñar y almacenar de forma visual las jugadas ensayadas a balón parado (córners, faltas, saques de banda), asignando roles y puestos en el campo (Lanzador, Primer Palo, Rematador, Bloqueo, Vigilancias, etc.).
           </p>
         </div>
       </div>
@@ -437,16 +420,36 @@ function Capitulo7Content({ isPrint = false }: { isPrint?: boolean }) {
         Registro y seguimiento de métricas físicas condicionales de los futbolistas obtenidas durante los partidos.
       </p>
 
-      <div className={`p-4 rounded-xl border ${isPrint ? 'bg-slate-50 border-slate-200' : 'bg-slate-900/60 border-slate-800'} text-xs space-y-2`}>
-        <h3 className="font-bold text-slate-100 print:text-slate-900">Métricas GPS:</h3>
-        <ul className="grid grid-cols-2 md:grid-cols-3 gap-2 text-slate-400 print:text-slate-700">
-          <li>• Distancia Total (m)</li>
-          <li>• HSR (&gt; 21 km/h)</li>
-          <li>• Sprints (&gt; 24 km/h)</li>
-          <li>• Aceleraciones</li>
-          <li>• Desaceleraciones</li>
-          <li>• Velocidad Máxima (km/h)</li>
-        </ul>
+      <div className="space-y-4 text-xs">
+        <div className={`p-4 rounded-xl border ${isPrint ? 'bg-slate-50 border-slate-200' : 'bg-slate-900/60 border-slate-800'} space-y-2`}>
+          <h3 className="font-bold text-slate-100 print:text-slate-900 text-sm">Métricas GPS y Definiciones Exactas</h3>
+          <ul className="space-y-2 text-slate-400 print:text-slate-700">
+            <li>• <strong>Distancia Total (m):</strong> Distancia recorrida en metros.</li>
+            <li>• <strong>HSR:</strong> Distancia recorrida a alta intensidad según la métrica del proveedor.</li>
+            <li>• <strong>Sprint / máxima intensidad:</strong> Distancia recorrida en acciones de máxima intensidad.</li>
+            <li>• <strong>Aceleraciones intensas y máximas:</strong> Registro numérico de eventos de aceleración de alta y máxima intensidad.</li>
+            <li>• <strong>Deceleraciones intensas y máximas:</strong> Registro numérico de eventos de deceleración de alta y máxima intensidad.</li>
+            <li>• <strong>Velocidad Máxima (km/h):</strong> Pico de velocidad alcanzado.</li>
+          </ul>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className={`p-4 rounded-xl border ${isPrint ? 'bg-slate-50 border-slate-200' : 'bg-slate-900/60 border-slate-800'} space-y-2`}>
+            <h4 className="font-bold text-slate-100 print:text-slate-900">Criterios de Unidades y Registros</h4>
+            <ul className="space-y-1.5 text-slate-400 print:text-slate-700">
+              <li>• <strong>(m) frente a (#):</strong> Distancia en metros <code>(m)</code> frente a número de repeticiones/eventos <code>(#)</code>.</li>
+              <li>• <strong>Sin dato frente a 0:</strong> <code>Sin dato</code> indica falta de registro GPS; <code>0</code> representa una medición real de valor cero.</li>
+            </ul>
+          </div>
+
+          <div className={`p-4 rounded-xl border ${isPrint ? 'bg-slate-50 border-slate-200' : 'bg-slate-900/60 border-slate-800'} space-y-2`}>
+            <h4 className="font-bold text-slate-100 print:text-slate-900">Permisos y Modos de Acceso</h4>
+            <ul className="space-y-1.5 text-slate-400 print:text-slate-700">
+              <li>• <strong>GPS Detalle:</strong> Disponible en Modo Lectura.</li>
+              <li>• <strong>GPS → Comparar:</strong> Disponible únicamente en Modo Edición.</li>
+            </ul>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -461,19 +464,8 @@ function Capitulo8Content({ isPrint = false }: { isPrint?: boolean }) {
       </div>
 
       <p className="text-xs text-slate-400 print:text-slate-700 leading-relaxed">
-        Panel de control y vista analítica general de la plantilla.
+        Panel de control y vista analítica general de la plantilla. Consolidado de métricas del grupo, porcentaje de asistencia, disponibilidad física de los jugadores y distribución global de minutos.
       </p>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-        <div className={`p-3.5 rounded-xl border ${isPrint ? 'bg-slate-50 border-slate-200' : 'bg-slate-900/60 border-slate-800'}`}>
-          <strong className="text-[#CC0E21] block mb-1">Métricas Consolidadas</strong>
-          Visión global del estado del grupo, porcentaje de asistencia y carga acumulada.
-        </div>
-        <div className={`p-3.5 rounded-xl border ${isPrint ? 'bg-slate-50 border-slate-200' : 'bg-slate-900/60 border-slate-800'}`}>
-          <strong className="text-[#CC0E21] block mb-1">Minutos y Disponibilidad</strong>
-          Seguimiento de minutos acumulados por los futbolistas y tasa de disponibilidad.
-        </div>
-      </div>
     </div>
   );
 }
@@ -487,15 +479,8 @@ function Capitulo9Content({ isPrint = false }: { isPrint?: boolean }) {
       </div>
 
       <p className="text-xs text-slate-400 print:text-slate-700 leading-relaxed">
-        Herramienta de comparación directa entre dos jugadores de la plantilla.
+        Herramienta de comparación directa entre dos jugadores de la plantilla. Permite contrastar valoraciones de entrenamiento, estadísticas, minutos disputados y métricas físicas entre futbolistas para apoyar la toma de decisiones del cuerpo técnico.
       </p>
-
-      <div className={`p-4 rounded-xl border ${isPrint ? 'bg-slate-50 border-slate-200' : 'bg-slate-900/60 border-slate-800'} text-xs space-y-2`}>
-        <h3 className="font-bold text-slate-100 print:text-slate-900">Comparativa de Jugadores:</h3>
-        <p className="text-slate-400 print:text-slate-700 leading-relaxed">
-          Permite contrastar valoraciones de entrenamiento, estadísticas, minutos disputados y métricas físicas entre futbolistas para apoyar la toma de decisiones del cuerpo técnico.
-        </p>
-      </div>
     </div>
   );
 }
@@ -511,20 +496,20 @@ function Capitulo10Content({ isPrint = false }: { isPrint?: boolean }) {
       <div className="space-y-3 text-xs">
         <div className={`p-4 rounded-xl border ${isPrint ? 'bg-slate-50 border-slate-200' : 'bg-slate-900/60 border-slate-800'}`}>
           <h3 className="font-bold text-slate-100 print:text-slate-900 mb-2">Convención de Nombres</h3>
-          <p className="text-slate-400 print:text-slate-700 leading-relaxed">
-            • Sesiones: <code>[AAAA-MM-DD] [Tipo_Sesion] - [Objetivo_Principal]</code><br/>
-            • ABP: <code>[Tipo_ABP] - [Nombre_Clave] - [Variante/Detalle]</code><br/>
-            • Partidos: <code>[Jornada_XX] vs [Rival] - [Esquema_Inicial]</code><br/>
-            • Informes: <code>[Mesociclo/Mes] - [Tipo_Informe] - [Detalle]</code>
-          </p>
+          <ul className="space-y-1 text-slate-400 print:text-slate-700">
+            <li>• <strong>Sesiones:</strong> <code>[AAAA-MM-DD] [Tipo_Sesion] - [Objetivo_Principal]</code></li>
+            <li>• <strong>ABP:</strong> <code>[Tipo_ABP] - [Nombre_Clave] - [Variante/Detalle]</code></li>
+            <li>• <strong>Partidos:</strong> <code>[Jornada_XX] vs [Rival] - [Esquema_Inicial]</code></li>
+            <li>• <strong>Informes:</strong> <code>[Mesociclo/Mes] - [Tipo_Informe] - [Detalle]</code></li>
+          </ul>
         </div>
 
         <div className={`p-4 rounded-xl border ${isPrint ? 'bg-red-50 border-red-200' : 'bg-[#CC0E21]/10 border-[#CC0E21]/30'}`}>
-          <h3 className="font-bold text-[#CC0E21] mb-2">Procedimiento Ante Incidencias</h3>
+          <h3 className="font-bold text-[#CC0E21] mb-2">Procedimiento ante Incidencias</h3>
           <ol className="list-decimal pl-4 text-slate-400 print:text-slate-700 space-y-1">
             <li><strong>NO BORRAR DATOS:</strong> No intentes solucionar el problema borrando registros históricos.</li>
             <li><strong>HACER CAPTURA DE PANTALLA:</strong> Toma una captura completa con el mensaje de error, la URL y la consola (F12).</li>
-            <li><strong>AVISAR AL ADMINISTRADOR:</strong> Envía la captura con una descripción simple a Zigor Garitagoitia.</li>
+            <li><strong>AVISAR AL ADMINISTRADOR:</strong> Envía la captura con una descripción simple a <strong>Zigor Garitagoitia</strong>.</li>
           </ol>
         </div>
       </div>
@@ -547,12 +532,12 @@ function FlujosContent({ isPrint = false }: { isPrint?: boolean }) {
             <Calendar className="h-4 w-4" />
             1. Flujo de Entrenamiento
           </h3>
-          <div className="space-y-1.5 text-slate-400 print:text-slate-700 font-mono text-[11px]">
-            <p>1. Programar sesión y cargas en <strong>Planificación</strong>.</p>
-            <p>2. Pasar lista de presencia en <strong>Asistencia</strong> pre-sesión.</p>
-            <p>3. Introducir valoraciones de entrenamiento post-sesión.</p>
-            <p>4. Consultar métricas en <strong>Dashboard Plantilla</strong>.</p>
-          </div>
+          <ol className="list-decimal pl-4 space-y-1 text-slate-400 print:text-slate-700 font-mono text-[11px]">
+            <li>Programar sesión y cargas en <strong>Planificación</strong>.</li>
+            <li>Pasar lista de presencia en <strong>Asistencia</strong> pre-sesión.</li>
+            <li>Introducir valoraciones de entrenamiento post-sesión.</li>
+            <li>Consultar métricas en <strong>Dashboard Plantilla</strong>.</li>
+          </ol>
         </div>
 
         {/* Flujo 2: Partido */}
@@ -561,12 +546,12 @@ function FlujosContent({ isPrint = false }: { isPrint?: boolean }) {
             <Trophy className="h-4 w-4" />
             2. Flujo de Partido
           </h3>
-          <div className="space-y-1.5 text-slate-400 print:text-slate-700 font-mono text-[11px]">
-            <p>1. Analizar rival en <strong>Rivales</strong> y <strong>Centro de Partido</strong>.</p>
-            <p>2. Definir sistema en <strong>Pizarra Táctica</strong> y jugadas en <strong>ABP</strong>.</p>
-            <p>3. Registrar alineaciones, acta y minutos en <strong>Liga / Amistosos</strong>.</p>
-            <p>4. Enlazar cortes tácticos en <strong>Multimedia / Vídeos</strong>.</p>
-          </div>
+          <ol className="list-decimal pl-4 space-y-1 text-slate-400 print:text-slate-700 font-mono text-[11px]">
+            <li>Analizar rival en <strong>Rivales</strong> y <strong>Centro de Partido</strong>.</li>
+            <li>Definir sistema en <strong>Pizarra Táctica</strong> y jugadas en <strong>ABP</strong>.</li>
+            <li>Registrar alineaciones, acta y minutos en <strong>Liga / Amistosos</strong>.</li>
+            <li>Enlazar cortes tácticos en <strong>Multimedia / Vídeos</strong>.</li>
+          </ol>
         </div>
 
         {/* Flujo 3: Jugador */}
@@ -575,12 +560,12 @@ function FlujosContent({ isPrint = false }: { isPrint?: boolean }) {
             <Users className="h-4 w-4" />
             3. Flujo de Jugador
           </h3>
-          <div className="space-y-1.5 text-slate-400 print:text-slate-700 font-mono text-[11px]">
-            <p>1. Consulta de ficha deportiva en <strong>Plantilla</strong>.</p>
-            <p>2. Seguimiento de valoraciones e historial.</p>
-            <p>3. Registro médico en <strong>Lesiones</strong> (Activa / En recuperación / Alta médica).</p>
-            <p>4. Comparativa individual en <strong>Comparador Plantilla</strong>.</p>
-          </div>
+          <ol className="list-decimal pl-4 space-y-1 text-slate-400 print:text-slate-700 font-mono text-[11px]">
+            <li>Consulta de ficha deportiva en <strong>Plantilla</strong>.</li>
+            <li>Seguimiento de valoraciones e historial.</li>
+            <li>Registro médico en <strong>Lesiones</strong> (Activa / En recuperación / Alta médica).</li>
+            <li>Comparativa individual en <strong>Comparador Plantilla</strong>.</li>
+          </ol>
         </div>
 
         {/* Flujo 4: GPS */}
@@ -589,12 +574,12 @@ function FlujosContent({ isPrint = false }: { isPrint?: boolean }) {
             <Zap className="h-4 w-4" />
             4. Flujo de GPS
           </h3>
-          <div className="space-y-1.5 text-slate-400 print:text-slate-700 font-mono text-[11px]">
-            <p>1. Recopilar datos físicos condicionales del partido.</p>
-            <p>2. Cargar métricas en el módulo <strong>GPS de Partido</strong>.</p>
-            <p>3. Analizar distancias, HSR y aceleraciones por jugador.</p>
-            <p>4. Ajustar planificación de cargas condicionales semanales.</p>
-          </div>
+          <ol className="list-decimal pl-4 space-y-1 text-slate-400 print:text-slate-700 font-mono text-[11px]">
+            <li>Recopilar datos físicos condicionales del partido.</li>
+            <li>Cargar métricas en el módulo <strong>GPS de Partido</strong>.</li>
+            <li>Analizar distancias, HSR y aceleraciones por jugador.</li>
+            <li>Ajustar planificación de cargas condicionales semanales.</li>
+          </ol>
         </div>
       </div>
     </div>
@@ -611,7 +596,7 @@ function RfefContent({ isPrint = false }: { isPrint?: boolean }) {
 
       <div className={`p-4 rounded-xl border ${isPrint ? 'bg-slate-50 border-slate-200' : 'bg-slate-900/60 border-slate-800'} text-xs space-y-3`}>
         <p className="text-slate-400 print:text-slate-700 leading-relaxed">
-          Punto de continuidad y coordinación respecto a las fuentes oficiales RFEF y los sistemas de análisis Die Ligen. La aplicación mantiene la independencia y el control de los datos internos del staff del Juvenil A.
+          Punto de continuidad y coordinación respecto a las fuentes oficiales RFEF y los sistemas de análisis Die Ligen. La aplicación mantiene la independencia y el control de los datos internos del staff.
         </p>
       </div>
     </div>
@@ -631,7 +616,7 @@ function CierreContent({ isPrint = false }: { isPrint?: boolean }) {
         <h3 className="text-lg font-black text-slate-100 print:text-slate-900">
           GUÍA APP INDAUTXU 26-27
         </h3>
-        <p className="text-xs text-slate-400 print:text-slate-700 max-w-xl mx-auto leading-relaxed">
+        <p className="text-xs text-slate-400 print:text-slate-700 max-w-xl mx-auto leading-relaxed font-semibold">
           Manual de Referencia Práctica para el Cuerpo Técnico — Juvenil A (División de Honor), S.D. Indautxu (Temporada 2026-27).
         </p>
       </div>
