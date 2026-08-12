@@ -27,7 +27,7 @@ const navigation: NavItem[] = [
   { name: 'Rivales', href: '/rivales', icon: Shield },
   { name: 'Dashboard', href: '/dashboard', icon: BarChart3 },
   { name: 'GPS', href: '/gps', icon: Activity },
-  { name: 'Comparador', href: '/comparador', icon: ArrowRightLeft },
+  { name: 'Comparador Plantilla', href: '/comparador', icon: ArrowRightLeft },
   { name: 'Ayuda / Guía', href: '/guia', icon: HelpCircle },
 ];
 

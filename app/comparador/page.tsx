@@ -3,8 +3,8 @@ import { Metadata } from 'next';
 import { AnalisisClient } from '@/components/analisis/AnalisisClient';
 
 export const metadata: Metadata = {
-  title: 'Comparador - indautxu_26_27',
-  description: 'Comparativa interactiva de rendimiento 1vs1 de los futbolistas.',
+  title: 'Comparador Plantilla - indautxu_26_27',
+  description: 'Comparación 1vs1 de evaluación del staff y estadísticas de temporada.',
 };
 
 export default function Page() {

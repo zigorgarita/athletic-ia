@@ -340,14 +340,14 @@ export function AnalisisClient({ mode }: { mode: 'dashboard' | 'comparator' }) {
           ) : (
             <>
               <ArrowRightLeft className="h-8 w-8 text-[#CC0E21]" />
-              Comparador
+              Comparador Plantilla
             </>
           )}
         </h1>
         <p className="text-slate-400 text-sm">
           {mode === 'dashboard'
             ? 'Panel general de rendimiento, estadísticas acumuladas y rankings de la plantilla.'
-            : 'Comparativa interactiva de rendimiento 1vs1 de los futbolistas.'}
+            : 'Comparación 1vs1 de evaluación del staff y estadísticas de temporada.'}
         </p>
       </div>
 
