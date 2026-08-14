@@ -22,8 +22,7 @@ export function useTacticalReportSelections(
       editorUser === 'zigor' ? (process.env.NEXT_PUBLIC_EDIT_PASSWORD_ZIGOR || 'indautxuzigor2026')
       : editorUser === 'aitor' ? (process.env.NEXT_PUBLIC_EDIT_PASSWORD_AITOR || 'indautxuaitor2026')
       : editorUser === 'nacho' ? (process.env.NEXT_PUBLIC_EDIT_PASSWORD_NACHO || 'indautxunacho2026')
-      : editorUser === 'julen' ? (process.env.NEXT_PUBLIC_EDIT_PASSWORD_JULEN || 'indautxujulen2026')
-      : 'indautxuaitor2026'
+      : ''
     );
 
     return {

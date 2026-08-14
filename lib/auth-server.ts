@@ -56,7 +56,7 @@ export async function verifyServerAuthorization(req: Request): Promise<AuthVerif
     zigor: process.env.EDIT_PASSWORD_ZIGOR || process.env.NEXT_PUBLIC_EDIT_PASSWORD_ZIGOR || 'indautxuzigor2026',
     aitor: process.env.EDIT_PASSWORD_AITOR || process.env.NEXT_PUBLIC_EDIT_PASSWORD_AITOR || 'indautxuaitor2026',
     nacho: process.env.EDIT_PASSWORD_NACHO || process.env.NEXT_PUBLIC_EDIT_PASSWORD_NACHO || 'indautxunacho2026',
-    julen: process.env.EDIT_PASSWORD_JULEN || process.env.NEXT_PUBLIC_EDIT_PASSWORD_JULEN || 'indautxujulen2026',
+    julen: process.env.EDIT_PASSWORD_JULEN,
   };
 
   // Si no se proporcionaron credenciales o vienen vacías, permitir acceso con perfil de staff por defecto ('aitor')

@@ -39,11 +39,6 @@ const AUTHORIZED_USERS: Record<string, { pass: string; name: string; role: UserR
     name: 'Nacho',
     role: 'editor',
   },
-  julen: {
-    pass: process.env.NEXT_PUBLIC_EDIT_PASSWORD_JULEN || 'indautxujulen2026',
-    name: 'Julen',
-    role: 'editor',
-  },
 };
 
 const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30 minutes in milliseconds
@@ -75,8 +70,40 @@ export function EditModeProvider({ children }: { children: React.ReactNode }) {
 
   const unlockEditing = useCallback(async (username: string, pass: string) => {
     const userLower = username.trim().toLowerCase();
-    const authData = AUTHORIZED_USERS[userLower];
 
+    // 1. Verificación preferente mediante endpoint servidor privado (seguridad reforzada)
+    try {
+      const res = await fetch('/api/auth/verify-editor', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: userLower, pass }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (res.ok && data.success && data.profile) {
+        const profile: UserProfile = {
+          id: data.profile.id,
+          name: data.profile.name,
+          role: data.profile.role,
+          canEdit: data.profile.canEdit,
+          pass: pass,
+        };
+        setCurrentUser(profile);
+
+        if (timerRef.current) clearTimeout(timerRef.current);
+        timerRef.current = setTimeout(() => {
+          lockEditing();
+        }, INACTIVITY_TIMEOUT);
+
+        return { success: true };
+      }
+    } catch {
+      // Fallback local para usuarios legacy si la API falla
+    }
+
+    // 2. Fallback de cliente únicamente para usuarios locales legacy (Zigor, Aitor, Nacho)
+    const authData = AUTHORIZED_USERS[userLower];
     if (authData && authData.pass === pass) {
       const profile: UserProfile = {
         id: userLower,
@@ -87,7 +114,6 @@ export function EditModeProvider({ children }: { children: React.ReactNode }) {
       };
       setCurrentUser(profile);
       
-      // Start/reset the inactivity timer
       if (timerRef.current) clearTimeout(timerRef.current);
       timerRef.current = setTimeout(() => {
         lockEditing();
