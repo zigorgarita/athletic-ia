@@ -45,12 +45,7 @@ export function DocumentsTab({ club, season }: DocumentsTabProps) {
       }
 
       const editorUser = currentUser?.id || 'aitor';
-      const editorPass = currentUser?.pass || (
-        editorUser === 'zigor' ? (process.env.NEXT_PUBLIC_EDIT_PASSWORD_ZIGOR || 'indautxuzigor2026')
-        : editorUser === 'aitor' ? (process.env.NEXT_PUBLIC_EDIT_PASSWORD_AITOR || 'indautxuaitor2026')
-        : editorUser === 'nacho' ? (process.env.NEXT_PUBLIC_EDIT_PASSWORD_NACHO || 'indautxunacho2026')
-        : ''
-      );
+      const editorPass = currentUser?.pass || '';
 
       // Llamar al endpoint genérico multimodal /api/rivales/analyze-document
       const res = await fetch('/api/rivales/analyze-document', {

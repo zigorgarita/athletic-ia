@@ -65,12 +65,7 @@ export function useClubDocuments(clubId: string | undefined, seasonId: string | 
       setError(null);
 
       const editorUser = currentUser?.id || 'zigor';
-      const editorPass = currentUser?.pass || (
-        editorUser === 'zigor' ? (process.env.NEXT_PUBLIC_EDIT_PASSWORD_ZIGOR || '')
-        : editorUser === 'aitor' ? (process.env.NEXT_PUBLIC_EDIT_PASSWORD_AITOR || '')
-        : editorUser === 'nacho' ? (process.env.NEXT_PUBLIC_EDIT_PASSWORD_NACHO || '')
-        : ''
-      );
+      const editorPass = currentUser?.pass || '';
 
       const res = await fetch('/api/rivales/save-document', {
         method: 'POST',

@@ -23,24 +23,6 @@ interface EditModeContextType {
 
 const EditModeContext = createContext<EditModeContextType | undefined>(undefined);
 
-const AUTHORIZED_USERS: Record<string, { pass: string; name: string; role: UserRole }> = {
-  zigor: {
-    pass: process.env.NEXT_PUBLIC_EDIT_PASSWORD_ZIGOR || 'indautxuzigor2026',
-    name: 'Zigor',
-    role: 'admin',
-  },
-  aitor: {
-    pass: process.env.NEXT_PUBLIC_EDIT_PASSWORD_AITOR || 'indautxuaitor2026',
-    name: 'Aitor',
-    role: 'editor',
-  },
-  nacho: {
-    pass: process.env.NEXT_PUBLIC_EDIT_PASSWORD_NACHO || 'indautxunacho2026',
-    name: 'Nacho',
-    role: 'editor',
-  },
-};
-
 const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30 minutes in milliseconds
 
 export function EditModeProvider({ children }: { children: React.ReactNode }) {
@@ -71,7 +53,7 @@ export function EditModeProvider({ children }: { children: React.ReactNode }) {
   const unlockEditing = useCallback(async (username: string, pass: string) => {
     const userLower = username.trim().toLowerCase();
 
-    // 1. Verificación preferente mediante endpoint servidor privado (seguridad reforzada)
+    // Verificación de credenciales 100% del lado del servidor (seguridad garantizada sin expesión en cliente)
     try {
       const res = await fetch('/api/auth/verify-editor', {
         method: 'POST',
@@ -98,31 +80,11 @@ export function EditModeProvider({ children }: { children: React.ReactNode }) {
 
         return { success: true };
       }
+
+      return { success: false, error: data.error || 'Usuario o contraseña incorrectos' };
     } catch {
-      // Fallback local para usuarios legacy si la API falla
+      return { success: false, error: 'Error de conexión con el servidor de autenticación' };
     }
-
-    // 2. Fallback de cliente únicamente para usuarios locales legacy (Zigor, Aitor, Nacho)
-    const authData = AUTHORIZED_USERS[userLower];
-    if (authData && authData.pass === pass) {
-      const profile: UserProfile = {
-        id: userLower,
-        name: authData.name,
-        role: authData.role,
-        canEdit: authData.role === 'admin' || authData.role === 'editor',
-        pass: pass,
-      };
-      setCurrentUser(profile);
-      
-      if (timerRef.current) clearTimeout(timerRef.current);
-      timerRef.current = setTimeout(() => {
-        lockEditing();
-      }, INACTIVITY_TIMEOUT);
-
-      return { success: true };
-    }
-
-    return { success: false, error: 'Usuario o contraseña incorrectos' };
   }, [lockEditing]);
 
   const verifyWritePermission = useCallback(() => {

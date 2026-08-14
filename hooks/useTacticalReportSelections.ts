@@ -18,12 +18,7 @@ export function useTacticalReportSelections(
 
   const buildAuthHeaders = useCallback(() => {
     const editorUser = currentUser?.id || 'aitor';
-    const editorPass = currentUser?.pass || (
-      editorUser === 'zigor' ? (process.env.NEXT_PUBLIC_EDIT_PASSWORD_ZIGOR || 'indautxuzigor2026')
-      : editorUser === 'aitor' ? (process.env.NEXT_PUBLIC_EDIT_PASSWORD_AITOR || 'indautxuaitor2026')
-      : editorUser === 'nacho' ? (process.env.NEXT_PUBLIC_EDIT_PASSWORD_NACHO || 'indautxunacho2026')
-      : ''
-    );
+    const editorPass = currentUser?.pass || '';
 
     return {
       'Content-Type': 'application/json',

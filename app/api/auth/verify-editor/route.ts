@@ -17,9 +17,9 @@ export async function POST(req: Request) {
 
     // Servidor: obtener contraseñas desde variables de entorno de servidor privadas
     const serverPasswords: Record<string, string | undefined> = {
-      zigor: process.env.EDIT_PASSWORD_ZIGOR || process.env.NEXT_PUBLIC_EDIT_PASSWORD_ZIGOR || 'indautxuzigor2026',
-      aitor: process.env.EDIT_PASSWORD_AITOR || process.env.NEXT_PUBLIC_EDIT_PASSWORD_AITOR || 'indautxuaitor2026',
-      nacho: process.env.EDIT_PASSWORD_NACHO || process.env.NEXT_PUBLIC_EDIT_PASSWORD_NACHO || 'indautxunacho2026',
+      zigor: process.env.EDIT_PASSWORD_ZIGOR,
+      aitor: process.env.EDIT_PASSWORD_AITOR,
+      nacho: process.env.EDIT_PASSWORD_NACHO,
       julen: process.env.EDIT_PASSWORD_JULEN,
     };
 
