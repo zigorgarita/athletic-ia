@@ -39,6 +39,11 @@ const AUTHORIZED_USERS: Record<string, { pass: string; name: string; role: UserR
     name: 'Nacho',
     role: 'editor',
   },
+  julen: {
+    pass: process.env.NEXT_PUBLIC_EDIT_PASSWORD_JULEN || 'indautxujulen2026',
+    name: 'Julen',
+    role: 'editor',
+  },
 };
 
 const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30 minutes in milliseconds

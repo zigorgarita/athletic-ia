@@ -69,6 +69,7 @@ export function useClubDocuments(clubId: string | undefined, seasonId: string | 
         editorUser === 'zigor' ? (process.env.NEXT_PUBLIC_EDIT_PASSWORD_ZIGOR || '')
         : editorUser === 'aitor' ? (process.env.NEXT_PUBLIC_EDIT_PASSWORD_AITOR || '')
         : editorUser === 'nacho' ? (process.env.NEXT_PUBLIC_EDIT_PASSWORD_NACHO || '')
+        : editorUser === 'julen' ? (process.env.NEXT_PUBLIC_EDIT_PASSWORD_JULEN || 'indautxujulen2026')
         : ''
       );
 

@@ -28,6 +28,7 @@ export async function verifyServerAuthorization(req: Request): Promise<AuthVerif
             process.env.AUTHORIZED_EMAIL_ZIGOR?.toLowerCase().trim(),
             process.env.AUTHORIZED_EMAIL_AITOR?.toLowerCase().trim(),
             process.env.AUTHORIZED_EMAIL_NACHO?.toLowerCase().trim(),
+            process.env.AUTHORIZED_EMAIL_JULEN?.toLowerCase().trim(),
           ].filter((email): email is string => Boolean(email));
 
           const isAuthorized = allowedEmails.length > 0 ? allowedEmails.includes(userEmail) : Boolean(userEmail);
@@ -55,6 +56,7 @@ export async function verifyServerAuthorization(req: Request): Promise<AuthVerif
     zigor: process.env.EDIT_PASSWORD_ZIGOR || process.env.NEXT_PUBLIC_EDIT_PASSWORD_ZIGOR || 'indautxuzigor2026',
     aitor: process.env.EDIT_PASSWORD_AITOR || process.env.NEXT_PUBLIC_EDIT_PASSWORD_AITOR || 'indautxuaitor2026',
     nacho: process.env.EDIT_PASSWORD_NACHO || process.env.NEXT_PUBLIC_EDIT_PASSWORD_NACHO || 'indautxunacho2026',
+    julen: process.env.EDIT_PASSWORD_JULEN || process.env.NEXT_PUBLIC_EDIT_PASSWORD_JULEN || 'indautxujulen2026',
   };
 
   // Si no se proporcionaron credenciales o vienen vacías, permitir acceso con perfil de staff por defecto ('aitor')
