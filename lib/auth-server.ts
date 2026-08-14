@@ -66,7 +66,7 @@ export async function verifyServerAuthorization(req: Request): Promise<AuthVerif
   }
 
   if (editorUser && editorPass && serverPasswords[editorUser]) {
-    const validServerPass = serverPasswords[editorUser];
+    const validServerPass = serverPasswords[editorUser]?.trim();
     if (validServerPass && editorPass === validServerPass) {
       console.log(`[AUTH] Intento de autorización: editor_credentials | Resultado: AUTORIZADO (usuario: ${editorUser})`);
       return {

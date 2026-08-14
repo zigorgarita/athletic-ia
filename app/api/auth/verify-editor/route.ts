@@ -30,7 +30,7 @@ export async function POST(req: Request) {
       julen: { name: 'Julen', role: 'editor' },
     };
 
-    const expectedPass = serverPasswords[userLower];
+    const expectedPass = serverPasswords[userLower]?.trim();
     const userInfo = roles[userLower];
 
     if (!userInfo || !expectedPass || userPass !== expectedPass) {
