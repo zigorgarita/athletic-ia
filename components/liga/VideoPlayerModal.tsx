@@ -60,6 +60,15 @@ export function parseEmbedVideoUrl(url: string): { embedUrl: string | null; isIf
     };
   }
 
+  if (info.type === 'veo') {
+    return {
+      embedUrl: info.embedUrl,
+      isIframe: false,
+      isVertical: false,
+      type: 'veo'
+    };
+  }
+
   // Direct video stream / file
   if (url.match(/\.(mp4|webm|ogg|mov|m4v)(?:\?|$)/i) || url.includes('supabase.co/storage/')) {
     return {
@@ -180,6 +189,25 @@ export function VideoPlayerModal({ isOpen, onClose, title, videoUrl, tipoOrigen 
                 className="w-full h-full rounded-lg object-contain max-h-[75vh]"
                 autoPlay
               />
+            ) : parsed.type === 'veo' ? (
+              <div className="text-center p-8 flex flex-col items-center gap-4 max-w-md">
+                <div className="h-14 w-14 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center">
+                  <ExternalLink className="h-7 w-7 text-[#CC0E21]" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-200">Vídeo de Veo</h3>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Los partidos de la plataforma Veo se visualizan externamente en el visor oficial de Veo.
+                  </p>
+                </div>
+                <Button
+                  onClick={() => window.open(externalUrl, '_blank', 'noopener,noreferrer')}
+                  className="flex items-center gap-2 mt-2 bg-[#CC0E21] hover:bg-[#b00c1c]"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  Abrir partido en Veo
+                </Button>
+              </div>
             ) : (
               <div className="text-center p-8 flex flex-col items-center gap-4 max-w-md">
                 <div className="h-14 w-14 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center">

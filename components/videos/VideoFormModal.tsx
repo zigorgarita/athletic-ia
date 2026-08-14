@@ -13,7 +13,7 @@ const videoSchema = zod.object({
   video_url: zod.string()
     .min(1, 'La URL del video es requerida')
     .refine((url) => isValidVideoUrl(url), {
-      message: 'Ingrese una URL válida de YouTube, Shorts, Google Drive o enlace directo a video',
+      message: 'Ingrese una URL válida de YouTube, Shorts, Google Drive, Veo o enlace directo a video',
     }),
   fecha_partido: zod.string().min(1, 'La fecha del partido es requerida'),
   descripcion: zod.string().optional(),

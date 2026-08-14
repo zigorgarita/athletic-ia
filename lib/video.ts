@@ -1,4 +1,4 @@
-export type VideoType = 'youtube' | 'shorts' | 'vimeo' | 'gdrive' | 'direct';
+export type VideoType = 'youtube' | 'shorts' | 'vimeo' | 'gdrive' | 'veo' | 'direct';
 
 export interface VideoInfo {
   type: VideoType;
@@ -9,7 +9,7 @@ export interface VideoInfo {
 }
 
 /**
- * Analiza una URL de video y extrae el tipo, ID, URL de inserción y miniatura (con soporte para YouTube Shorts y Drive)
+ * Analiza una URL de video y extrae el tipo, ID, URL de inserción y miniatura (con soporte para YouTube Shorts, Drive y Veo)
  */
 export function parseVideoUrl(url: string): VideoInfo {
   if (!url || typeof url !== 'string') {
@@ -82,7 +82,18 @@ export function parseVideoUrl(url: string): VideoInfo {
     };
   }
 
-  // 5. Direct Video fallback (.mp4, .webm, .mov, etc. o Supabase storage)
+  // 5. Veo match links (ej: https://app.veo.co/matches/...)
+  if (cleanUrl.includes('app.veo.co') || cleanUrl.match(/^https?:\/\/(?:[a-z0-9-]+\.)?veo\.co\//i)) {
+    return {
+      type: 'veo',
+      id: null,
+      embedUrl: cleanUrl,
+      thumbnailUrl: null,
+      isVertical: false
+    };
+  }
+
+  // 6. Direct Video fallback (.mp4, .webm, .mov, etc. o Supabase storage)
   return {
     type: 'direct',
     id: null,
@@ -93,7 +104,7 @@ export function parseVideoUrl(url: string): VideoInfo {
 }
 
 /**
- * Valida si una URL es compatible (YouTube, Shorts, Drive, Vimeo o URL de video directa)
+ * Valida si una URL es compatible (YouTube, Shorts, Drive, Vimeo, Veo o URL de video directa)
  */
 export function isValidVideoUrl(url: string): boolean {
   if (!url || typeof url !== 'string') return false;
@@ -105,7 +116,7 @@ export function isValidVideoUrl(url: string): boolean {
   }
 
   const info = parseVideoUrl(url);
-  if (info.type === 'youtube' || info.type === 'shorts' || info.type === 'gdrive' || info.type === 'vimeo') {
+  if (info.type === 'youtube' || info.type === 'shorts' || info.type === 'gdrive' || info.type === 'vimeo' || info.type === 'veo') {
     return true;
   }
 

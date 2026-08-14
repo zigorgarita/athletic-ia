@@ -40,7 +40,7 @@ export function VideoUploader({ initialUrl = '', onVideoSelected, className = ''
     if (!val.trim()) return;
 
     if (!isValidVideoUrl(val.trim())) {
-      setUrlError('URL de vídeo no reconocida. Introduce un enlace válido de YouTube, YouTube Shorts, Google Drive o MP4.');
+      setUrlError('URL de vídeo no reconocida. Introduce un enlace válido de YouTube, YouTube Shorts, Google Drive, Veo o MP4.');
     } else {
       setUrlError(null);
       onVideoSelected({
@@ -139,7 +139,7 @@ export function VideoUploader({ initialUrl = '', onVideoSelected, className = ''
               activeTab === 'url' ? 'bg-[#CC0E21] text-white shadow' : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            <LinkIcon className="h-3 w-3" /> Pegar Enlace (YouTube / Drive)
+            <LinkIcon className="h-3 w-3" /> Pegar Enlace (YouTube / Drive / Veo)
           </button>
           <button
             type="button"
@@ -158,13 +158,13 @@ export function VideoUploader({ initialUrl = '', onVideoSelected, className = ''
         <div className="space-y-3">
           <div>
             <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
-              URL del Vídeo (YouTube, Shorts, Drive o MP4 Directo) <span className="text-red-500">*</span>
+              URL del Vídeo (YouTube, Shorts, Drive, Veo o MP4 Directo) <span className="text-red-500">*</span>
             </label>
             <input
               type="url"
               value={urlInput}
               onChange={handleUrlChange}
-              placeholder="Ej: https://www.youtube.com/watch?v=... o https://drive.google.com/file/d/..."
+              placeholder="Ej: https://app.veo.co/matches/... o https://www.youtube.com/watch?v=..."
               className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-[#CC0E21]/50 focus:ring-1 focus:ring-[#CC0E21]/30 transition-all placeholder:text-slate-600"
             />
           </div>

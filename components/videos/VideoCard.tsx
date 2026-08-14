@@ -77,7 +77,7 @@ export function VideoCard({ video, onPlay, onEdit, onDelete }: VideoCardProps) {
           <Video className="h-10 w-10 text-slate-600 group-hover:text-[#CC0E21] transition-colors duration-300" />
         )}
         <span className="text-[10px] uppercase tracking-wider font-semibold opacity-80 text-slate-400">
-          {isDriveVideo ? 'Google Drive 5 TB' : type === 'vimeo' ? 'Vimeo' : 'Enlace Vídeo'}
+          {isDriveVideo ? 'Google Drive 5 TB' : type === 'vimeo' ? 'Vimeo' : type === 'veo' ? 'Veo' : 'Enlace Vídeo'}
         </span>
       </div>
     );
@@ -113,7 +113,7 @@ export function VideoCard({ video, onPlay, onEdit, onDelete }: VideoCardProps) {
               <span className="w-1.5 h-1.5 rounded-full bg-slate-800" />
               <span className="capitalize text-slate-300 bg-slate-850 px-2.5 py-0.5 rounded-full border border-slate-800 text-[10px] font-bold flex items-center gap-1">
                 {isDriveVideo && <HardDrive className="h-3 w-3 text-[#CC0E21]" />}
-                {isDriveVideo ? 'Google Drive 5 TB' : type}
+                {isDriveVideo ? 'Google Drive 5 TB' : type === 'veo' ? 'Veo' : type}
               </span>
               {sizeFormatted && (
                 <>
