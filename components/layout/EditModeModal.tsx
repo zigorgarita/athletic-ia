@@ -13,7 +13,7 @@ interface EditModeModalProps {
 
 export function EditModeModal({ isOpen, onClose }: EditModeModalProps) {
   const { unlockEditing } = useEditMode();
-  const [username, setUsername] = useState('');
+  const [username, setUsername] = useState('zigor');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -24,10 +24,12 @@ export function EditModeModal({ isOpen, onClose }: EditModeModalProps) {
     setError(null);
     setLoading(true);
 
+    const userToVerify = username || 'zigor';
+
     try {
-      const res = await unlockEditing(username, password);
+      const res = await unlockEditing(userToVerify, password);
       if (res.success) {
-        setUsername('');
+        setUsername('zigor');
         setPassword('');
         onClose();
       } else {

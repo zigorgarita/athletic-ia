@@ -23,8 +23,8 @@ export async function POST(req: Request) {
       julen: process.env.EDIT_PASSWORD_JULEN,
     };
 
-    const roles: Record<string, { name: string; role: 'admin' | 'editor' }> = {
-      zigor: { name: 'Zigor', role: 'admin' },
+    const roles: Record<string, { name: string; role: 'editor' }> = {
+      zigor: { name: 'Zigor', role: 'editor' },
       aitor: { name: 'Aitor', role: 'editor' },
       nacho: { name: 'Nacho', role: 'editor' },
       julen: { name: 'Julen', role: 'editor' },
