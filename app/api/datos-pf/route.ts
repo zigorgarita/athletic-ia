@@ -5,7 +5,7 @@ import { createClient } from '@supabase/supabase-js';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-// Cliente Supabase de servidor con credencial administrativa privada
+// Cliente Supabase de servidor con credencial administrativa privada (Zero Public Fallback)
 function getServerSupabaseClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://jdkshextphguyyiwwtyt.supabase.co';
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
