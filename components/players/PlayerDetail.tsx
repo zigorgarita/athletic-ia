@@ -22,11 +22,12 @@ import {
   Award, ClipboardList, BarChart3, PlusCircle, 
   Calendar, Check, Star, Sparkles, User, AlertTriangle,
   History, Trash2, Heart, Plus, ShieldAlert, MessageSquare,
-  Coins, X
+  Coins, X, Activity
 } from 'lucide-react';
 import { useEditMode } from '@/context/EditModeContext';
 import { PlayerProfileViewer } from '@/components/players/PlayerProfileViewer';
 import { PlayerMultimediaTab } from '@/components/players/PlayerMultimediaTab';
+import { PlayerDatosPFTab } from '@/components/players/PlayerDatosPFTab';
 
 
 const METRICAS_ESPECIFICAS: Record<string, string[]> = {
@@ -68,7 +69,7 @@ const SANCIONES_PREDEFINIDAS = [
   { motivo: 'Tarjeta roja por hablar', base: 30, variable: false }
 ];
 
-type PlayerTab = 'personal' | 'resumen' | 'rendimiento' | 'tactica' | 'fisico' | 'multimedia' | 'reuniones' | 'ia' | 'multas';
+type PlayerTab = 'personal' | 'resumen' | 'rendimiento' | 'tactica' | 'fisico' | 'datos_pf' | 'multimedia' | 'reuniones' | 'ia' | 'multas';
 
 interface PlayerDetailProps {
   player: Player;
@@ -894,6 +895,19 @@ export function PlayerDetail({ player, onBack, initialTab }: PlayerDetailProps) 
             </span>
           )}
         </button>
+        {isEditMode && (
+          <button
+            onClick={() => setActiveTab('datos_pf')}
+            className={`flex items-center gap-2 px-5 py-3.5 border-b-2 text-sm font-semibold transition-all duration-200 ${
+              activeTab === 'datos_pf'
+                ? 'border-[#CC0E21] text-[#CC0E21] bg-[#CC0E21]/5'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Activity className="h-4 w-4" />
+            Datos PF
+          </button>
+        )}
         <button
           onClick={() => setActiveTab('multimedia')}
           className={`flex items-center gap-2 px-5 py-3.5 border-b-2 text-sm font-semibold transition-all duration-200 ${
@@ -1551,6 +1565,11 @@ export function PlayerDetail({ player, onBack, initialTab }: PlayerDetailProps) 
               </div>
             )}
           </div>
+        )}
+
+        {/* Tab: DATOS PF (Solo Staff Autenticado) */}
+        {activeTab === 'datos_pf' && isEditMode && (
+          <PlayerDatosPFTab player={currentPlayer} />
         )}
 
         {/* Tab 5: Estadísticas Acumuladas */}

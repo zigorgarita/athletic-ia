@@ -19,9 +19,9 @@ import { Badge } from '@/components/ui/Badge';
 import { supabase } from '@/lib/supabase';
 import { useEditMode } from '@/context/EditModeContext';
 
-type PlayerTab = 'personal' | 'resumen' | 'rendimiento' | 'tactica' | 'fisico' | 'multimedia' | 'reuniones' | 'ia' | 'multas';
+type PlayerTab = 'personal' | 'resumen' | 'rendimiento' | 'tactica' | 'fisico' | 'datos_pf' | 'multimedia' | 'reuniones' | 'ia' | 'multas';
 
-const VALID_TABS: PlayerTab[] = ['personal', 'resumen', 'rendimiento', 'tactica', 'fisico', 'multimedia', 'reuniones', 'ia', 'multas'];
+const VALID_TABS: PlayerTab[] = ['personal', 'resumen', 'rendimiento', 'tactica', 'fisico', 'datos_pf', 'multimedia', 'reuniones', 'ia', 'multas'];
 
 function parseTab(value: string | null): PlayerTab | undefined {
   if (!value) return undefined;

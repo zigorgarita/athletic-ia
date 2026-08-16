@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { createSignedSessionToken } from '@/lib/auth/session';
 
 export async function POST(req: Request) {
   try {
@@ -40,7 +41,13 @@ export async function POST(req: Request) {
       );
     }
 
-    return NextResponse.json({
+    const token = createSignedSessionToken({
+      userId: userLower,
+      name: userInfo.name,
+      role: userInfo.role,
+    });
+
+    const response = NextResponse.json({
       success: true,
       profile: {
         id: userLower,
@@ -49,6 +56,19 @@ export async function POST(req: Request) {
         canEdit: true,
       },
     });
+
+    // Set HttpOnly, Secure cookie
+    response.cookies.set({
+      name: 'staff_session',
+      value: token,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 30 * 60, // 30 minutos
+    });
+
+    return response;
   } catch {
     return NextResponse.json(
       { success: false, error: 'Error interno en el servidor de autenticación' },

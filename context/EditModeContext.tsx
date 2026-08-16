@@ -35,6 +35,7 @@ export function EditModeProvider({ children }: { children: React.ReactNode }) {
       clearTimeout(timerRef.current);
       timerRef.current = null;
     }
+    fetch('/api/auth/logout-editor', { method: 'POST' }).catch(() => {});
   }, []);
 
   const reportWriteAction = useCallback(() => {

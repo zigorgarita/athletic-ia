@@ -59,6 +59,44 @@ export interface PlayerInjury {
   updated_at?: string;
 }
 
+export interface PlayerPhysicalTest {
+  id: string;
+  player_id: string;
+  test_type: 'yoyo' | 'sprint_curvo_derecho' | 'sprint_curvo_izquierdo' | 'sprint_lineal' | 'illinois' | 'saltabilidad';
+  valor: number;
+  valor_origen: string;
+  fecha_test: string | null;
+  periodo: string;
+  lote: string;
+  unidad: string | null;
+  protocolo: string | null;
+  origen_datos: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PlayerBodyMeasurement {
+  id: string;
+  player_id: string;
+  fecha_medicion: string | null;
+  periodo: string;
+  lote: string;
+  peso: number | null;
+  imc: number | null;
+  grasa_corporal: number | null;
+  triceps: number | null;
+  subescapular: number | null;
+  suprailiaco: number | null;
+  abdominal: number | null;
+  cuadriceps: number | null;
+  biceps: number | null;
+  gemelo: number | null;
+  observaciones: string | null;
+  origen_datos: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface DetailedEvaluation {
   id: string;
   player_id: string;
