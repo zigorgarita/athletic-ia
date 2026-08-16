@@ -158,38 +158,41 @@ export function PlayerDatosPFTab({ player }: PlayerDatosPFTabProps) {
           )}
         </div>
 
-        {tests.length === 0 ? (
-          <div className="p-6 border border-dashed border-slate-800 rounded-xl text-center text-xs text-slate-500">
-            Sin tests físicos registrados para este jugador.
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {ORDERED_TEST_TYPES.map((typeKey) => {
-              const testItem = testMap[typeKey];
-              const hasVal = testItem && testItem.valor !== null && testItem.valor !== undefined;
+        {(() => {
+          const activeTests = ORDERED_TEST_TYPES
+            .map((typeKey) => testMap[typeKey])
+            .filter((testItem): testItem is PlayerPhysicalTest => 
+              Boolean(testItem && testItem.valor !== null && testItem.valor !== undefined)
+            );
 
-              return (
+          if (activeTests.length === 0) {
+            return (
+              <div className="p-6 border border-dashed border-slate-800 rounded-xl text-center text-xs text-slate-500">
+                Sin tests físicos registrados para este jugador.
+              </div>
+            );
+          }
+
+          return (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {activeTests.map((testItem) => (
                 <div
-                  key={typeKey}
+                  key={testItem.test_type}
                   className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800/80 flex flex-col justify-between"
                 >
                   <span className="text-[11px] text-slate-400 font-medium">
-                    {TEST_LABELS[typeKey]}
+                    {TEST_LABELS[testItem.test_type] || testItem.test_type}
                   </span>
                   <div className="mt-1 flex items-baseline gap-1">
-                    {hasVal ? (
-                      <span className="text-base font-bold text-slate-100 font-mono">
-                        {testItem.valor_origen || testItem.valor}
-                      </span>
-                    ) : (
-                      <span className="text-xs text-slate-600 font-medium">Sin dato</span>
-                    )}
+                    <span className="text-base font-bold text-slate-100 font-mono">
+                      {testItem.valor_origen || testItem.valor}
+                    </span>
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        )}
+              ))}
+            </div>
+          );
+        })()}
       </div>
 
       {/* 2. SECCIÓN: MEDICIONES CORPORALES */}

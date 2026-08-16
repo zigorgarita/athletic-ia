@@ -1,23 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getStaffSession } from '@/lib/auth/session';
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseServerClient } from '@/lib/supabase-server';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
-
-// Cliente Supabase de servidor con credencial administrativa privada (Zero Public Fallback)
-function getServerSupabaseClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://jdkshextphguyyiwwtyt.supabase.co';
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!serviceKey || serviceKey.trim().length === 0) {
-    throw new Error('SUPABASE_SERVICE_ROLE_KEY no está configurada en las variables privadas de servidor.');
-  }
-
-  return createClient(url, serviceKey.trim(), {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-}
 
 export async function GET(req: Request) {
   try {
@@ -41,7 +27,7 @@ export async function GET(req: Request) {
       );
     }
 
-    const supabase = getServerSupabaseClient();
+    const supabase = getSupabaseServerClient();
 
     // 2. Consultar tests físicos
     const { data: tests, error: testsError } = await supabase
