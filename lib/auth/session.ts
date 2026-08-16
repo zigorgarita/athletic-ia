@@ -12,13 +12,10 @@ export interface StaffSessionPayload {
 }
 
 function getSessionSecret(): string {
-  const secret =
-    process.env.AUTH_SESSION_SECRET ||
-    process.env.EDIT_PASSWORD_ZIGOR ||
-    process.env.NEXT_PUBLIC_EDIT_PASSWORD_ZIGOR;
+  const secret = process.env.AUTH_SESSION_SECRET;
 
   if (!secret || secret.trim().length === 0) {
-    throw new Error('AUTH_SESSION_SECRET no está configurada en el servidor.');
+    throw new Error('AUTH_SESSION_SECRET no está configurada en las variables privadas de servidor.');
   }
   return secret.trim();
 }

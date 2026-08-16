@@ -19,12 +19,12 @@ export async function POST(req: Request) {
     const userLower = String(username).trim().toLowerCase();
     const userPass = String(pass).trim();
 
-    // Servidor: obtener contraseñas desde variables de entorno de servidor
+    // Servidor: obtener contraseñas exclusivamente desde variables privadas de servidor
     const serverPasswords: Record<string, string | undefined> = {
-      zigor: process.env.EDIT_PASSWORD_ZIGOR || process.env.NEXT_PUBLIC_EDIT_PASSWORD_ZIGOR,
-      aitor: process.env.EDIT_PASSWORD_AITOR || process.env.NEXT_PUBLIC_EDIT_PASSWORD_AITOR,
-      nacho: process.env.EDIT_PASSWORD_NACHO || process.env.NEXT_PUBLIC_EDIT_PASSWORD_NACHO,
-      julen: process.env.EDIT_PASSWORD_JULEN || process.env.NEXT_PUBLIC_EDIT_PASSWORD_JULEN,
+      zigor: process.env.EDIT_PASSWORD_ZIGOR,
+      aitor: process.env.EDIT_PASSWORD_AITOR,
+      nacho: process.env.EDIT_PASSWORD_NACHO,
+      julen: process.env.EDIT_PASSWORD_JULEN,
     };
 
     const roles: Record<string, { name: string; role: 'editor' }> = {
