@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { getStaffSession } from '@/lib/auth/session';
 import { createClient } from '@supabase/supabase-js';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 // Cliente Supabase de servidor
 function getServerSupabaseClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://jdkshextphguyyiwwtyt.supabase.co';
