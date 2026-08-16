@@ -44,7 +44,7 @@ export function PlayerDatosPFTab({ player }: PlayerDatosPFTabProps) {
       setLoading(true);
       setError(null);
       try {
-        const res = await fetch(`/api/players/${player.id}/datos-pf`);
+        const res = await fetch(`/api/datos-pf?playerId=${player.id}`);
         if (!res.ok) {
           if (res.status === 401) {
             throw new Error('Se requiere inicio de sesión del cuerpo técnico para ver estos datos.');
