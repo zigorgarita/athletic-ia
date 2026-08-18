@@ -124,6 +124,22 @@ const CATEGORIES: CategoryConfig[] = [
     allowUpload: true
   },
   {
+    id: 'ABP_PROPIO',
+    label: 'ABP Propio',
+    subCategoryFolder: 'ABP_Propio',
+    icon: Zap,
+    description: 'Acciones de estrategia y balón parado de nuestro equipo.',
+    allowUpload: true
+  },
+  {
+    id: 'ABP_EN_CONTRA',
+    label: 'ABP en Contra',
+    subCategoryFolder: 'ABP_En_Contra',
+    icon: Shield,
+    description: 'Acciones de estrategia y balón parado del rival.',
+    allowUpload: true
+  },
+  {
     id: 'PERSONALIZADOS',
     label: 'Vídeos personalizados',
     subCategoryFolder: 'Videos_Personalizados',
