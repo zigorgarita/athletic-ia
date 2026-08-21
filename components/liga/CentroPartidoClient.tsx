@@ -6,9 +6,9 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { useEditMode } from '@/context/EditModeContext';
 import {
-  Player, Match, MatchPlayerStats, MatchABPPlay, MatchABPPlayerRole,
+  Player, Match, MatchPlayerStats,
   MatchFullVideo, MatchVideoClip, MatchStrategicAction, MatchCustomVideo, MatchDocument,
-  ABPPlay, TacticalLineup, GameModelAnalysis
+  TacticalLineup, GameModelAnalysis, MatchABPPlan
 } from '@/types';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
@@ -20,9 +20,14 @@ import { MatchTabs } from './MatchTabs';
 import { AnalisisPropioTab } from './AnalisisPropioTab';
 import { useClubLogos } from '@/hooks/useClubLogos';
 import { TacticalField, PositionNode } from '@/components/tactica/TacticalField';
+import { ABPPlanField } from '@/components/tactica/ABPPlanField';
+import { normalizeRoleName } from '@/lib/abpUtils';
+import { DriveResumableUploader } from '@/lib/drive-resumable';
+import { DriveUploadContext } from '@/lib/drive-folders';
+import { uploadToStorage } from '@/lib/storage';
 import {
   Trophy, MapPin, Users, Shield, Film,
-  BookOpen, Plus, PlusCircle, Save, Trash2, FileText, ClipboardList,
+  BookOpen, Plus, FolderOpen, Save, Trash2, FileText, ClipboardList,
   Eye, Download, Upload, AlertCircle, Brain, TrendingUp, Lightbulb,
   AlertTriangle, Activity, CheckCircle2, User, Calendar, RefreshCw,
   Sparkles, PlayCircle, Target, Sun, Clock, Star, Paperclip, Link2, ExternalLink
@@ -80,22 +85,6 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
   const [matchStats, setMatchStats] = useState<MatchPlayerStats[]>([]);
   const [nodesPropio, setNodesPropio] = useState<PositionNode[]>([]);
   const [tacticalLineup, setTacticalLineup] = useState<TacticalLineup | null>(null);
-
-  // Tab 2: ABP states
-  const [matchABPs, setMatchABPs] = useState<MatchABPPlay[]>([]);
-  const [selectedABP, setSelectedABP] = useState<MatchABPPlay | null>(null);
-  const [abpRoles, setAbpRoles] = useState<MatchABPPlayerRole[]>([]);
-  const [isImportABPModalOpen, setIsImportABPModalOpen] = useState(false);
-  const [masterABPs, setMasterABPs] = useState<ABPPlay[]>([]);
-  const [selectedMasterABPId, setSelectedMasterABPId] = useState('');
-  const [isCreatingABP, setIsCreatingABP] = useState(false);
-  const [newABPTitle, setNewABPTitle] = useState('');
-  const [newABPTipo, setNewABPTipo] = useState('Córner ofensivo');
-  const [newABPDesc, setNewABPDesc] = useState('');
-  const [newABPUrl, setNewABPUrl] = useState('');
-  const [newABPOrigin, setNewABPOrigin] = useState<'Enlace' | 'Archivo'>('Enlace');
-  const [abpFile, setAbpFile] = useState<File | null>(null);
-  const [isUploadingABP, setIsUploadingABP] = useState(false);
 
   // Tab 3: Video Completo states
   const [fullVideos, setFullVideos] = useState<MatchFullVideo[]>([]);
@@ -161,6 +150,15 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
   const [docComment, setDocComment] = useState('');
   const [docFile, setDocFile] = useState<File | null>(null);
   const [isSavingDoc, setIsSavingDoc] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const [uploadStatusText, setUploadStatusText] = useState<string>('');
+
+  // Official Match ABP Plans (from /abp module)
+  const [officialAbpPlans, setOfficialAbpPlans] = useState<MatchABPPlan[]>([]);
+  const [abpTabFilter, setAbpTabFilter] = useState<'FAVOR' | 'CONTRA'>('FAVOR');
+  const [abpModuleTabFilter, setAbpModuleTabFilter] = useState<'TODOS' | 'FAVOR' | 'CONTRA'>('TODOS');
+  const [selectedOfficialPlanId, setSelectedOfficialPlanId] = useState<string | null>(null);
+  const [expandedPlanId, setExpandedPlanId] = useState<string | null>(null);
 
   const openAnalysisDocModal = (type: string, origin: 'Archivo' | 'Enlace') => {
     setDocType(type);
@@ -209,17 +207,53 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
       if (statsErr) throw statsErr;
       setMatchStats(statsData || []);
 
-      // 4. Match ABP plays
-      const { data: abpPlaysData, error: abpPlaysErr } = await supabase
-        .from('match_abp_plays')
-        .select('*')
-        .eq('match_id', matchId);
-      if (abpPlaysErr) throw abpPlaysErr;
-      setMatchABPs(abpPlaysData || []);
-      if (abpPlaysData && abpPlaysData.length > 0) {
-        setSelectedABP(abpPlaysData[0]);
+
+
+      // 4b. Official Match ABP Plans (vincular automáticamente desde el módulo ABP en 2 pasos)
+      const { data: plansData, error: plansErr } = await supabase
+        .from('match_abp_plans')
+        .select('*, abp_play:abp_plays(*)')
+        .eq('match_id', matchId)
+        .order('orden', { ascending: true });
+
+      if (plansErr) {
+        console.error('Error fetching match_abp_plans:', plansErr);
+      }
+
+      if (plansData && plansData.length > 0) {
+        const { data: rolesData, error: rolesErr } = await supabase
+          .from('match_abp_player_assignments')
+          .select('*, role:abp_player_roles(*)')
+          .in('match_abp_plan_id', plansData.map(p => p.id));
+
+        if (rolesErr) {
+          console.error('Error fetching match_abp_player_assignments:', rolesErr);
+        }
+
+        const normalizedPlans: MatchABPPlan[] = plansData.map(plan => {
+          const planAssignments = (rolesData || [])
+            .filter(r => r.match_abp_plan_id === plan.id)
+            .map(r => {
+              const assignedPlayer = (playersData || []).find(p => p.id === r.player_id);
+              return {
+                ...r,
+                player: assignedPlayer,
+                role: r.role ? {
+                  ...r.role,
+                  rol_asignado: normalizeRoleName(r.role.rol_asignado)
+                } : undefined
+              };
+            });
+
+          return {
+            ...plan,
+            assignments: planAssignments
+          };
+        });
+
+        setOfficialAbpPlans(normalizedPlans);
       } else {
-        setSelectedABP(null);
+        setOfficialAbpPlans([]);
       }
 
       // 5. Match Full Videos
@@ -332,39 +366,6 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
     loadAllData();
   }, [loadAllData]);
 
-  // Load abp roles when selected ABP changes
-  useEffect(() => {
-    async function loadABPRoles() {
-      if (!selectedABP) {
-        setAbpRoles([]);
-        return;
-      }
-      const { data, error } = await supabase
-        .from('match_abp_player_roles')
-        .select('*')
-        .eq('match_abp_play_id', selectedABP.id)
-        .order('orden', { ascending: true });
-      if (error) {
-        console.error('Error fetching match ABP roles:', error);
-      } else {
-        setAbpRoles(data || []);
-      }
-    }
-    loadABPRoles();
-  }, [selectedABP]);
-
-  // Load Master ABPs for cloning
-  const openImportABPModal = async () => {
-    setIsImportABPModalOpen(true);
-    const { data, error } = await supabase
-      .from('abp_plays')
-      .select('*')
-      .order('titulo', { ascending: true });
-    if (!error) {
-      setMasterABPs(data || []);
-    }
-  };
-
   // Visor play helper
   const handlePlayVideo = (title: string, url: string, origin: 'Enlace' | 'Archivo') => {
     setActiveVideoTitle(title);
@@ -373,37 +374,75 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
     setIsVideoModalOpen(true);
   };
 
-  // Helper function to upload files preferring Google Drive (5 TB) with Supabase Storage fallback
+  // Helper function to upload files preferring Google Drive (Resumable Chunks) with Supabase Storage fallback
   const uploadFile = async (file: File, folder: string): Promise<string> => {
+    setUploadProgress(0);
+    setUploadStatusText('Iniciando subida...');
+
+    // 1. Intentar subir mediante Google Drive Resumable Uploader (chunks de 4 MiB para archivos de cualquier tamaño)
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      const res = await fetch('/api/google-drive/upload', {
-        method: 'POST',
-        body: formData,
-      });
-      if (res.ok) {
-        const driveData = await res.json();
-        if (driveData.url) {
-          return driveData.url;
+      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
+      
+      let subCat = 'Documentos';
+      if (folder === 'full-videos') subCat = 'Videos_Completos';
+      else if (folder === 'video-clips') subCat = 'Cortes';
+      else if (folder === 'strategic-actions') subCat = 'Acciones_Estrategicas';
+      else if (folder === 'custom-videos') subCat = 'Videos_Staff';
+      else if (folder === 'match-abp') subCat = 'ABP';
+      else if (folder === 'documents') subCat = 'Documentos';
+
+      const entityName = match 
+        ? `${match.fecha || 'SF'}_J${match.jornada ? String(match.jornada).padStart(2, '0') : '00'}_${match.rival || 'Rival'}`
+        : `Partido_${matchId}`;
+
+      const uploadContext: DriveUploadContext = {
+        season: '2026-27',
+        module: 'PARTIDOS',
+        entityName,
+        subCategory: subCat
+      };
+
+      const uploader = new DriveResumableUploader({
+        file,
+        passkey,
+        uploadContext,
+        onProgress: (info) => {
+          setUploadProgress(info.percent);
+          const speed = info.speedMBps > 0 ? ` (${info.speedMBps.toFixed(1)} MB/s)` : '';
+          setUploadStatusText(`Subiendo: ${info.percent}%${speed}`);
         }
+      });
+
+      const info = await uploader.start();
+      let finalUrl = info.videoUrl || (info.driveFileId ? `https://drive.google.com/file/d/${info.driveFileId}/view` : '');
+
+      if (!info.driveFileId && info.status === 'fallido') {
+        throw new Error(info.errorMessage || 'Error en subida a Google Drive.');
+      }
+
+      if (!finalUrl && info.driveFileId) {
+        finalUrl = `https://drive.google.com/file/d/${info.driveFileId}/view`;
+      }
+
+      if (finalUrl) {
+        setUploadProgress(100);
+        return finalUrl;
       }
     } catch (driveErr) {
-      console.warn('[uploadFile] Google Drive upload notice/fallback:', driveErr);
+      console.warn('[uploadFile] Fallo o aviso en Google Drive, iniciando fallback a Supabase Storage:', driveErr);
+      setUploadStatusText('Guardando en almacenamiento de respaldo...');
     }
 
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
-    const filePath = `${folder}/${fileName}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from('match-videos')
-      .upload(filePath, file);
-
-    if (uploadError) throw uploadError;
-
-    const { data } = supabase.storage.from('match-videos').getPublicUrl(filePath);
-    return data.publicUrl;
+    // 2. Fallback a Supabase Storage con bucket indautxu-assets
+    try {
+      const storagePath = `matches/${folder}`;
+      const publicUrl = await uploadToStorage(storagePath, file);
+      setUploadProgress(100);
+      return publicUrl;
+    } catch (supabaseErr) {
+      console.error('[uploadFile] Fallo en Supabase Storage fallback:', supabaseErr);
+      throw new Error(`Error al subir el archivo: ${supabaseErr instanceof Error ? supabaseErr.message : String(supabaseErr)}`);
+    }
   };
 
   // --- SAVE ACTIONS ---
@@ -452,200 +491,61 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
     }
   };
 
-  // Tab 2: Clone master ABP play to match ABP play
-  const handleImportABP = async () => {
-    if (!selectedMasterABPId) return;
+  // Official ABP Player Assignment Handlers
+  const handleAssignOfficialABPPlayer = async (planId: string, roleId: string, playerId: string) => {
     try {
-      // 1. Get master play
-      const { data: masterPlay, error: playErr } = await supabase
-        .from('abp_plays')
-        .select('*')
-        .eq('id', selectedMasterABPId)
-        .single();
-      if (playErr) throw playErr;
+      const { error } = await supabase
+        .from('match_abp_player_assignments')
+        .update({ player_id: playerId })
+        .match({ match_abp_plan_id: planId, abp_player_role_id: roleId });
 
-      // 2. Clone play to match_abp_plays
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
-      const { data: clonedPlay, error: cloneErr } = await supabase
-        .rpc('exec_secure_upsert', {
-          target_table: 'match_abp_plays',
-          payload: {
-            match_id: matchId,
-            tipo: masterPlay.tipo,
-            titulo: masterPlay.titulo,
-            descripcion: masterPlay.descripcion,
-            video_url: masterPlay.video_url,
-            tipo_origen: 'Enlace'
-          },
-          conflict_columns: null,
-          staff_passkey: passkey
-        });
-      if (cloneErr) throw cloneErr;
+      if (error) throw error;
 
-      // 3. Get master roles
-      const { data: masterRoles, error: rolesErr } = await supabase
-        .from('abp_player_roles')
-        .select('*')
-        .eq('abp_play_id', selectedMasterABPId);
-      if (rolesErr) throw rolesErr;
-
-      // 4. Clone roles to match_abp_player_roles
-      if (masterRoles && masterRoles.length > 0) {
-        const clonedRoles = masterRoles.map(mr => {
-          const player = players.find(p => p.id === mr.player_id);
-          return {
-            match_abp_play_id: clonedPlay.id,
-            player_id: mr.player_id,
-            player_full_name_backup: player ? `${player.nombre} ${player.apellidos}` : null,
-            player_dorsal_backup: player ? player.dorsal : null,
-            rol_asignado: mr.rol_asignado,
-            posicion_x: mr.posicion_x || 50,
-            posicion_y: mr.posicion_y || 50,
-            etiqueta: mr.etiqueta || '',
-            comentario: mr.comentario || '',
-            orden: mr.orden || 1
-          };
-        });
-
-        const { error: rolesInsertErr } = await supabase
-          .rpc('exec_secure_bulk_upsert', {
-            target_table: 'match_abp_player_roles',
-            payloads: clonedRoles,
-            conflict_columns: null,
-            staff_passkey: passkey
+      setOfficialAbpPlans(prev => prev.map(plan => {
+        if (plan.id === planId) {
+          const updatedAssignments = (plan.assignments || []).map(asg => {
+            if (asg.abp_player_role_id === roleId) {
+              const assignedPlayer = players.find(p => p.id === playerId);
+              return { ...asg, player_id: playerId, player: assignedPlayer };
+            }
+            return asg;
           });
-        if (rolesInsertErr) throw rolesInsertErr;
-      }
-
-      setIsImportABPModalOpen(false);
-      setSelectedMasterABPId('');
-      loadAllData();
-      alert('ABP clonada al partido correctamente.');
-    } catch (err: unknown) {
-      alert(`Error al clonar ABP: ${err instanceof Error ? err.message : String(err)}`);
-    }
-  };
-
-  // Tab 2: Create new custom Match ABP
-  const handleCreateMatchABP = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newABPTitle.trim()) return;
-    setIsUploadingABP(true);
-    try {
-      let finalUrl = newABPUrl;
-      if (newABPOrigin === 'Archivo' && abpFile) {
-        finalUrl = await uploadFile(abpFile, 'match-abp');
-      }
-
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
-      const { data: play, error: playErr } = await supabase
-        .rpc('exec_secure_upsert', {
-          target_table: 'match_abp_plays',
-          payload: {
-            match_id: matchId,
-            tipo: newABPTipo,
-            titulo: newABPTitle,
-            descripcion: newABPDesc,
-            video_url: finalUrl || null,
-            tipo_origen: newABPOrigin
-          },
-          conflict_columns: null,
-          staff_passkey: passkey
-        });
-      if (playErr) throw playErr;
-
-      // Create default empty roles (say 6 default roles)
-      const defaultRoles = [
-        { rol_asignado: 'Lanzador', posicion_x: 10, posicion_y: 50, orden: 1 },
-        { rol_asignado: 'Rematador', posicion_x: 45, posicion_y: 20, orden: 2 },
-        { rol_asignado: 'Rematador', posicion_x: 52, posicion_y: 20, orden: 3 },
-        { rol_asignado: 'Cierre', posicion_x: 50, posicion_y: 75, orden: 4 },
-        { rol_asignado: 'Cierre', posicion_x: 35, posicion_y: 70, orden: 5 },
-        { rol_asignado: 'Rechace', posicion_x: 50, posicion_y: 45, orden: 6 }
-      ];
-
-      const rolesPayload = defaultRoles.map(dr => ({
-        match_abp_play_id: play.id,
-        player_id: null,
-        player_full_name_backup: null,
-        player_dorsal_backup: null,
-        rol_asignado: dr.rol_asignado,
-        posicion_x: dr.posicion_x,
-        posicion_y: dr.posicion_y,
-        orden: dr.orden
+          return { ...plan, assignments: updatedAssignments };
+        }
+        return plan;
       }));
-
-      const { error: rolesErr } = await supabase
-        .rpc('exec_secure_bulk_upsert', {
-          target_table: 'match_abp_player_roles',
-          payloads: rolesPayload,
-          conflict_columns: null,
-          staff_passkey: passkey
-        });
-      if (rolesErr) throw rolesErr;
-
-      setNewABPTitle('');
-      setNewABPDesc('');
-      setNewABPUrl('');
-      setAbpFile(null);
-      setIsCreatingABP(false);
-      loadAllData();
-      alert('ABP creada correctamente para el partido.');
-    } catch (err: unknown) {
-      alert(`Error al crear ABP: ${err instanceof Error ? err.message : String(err)}`);
-    } finally {
-      setIsUploadingABP(false);
+    } catch (e: unknown) {
+      alert('Error al asignar jugador: ' + (e instanceof Error ? e.message : String(e)));
     }
   };
 
-  // Tab 2: Update assigned player and coordinates on ABP Role
-  const handleUpdateABPRole = async (roleId: string, playerId: string | null, posX?: number, posY?: number) => {
+  const handleRemoveOfficialABPPlayer = async (planId: string, roleId: string) => {
     try {
-      const player = players.find(p => p.id === playerId);
-      const updates: Partial<MatchABPPlayerRole> = {};
-      if (playerId !== undefined) {
-        updates.player_id = playerId;
-        updates.player_full_name_backup = player ? `${player.nombre} ${player.apellidos}` : null;
-        updates.player_dorsal_backup = player ? player.dorsal : null;
-      }
-      if (posX !== undefined) updates.posicion_x = posX;
-      if (posY !== undefined) updates.posicion_y = posY;
-
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
       const { error } = await supabase
-        .rpc('exec_secure_upsert', {
-          target_table: 'match_abp_player_roles',
-          payload: { ...updates, id: roleId },
-          conflict_columns: ['id'],
-          staff_passkey: passkey
-        });
+        .from('match_abp_player_assignments')
+        .update({ player_id: null })
+        .match({ match_abp_plan_id: planId, abp_player_role_id: roleId });
 
       if (error) throw error;
 
-      // Update local state
-      setAbpRoles(prev => prev.map(r => r.id === roleId ? { ...r, ...updates } : r));
-    } catch (err: unknown) {
-      console.error('Error updating ABP role:', err);
+      setOfficialAbpPlans(prev => prev.map(plan => {
+        if (plan.id === planId) {
+          const updatedAssignments = (plan.assignments || []).map(asg => {
+            if (asg.abp_player_role_id === roleId) {
+              return { ...asg, player_id: null, player: undefined };
+            }
+            return asg;
+          });
+          return { ...plan, assignments: updatedAssignments };
+        }
+        return plan;
+      }));
+    } catch (e: unknown) {
+      alert('Error al quitar jugador: ' + (e instanceof Error ? e.message : String(e)));
     }
   };
 
-  // Tab 2: Delete match ABP play
-  const handleDeleteMatchABP = async (id: string) => {
-    if (!confirm('¿Estás seguro de que deseas eliminar esta ABP específica del partido?')) return;
-    try {
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
-      const { error } = await supabase
-        .rpc('exec_secure_delete', {
-          target_table: 'match_abp_plays',
-          record_id: id,
-          staff_passkey: passkey
-        });
-      if (error) throw error;
-      loadAllData();
-    } catch (err: unknown) {
-      alert(`Error al eliminar: ${err instanceof Error ? err.message : String(err)}`);
-    }
-  };
+
 
   // Tab 3: Save Full Videos
   const handleSaveFullVideos = async () => {
@@ -1679,16 +1579,45 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
           );
         })()}
 
-        {/* TAB 2: ABP DEL PARTIDO */}
+        {/* TAB 2: ABP DEL PARTIDO (OFICIAL DESDE MATCH_ABP_PLANS) */}
         {activeTab === 'abp' && (() => {
-          const offensiveABPs = matchABPs.filter(abp => 
-            abp.tipo.toLowerCase().includes('ofensiv') || 
-            abp.tipo.toLowerCase().includes('saque')
-          );
-          const defensiveABPs = matchABPs.filter(abp => 
-            !abp.tipo.toLowerCase().includes('ofensiv') && 
-            !abp.tipo.toLowerCase().includes('saque')
-          );
+          const favorPlans = officialAbpPlans.filter(p => !p.abp_play?.tipo?.toLowerCase().includes('defensiv'));
+          const contraPlans = officialAbpPlans.filter(p => p.abp_play?.tipo?.toLowerCase().includes('defensiv'));
+
+          const displayedPlans = abpModuleTabFilter === 'FAVOR'
+            ? favorPlans
+            : abpModuleTabFilter === 'CONTRA'
+            ? contraPlans
+            : officialAbpPlans;
+
+          const selectedPlan = officialAbpPlans.find(p => p.id === selectedOfficialPlanId) || displayedPlans[0] || officialAbpPlans[0] || null;
+
+          // Prepare roles for ABPPlanField
+          const planRoles = (selectedPlan?.assignments || []).map(asg => {
+            const originalRole = asg.role || {
+              id: asg.abp_player_role_id,
+              abp_play_id: selectedPlan?.abp_play_id || '',
+              player_id: asg.player_id || null,
+              rol_asignado: 'Rol',
+              etiqueta: '',
+              comentario: '',
+              orden: 1,
+              posicion_x: 50,
+              posicion_y: 50,
+              created_at: ''
+            };
+            return {
+              ...originalRole,
+              player_id: asg.player_id || (originalRole as { player_id?: string | null }).player_id || null,
+              rol_asignado: normalizeRoleName(originalRole.rol_asignado),
+              assignment: asg,
+              assignedPlayer: asg.player || players.find(p => p.id === asg.player_id)
+            };
+          });
+
+          const lineupPlayerIds = nodesPropio
+            .filter(n => n.player_id)
+            .map(n => n.player_id as string);
 
           return (
             <div className="space-y-6">
@@ -1697,149 +1626,192 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
                 <div>
                   <h3 className="font-bold text-slate-200 flex items-center gap-2">
                     <Shield className="h-5 w-5 text-[#CC0E21]" />
-                    Acciones a Balón Parado (ABP)
+                    Acciones a Balón Parado (ABP del Partido)
                   </h3>
-                  <p className="text-slate-500 text-xs mt-0.5">Centro de preparación estratégica. Diseña y asigna responsabilidades para faltas, córners y saques.</p>
+                  <p className="text-slate-500 text-xs mt-0.5">
+                    Centro de preparación estratégica. Jugadas ensayadas y asignación de responsabilidades planificadas para este encuentro.
+                  </p>
                 </div>
                 <div className="flex items-center gap-2 self-start sm:self-auto">
-                  <Button onClick={openImportABPModal} className="flex items-center gap-1.5 text-xs">
-                    <Plus className="h-3.5 w-3.5" />
-                    Importar de Biblioteca
-                  </Button>
-                  <Button onClick={() => setIsCreatingABP(true)} variant="secondary" className="flex items-center gap-1.5 text-xs">
-                    <PlusCircle className="h-3.5 w-3.5" />
-                    Nueva ABP Exclusiva
-                  </Button>
+                  <Link href="/abp" className="inline-flex">
+                    <Button variant="secondary" className="flex items-center gap-1.5 text-xs">
+                      <FolderOpen className="h-3.5 w-3.5" />
+                      Planificador ABP
+                    </Button>
+                  </Link>
                 </div>
               </div>
 
-              {matchABPs.length === 0 ? (
+              {officialAbpPlans.length === 0 ? (
                 <div className="p-12 border border-dashed border-slate-800 rounded-2xl text-center text-slate-500 space-y-3 bg-slate-900/5">
                   <Shield className="h-10 w-10 text-slate-700 mx-auto" />
                   <div className="max-w-md mx-auto space-y-1">
                     <p className="text-sm font-bold text-slate-400">No se han asociado jugadas ABP a este partido todavía</p>
-                    <p className="text-xs text-slate-500 leading-relaxed">Importa jugadas maestras de tu biblioteca estratégica o crea jugadas exclusivas para este encuentro.</p>
+                    <p className="text-xs text-slate-500 leading-relaxed">
+                      Planifica y asigna jugadas maestras para esta jornada desde el módulo oficial de Estrategia ABP.
+                    </p>
                   </div>
-                  <Button onClick={openImportABPModal} variant="secondary" className="text-xs mt-2">Importar una jugada ahora</Button>
+                  <Link href="/abp" className="inline-block mt-2">
+                    <Button variant="primary" className="text-xs">Ir al Planificador ABP</Button>
+                  </Link>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                   
                   {/* COLUMNA IZQUIERDA: MESA DE TRABAJO Y LISTADO DE ABP (4 cols) */}
-                  <div className="lg:col-span-4 space-y-5">
-                    
-                    <div className="p-4 bg-slate-900/30 border border-slate-800 rounded-2xl space-y-4">
-                      <h4 className="text-xs font-black uppercase text-slate-200 tracking-widest border-b border-slate-850 pb-2">
-                        Mesa de Trabajo ABP
-                      </h4>
-
-                      {/* SUBSECCIÓN: ABP OFENSIVO */}
-                      <div className="space-y-2">
-                        <span className="text-[10px] text-red-400 font-bold uppercase tracking-wider flex items-center gap-1.5 mb-2">
-                          <Target className="h-3.5 w-3.5 text-[#CC0E21]" />
-                          ABP Ofensivo
+                  <div className="lg:col-span-4 space-y-4">
+                    <div className="p-4 bg-slate-900/30 border border-slate-800 rounded-2xl space-y-3">
+                      <div className="flex items-center justify-between border-b border-slate-850 pb-2.5">
+                        <h4 className="text-xs font-black uppercase text-slate-200 tracking-widest">
+                          Jugadas del Partido
+                        </h4>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-950 border border-slate-800 text-slate-400 font-bold">
+                          {officialAbpPlans.length}
                         </span>
-                        
-                        {offensiveABPs.length === 0 ? (
-                          <p className="text-[10px] text-slate-550 italic pl-5">Sin jugadas ofensivas cargadas.</p>
-                        ) : (
-                          <div className="space-y-1.5">
-                            {offensiveABPs.map(abp => {
-                              const isSelected = selectedABP?.id === abp.id;
-                              return (
-                                <div
-                                  key={abp.id}
-                                  onClick={() => setSelectedABP(abp)}
-                                  className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
-                                    isSelected
-                                      ? 'bg-[#CC0E21]/10 border-[#CC0E21]/45 text-[#CC0E21]'
-                                      : 'bg-slate-950/20 border-slate-850/60 hover:border-slate-800 text-slate-355'
-                                  }`}
-                                >
-                                  <div className="min-w-0">
-                                    <span className="text-[8px] font-black uppercase bg-[#CC0E21]/10 px-1.5 py-0.5 rounded text-[#CC0E21]">{abp.tipo}</span>
-                                    <h4 className="text-xs font-bold text-slate-200 truncate mt-1.5">{abp.titulo}</h4>
-                                  </div>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleDeleteMatchABP(abp.id);
-                                    }}
-                                    className="text-slate-500 hover:text-red-400 p-1"
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </button>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
                       </div>
 
-                      {/* SUBSECCIÓN: ABP DEFENSIVO */}
-                      <div className="space-y-2 border-t border-slate-850/60 pt-4">
-                        <span className="text-[10px] text-blue-450 font-bold uppercase tracking-wider flex items-center gap-1.5 mb-2">
-                          <Shield className="h-3.5 w-3.5 text-blue-455" />
-                          ABP Defensivo
-                        </span>
-                        
-                        {defensiveABPs.length === 0 ? (
-                          <p className="text-[10px] text-slate-550 italic pl-5">Sin jugadas defensivas cargadas.</p>
-                        ) : (
-                          <div className="space-y-1.5">
-                            {defensiveABPs.map(abp => {
-                              const isSelected = selectedABP?.id === abp.id;
-                              return (
-                                <div
-                                  key={abp.id}
-                                  onClick={() => setSelectedABP(abp)}
-                                  className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
-                                    isSelected
-                                      ? 'bg-blue-950/15 border-blue-900/40 text-blue-400'
-                                      : 'bg-slate-950/20 border-slate-850/60 hover:border-slate-800 text-slate-355'
-                                  }`}
-                                >
-                                  <div className="min-w-0">
-                                    <span className="text-[8px] font-black uppercase bg-blue-950 text-blue-455 px-1.5 py-0.5 rounded">{abp.tipo}</span>
-                                    <h4 className="text-xs font-bold text-slate-200 truncate mt-1.5">{abp.titulo}</h4>
-                                  </div>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleDeleteMatchABP(abp.id);
-                                    }}
-                                    className="text-slate-500 hover:text-red-400 p-1"
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </button>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
+                      {/* Selector de Filtro */}
+                      <div className="flex items-center gap-1 bg-slate-950/80 p-0.5 rounded-lg border border-slate-800 text-[10px]">
+                        <button
+                          type="button"
+                          onClick={() => setAbpModuleTabFilter('TODOS')}
+                          className={`flex-1 py-1 rounded-md font-bold transition-all text-center ${
+                            abpModuleTabFilter === 'TODOS'
+                              ? 'bg-slate-800 text-white shadow-sm'
+                              : 'text-slate-400 hover:text-slate-200'
+                          }`}
+                        >
+                          Todos ({officialAbpPlans.length})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setAbpModuleTabFilter('FAVOR')}
+                          className={`flex-1 py-1 rounded-md font-bold transition-all text-center ${
+                            abpModuleTabFilter === 'FAVOR'
+                              ? 'bg-[#CC0E21] text-white shadow-sm'
+                              : 'text-slate-400 hover:text-slate-200'
+                          }`}
+                        >
+                          A Favor ({favorPlans.length})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setAbpModuleTabFilter('CONTRA')}
+                          className={`flex-1 py-1 rounded-md font-bold transition-all text-center ${
+                            abpModuleTabFilter === 'CONTRA'
+                              ? 'bg-blue-600 text-white shadow-sm'
+                              : 'text-slate-400 hover:text-slate-200'
+                          }`}
+                        >
+                          En Contra ({contraPlans.length})
+                        </button>
+                      </div>
+
+                      {/* Lista de Jugadas */}
+                      <div className="space-y-2 pt-1">
+                        {displayedPlans.map((plan, idx) => {
+                          const isSelected = selectedPlan?.id === plan.id;
+                          const play = plan.abp_play;
+                          const isDef = play?.tipo?.toLowerCase().includes('defensiv');
+                          const assignedCount = (plan.assignments || []).filter(a => a.player_id).length;
+                          const totalRoles = (plan.assignments || []).length;
+
+                          return (
+                            <div
+                              key={plan.id}
+                              onClick={() => setSelectedOfficialPlanId(plan.id)}
+                              className={`p-3 rounded-xl border transition-all cursor-pointer space-y-1.5 ${
+                                isSelected
+                                  ? isDef
+                                    ? 'bg-blue-950/20 border-blue-800 text-blue-300 shadow-sm'
+                                    : 'bg-red-950/20 border-red-800 text-red-300 shadow-sm'
+                                  : 'bg-slate-950/40 border-slate-850 hover:border-slate-800 text-slate-300'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <span className={`text-[8px] font-extrabold uppercase px-1.5 py-0.2 rounded border ${
+                                  isDef
+                                    ? 'bg-blue-950/60 border-blue-800/80 text-blue-400'
+                                    : 'bg-red-950/60 border-red-900/80 text-red-400'
+                                }`}>
+                                  {play?.tipo || 'ABP'}
+                                </span>
+                                <span className="text-[9px] font-mono text-slate-500">
+                                  #{idx + 1}
+                                </span>
+                              </div>
+                              <h4 className="text-xs font-bold text-slate-200 truncate">
+                                {play?.titulo || 'Jugada sin título'}
+                              </h4>
+                              {plan.observaciones && (
+                                <p className="text-[10px] text-slate-400 italic truncate">
+                                  {plan.observaciones}
+                                </p>
+                              )}
+                              <div className="flex items-center justify-between text-[9px] text-slate-500 pt-0.5">
+                                <span>{totalRoles > 0 ? `${assignedCount}/${totalRoles} roles asignados` : 'Sin roles'}</span>
+                                {(plan.video_asociado || play?.video_url) && (
+                                  <Film className="h-3 w-3 text-slate-400" />
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
 
                     </div>
                   </div>
 
-                  {/* COLUMNA DERECHA: DETALLE, ROLES Y OBSERVACIONES (8 cols) */}
-                  <div className="lg:col-span-8">
-                    {selectedABP ? (
+                  {/* COLUMNA DERECHA: PIZARRA TÁCTICA OFICIAL Y ASIGNACIONES (8 cols) */}
+                  <div className="lg:col-span-8 space-y-6">
+                    {selectedPlan ? (
                       <div className="space-y-6">
                         
                         {/* PANEL PRINCIPAL: DETALLES DE JUGADA */}
                         <div className="p-5 bg-slate-900/30 border border-slate-800 rounded-2xl flex flex-col md:flex-row md:items-start justify-between gap-4">
-                          <div className="space-y-1 max-w-xl">
-                            <span className="text-[9px] font-black uppercase tracking-widest bg-slate-950 border border-slate-850 text-slate-400 px-2 py-0.5 rounded">
-                              {selectedABP.tipo}
-                            </span>
-                            <h3 className="text-base font-bold text-slate-200 mt-2">{selectedABP.titulo}</h3>
-                            <p className="text-xs text-slate-400 leading-relaxed mt-1">{selectedABP.descripcion}</p>
+                          <div className="space-y-1.5 max-w-xl">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded border ${
+                                selectedPlan.abp_play?.tipo?.toLowerCase().includes('defensiv')
+                                  ? 'bg-blue-950 border-blue-800 text-blue-400'
+                                  : 'bg-red-950 border-red-900 text-red-400'
+                              }`}>
+                                {selectedPlan.abp_play?.tipo || 'ABP'}
+                              </span>
+                              {selectedPlan.abp_play?.zona && (
+                                <span className="text-[9px] bg-slate-950 border border-slate-800 text-slate-400 px-2 py-0.5 rounded font-medium">
+                                  Zona: {selectedPlan.abp_play.zona}
+                                </span>
+                              )}
+                            </div>
+                            <h3 className="text-base font-bold text-slate-200 mt-1">
+                              {selectedPlan.abp_play?.titulo || 'Jugada sin título'}
+                            </h3>
+                            {selectedPlan.abp_play?.descripcion && (
+                              <p className="text-xs text-slate-300 leading-relaxed">
+                                {selectedPlan.abp_play.descripcion}
+                              </p>
+                            )}
+                            {selectedPlan.observaciones && (
+                              <div className="p-2.5 bg-slate-950/60 rounded-xl border border-slate-850 text-xs text-slate-400 mt-2">
+                                <span className="text-[9px] font-bold text-slate-300 uppercase tracking-wider block mb-0.5">
+                                  Observaciones del Encuentro
+                                </span>
+                                {selectedPlan.observaciones}
+                              </div>
+                            )}
                           </div>
-                          {selectedABP.video_url && (
+
+                          {(selectedPlan.video_asociado || selectedPlan.abp_play?.video_url) && (
                             <Button
-                              onClick={() => handlePlayVideo(selectedABP.titulo, selectedABP.video_url!, selectedABP.tipo_origen)}
-                              className="flex items-center gap-1.5 text-xs py-1.5 px-3 self-start hover:bg-[#a80b1a]"
+                              onClick={() =>
+                                handlePlayVideo(
+                                  selectedPlan.abp_play?.titulo || 'Vídeo ABP',
+                                  (selectedPlan.video_asociado || selectedPlan.abp_play?.video_url)!,
+                                  'Enlace'
+                                )
+                              }
+                              className="flex items-center gap-1.5 text-xs py-1.5 px-3 self-start hover:bg-[#a80b1a] shrink-0"
                             >
                               <Film className="h-3.5 w-3.5" />
                               Ver vídeo ABP
@@ -1847,162 +1819,27 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
                           )}
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-                          
-                          {/* COLUMNA INTERNA IZQ (7 cols): ASIGNACIONES + OBSERVACIONES */}
-                          <div className="md:col-span-7 space-y-6">
-                            
-                            {/* AREA 3: ROLES Y ASIGNACIONES DE JUGADORES */}
-                            <div className="p-5 bg-slate-900/30 border border-slate-800 rounded-2xl space-y-4">
-                              <h4 className="text-xs font-black uppercase text-slate-205 tracking-widest border-b border-slate-850/60 pb-2.5 flex items-center gap-1.5">
-                                <Users className="h-4.5 w-4.5 text-[#CC0E21]" />
-                                Asignación de Roles del Partido
-                              </h4>
-                              
-                              {abpRoles.length === 0 ? (
-                                <p className="text-xs text-slate-500 italic py-2">No hay roles tácticos definidos para esta jugada en particular.</p>
-                              ) : (
-                                <div className="space-y-3">
-                                  {abpRoles.map(role => (
-                                    <div key={role.id} className="p-3 bg-slate-950/40 border border-slate-850 rounded-xl flex items-center justify-between gap-4">
-                                      <div className="min-w-0">
-                                        <span className="text-[9px] font-bold uppercase text-slate-550 tracking-wider block">Función</span>
-                                        <span className="text-xs font-extrabold text-slate-350 truncate block mt-0.5">{role.rol_asignado}</span>
-                                      </div>
-                                      <div className="w-48 flex-shrink-0">
-                                        <select
-                                          value={role.player_id || ''}
-                                          onChange={(e) => handleUpdateABPRole(role.id, e.target.value || null)}
-                                          className="w-full px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-850 text-slate-100 text-xs focus:border-[#CC0E21]/60 outline-none"
-                                        >
-                                          <option value="">-- Sin asignar / Histórico --</option>
-                                          {players.map(p => (
-                                            <option key={p.id} value={p.id} className="bg-slate-900 text-slate-100">
-                                              ({p.dorsal}) {p.nombre} {p.apellidos}
-                                            </option>
-                                          ))}
-                                        </select>
-                                        {!role.player_id && role.player_full_name_backup && (
-                                          <span className="text-[8px] text-amber-500/80 block mt-1 font-semibold">
-                                            Historial: {role.player_full_name_backup} (Dorsal {role.player_dorsal_backup})
-                                          </span>
-                                        )}
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
+                        {/* PIZARRA TÁCTICA OFICIAL REUTILIZANDO ABPPlanField */}
+                        <div className="p-5 bg-slate-900/30 border border-slate-800 rounded-2xl space-y-4">
+                          <h4 className="text-xs font-black uppercase text-slate-200 tracking-widest border-b border-slate-850 pb-2.5 flex items-center gap-1.5">
+                            <Sparkles className="h-4 w-4 text-[#CC0E21]" />
+                            Pizarra Táctica y Reparto de Roles
+                          </h4>
 
-                            {/* AREA 3: OBSERVACIONES TÁCTICAS DEL MÍSTER */}
-                            <div className="p-5 bg-slate-900/30 border border-slate-800 rounded-2xl space-y-4">
-                              <h4 className="text-xs font-black uppercase text-slate-205 tracking-widest border-b border-slate-850 pb-2">
-                                Observaciones y Puntos Clave
-                              </h4>
-                              
-                              <div className="space-y-3.5 text-xs text-slate-400">
-                                <div className="space-y-1">
-                                  <span className="text-[9px] font-extrabold text-[#CC0E21] uppercase tracking-wider block">Instrucciones Críticas</span>
-                                  <p className="leading-relaxed bg-slate-950/40 p-2.5 rounded-xl border border-slate-850/50">
-                                    Asegurar el arrastre defensivo en el primer poste. El lanzador debe buscar la comba hacia adentro para facilitar el remate.
-                                  </p>
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 pt-1.5 border-t border-slate-850/40">
-                                  <div>
-                                    <span className="text-[9px] font-bold text-amber-500 uppercase tracking-wider block">Vigilancias Defensivas</span>
-                                    <p className="text-[11px] leading-relaxed mt-0.5">Mediapunta y un interior preparados al rechace para cortar el contraataque rápido.</p>
-                                  </div>
-                                  <div>
-                                    <span className="text-[9px] font-bold text-blue-400 uppercase tracking-wider block">Recordatorio Clave</span>
-                                    <p className="text-[11px] leading-relaxed mt-0.5">Máxima concentración en segundas jugadas. Prohibido girarse de espaldas.</p>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-
-                          </div>
-
-                          {/* COLUMNA INTERNA DER (5 cols): PIZARRA MOCKUP + SIMULACIONES */}
-                          <div className="md:col-span-5 space-y-6">
-                            
-                            {/* AREA 5: PIZARRA ABP (Visual Mockup) */}
-                            <div className="p-5 bg-slate-900/30 border border-slate-800 rounded-2xl space-y-4 relative overflow-hidden">
-                              <div className="flex items-center justify-between border-b border-slate-850 pb-2.5">
-                                <h4 className="text-xs font-black uppercase text-slate-205 tracking-widest flex items-center gap-1.5">
-                                  <Sparkles className="h-4.5 w-4.5 text-[#CC0E21]" />
-                                  Pizarra Táctica ABP
-                                </h4>
-                                <span className="text-[8px] bg-[#CC0E21]/15 text-[#CC0E21] border border-[#CC0E21]/20 px-1.5 py-0.5 rounded font-black tracking-widest uppercase">
-                                  Mock-UP
-                                </span>
-                              </div>
-
-                              <div className="relative aspect-[3/4] bg-emerald-950/80 border border-emerald-900 rounded-xl overflow-hidden flex flex-col justify-between p-4">
-                                {/* Soccer pitch markings (aesthetic design) */}
-                                <div className="absolute inset-0 border border-emerald-800/35 m-3 pointer-events-none rounded-lg" />
-                                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-28 h-14 border border-emerald-800/35 pointer-events-none" />
-                                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-12 h-5 border border-emerald-800/35 pointer-events-none" />
-                                <div className="absolute top-0 left-1/2 -translate-x-1/2 translate-y-12 w-6 h-6 rounded-full border border-emerald-800/35 pointer-events-none" />
-
-                                {/* Mock tactical nodes */}
-                                <div className="absolute top-4 left-1/4 h-5 w-5 bg-red-650 text-white rounded-full flex items-center justify-center text-[9px] font-black shadow-md border border-white/20 select-none">3</div>
-                                <div className="absolute top-8 left-1/2 -translate-x-1/2 h-5 w-5 bg-red-650 text-white rounded-full flex items-center justify-center text-[9px] font-black shadow-md border border-white/20 select-none">9</div>
-                                <div className="absolute top-10 left-2/3 h-5 w-5 bg-red-650 text-white rounded-full flex items-center justify-center text-[9px] font-black shadow-md border border-white/20 select-none">7</div>
-                                <div className="absolute top-16 left-1/3 h-5 w-5 bg-blue-600 text-white rounded-full flex items-center justify-center text-[9px] font-black shadow-md border border-white/20 select-none">4</div>
-                                <div className="absolute top-20 left-1/2 -translate-x-1/2 h-5 w-5 bg-blue-600 text-white rounded-full flex items-center justify-center text-[9px] font-black shadow-md border border-white/20 select-none">5</div>
-
-                                {/* Arrow path mockup */}
-                                <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 120">
-                                  <path d="M 25,20 Q 50,45 50,32" fill="none" stroke="#e11d48" strokeWidth="1.5" strokeDasharray="3" />
-                                  <polygon points="50,32 47,36 53,36" fill="#e11d48" />
-                                </svg>
-
-                                <div className="text-center w-full z-10 mt-auto bg-slate-950/80 p-2.5 rounded-lg border border-slate-850/85">
-                                  <p className="text-[10px] font-bold text-slate-300">Pizarra Gráfica Interactiva</p>
-                                  <span className="text-[8px] text-slate-500 font-semibold block mt-0.5">Próximamente: Editor y animador táctico</span>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* MÓDULOS DE INTEGRACIÓN FUTURA ABP */}
-                            <div className="p-5 bg-slate-900/30 border border-slate-800 rounded-2xl space-y-4">
-                              <h4 className="text-xs font-black uppercase text-slate-205 tracking-widest border-b border-slate-850 pb-2">
-                                Simulaciones y Vídeo
-                              </h4>
-                              <div className="space-y-3">
-                                
-                                {/* Animación 3D */}
-                                <div className="p-3 bg-slate-950/20 border border-slate-850 rounded-xl flex items-center gap-3 opacity-55 select-none">
-                                  <div className="h-8 w-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-550">
-                                    <PlayCircle className="h-4.5 w-4.5 animate-pulse" />
-                                  </div>
-                                  <div>
-                                    <h5 className="text-xs font-bold text-slate-350">Simulación 2D / 3D</h5>
-                                    <span className="text-[8px] text-slate-500 font-semibold block mt-0.5">Próximamente disponible</span>
-                                  </div>
-                                </div>
-
-                                {/* Estadísticas de efectividad */}
-                                <div className="p-3 bg-slate-950/20 border border-slate-850 rounded-xl flex items-center gap-3 opacity-55 select-none">
-                                  <div className="h-8 w-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-550">
-                                    <TrendingUp className="h-4.5 w-4.5" />
-                                  </div>
-                                  <div className="flex-1">
-                                    <div className="flex items-center justify-between">
-                                      <h5 className="text-xs font-bold text-slate-355">Tasa Éxito Estimada</h5>
-                                      <span className="text-[9px] text-[#CC0E21] font-extrabold">64%</span>
-                                    </div>
-                                    <div className="w-full bg-slate-800 h-1.5 rounded-full mt-1.5 overflow-hidden">
-                                      <div className="bg-[#CC0E21] h-full rounded-full" style={{ width: '64%' }} />
-                                    </div>
-                                  </div>
-                                </div>
-
-                              </div>
-                            </div>
-
-                          </div>
-
+                          <ABPPlanField
+                            planId={selectedPlan.id}
+                            tipo={selectedPlan.abp_play?.tipo || ''}
+                            zona={selectedPlan.abp_play?.zona || null}
+                            roles={planRoles}
+                            players={players}
+                            lineupPlayerIds={lineupPlayerIds}
+                            onAssignPlayer={(roleId, playerId) =>
+                              handleAssignOfficialABPPlayer(selectedPlan.id, roleId, playerId)
+                            }
+                            onRemovePlayer={(roleId) =>
+                              handleRemoveOfficialABPPlayer(selectedPlan.id, roleId)
+                            }
+                          />
                         </div>
 
                       </div>
@@ -2011,7 +1848,9 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
                         <Shield className="h-10 w-10 text-slate-700 mx-auto" />
                         <div className="max-w-md mx-auto space-y-1">
                           <p className="text-sm font-bold text-slate-400">Ninguna jugada seleccionada</p>
-                          <p className="text-xs text-slate-500 leading-relaxed">Selecciona una jugada ofensiva o defensiva de la mesa de trabajo de la izquierda para ver su detalle, roles asignados y simulaciones tácticas.</p>
+                          <p className="text-xs text-slate-500 leading-relaxed">
+                            Selecciona una jugada de la columna izquierda para visualizar su pizarra táctica y responsabilidades.
+                          </p>
                         </div>
                       </div>
                     )}
@@ -3288,6 +3127,194 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
                             </div>
                           )}
                         </div>
+
+                        {/* 4. ABP DEL PARTIDO (Vinculadas desde el Módulo ABP) */}
+                        <div className="p-5 bg-slate-900/30 border border-slate-800 rounded-2xl space-y-4">
+                          <div className="flex items-center justify-between border-b border-slate-850 pb-2.5 flex-wrap gap-2">
+                            <div className="flex items-center gap-2">
+                              <Shield className="h-4 w-4 text-[#CC0E21]" />
+                              <h4 className="text-xs font-black uppercase text-slate-200 tracking-widest">
+                                ABP del Partido
+                              </h4>
+                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-950 border border-slate-850 text-slate-400 font-bold">
+                                {officialAbpPlans.length}
+                              </span>
+                            </div>
+
+                            {officialAbpPlans.length > 0 && (
+                              <div className="flex items-center gap-1 bg-slate-950/80 p-0.5 rounded-lg border border-slate-850 text-[10px]">
+                                {(() => {
+                                  const favorCount = officialAbpPlans.filter(p => !p.abp_play?.tipo?.toLowerCase().includes('defensiv')).length;
+                                  const contraCount = officialAbpPlans.filter(p => p.abp_play?.tipo?.toLowerCase().includes('defensiv')).length;
+                                  return (
+                                    <>
+                                      <button
+                                        type="button"
+                                        onClick={() => setAbpTabFilter('FAVOR')}
+                                        className={`px-2.5 py-1 rounded-md font-bold transition-all ${
+                                          abpTabFilter === 'FAVOR'
+                                            ? 'bg-[#CC0E21] text-white shadow-sm'
+                                            : 'text-slate-400 hover:text-slate-200'
+                                        }`}
+                                      >
+                                        A Favor ({favorCount})
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setAbpTabFilter('CONTRA')}
+                                        className={`px-2.5 py-1 rounded-md font-bold transition-all ${
+                                          abpTabFilter === 'CONTRA'
+                                            ? 'bg-blue-600 text-white shadow-sm'
+                                            : 'text-slate-400 hover:text-slate-200'
+                                        }`}
+                                      >
+                                        En Contra ({contraCount})
+                                      </button>
+                                    </>
+                                  );
+                                })()}
+                              </div>
+                            )}
+                          </div>
+
+                          {officialAbpPlans.length === 0 ? (
+                            <p className="text-xs text-slate-500 italic py-3 text-center">
+                              Sin jugadas ABP asignadas para este encuentro.
+                            </p>
+                          ) : (
+                            (() => {
+                              const filtered = officialAbpPlans.filter(p => {
+                                const isDef = p.abp_play?.tipo?.toLowerCase().includes('defensiv');
+                                return abpTabFilter === 'CONTRA' ? isDef : !isDef;
+                              });
+
+                              if (filtered.length === 0) {
+                                return (
+                                  <p className="text-xs text-slate-500 italic py-3 text-center">
+                                    No hay jugadas {abpTabFilter === 'FAVOR' ? 'a favor' : 'en contra'} asignadas para este partido.
+                                  </p>
+                                );
+                              }
+
+                              return (
+                                <div className="space-y-2.5">
+                                  {filtered.map((plan) => {
+                                    const play = plan.abp_play;
+                                    const isExpanded = expandedPlanId === plan.id;
+                                    const videoTargetUrl = plan.video_asociado || play?.video_url;
+                                    const assignments = plan.assignments || [];
+
+                                    return (
+                                      <div
+                                        key={plan.id}
+                                        className="p-3 bg-slate-950/50 border border-slate-850 rounded-xl space-y-2 hover:border-slate-800 transition-colors"
+                                      >
+                                        <div className="flex items-start justify-between gap-2">
+                                          <div
+                                            className="min-w-0 flex-1 cursor-pointer select-none"
+                                            onClick={() => setExpandedPlanId(isExpanded ? null : plan.id)}
+                                          >
+                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                              <span className={`text-[9px] font-extrabold uppercase px-1.5 py-0.2 rounded border ${
+                                                play?.tipo?.toLowerCase().includes('defensiv')
+                                                  ? 'bg-blue-950/40 border-blue-800/60 text-blue-400'
+                                                  : 'bg-red-950/40 border-red-900/60 text-red-400'
+                                              }`}>
+                                                {play?.tipo || 'ABP'}
+                                              </span>
+                                              <span className="text-xs font-bold text-slate-200">
+                                                {play?.titulo || 'Jugada sin título'}
+                                              </span>
+                                            </div>
+                                            {plan.observaciones && (
+                                              <p className="text-[11px] text-slate-400 mt-1 italic leading-snug">
+                                                {plan.observaciones}
+                                              </p>
+                                            )}
+                                          </div>
+
+                                          <div className="flex items-center gap-1.5 shrink-0">
+                                            {videoTargetUrl && (
+                                              <button
+                                                type="button"
+                                                onClick={() =>
+                                                  handlePlayVideo(
+                                                    play?.titulo || 'Vídeo ABP',
+                                                    videoTargetUrl,
+                                                    'Enlace'
+                                                  )
+                                                }
+                                                className="p-1 text-slate-400 hover:text-red-400 hover:bg-slate-900 border border-slate-800/80 rounded transition-colors"
+                                                title="Ver vídeo de la jugada"
+                                              >
+                                                <PlayCircle className="h-3.5 w-3.5" />
+                                              </button>
+                                            )}
+                                            <button
+                                              type="button"
+                                              onClick={() => setExpandedPlanId(isExpanded ? null : plan.id)}
+                                              className="p-1 text-slate-400 hover:text-slate-200 hover:bg-slate-900 border border-slate-800/80 rounded transition-colors"
+                                              title={isExpanded ? 'Contraer' : 'Expandir detalles'}
+                                            >
+                                              <span className={`inline-block text-[10px] transform transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
+                                                ▼
+                                              </span>
+                                            </button>
+                                          </div>
+                                        </div>
+
+                                        {/* Vista expandida: Descripción y Jugadores Asignados */}
+                                        {isExpanded && (
+                                          <div className="pt-2 border-t border-slate-850/60 space-y-2.5 text-xs">
+                                            {play?.descripcion && (
+                                              <div className="p-2 bg-slate-900/60 rounded-lg border border-slate-850/60">
+                                                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">
+                                                  Descripción Táctica
+                                                </span>
+                                                <p className="text-[11px] text-slate-300 leading-relaxed">
+                                                  {play.descripcion}
+                                                </p>
+                                              </div>
+                                            )}
+
+                                            {assignments.length > 0 && (
+                                              <div className="space-y-1">
+                                                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                                                  Roles y Jugadores Asignados ({assignments.length})
+                                                </span>
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-0.5">
+                                                  {assignments.map((asg) => {
+                                                    const roleName = asg.role?.rol_asignado || 'Rol';
+                                                    const playerName = asg.player?.nombre;
+                                                    const dorsal = asg.player?.dorsal;
+
+                                                    return (
+                                                      <div
+                                                        key={asg.id}
+                                                        className="p-1.5 bg-slate-900/40 rounded border border-slate-850/50 flex items-center justify-between text-[10px]"
+                                                      >
+                                                        <span className="font-semibold text-slate-400 truncate">
+                                                          {roleName}
+                                                        </span>
+                                                        <span className="font-bold text-slate-200 truncate ml-1">
+                                                          {playerName ? `${dorsal ? `#${dorsal} ` : ''}${playerName}` : '—'}
+                                                        </span>
+                                                      </div>
+                                                    );
+                                                  })}
+                                                </div>
+                                              </div>
+                                            )}
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              );
+                            })()
+                          )}
+                        </div>
                       </div>
                     );
                   })()}
@@ -3502,83 +3529,6 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
 
       {/* --- MODALS --- */}
 
-      {/* 1. Modal Importar ABP */}
-      <Modal isOpen={isImportABPModalOpen} onClose={() => setIsImportABPModalOpen(false)} title="Importar ABP de Biblioteca">
-        <div className="space-y-4">
-          <div>
-            <label className="text-xs font-bold text-slate-300 block mb-1.5">Seleccionar Jugada ABP</label>
-            <select value={selectedMasterABPId} onChange={(e) => setSelectedMasterABPId(e.target.value)} className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-850 text-slate-100 text-xs focus:border-[#CC0E21] outline-none">
-              <option value="" className="bg-slate-900 text-slate-100">-- Seleccionar jugada --</option>
-              {masterABPs.map(abp => (
-                <option key={abp.id} value={abp.id} className="bg-slate-900 text-slate-100">
-                  [{abp.tipo}] {abp.titulo}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="flex justify-end gap-2 border-t border-slate-800 pt-4">
-            <Button variant="secondary" onClick={() => setIsImportABPModalOpen(false)} className="text-xs">
-              Cancelar
-            </Button>
-            <Button onClick={handleImportABP} className="text-xs" disabled={!selectedMasterABPId}>
-              Clonar Jugada al Partido
-            </Button>
-          </div>
-        </div>
-      </Modal>
-
-      {/* 2. Modal Crear ABP Exclusiva */}
-      <Modal isOpen={isCreatingABP} onClose={() => setIsCreatingABP(false)} title="Nueva ABP Exclusiva del Partido">
-        <form onSubmit={handleCreateMatchABP} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-xs font-bold text-slate-350 block mb-1">Tipo de ABP</label>
-              <select value={newABPTipo} onChange={(e) => setNewABPTipo(e.target.value)} className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-850 text-slate-100 text-xs focus:border-[#CC0E21] outline-none">
-                <option value="Córner ofensivo" className="bg-slate-900 text-slate-100">Córner ofensivo</option>
-                <option value="Córner defensivo" className="bg-slate-900 text-slate-100">Córner defensivo</option>
-                <option value="Falta frontal ofensiva" className="bg-slate-900 text-slate-100">Falta frontal ofensiva</option>
-                <option value="Falta frontal defensiva" className="bg-slate-900 text-slate-100">Falta frontal defensiva</option>
-                <option value="Falta lateral ofensiva" className="bg-slate-900 text-slate-100">Falta lateral ofensiva</option>
-                <option value="Falta lateral defensiva" className="bg-slate-900 text-slate-100">Falta lateral defensiva</option>
-                <option value="Penalti ofensivo" className="bg-slate-900 text-slate-100">Penalti ofensivo</option>
-                <option value="Penalti defensivo" className="bg-slate-900 text-slate-100">Penalti defensivo</option>
-                <option value="Jugada especial ofensiva" className="bg-slate-900 text-slate-100">Jugada especial ofensiva</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-xs font-bold text-slate-350 block mb-1">Título de la Jugada</label>
-              <input required value={newABPTitle} onChange={(e) => setNewABPTitle(e.target.value)} placeholder="Ej: Bloqueo primer palo..." className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-850 text-slate-100 text-xs focus:border-[#CC0E21] outline-none" />
-            </div>
-          </div>
-          <div>
-            <label className="text-xs font-bold text-slate-350 block mb-1">Descripción / Instrucciones</label>
-            <textarea value={newABPDesc} onChange={(e) => setNewABPDesc(e.target.value)} placeholder="Pasos, bloqueos, movimientos de arrastre..." rows={3} className="w-full bg-slate-950 border border-slate-850 rounded-lg p-2.5 text-xs text-slate-300 focus:outline-none" />
-          </div>
-          <div className="space-y-2 border-t border-slate-800/60 pt-3">
-            <label className="text-xs font-bold text-slate-350 block">Vídeo de la ABP</label>
-            <div className="grid grid-cols-3 gap-2">
-              <select value={newABPOrigin} onChange={(e) => setNewABPOrigin(e.target.value as 'Enlace' | 'Archivo')} className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-850 text-slate-100 text-xs focus:border-[#CC0E21] outline-none">
-                <option value="Enlace" className="bg-slate-900 text-slate-100">Enlace</option>
-                <option value="Archivo" className="bg-slate-900 text-slate-100">Archivo</option>
-              </select>
-              {newABPOrigin === 'Enlace' ? (
-                <input value={newABPUrl} onChange={(e) => setNewABPUrl(e.target.value)} placeholder="URL del vídeo" className="col-span-2 w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-850 text-slate-100 text-xs focus:border-[#CC0E21] outline-none" />
-              ) : (
-                <input type="file" accept="video/*" onChange={(e) => setAbpFile(e.target.files?.[0] || null)} className="col-span-2 text-xs text-slate-400 bg-slate-950 border border-slate-850 rounded-lg p-1.5" />
-              )}
-            </div>
-          </div>
-          <div className="flex justify-end gap-2 border-t border-slate-800 pt-4">
-            <Button variant="secondary" type="button" onClick={() => setIsCreatingABP(false)} className="text-xs">
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={isUploadingABP} className="text-xs">
-              {isUploadingABP ? 'Subiendo...' : 'Crear ABP'}
-            </Button>
-          </div>
-        </form>
-      </Modal>
-
       {/* 3. Modal Añadir Clip de Vídeo */}
       <Modal isOpen={isClipModalOpen} onClose={() => setIsClipModalOpen(false)} title="Añadir Corte de Vídeo Táctico">
         <form onSubmit={handleSaveClip} className="space-y-4">
@@ -3763,6 +3713,23 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
             <label className="text-xs font-bold text-slate-350 block mb-1">Comentario Opcional</label>
             <textarea value={docComment} onChange={(e) => setDocComment(e.target.value)} placeholder="Comentarios o notas breves..." rows={2} className="w-full bg-slate-950 border border-slate-850 rounded-lg p-2.5 text-xs text-slate-300 focus:outline-none" />
           </div>
+          {isSavingDoc && uploadProgress > 0 && uploadProgress < 100 && (
+            <div className="space-y-1.5 p-3 rounded-xl bg-slate-900/60 border border-slate-800">
+              <div className="flex items-center justify-between text-[11px] font-bold">
+                <span className="text-slate-300 flex items-center gap-1.5">
+                  <Upload className="h-3.5 w-3.5 text-[#CC0E21] animate-pulse" />
+                  {uploadStatusText || `Subiendo archivo: ${uploadProgress}%`}
+                </span>
+                <span className="text-[#CC0E21] font-mono">{uploadProgress}%</span>
+              </div>
+              <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                <div 
+                  className="bg-gradient-to-r from-[#CC0E21] to-red-500 h-full transition-all duration-200 rounded-full"
+                  style={{ width: `${uploadProgress}%` }}
+                />
+              </div>
+            </div>
+          )}
           <div className="flex justify-end gap-2 border-t border-slate-800 pt-4">
             <Button variant="secondary" type="button" onClick={() => setIsDocModalOpen(false)} className="text-xs">
               Cancelar
