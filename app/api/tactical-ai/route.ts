@@ -170,6 +170,7 @@ export async function POST(request: Request) {
     else if (actionType === 'search_knowledge') actionKey = 'searchKnowledge';
     else if (actionType === 'explain_concept') actionKey = 'explainConcept';
     else if (actionType === 'analyze_game_model') actionKey = 'analyzeGameModel';
+    else if (actionType === 'analyze_match_lineup') actionKey = 'analyzeMatchLineup';
 
     const promptFn = actionKey ? PROMPTS[actionKey as keyof typeof PROMPTS] : null;
 

@@ -22,6 +22,7 @@ import { useClubLogos } from '@/hooks/useClubLogos';
 import { TacticalField, PositionNode } from '@/components/tactica/TacticalField';
 import { ABPPlanField } from '@/components/tactica/ABPPlanField';
 import { normalizeRoleName } from '@/lib/abpUtils';
+import { useTacticalAI } from '@/hooks/useTacticalAI';
 import { DriveResumableUploader } from '@/lib/drive-resumable';
 import { DriveUploadContext } from '@/lib/drive-folders';
 import { uploadToStorage } from '@/lib/storage';
@@ -30,8 +31,19 @@ import {
   BookOpen, Plus, FolderOpen, Save, Trash2, FileText, ClipboardList,
   Eye, Download, Upload, AlertCircle, Brain, TrendingUp, Lightbulb,
   AlertTriangle, Activity, CheckCircle2, User, Calendar, RefreshCw,
-  Sparkles, PlayCircle, Target, Sun, Clock, Star, Paperclip, Link2, ExternalLink
+  Sparkles, PlayCircle, Target, Sun, Clock, Star, Paperclip, Link2, ExternalLink, Loader2
 } from 'lucide-react';
+
+interface LineupAnalysisResult {
+  fortalezas: string[];
+  riesgos: string[];
+  encajeModelo: string[];
+  clavesDefensa: string[];
+  clavesMedio: string[];
+  clavesAtaque: string[];
+  alertas: string[];
+  recomendaciones: string[];
+}
 
 interface CentroPartidoClientProps {
   matchId: string;
@@ -168,6 +180,85 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
     setDocComment('');
     setDocFile(null);
     setIsDocModalOpen(true);
+  };
+
+  // --- IA TÁCTICA REAL (ANÁLISIS DEL ONCE Y SISTEMA) ---
+  const { analyzeMatchLineup } = useTacticalAI();
+  const [lineupAnalysis, setLineupAnalysis] = useState<LineupAnalysisResult | null>(null);
+  const [isAnalyzingLineup, setIsAnalyzingLineup] = useState(false);
+  const [lineupAnalysisError, setLineupAnalysisError] = useState<string | null>(null);
+
+  const handleRunLineupAnalysis = async () => {
+    setLineupAnalysisError(null);
+    setIsAnalyzingLineup(true);
+    try {
+      const assignedNodes = nodesPropio.filter(n => n.player_id);
+      if (assignedNodes.length === 0) {
+        throw new Error('Coloca al menos un jugador en la pizarra para iniciar el análisis táctico.');
+      }
+
+      const assignedPlayerIds = assignedNodes.map(n => n.player_id as string);
+      const systemNodes = nodesPropio.map(n => {
+        const p = players.find(x => x.id === n.player_id);
+        return `${n.label}: ${p ? `${p.nombre} ${p.apellidos} (${p.demarcacion})` : 'Sin asignar'}`;
+      });
+
+      const rivalSystem = tacticalLineup?.sistema_rival || '1-4-4-2';
+      const ownSystem = tacticalLineup?.sistema_propio || tacticalLineup?.nombre_sistema || '1-4-2-3-1';
+
+      const res = await analyzeMatchLineup({
+        systemOwn: ownSystem,
+        systemRival: rivalSystem,
+        matchId,
+        matchRival: match?.rival || null,
+        assignedPlayerIds,
+        systemNodes
+      });
+
+      if (!res || !res.content) {
+        throw new Error('No se recibió respuesta del proveedor de IA.');
+      }
+
+      let rawJson = res.content.trim();
+      if (rawJson.startsWith('```json')) rawJson = rawJson.replace(/^```json/, '').replace(/```$/, '').trim();
+      else if (rawJson.startsWith('```')) rawJson = rawJson.replace(/^```/, '').replace(/```$/, '').trim();
+
+      const parsed = JSON.parse(rawJson);
+      const sanitizeStr = (t: unknown): string => {
+        if (typeof t !== 'string') return '';
+        return t
+          .replace(/^svg[A-Za-z0-9_]*:?\s*/i, '')
+          .replace(/\bsvg[A-Za-z0-9_]+\b/gi, '')
+          .replace(/<[^>]*>/g, '')
+          .trim();
+      };
+      const sanitizeArr = (arr: unknown): string[] => {
+        if (!Array.isArray(arr)) {
+          if (typeof arr === 'string') return [sanitizeStr(arr)].filter(Boolean);
+          return [];
+        }
+        return arr.map(sanitizeStr).filter(Boolean);
+      };
+
+      const cleaned: LineupAnalysisResult = {
+        fortalezas: sanitizeArr(parsed.fortalezas),
+        riesgos: sanitizeArr(parsed.riesgos),
+        encajeModelo: sanitizeArr(parsed.encajeModelo),
+        clavesDefensa: sanitizeArr(parsed.clavesDefensa || parsed.clavesPorLineas?.defensa),
+        clavesMedio: sanitizeArr(parsed.clavesMedio || parsed.clavesPorLineas?.medio),
+        clavesAtaque: sanitizeArr(parsed.clavesAtaque || parsed.clavesPorLineas?.ataque),
+        alertas: sanitizeArr(parsed.alertas || parsed.alertasReales),
+        recomendaciones: sanitizeArr(parsed.recomendaciones)
+      };
+
+      setLineupAnalysis(cleaned);
+    } catch (err: unknown) {
+      console.error('Error al analizar once con IA:', err);
+      const msg = err instanceof Error ? err.message : String(err);
+      setLineupAnalysisError(msg || 'Error al conectar con la IA.');
+    } finally {
+      setIsAnalyzingLineup(false);
+    }
   };
 
   // --- FETCH DATA ---
@@ -1335,104 +1426,221 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
                 {/* COLUMNA DERECHA: IA Táctica e IA Individual (4 cols) */}
                 <div className="lg:col-span-4 space-y-6">
                   
-                  {/* Panel IA Táctica */}
+                  {/* Panel IA Táctica Real */}
                   <div className="p-5 bg-slate-900/30 border border-slate-800 rounded-2xl space-y-4">
                     <div className="flex items-center justify-between border-b border-slate-800/60 pb-3">
-                      <h3 className="font-bold text-slate-200 flex items-center gap-2 text-sm">
-                        <Brain className="h-4.5 w-4.5 text-[#CC0E21]" />
-                        Análisis del Sistema (IA)
-                      </h3>
-                      <span className="text-[9px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-1.5 py-0.5 rounded font-black tracking-widest uppercase flex items-center gap-1 animate-pulse">
-                        <Activity className="h-2.5 w-2.5" /> Activo
-                      </span>
-                    </div>
-
-                    <div className="space-y-4">
-                      {/* Equilibrio de formación */}
                       <div>
-                        <h4 className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block mb-2">Equilibrio Sectorial</h4>
-                        <div className="space-y-2 bg-slate-950/40 border border-slate-850 p-3 rounded-xl">
-                          <div>
-                            <div className="flex justify-between text-[10px] mb-1 font-bold">
-                              <span className="text-slate-400">Bloque Defensivo</span>
-                              <span className="text-emerald-400">85%</span>
-                            </div>
-                            <div className="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden">
-                              <div className="bg-emerald-500 h-full rounded-full" style={{ width: '85%' }} />
-                            </div>
-                          </div>
-                          <div>
-                            <div className="flex justify-between text-[10px] mb-1 font-bold">
-                              <span className="text-slate-400">Medio / Transición</span>
-                              <span className="text-emerald-400">90%</span>
-                            </div>
-                            <div className="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden">
-                              <div className="bg-emerald-500 h-full rounded-full" style={{ width: '90%' }} />
-                            </div>
-                          </div>
-                          <div>
-                            <div className="flex justify-between text-[10px] mb-1 font-bold">
-                              <span className="text-slate-400">Poder Ofensivo</span>
-                              <span className="text-amber-400">78%</span>
-                            </div>
-                            <div className="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden">
-                              <div className="bg-amber-500 h-full rounded-full" style={{ width: '78%' }} />
-                            </div>
-                          </div>
-                        </div>
+                        <h3 className="font-bold text-slate-200 flex items-center gap-2 text-sm">
+                          <Brain className="h-4.5 w-4.5 text-[#CC0E21]" />
+                          Análisis del Once (IA)
+                        </h3>
+                        <span className="text-[10px] text-slate-500 font-semibold">
+                          Doctrina Oficial S.D. Indautxu
+                        </span>
                       </div>
 
-                      {/* Fortalezas */}
-                      <div className="space-y-1.5">
-                        <h4 className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider flex items-center gap-1">
-                          <CheckCircle2 className="h-3.5 w-3.5" /> Fortalezas del Sistema
-                        </h4>
-                        <ul className="text-xs text-slate-350 space-y-1 pl-4 list-disc">
-                          <li>Sólida densidad defensiva en el pasillo central mediante el doble pivote.</li>
-                          <li>Amplitud ofensiva natural gracias al despliegue y profundidad de los volantes/extremos.</li>
-                          <li>Estructura idónea para transiciones rápidas defensa-ataque tras recuperación de balón.</li>
-                        </ul>
-                      </div>
-
-                      {/* Debilidades */}
-                      <div className="space-y-1.5">
-                        <h4 className="text-[10px] text-amber-500 font-bold uppercase tracking-wider flex items-center gap-1">
-                          <AlertTriangle className="h-3.5 w-3.5" /> Desajustes / Debilidades
-                        </h4>
-                        <ul className="text-xs text-slate-350 space-y-1 pl-4 list-disc">
-                          <li>Distancia de separación excesiva entre la línea de ataque y la línea defensiva en bloque bajo.</li>
-                          <li>Exposición en las bandas a espaldas de los laterales si no se coordinan coberturas de pivotes.</li>
-                        </ul>
-                      </div>
-
-                      {/* Riesgos y Alertas */}
-                      <div className="space-y-2 bg-red-500/5 border border-red-500/10 p-3 rounded-xl">
-                        <h4 className="text-[10px] text-red-400 font-bold uppercase tracking-wider flex items-center gap-1">
-                          <AlertCircle className="h-3.5 w-3.5" /> Riesgos de Roster
-                        </h4>
-                        <div className="space-y-1.5">
-                          <div className="text-[11px] text-slate-300 flex items-start gap-1">
-                            <span className="text-[#CC0E21] font-bold mt-0.5">•</span>
-                            <span>Presencia de jugadores listados como &quot;Duda&quot; en el once inicial. Posible decaimiento físico en el minuto 60.</span>
-                          </div>
-                          <div className="text-[11px] text-slate-300 flex items-start gap-1">
-                            <span className="text-[#CC0E21] font-bold mt-0.5">•</span>
-                            <span>Un jugador en campo está posicionado fuera de su rol natural del perfil.</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Recomendaciones */}
-                      <div className="space-y-1.5">
-                        <h4 className="text-[10px] text-blue-400 font-bold uppercase tracking-wider flex items-center gap-1">
-                          <Lightbulb className="h-3.5 w-3.5" /> Recomendaciones Generales
-                        </h4>
-                        <ul className="text-xs text-slate-350 space-y-1 pl-4 list-disc">
-                          <li>Asegurar que los interiores mantengan distancia de seguridad táctica.</li>
-                          <li>Ajustar la altura de la zaga defensiva para evitar pases a la espalda de centrales lentos.</li>
-                        </ul>
-                      </div>
+                      {isAnalyzingLineup ? (
+                        <span className="text-[10px] bg-red-500/10 text-red-400 border border-red-500/20 px-2 py-1 rounded-lg font-bold flex items-center gap-1.5">
+                          <Loader2 className="h-3 w-3 animate-spin text-[#CC0E21]" />
+                          Analizando...
+                        </span>
+                      ) : lineupAnalysis ? (
+                        <Button 
+                          onClick={handleRunLineupAnalysis} 
+                          variant="secondary" 
+                          className="text-[11px] h-7 px-2.5 flex items-center gap-1.5 border border-slate-750 hover:border-red-500/40"
+                        >
+                          <RefreshCw className="h-3 w-3 text-slate-400" />
+                          Actualizar
+                        </Button>
+                      ) : (
+                        <Button 
+                          onClick={handleRunLineupAnalysis} 
+                          className="text-[11px] h-7 px-3 bg-[#CC0E21] hover:bg-red-700 text-white font-bold flex items-center gap-1.5 shadow-md shadow-red-950/40"
+                        >
+                          <Sparkles className="h-3 w-3" />
+                          Analizar Once
+                        </Button>
+                      )}
                     </div>
+
+                    {lineupAnalysisError && (
+                      <div className="p-3 bg-red-950/40 border border-red-800/50 rounded-xl text-[11px] text-red-300 flex items-start gap-2">
+                        <AlertCircle className="h-4 w-4 text-red-400 shrink-0 mt-0.5" />
+                        <div>
+                          <p className="font-bold text-red-200">Error en el análisis</p>
+                          <p className="text-red-300/90 mt-0.5">{lineupAnalysisError}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {!lineupAnalysis && !isAnalyzingLineup && (
+                      <div className="p-5 border border-dashed border-slate-800/80 rounded-xl bg-slate-950/30 text-center space-y-3">
+                        <div className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto text-[#CC0E21]">
+                          <Brain className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-bold text-slate-200">Análisis Táctico del Once</h4>
+                          <p className="text-[11px] text-slate-400 max-w-xs mx-auto mt-1 leading-relaxed">
+                            Evalúa el encaje del sistema ({tacticalLineup?.sistema_propio || tacticalLineup?.nombre_sistema || '1-4-2-3-1'}) y los {nodesPropio.filter(n => n.player_id).length} jugadores colocados en pizarra frente a {match?.rival || 'el rival'} según el Modelo de Juego Indautxu.
+                          </p>
+                        </div>
+                        <Button 
+                          onClick={handleRunLineupAnalysis} 
+                          className="text-xs px-4 py-2 bg-[#CC0E21] hover:bg-red-700 text-white font-bold inline-flex items-center gap-1.5 shadow-lg shadow-red-950/50"
+                        >
+                          <Sparkles className="h-3.5 w-3.5" />
+                          Ejecutar Análisis con IA
+                        </Button>
+                      </div>
+                    )}
+
+                    {isAnalyzingLineup && (
+                      <div className="p-8 border border-slate-800 rounded-xl bg-slate-950/40 text-center space-y-3 animate-pulse">
+                        <Loader2 className="h-8 w-8 animate-spin text-[#CC0E21] mx-auto" />
+                        <div>
+                          <h4 className="text-xs font-bold text-slate-200">Razonando con la Doctrina Indautxu...</h4>
+                          <p className="text-[11px] text-slate-500 mt-1">
+                            Evaluando alineación, demarcaciones naturales, transiciones y vigilancias contra {match?.rival || 'el rival'}.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {lineupAnalysis && !isAnalyzingLineup && (
+                      <div className="space-y-4">
+                        {/* 1. Fortalezas del Once */}
+                        {lineupAnalysis.fortalezas && lineupAnalysis.fortalezas.length > 0 && (
+                          <div className="space-y-1.5">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs select-none" aria-hidden="true">🟢</span>
+                              <h4 className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider">
+                                Fortalezas del Once
+                              </h4>
+                            </div>
+                            <ul className="text-xs text-slate-350 space-y-1 pl-4 list-disc">
+                              {lineupAnalysis.fortalezas.map((f, idx) => (
+                                <li key={idx} className="leading-relaxed">{f}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {/* 2. Riesgos Tácticos */}
+                        {lineupAnalysis.riesgos && lineupAnalysis.riesgos.length > 0 && (
+                          <div className="space-y-1.5">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs select-none" aria-hidden="true">🟡</span>
+                              <h4 className="text-[10px] text-amber-400 font-bold uppercase tracking-wider">
+                                Riesgos Tácticos
+                              </h4>
+                            </div>
+                            <ul className="text-xs text-slate-350 space-y-1 pl-4 list-disc">
+                              {lineupAnalysis.riesgos.map((r, idx) => (
+                                <li key={idx} className="leading-relaxed">{r}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {/* 3. Encaje con Nuestro Modelo */}
+                        {lineupAnalysis.encajeModelo && lineupAnalysis.encajeModelo.length > 0 && (
+                          <div className="space-y-1.5">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs select-none" aria-hidden="true">🔴</span>
+                              <h4 className="text-[10px] text-[#CC0E21] font-bold uppercase tracking-wider">
+                                Encaje con Nuestro Modelo
+                              </h4>
+                            </div>
+                            <ul className="text-xs text-slate-300 space-y-1.5 pl-4 list-disc bg-red-500/5 border border-red-500/15 p-3 rounded-xl">
+                              {lineupAnalysis.encajeModelo.map((item, idx) => (
+                                <li key={idx} className="leading-relaxed">{item}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {/* 4. Claves por Líneas */}
+                        {((lineupAnalysis.clavesDefensa && lineupAnalysis.clavesDefensa.length > 0) ||
+                          (lineupAnalysis.clavesMedio && lineupAnalysis.clavesMedio.length > 0) ||
+                          (lineupAnalysis.clavesAtaque && lineupAnalysis.clavesAtaque.length > 0)) && (
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs select-none" aria-hidden="true">🎯</span>
+                              <h4 className="text-[10px] text-sky-400 font-bold uppercase tracking-wider">
+                                Claves por Líneas
+                              </h4>
+                            </div>
+                            <div className="space-y-2.5 bg-slate-950/50 border border-slate-850 p-3 rounded-xl text-xs">
+                              {lineupAnalysis.clavesDefensa && lineupAnalysis.clavesDefensa.length > 0 && (
+                                <div>
+                                  <span className="text-[10px] font-bold text-slate-400 block mb-1">🧤 Portería y Defensa:</span>
+                                  <ul className="text-slate-300 text-[11px] space-y-1 pl-4 list-disc">
+                                    {lineupAnalysis.clavesDefensa.map((cd, idx) => (
+                                      <li key={idx} className="leading-relaxed">{cd}</li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                              {lineupAnalysis.clavesMedio && lineupAnalysis.clavesMedio.length > 0 && (
+                                <div className="border-t border-slate-850 pt-2">
+                                  <span className="text-[10px] font-bold text-slate-400 block mb-1">⚙️ Medio Campo:</span>
+                                  <ul className="text-slate-300 text-[11px] space-y-1 pl-4 list-disc">
+                                    {lineupAnalysis.clavesMedio.map((cm, idx) => (
+                                      <li key={idx} className="leading-relaxed">{cm}</li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                              {lineupAnalysis.clavesAtaque && lineupAnalysis.clavesAtaque.length > 0 && (
+                                <div className="border-t border-slate-850 pt-2">
+                                  <span className="text-[10px] font-bold text-slate-400 block mb-1">⚡ Ataque y Presión:</span>
+                                  <ul className="text-slate-300 text-[11px] space-y-1 pl-4 list-disc">
+                                    {lineupAnalysis.clavesAtaque.map((ca, idx) => (
+                                      <li key={idx} className="leading-relaxed">{ca}</li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* 5. Alertas de Roster */}
+                        {lineupAnalysis.alertas && lineupAnalysis.alertas.length > 0 && (
+                          <div className="space-y-1.5 bg-red-500/5 border border-red-500/10 p-3 rounded-xl">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs select-none" aria-hidden="true">⚠️</span>
+                              <h4 className="text-[10px] text-rose-400 font-bold uppercase tracking-wider">
+                                Alertas de Roster
+                              </h4>
+                            </div>
+                            <ul className="text-[11px] text-slate-300 space-y-1 pl-4 list-disc">
+                              {lineupAnalysis.alertas.map((a, idx) => (
+                                <li key={idx} className="leading-relaxed">{a}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {/* 6. Recomendaciones */}
+                        {lineupAnalysis.recomendaciones && lineupAnalysis.recomendaciones.length > 0 && (
+                          <div className="space-y-1.5">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs select-none" aria-hidden="true">💡</span>
+                              <h4 className="text-[10px] text-blue-400 font-bold uppercase tracking-wider">
+                                Recomendaciones para el Partido
+                              </h4>
+                            </div>
+                            <ul className="text-xs text-slate-350 space-y-1 pl-4 list-disc">
+                              {lineupAnalysis.recomendaciones.map((rec, idx) => (
+                                <li key={idx} className="leading-relaxed">{rec}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* Panel IA Individual */}

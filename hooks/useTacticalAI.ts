@@ -161,6 +161,29 @@ export function useTacticalAI() {
     return await callAIAPI(triggerMsg, 'analyze_game_model', context);
   }, [callAIAPI]);
 
+  const analyzeMatchLineup = useCallback(async (context: Partial<TacticalAIContext> & { systemOwn: string; systemRival: string }): Promise<AIMessage | null> => {
+    const fullContext: TacticalAIContext = {
+      systemOwn: context.systemOwn,
+      systemRival: context.systemRival,
+      matchupId: context.matchupId || null,
+      matchId: context.matchId || null,
+      matchRival: context.matchRival || null,
+      assignedPlayerIds: context.assignedPlayerIds || [],
+      systemNodes: context.systemNodes || [],
+      roleCards: context.roleCards || [],
+      ventajas: context.ventajas || '',
+      desventajas: context.desventajas || '',
+      zonaConflicto: context.zonaConflicto || '',
+      dueloClave: context.dueloClave || '',
+      tareasLineas: context.tareasLineas || '',
+      validatedRivalInsights: context.validatedRivalInsights || [],
+      rivalPlayerThreats: context.rivalPlayerThreats || [],
+      reportSourcesLabels: context.reportSourcesLabels || []
+    };
+    const triggerMsg = `Realiza un análisis táctico real y riguroso del once titular dispuesto en la pizarra para este encuentro, evaluando su encaje con el Modelo de Juego Oficial del S.D. Indautxu frente al rival ${context.matchRival || 'Rival'}.`;
+    return await callAIAPI(triggerMsg, 'analyze_match_lineup', fullContext);
+  }, [callAIAPI]);
+
   // Métodos para aplicar las acciones de la IA a la BD / Estado
 
   // Guardar sugerencia de la IA en la biblioteca de conocimiento
@@ -285,6 +308,7 @@ export function useTacticalAI() {
     searchKnowledge,
     explainConcept,
     analyzeGameModel,
+    analyzeMatchLineup,
     saveToLibrary,
     applyToRoleCards
   };

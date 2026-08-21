@@ -386,6 +386,68 @@ Estructura JSON requerida estrictamente:
 }
 `,
 
+  analyzeMatchLineup: (ctx: PromptContext) => `
+${buildContextString(ctx)}
+
+TAREA: Realiza un análisis táctico real, práctico y útil para el entrenador sobre el once titular dispuesto en la pizarra frente al rival ${ctx.matchRival || 'Rival'} (${ctx.systemRival}).
+
+FÓRMULA OBLIGATORIA:
+DATOS REALES DEL PARTIDO + NUESTRO MODELO + CONSECUENCIAS GEOMÉTRICAS DEL SISTEMA RIVAL
+
+DIRECTRICES CRÍTICAS Y VINCULANTES:
+
+1. NO DECLARAR SUPERIORIDADES NUMÉRICAS FALSAS:
+   - En un emparejamiento 1-4-2-3-1 vs 1-4-3-3, nuestro doble pivote NO debe describirse automáticamente como superioridad 2v1 contra el pivote rival, porque el rival dispone además de dos interiores (se produce un 3v3 estructural en la zona central: doble pivote + mediapunta vs pivote + 2 interiores).
+   - Analiza las relaciones posicionales considerando siempre el triángulo completo del mediocampo rival.
+
+2. GEOMETRÍA RIVAL ≠ COMPORTAMIENTO:
+   - Disponemos ÚNICAMENTE del dibujo táctico rival (${ctx.systemRival}).
+   - Está TERMINANTEMENTE PROHIBIDO decir que los laterales rivales "suben", se "proyectan", desdoblan, o que sus líneas presionan o repliegan, si no existe ese dato registrado.
+   - Del sistema rival solo se pueden deducir posiciones estructurales estáticas.
+
+3. NUESTROS JUGADORES (DISTINCIÓN ESTRICTA: DATO REAL VS CONSIGNA):
+   - Solo disponemos de: nombre, rol en pizarra, demarcación natural, estado físico y las evaluaciones registradas.
+   - Si no existe un dato real que acredite una cualidad (velocidad, desborde, profundidad, 1v1, fijar centrales), está PROHIBIDO afirmarla como capacidad real del jugador.
+   - Fórmula obligatoria para roles: En lugar de "capacidad de X para...", escribir SIEMPRE: "Desde su posición de [Puesto], se recomienda a [Nombre] [acción táctica recomendada]."
+
+4. TRANSFORMACIONES PROPIAS SIN NOMBRES INVENTADOS (DOCTRINA INDAUTXU LITERAL):
+   - El equipo ejecuta Bloque Medio 1-4-1-3-2 y Bloque Bajo 1-4-4-2 conforme a la doctrina oficial.
+   - Queda PROHIBIDO afirmar que Danel López u otro jugador concreto forma el 4-4-1-1, 4-4-2, 1-4-1-3-2, doble punta, línea de tres o pivote, salvo que el SYSTEM_PROMPT_GAME_MODEL determine explícitamente esa asignación individual.
+   - Si la reorganización no especifica los futbolistas concretos para los reajustes, indícalo con rigor sin inventar listas.
+
+5. SÍNTESIS Y FORMATO:
+   - Máximo 4 puntos por sección.
+   - Devuelve EXCLUSIVAMENTE un JSON válido (sin bloques markdown, sin comillas adicionales).
+
+Estructura JSON requerida:
+{
+  "fortalezas": [
+    "Máximo 4 fortalezas geométricas/estructurales del once..."
+  ],
+  "riesgos": [
+    "Máximo 4 riesgos geométricos considerando el triángulo completo del rival..."
+  ],
+  "encajeModelo": [
+    "Máximo 4 puntos literales de ejecución de nuestro Modelo Indautxu..."
+  ],
+  "clavesDefensa": [
+    "Máximo 4 consignas para la línea defensiva y portería..."
+  ],
+  "clavesMedio": [
+    "Máximo 4 consignas para el centro del campo..."
+  ],
+  "clavesAtaque": [
+    "Máximo 4 consignas para la línea ofensiva..."
+  ],
+  "alertas": [
+    "Alertas reales verificadas en los datos (o 'Sin alertas de roster ni posiciones forzadas detectadas.')"
+  ],
+  "recomendaciones": [
+    "Máximo 4 recomendaciones tácticas directas para el entrenador..."
+  ]
+}
+`,
+
   freeChat: (ctx: PromptContext, message?: string) => `
 ${buildContextString(ctx)}
 
