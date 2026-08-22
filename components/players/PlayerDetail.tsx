@@ -183,7 +183,7 @@ export function PlayerDetail({ player, onBack, initialTab }: PlayerDetailProps) 
   const { evaluations, loading: loadingEvals, refetch: refetchEvals } = useEvaluations(currentPlayer.id);
   const { createEvaluation, loading: savingEval, error: evalSaveError } = useCreateEvaluation();
   const { observaciones, loading: loadingObs, createObservacion, refetch: refetchObs } = useObservaciones(currentPlayer.id);
-  const { summary: statsSummary, loading: loadingStats } = usePlayerStats(currentPlayer.id);
+  const { summary: statsSummary, leagueSummary, preseasonSummary, loading: loadingStats } = usePlayerStats(currentPlayer.id);
   const { updatePlayer } = useUpdatePlayer();
   const { uploadPhoto, loading: uploadingPhoto } = useUploadPlayerPhoto();
   const { injuries, loading: loadingInjuries, addInjury, updateInjury, deleteInjury } = usePlayerInjuries(currentPlayer.id);
@@ -1031,7 +1031,7 @@ export function PlayerDetail({ player, onBack, initialTab }: PlayerDetailProps) 
         {/* Tab 2: Resumen */}
         {activeTab === 'resumen' && (
           <div className="space-y-6 animate-fadeIn">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {/* Rendimiento Global */}
               <div className="p-6 bg-slate-900/40 border border-slate-800/80 rounded-2xl flex flex-col justify-center items-center text-center">
                 <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">Valoración Global Vigente</h3>
@@ -1072,7 +1072,7 @@ export function PlayerDetail({ player, onBack, initialTab }: PlayerDetailProps) 
                 </div>
               </div>
 
-              {/* Competición */}
+              {/* Competición (Liga) */}
               <div className="p-6 bg-slate-900/40 border border-slate-800/80 rounded-2xl space-y-4">
                 <h3 className="text-sm font-bold text-slate-200 uppercase tracking-wider border-b border-slate-850 pb-2 flex items-center gap-2">
                   <Award className="h-4 w-4 text-emerald-400" />
@@ -1081,19 +1081,45 @@ export function PlayerDetail({ player, onBack, initialTab }: PlayerDetailProps) 
                 <div className="space-y-3 text-xs">
                   <div className="flex justify-between items-center">
                     <span className="text-slate-400">Partidos Jugados</span>
-                    <span className="font-bold text-white text-sm">{statsSummary?.partidos || 0}</span>
+                    <span className="font-bold text-white text-sm">{leagueSummary?.partidos || 0}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-slate-400">Titularidades</span>
-                    <span className="font-bold text-white">{statsSummary?.titularidades || 0}</span>
+                    <span className="font-bold text-white">{leagueSummary?.titularidades || 0}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-slate-400">Minutos Totales</span>
-                    <span className="font-bold text-white">{statsSummary?.minutos || 0}m</span>
+                    <span className="font-bold text-white">{leagueSummary?.minutos || 0}m</span>
                   </div>
                   <div className="flex justify-between items-center pt-2 border-t border-slate-800/50">
                     <span className="text-slate-400">Goles / Asistencias</span>
-                    <span className="font-bold text-green-400">{statsSummary?.goles || 0} / {statsSummary?.asistencias || 0}</span>
+                    <span className="font-bold text-green-400">{leagueSummary?.goles || 0} / {leagueSummary?.asistencias || 0}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Minutos Pretemporada */}
+              <div className="p-6 bg-slate-900/40 border border-slate-800/80 rounded-2xl space-y-4">
+                <h3 className="text-sm font-bold text-slate-200 uppercase tracking-wider border-b border-slate-850 pb-2 flex items-center gap-2">
+                  <Activity className="h-4 w-4 text-amber-400" />
+                  Minutos Pretemporada
+                </h3>
+                <div className="space-y-3 text-xs">
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-400">Partidos Jugados</span>
+                    <span className="font-bold text-white text-sm">{preseasonSummary?.partidos || 0}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-400">Titularidades</span>
+                    <span className="font-bold text-white">{preseasonSummary?.titularidades || 0}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-400">Minutos Totales</span>
+                    <span className="font-bold text-white">{preseasonSummary?.minutos || 0}m</span>
+                  </div>
+                  <div className="flex justify-between items-center pt-2 border-t border-slate-800/50">
+                    <span className="text-slate-400">Goles / Asistencias</span>
+                    <span className="font-bold text-amber-400">{preseasonSummary?.goles || 0} / {preseasonSummary?.asistencias || 0}</span>
                   </div>
                 </div>
               </div>
