@@ -456,3 +456,239 @@ MENSAJE DEL ENTRENADOR: ${message || ''}
 TAREA: Responde al mensaje del entrenador de forma profesional y con base táctica sólida. Puedes sugerir cualquiera de las acciones rápidas si notas que el entrenador busca algo específico (analizar, planificar, programar ejercicios).
 `
 };
+
+export interface RivalScoutingPromptContext {
+  rivalName: string;
+  season?: string;
+  rivalSystem?: string;
+  rivalPlayModel?: Record<string, unknown> | null;
+  misterReport?: Record<string, unknown> | null;
+  approvedObservations: Array<{
+    id: string;
+    categoria: string;
+    contenido: string;
+    fuente?: string;
+    pagina?: number;
+    evidenciaOriginal?: string;
+    confianza?: string;
+    prioridad?: string;
+    esPropuestaAnalista?: boolean;
+    rivalPlayerName?: string;
+    rivalPlayerDorsal?: string;
+    rivalPlayerPosition?: string;
+    rivalPlayerThreatLevel?: string;
+    documentName?: string;
+    documentDate?: string;
+  }>;
+  reportSourcesLabels?: string[];
+}
+
+export function generateRivalScoutingPlan(ctx: RivalScoutingPromptContext): string {
+  return `
+${buildRivalScoutingContextString(ctx)}
+
+TAREA: Genera el Plan de Scouting Táctico Integral comparando al rival (${ctx.rivalName}) contra la Identidad y Modelo de Juego Oficial de la S.D. Indautxu Juvenil A (División de Honor).
+
+DIRECTRICES CRÍTICAS Y VINCULANTES:
+
+1. DISTINCIÓN ESTRICTA DE 3 CAPAS EN CADA BLOQUE:
+   - CAPA A (Evidencia del Rival): Cita literal o síntesis rigurosa de lo observado en los informes aprobados. NUNCA inventes comportamientos. Debes incluir en 'evidenciasIds' los IDs de las observaciones que sustentan este punto.
+   - CAPA B (Interpretación IA): Explicación analítica de la ventaja, vulnerabilidad o patrón táctico que genera ese comportamiento del rival.
+   - CAPA C (Propuesta SD Indautxu): Consigna táctica específica adaptando nuestro sistema 1-4-2-3-1 y la doctrina oficial del club para contrarrestar o explotar esa situación.
+
+2. REGLA DE AUSENCIA DE DATOS:
+   - Si no existe evidencia aprobada en los informes sobre un aspecto específico (por ejemplo, si no hay datos de córneres o de repliegue), ESTÁ ESTRICTAMENTE PROHIBIDO inventar o asumir patrones del rival.
+   - En ese caso debes indicar explícitamente:
+     * capaA_evidencias: ["Sin datos suficientes en los informes analizados."]
+     * capaB_interpretacion: "No se registran observaciones aprobadas en los informes sobre esta fase."
+     * capaC_propuestaIndautxu: "Mantener los principios generales del Modelo Indautxu DH."
+     * evidenciasIds: []
+
+3. JERARQUÍA DE DOCTRINA INDAUTXU (INVIOLABLE):
+   - Sistema base: 1-4-2-3-1.
+   - Salida de balón: Cuadrado de superioridad (Centrales + Pivotes), 3º hombre (Hombre Libre) y fijar para dividir.
+   - Presión tras pérdida: 6-8 segundos CONDICIONADA a cercanía, coberturas y carril interior cerrado. Si es superada → abandono inmediato y repliegue.
+   - Fases Defensivas:
+     * Presión alta: Al hombre / referencias individuales.
+     * Bloque Medio: 1-4-1-3-2 (cerrar pasillos interiores, activador en pase al lateral rival, basculación y emparejamientos).
+     * Bloque Bajo: 1-4-4-2 (cambio de marcas en banda extremo/lateral, saltos de atrás hacia adelante, defensa de área con centrales por delante y pivotes siguiendo llegadas).
+
+4. FORMATO DE RESPUESTA:
+   - DEBES RESPONDER ÚNICA Y EXCLUSIVAMENTE CON UN OBJETO JSON VÁLIDO.
+   - NO incluyas bloques markdown (sin triple comilla invertida), NO incluyas texto antes ni después. Solo el JSON crudo.
+
+ESTRUCTURA JSON REQUERIDA STRICTAMENTE:
+{
+  "resumenEjecutivo": "Síntesis del perfil del rival y las 2 o 3 claves estratégicas del partido frente a nuestro 1-4-2-3-1.",
+  "sistemaRivalIdentificado": "${ctx.rivalSystem || '1-4-3-3'}",
+  "comoDefenderles": {
+    "capaA_evidencias": ["Evidencias reales de cómo atacan o progresan..."],
+    "capaB_interpretacion": "Qué peligros genera su estructura ofensiva...",
+    "capaC_propuestaIndautxu": "Cómo nos organizamos en Bloque Medio 1-4-1-3-2 / Bloque Bajo 1-4-4-2 para neutralizarlos...",
+    "evidenciasIds": ["id_obs_1", "id_obs_2"]
+  },
+  "comoAtacarles": {
+    "capaA_evidencias": ["Evidencias reales de cómo defienden o sus puntos débiles..."],
+    "capaB_interpretacion": "Dónde conceden espacios o qué desajustes sufren...",
+    "capaC_propuestaIndautxu": "Cómo progresar con 3º hombre, cuadrado de salida y fijar para dividir...",
+    "evidenciasIds": ["id_obs_3"]
+  },
+  "presionYActivadores": {
+    "capaA_evidencias": ["Evidencias de su salida de balón o juego bajo acoso..."],
+    "capaB_interpretacion": "Cuándo y dónde son más vulnerables al inicio...",
+    "capaC_propuestaIndautxu": "Activador de presión de Indautxu: orientar a su lateral, emparejamientos y saltos...",
+    "evidenciasIds": []
+  },
+  "salidaBalon": {
+    "capaA_evidencias": ["Evidencias de cómo presionan ellos nuestra salida..."],
+    "capaB_interpretacion": "Qué altura de bloque usan y dónde colocan sus marcas...",
+    "capaC_propuestaIndautxu": "Solución con pivotes en diagonal y cuadrado de centrales...",
+    "evidenciasIds": []
+  },
+  "transicionOfensiva": {
+    "capaA_evidencias": ["Evidencias de su repliegue tras perder el balón..."],
+    "capaB_interpretacion": "Espacios que dejan a la espalda de sus laterales o lentitud de pivotes...",
+    "capaC_propuestaIndautxu": "Contraataque directo o cambio de carril según zona de robo (Indautxu DH)...",
+    "evidenciasIds": []
+  },
+  "transicionDefensiva": {
+    "capaA_evidencias": ["Evidencias de su contraataque o verticalidad tras recuperar..."],
+    "capaB_interpretacion": "Jugadores a los que buscan inmediatamente y velocidad de despliegue...",
+    "capaC_propuestaIndautxu": "Presión 6-8s condicionada o repliegue inmediato a bloque compacto máx 40m...",
+    "evidenciasIds": []
+  },
+  "abpOfensivo": {
+    "capaA_evidencias": ["Evidencias de su defensa a balón parado (marcas zonales/mixtas)..."],
+    "capaB_interpretacion": "Dónde sufren en córneres o faltas laterales...",
+    "capaC_propuestaIndautxu": "Diseño de jugada ensayada o zona de remate a cargar...",
+    "evidenciasIds": []
+  },
+  "abpDefensivo": {
+    "capaA_evidencias": ["Evidencias de sus jugadas a balón parado a favor...", "Rematadores principales..."],
+    "capaB_interpretacion": "Patrones ensayados (primer palo, bloqueos, segundo palo)...",
+    "capaC_propuestaIndautxu": "Organización defensiva de Indautxu para contrarrestarlo...",
+    "evidenciasIds": []
+  },
+  "amenazasPrincipales": [
+    {
+      "jugador": "Nombre o Dorsal",
+      "dorsal": "Dorsal si se conoce",
+      "posicion": "Posición habitual",
+      "peligro": "critico | alto | medio",
+      "capaA_evidencia": "Evidencia literal observada...",
+      "capaB_interpretacion": "Por qué es una amenaza para nosotros...",
+      "capaC_propuestaIndautxu": "Consigna de marcaje / ayudas del lateral o central de Indautxu...",
+      "evidenciaId": "id_obs_amenaza"
+    }
+  ],
+  "debilidadesExplotar": [
+    {
+      "aspecto": "Nombre de la debilidad detectada",
+      "capaA_evidencia": "Evidencia literal del informe...",
+      "capaB_interpretacion": "Diagnóstico táctico...",
+      "capaC_propuestaIndautxu": "Plan de explotación en partido...",
+      "evidenciaId": "id_obs_debilidad"
+    }
+  ],
+  "consignasPorLineas": {
+    "porteria": "Consignas para el Portero (salida de balón, vigilancias a la espalda y centros).",
+    "defensa": "Consignas para Centrales y Laterales (duelos 1v1, coberturas, saltos de atrás a adelante).",
+    "mediocampo": "Consignas para Doble Pivote y Mediapunta (cierre interior, basculación, 3º hombre).",
+    "delantera": "Consignas para Extremos y Delantero (orientación de la salida rival, fijación y rupturas)."
+  },
+  "riesgosDelPlan": [
+    "Riesgo táctico 1 asumido en este emparejamiento...",
+    "Riesgo táctico 2..."
+  ],
+  "metadatosAnalisis": {
+    "totalObservacionesUsadas": ${ctx.approvedObservations.length},
+    "documentosFuentes": ${JSON.stringify(ctx.reportSourcesLabels || [])},
+    "fechaGeneracion": "${new Date().toISOString().split('T')[0]}"
+  }
+}
+`;
+}
+
+
+export function buildRivalScoutingContextString(ctx: RivalScoutingPromptContext): string {
+  let text = `
+=== CONTEXTO DEL SCOUTING RIVAL ===
+- Rival: ${ctx.rivalName}
+- Temporada: ${ctx.season || '2026-27'}
+- Sistema Principal Rival Detectado / Registrado: ${ctx.rivalSystem || '1-4-3-3 (o por determinar en informes)'}
+- Total Observaciones Aprobadas por el Entrenador: ${ctx.approvedObservations.length}
+- Documentos / Informes de Origen: ${ctx.reportSourcesLabels && ctx.reportSourcesLabels.length > 0 ? ctx.reportSourcesLabels.join(', ') : 'Informes de scouting del club'}
+`;
+
+  // 1. Modelo de Juego registrado del rival (si existe en club_play_models)
+  if (ctx.rivalPlayModel) {
+    const pm = ctx.rivalPlayModel;
+    text += `\n=== MODELO DE JUEGO REGISTRADO DEL RIVAL (FICHA DEL CLUB) ===\n`;
+    if (pm.sistema_principal) text += `- Sistema Principal: ${pm.sistema_principal}\n`;
+    if (pm.sistemas_alternativos) text += `- Sistemas Alternativos: ${pm.sistemas_alternativos}\n`;
+    if (pm.salida_balon) text += `- Salida de Balón: ${pm.salida_balon}\n`;
+    if (pm.construccion) text += `- Construcción: ${pm.construccion}\n`;
+    if (pm.ataque_organizado) text += `- Ataque Organizado: ${pm.ataque_organizado}\n`;
+    if (pm.transicion_ofensiva) text += `- Transición Ofensiva: ${pm.transicion_ofensiva}\n`;
+    if (pm.transicion_defensiva) text += `- Transición Defensiva: ${pm.transicion_defensiva}\n`;
+    if (pm.presion) text += `- Presión: ${pm.presion}\n`;
+    if (pm.bloque_defensivo) text += `- Bloque Defensivo: ${pm.bloque_defensivo}\n`;
+    if (pm.defensa_area) text += `- Defensa de Área: ${pm.defensa_area}\n`;
+    if (pm.abp_ofensiva) text += `- ABP Ofensiva: ${pm.abp_ofensiva}\n`;
+    if (pm.abp_defensiva) text += `- ABP Defensiva: ${pm.abp_defensiva}\n`;
+  }
+
+  // 2. Informe Previo del Míster (si existe en club_reports)
+  if (ctx.misterReport) {
+    const mr = ctx.misterReport;
+    text += `\n=== ANOTACIONES PREVIAS DEL ENTRENADOR (INFORME DEL MÍSTER) ===\n`;
+    if (mr.titulo) text += `- Título: ${mr.titulo}\n`;
+    if (mr.plan_partido) text += `- Estrategia Global: ${mr.plan_partido}\n`;
+    if (mr.que_atacar) text += `- Debilidades Observadas por el Míster: ${mr.que_atacar}\n`;
+    if (mr.que_proteger) text += `- Amenazas Identificadas por el Míster: ${mr.que_proteger}\n`;
+    if (mr.consignas) text += `- Consignas Previas: ${mr.consignas}\n`;
+  }
+
+  // 3. Observaciones Aprobadas de Informes (Conocimiento Real Validado)
+  if (ctx.approvedObservations && ctx.approvedObservations.length > 0) {
+    text += `\n=== OBSERVACIONES APROBADAS E INTEGRADAS DE INFORMES DE SCOUTING (CONOCIMIENTO REAL VALIDADO) ===\n`;
+    ctx.approvedObservations.forEach((obs) => {
+      let line = `[ID: ${obs.id}] (${obs.categoria}) ${obs.contenido}`;
+      const meta: string[] = [];
+      if (obs.documentName) meta.push(`Doc: "${obs.documentName}"`);
+      if (obs.pagina) meta.push(`Pág: ${obs.pagina}`);
+      if (obs.confianza) meta.push(`Confianza: ${obs.confianza}`);
+      if (obs.prioridad) meta.push(`Prioridad: ${obs.prioridad}`);
+      if (obs.esPropuestaAnalista) meta.push('Propuesta del Analista');
+      if (obs.rivalPlayerName || obs.rivalPlayerDorsal) {
+        meta.push(`Jugador: ${obs.rivalPlayerName || ''} Dorsal ${obs.rivalPlayerDorsal || ''} (${obs.rivalPlayerPosition || ''}) Peligro: ${obs.rivalPlayerThreatLevel || 'alto'}`);
+      }
+      if (meta.length > 0) line += ` [${meta.join(' | ')}]`;
+      if (obs.evidenciaOriginal) line += `\n   ↳ Evidencia Literal: "${obs.evidenciaOriginal}"`;
+      text += `${line}\n`;
+    });
+  } else {
+    text += `\n=== OBSERVACIONES APROBADAS E INTEGRADAS ===\nNo existen observaciones aprobadas en informes todavía para este rival.\n`;
+  }
+
+  text += `
+=== DOCTRINA OFICIAL E IDENTIDAD S.D. INDAUTXU JUVENIL A (DIVISIÓN DE HONOR) ===
+- Sistema Base: 1-4-2-3-1
+- Filosofía: Protagonistas con balón (iniciar para progresar) y agresivos sin balón con presión alta e intensa.
+- Ataque Posicional:
+  * Cuadrado de Superioridad (Centrales + Doble Pivote).
+  * 3º Hombre: Reconocimiento de Hombre Libre (HL) y superioridad posicional.
+  * Dividir: Fijar rivales para liberar al compañero libre.
+  * Ante defensa zonal: Juntar y girar / Repetir y girar.
+- Transición Tras Pérdida:
+  * Acoso inmediato e intenso durante 6-8 segundos CONDICIONADO (cercanía de efectivos, coberturas de soporte, carril interior cerrado y profundidad vigilada).
+  * Si la presión es superada o no se dan las condiciones: ABANDONAR persecución y replegar inmediatamente a bloque compacto de máx 40m.
+- Organización Defensiva en 3 Fases:
+  1. Presión Alta: Referencias al hombre en campo rival.
+  2. Bloque Medio (1-4-1-3-2): Línea defensiva a ~10m del área grande, cerrar pasillos interiores, pase al lateral rival como activador de presión, basculación intensa y emparejamientos.
+  3. Bloque Bajo (1-4-4-2): Proteger zona central, cambios de marca en banda (extremo toma al que entra en zona, lateral toma al exterior), saltos de atrás hacia adelante (central salta de frente si reciben entre líneas), defensa de centros con centrales por delante y pivotes siguiendo llegadas.
+==============================================
+`;
+  return text;
+}
+

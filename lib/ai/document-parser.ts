@@ -1,4 +1,5 @@
 import { FlexibleReportExtraction, Observation, RivalPlayerThreat } from '@/types';
+import { getGoogleDriveAccessToken } from '@/lib/google-drive';
 
 const ALLOWED_MIME_TYPES = [
   'application/pdf',
@@ -43,6 +44,8 @@ export function transformGoogleDriveUrl(url: string): string {
 const ALLOWED_DOMAINS = [
   'drive.google.com',
   'docs.google.com',
+  'www.googleapis.com',
+  'googleapis.com',
   'www.dropbox.com',
   'dl.dropboxusercontent.com',
   'supabase.co',
@@ -85,10 +88,56 @@ export function validateDownloadUrl(url: string): void {
 }
 
 /**
- * Descarga los bytes del archivo desde una URL y maneja reintentos de confirmación en Google Drive.
+ * Extrae el ID de archivo de Google Drive si la URL corresponde a Drive / Docs.
+ */
+export function extractGoogleDriveFileId(url: string): string | null {
+  if (!url) return null;
+  const driveRegex = /(?:drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?id=)|docs\.google\.com\/(?:document|presentation|spreadsheets)\/d\/)([a-zA-Z0-9_-]+)/i;
+  const match = url.match(driveRegex);
+  return match && match[1] ? match[1] : null;
+}
+
+/**
+ * Descarga los bytes del archivo desde una URL.
+ * Para archivos de Google Drive, utiliza descarga autenticada con OAuth mediante Google Drive API.
+ * Para otros orígenes o fallbacks, realiza descarga HTTP estándar.
  */
 export async function downloadFileFromUrl(rawUrl: string): Promise<{ buffer: Buffer; contentType: string }> {
   validateDownloadUrl(rawUrl);
+
+  const driveFileId = extractGoogleDriveFileId(rawUrl);
+
+  // 1. Si es un archivo de Google Drive, intentar descarga autenticada con OAuth primero
+  if (driveFileId) {
+    try {
+      const accessToken = await getGoogleDriveAccessToken();
+      if (accessToken) {
+        const driveRes = await fetch(
+          `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(driveFileId)}?alt=media`,
+          {
+            signal: AbortSignal.timeout(60_000),
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+            },
+          }
+        );
+
+        if (driveRes.ok) {
+          const contentType = driveRes.headers.get('content-type') || 'application/pdf';
+          const arrayBuf = await driveRes.arrayBuffer();
+          const buffer = Buffer.from(arrayBuf);
+          return { buffer, contentType };
+        } else {
+          console.warn(`[document-parser] Petición autenticada a Drive API devolvió HTTP ${driveRes.status}. Intentando fallback público...`);
+        }
+      }
+    } catch (authErr: unknown) {
+      const msg = authErr instanceof Error ? authErr.message : String(authErr);
+      console.warn('[document-parser] No se pudo obtener access token para descarga autenticada de Drive:', msg);
+    }
+  }
+
+  // 2. Fallback público / Descarga directa para orígenes externos (Dropbox, URLs públicas, etc.)
   const targetUrl = transformGoogleDriveUrl(rawUrl);
 
   const response = await fetch(targetUrl, {

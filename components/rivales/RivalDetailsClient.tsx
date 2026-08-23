@@ -261,7 +261,7 @@ export function RivalDetailsClient({ rivalId }: { rivalId: string }) {
           <PlayModelTab season={season} />
         )}
         {activeTab === 'IA' && (
-          <AIScoutingTab season={season} />
+          <AIScoutingTab club={club} season={season} />
         )}
         {activeTab === 'INFORME' && (
           <ReportsTab season={season} />
