@@ -12,7 +12,8 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { 
   Film, Plus, AlertCircle, Trash2, BookOpen, Layers, X, 
   Save, RefreshCw, Copy, Edit2, 
-  PlusCircle, Check, ChevronDown, FolderOpen, FileDown, Calendar
+  PlusCircle, Check, ChevronDown, FolderOpen, FileDown, Calendar,
+  Upload, Loader2
 } from 'lucide-react';
 import { useEditMode } from '@/context/EditModeContext';
 import { exportToPDF, buildABPFilename } from '@/lib/exportPdf';
@@ -567,6 +568,51 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
   const [playVideoUrl, setPlayVideoUrl] = useState('');
   const [playZone, setPlayZone] = useState<'Inicio' | 'Medio' | 'Último tercio' | ''>('Último tercio');
   const [videoFile, setVideoFile] = useState<File | null>(null);
+
+  // Drag & Drop Video States
+  const [isUploadingVideo, setIsUploadingVideo] = useState(false);
+  const [isDraggingVideo, setIsDraggingVideo] = useState(false);
+  const [pendingReplaceVideoFile, setPendingReplaceVideoFile] = useState<File | null>(null);
+  const [isConfirmReplaceOpen, setIsConfirmReplaceOpen] = useState(false);
+  const dropFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Helper reutilizable para subir vídeos ABP a Supabase Storage (match-videos/abp-videos/)
+  const uploadAbpVideo = async (file: File): Promise<string> => {
+    const fileExt = file.name.split('.').pop()?.toLowerCase() || 'mp4';
+    const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 9)}.${fileExt}`;
+    const filePath = `abp-videos/${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('match-videos')
+      .upload(filePath, file);
+
+    if (uploadError) throw uploadError;
+
+    const { data } = supabase.storage.from('match-videos').getPublicUrl(filePath);
+    return data.publicUrl;
+  };
+
+  // Prevenir comportamiento nativo del navegador al arrastrar archivos fuera de la drop zone
+  useEffect(() => {
+    const handleGlobalDragOver = (e: DragEvent) => {
+      if (e.dataTransfer?.types?.includes('Files')) {
+        e.preventDefault();
+      }
+    };
+    const handleGlobalDrop = (e: DragEvent) => {
+      if (e.dataTransfer?.types?.includes('Files')) {
+        e.preventDefault();
+      }
+    };
+
+    window.addEventListener('dragover', handleGlobalDragOver);
+    window.addEventListener('drop', handleGlobalDrop);
+
+    return () => {
+      window.removeEventListener('dragover', handleGlobalDragOver);
+      window.removeEventListener('drop', handleGlobalDrop);
+    };
+  }, []);
   
   // Filters & Search
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -801,18 +847,7 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
 
       // Handle video upload if selected
       if (videoFile) {
-        const fileExt = videoFile.name.split('.').pop();
-        const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
-        const filePath = `abp-videos/${fileName}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from('match-videos')
-          .upload(filePath, videoFile);
-
-        if (uploadError) throw uploadError;
-
-        const { data } = supabase.storage.from('match-videos').getPublicUrl(filePath);
-        videoUrl = data.publicUrl;
+        videoUrl = await uploadAbpVideo(videoFile);
       }
 
       const isThrowIn = playType === 'Saque de banda ofensivo' || playType === 'Saque de banda defensivo';
@@ -852,7 +887,7 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
         const defaultRoles = getPositionsForPlay(playType, isThrowIn ? playZone : null);
         rolesPayload = defaultRoles.map((dr, index) => ({
           abp_play_id: playRes.id,
-          player_id: null, // VACÍO initially
+          player_id: null,
           rol_asignado: dr.role,
           posicion_x: dr.x,
           posicion_y: dr.y,
@@ -873,22 +908,17 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
         if (rolesError) console.error('Error creating default roles:', rolesError);
       }
 
+      setIsPlayModalOpen(false);
       setPlayTitle('');
       setPlayDesc('');
       setPlayVideoUrl('');
       setVideoFile(null);
-      setIsPlayModalOpen(false);
-      
-      // Select the new play
-      if (playRes) {
-        setSelectedPlay(playRes);
-      }
       await loadPlays();
-      setSuccessMsg('Jugada de estrategia creada correctamente.');
+      setSuccessMsg('Jugada creada correctamente.');
     } catch (err: unknown) {
       const error = err as Error;
-      console.error('Error creating ABP play:', error);
-      setErrorMsg(error.message || 'Error al guardar la jugada.');
+      console.error('Error creating play:', error);
+      setErrorMsg(error.message || 'Error al crear la jugada.');
     } finally {
       setIsSaving(false);
     }
@@ -910,18 +940,7 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
 
       // Handle video upload if selected
       if (videoFile) {
-        const fileExt = videoFile.name.split('.').pop();
-        const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
-        const filePath = `abp-videos/${fileName}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from('match-videos')
-          .upload(filePath, videoFile);
-
-        if (uploadError) throw uploadError;
-
-        const { data } = supabase.storage.from('match-videos').getPublicUrl(filePath);
-        videoUrl = data.publicUrl;
+        videoUrl = await uploadAbpVideo(videoFile);
       }
 
       const isThrowIn = playType === 'Saque de banda ofensivo' || playType === 'Saque de banda defensivo';
@@ -970,6 +989,78 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
       setIsSaving(false);
     }
   }
+
+  // --- DRAG & DROP / DIRECT VIDEO UPLOAD FOR SELECTED PLAY ---
+  const handleDropVideoFile = (file: File) => {
+    if (!selectedPlay) return;
+
+    // Validación estricta de archivo de vídeo
+    const validExtensions = ['mp4', 'mov', 'webm', 'mkv', 'avi', 'm4v'];
+    const ext = file.name.split('.').pop()?.toLowerCase() || '';
+    const isVideo = file.type.startsWith('video/') || validExtensions.includes(ext);
+
+    if (!isVideo) {
+      setErrorMsg('Archivo no válido. Por favor, arrastra o selecciona un archivo de vídeo (.mp4, .mov, .webm, etc.).');
+      return;
+    }
+
+    // Si la jugada ya tiene vídeo asociado, solicitar confirmación antes de sustituir
+    if (selectedPlay.video_url) {
+      setPendingReplaceVideoFile(file);
+      setIsConfirmReplaceOpen(true);
+      return;
+    }
+
+    // Si no tiene vídeo previo, ejecutar subida directa
+    executeVideoUpload(file, selectedPlay);
+  };
+
+  const executeVideoUpload = async (file: File, targetPlay: ABPPlay) => {
+    setIsUploadingVideo(true);
+    setErrorMsg(null);
+
+    try {
+      // 1. Subir archivo al bucket match-videos/abp-videos/
+      const publicUrl = await uploadAbpVideo(file);
+
+      // 2. Asociar exclusivamente a la abp_play seleccionada
+      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
+      const { error: updateError } = await supabase
+        .rpc('exec_secure_upsert', {
+          target_table: 'abp_plays',
+          payload: {
+            id: targetPlay.id,
+            tipo: targetPlay.tipo,
+            titulo: targetPlay.titulo,
+            descripcion: targetPlay.descripcion,
+            video_url: publicUrl,
+            zona: targetPlay.zona
+          },
+          conflict_columns: ['id'],
+          staff_passkey: passkey
+        });
+
+      if (updateError) throw updateError;
+
+      // 3. Actualizar estado local reactivamente para reproducción inmediata
+      const updatedPlay = {
+        ...targetPlay,
+        video_url: publicUrl
+      };
+      setSelectedPlay(updatedPlay);
+      setPlays(prev => prev.map(p => p.id === targetPlay.id ? updatedPlay : p));
+
+      setSuccessMsg('Vídeo táctico asociado correctamente a la jugada.');
+    } catch (err: unknown) {
+      const error = err as Error;
+      console.error('Error asociando vídeo ABP:', error);
+      setErrorMsg(error.message || 'Error al subir el archivo de vídeo.');
+    } finally {
+      setIsUploadingVideo(false);
+      setPendingReplaceVideoFile(null);
+      setIsConfirmReplaceOpen(false);
+    }
+  };
 
   // Open Edit Modal with current values
   const openEditModal = () => {
@@ -1845,13 +1936,85 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
                     </div>
                   </div>
 
-                  {/* Vídeo */}
-                  <div className="p-4 bg-slate-900/40 border border-slate-800/80 rounded-2xl flex flex-col h-[220px]">
-                    <h4 className="text-[11px] font-bold text-slate-400 flex items-center gap-1.5 uppercase tracking-wider mb-2 shrink-0">
-                      <Film className="h-3.5 w-3.5 text-blue-500" /> Vídeo táctico
-                    </h4>
-                    {selectedPlay.video_url ? (
+                  {/* Vídeo Táctico con Soporte Drag & Drop */}
+                  <div
+                    onDragEnter={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setIsDraggingVideo(true);
+                    }}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      e.dataTransfer.dropEffect = 'copy';
+                      if (!isDraggingVideo) setIsDraggingVideo(true);
+                    }}
+                    onDragLeave={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+                      setIsDraggingVideo(false);
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setIsDraggingVideo(false);
+                      if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                        handleDropVideoFile(e.dataTransfer.files[0]);
+                      }
+                    }}
+                    className={`relative p-4 bg-slate-900/40 border transition-all rounded-2xl flex flex-col h-[220px] ${
+                      isDraggingVideo
+                        ? 'border-[#CC0E21] ring-2 ring-[#CC0E21]/40 bg-[#CC0E21]/5'
+                        : 'border-slate-800/80'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2 mb-2 shrink-0">
+                      <h4 className="text-[11px] font-bold text-slate-400 flex items-center gap-1.5 uppercase tracking-wider">
+                        <Film className="h-3.5 w-3.5 text-blue-500" /> Vídeo táctico
+                      </h4>
+                      {selectedPlay.video_url && (
+                        <button
+                          type="button"
+                          onClick={() => dropFileInputRef.current?.click()}
+                          className="text-[10px] text-slate-400 hover:text-white flex items-center gap-1 bg-slate-950/60 border border-slate-800 px-2 py-0.5 rounded-lg hover:border-slate-700 transition-colors"
+                          title="Sustituir vídeo"
+                        >
+                          <Upload className="h-3 w-3 text-slate-400" /> Cambiar
+                        </button>
+                      )}
+                    </div>
+
+                    <input
+                      ref={dropFileInputRef}
+                      type="file"
+                      accept="video/mp4,video/quicktime,video/webm,video/x-matroska,video/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          handleDropVideoFile(e.target.files[0]);
+                          e.target.value = '';
+                        }
+                      }}
+                    />
+
+                    {/* Estado: Subiendo vídeo */}
+                    {isUploadingVideo ? (
+                      <div className="flex-1 rounded-xl border border-slate-800 bg-slate-950/80 flex flex-col items-center justify-center gap-2 text-center p-4">
+                        <Loader2 className="h-7 w-7 text-[#CC0E21] animate-spin" />
+                        <span className="text-xs font-bold text-slate-200">Subiendo vídeo a la jugada...</span>
+                        <span className="text-[10px] text-slate-500">Guardando en match-videos/abp-videos</span>
+                      </div>
+                    ) : selectedPlay.video_url ? (
+                      /* Vídeo presente con overlay si se arrastra encima */
                       <div className="relative flex-1 rounded-xl overflow-hidden border border-slate-800 bg-black">
+                        {isDraggingVideo && (
+                          <div className="absolute inset-0 z-30 bg-slate-950/90 border-2 border-dashed border-[#CC0E21] rounded-xl flex flex-col items-center justify-center p-4 text-center backdrop-blur-sm animate-pulse">
+                            <Upload className="h-8 w-8 text-[#CC0E21] mb-2 animate-bounce" />
+                            <p className="text-xs font-bold text-white">Soltar vídeo para sustituir el actual</p>
+                            <p className="text-[10px] text-slate-400 mt-1">Se solicitará confirmación antes de guardar</p>
+                          </div>
+                        )}
                         {getEmbedVideoUrl(selectedPlay.video_url) ? (
                           <iframe
                             src={getEmbedVideoUrl(selectedPlay.video_url) || ''}
@@ -1868,8 +2031,30 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
                         )}
                       </div>
                     ) : (
-                      <div className="border border-slate-850 bg-slate-950/20 rounded-xl text-center text-xs text-slate-600 italic flex items-center justify-center flex-1">
-                        Sin vídeo asociado.
+                      /* Drop Zone interactiva sin vídeo */
+                      <div
+                        onClick={() => dropFileInputRef.current?.click()}
+                        className={`relative border-2 border-dashed rounded-xl flex flex-col items-center justify-center p-4 text-center cursor-pointer transition-all flex-1 ${
+                          isDraggingVideo
+                            ? 'border-[#CC0E21] bg-[#CC0E21]/15 text-white shadow-lg shadow-[#CC0E21]/10 animate-pulse'
+                            : 'border-slate-800 hover:border-slate-700 bg-slate-950/30 hover:bg-slate-950/50 text-slate-400'
+                        }`}
+                      >
+                        {isDraggingVideo ? (
+                          <div className="flex flex-col items-center gap-1">
+                            <Upload className="h-8 w-8 text-[#CC0E21] animate-bounce" />
+                            <span className="text-xs font-bold text-white">¡Suelta el vídeo aquí!</span>
+                            <span className="text-[10px] text-red-300">Asociar a {selectedPlay.titulo}</span>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-center gap-1.5">
+                            <div className="p-2 rounded-full bg-slate-900/80 border border-slate-800 text-slate-400 group-hover:text-[#CC0E21] transition-colors">
+                              <Upload className="h-5 w-5 text-slate-400" />
+                            </div>
+                            <p className="text-xs font-semibold text-slate-300">Arrastra aquí el vídeo táctico</p>
+                            <p className="text-[10px] text-slate-500">o haz clic para seleccionar archivo (.mp4 / .mov)</p>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -2144,6 +2329,57 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
             </Button>
           </div>
         </form>
+      </Modal>
+
+      {/* ========================================================================= */}
+      {/* MODAL: CONFIRMAR SUSTITUCIÓN DE VÍDEO TÁCTICO */}
+      {/* ========================================================================= */}
+      <Modal 
+        isOpen={isConfirmReplaceOpen} 
+        onClose={() => {
+          setIsConfirmReplaceOpen(false);
+          setPendingReplaceVideoFile(null);
+        }} 
+        title="Confirmar Sustitución de Vídeo Táctico"
+      >
+        <div className="space-y-4">
+          <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-300 flex items-start gap-2.5">
+            <AlertCircle className="h-5 w-5 text-amber-400 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-bold text-amber-200">Esta jugada ya dispone de un vídeo táctico asociado.</p>
+              <p className="text-slate-300 mt-1">
+                ¿Deseas sustituir el vídeo actual de <strong className="text-white">&quot;{selectedPlay?.titulo}&quot;</strong> por el nuevo archivo <strong className="text-amber-200">{pendingReplaceVideoFile?.name}</strong>?
+              </p>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button
+              variant="ghost"
+              type="button"
+              disabled={isUploadingVideo}
+              onClick={() => {
+                setIsConfirmReplaceOpen(false);
+                setPendingReplaceVideoFile(null);
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="primary"
+              type="button"
+              loading={isUploadingVideo}
+              onClick={() => {
+                if (pendingReplaceVideoFile && selectedPlay) {
+                  executeVideoUpload(pendingReplaceVideoFile, selectedPlay);
+                }
+              }}
+              className="bg-[#CC0E21] hover:bg-red-500 text-white font-bold"
+            >
+              Sustituir Vídeo
+            </Button>
+          </div>
+        </div>
       </Modal>
 
       {/* Hidden container for high-res PDF Export */}
