@@ -25,6 +25,7 @@ import {
   Sparkles,
   RefreshCw,
 } from 'lucide-react';
+import CapaCStructuredView from '@/components/rivales/scouting/CapaCStructuredView';
 
 interface AIScoutingTabProps {
   club?: Club | null;
@@ -426,8 +427,11 @@ export function AIScoutingTab({ club, season }: AIScoutingTabProps) {
                         <p className="text-slate-300 mt-0.5">{threat.capaA_evidencia}</p>
                       </div>
                       <div>
-                        <span className="text-[10px] font-bold text-indigo-400 uppercase">Consigna Indautxu:</span>
-                        <p className="text-indigo-200 mt-0.5 font-medium">{threat.capaC_propuestaIndautxu}</p>
+                        <span className="text-[10px] font-bold text-emerald-400 uppercase flex items-center gap-1 mb-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                          Consigna Indautxu:
+                        </span>
+                        <CapaCStructuredView text={threat.capaC_propuestaIndautxu} compact />
                       </div>
                     </div>
                   </div>
@@ -451,9 +455,15 @@ export function AIScoutingTab({ club, season }: AIScoutingTabProps) {
                       <span className="w-2 h-2 rounded-full bg-emerald-400" />
                       {deb.aspecto || `Vulnerabilidad #${idx + 1}`}
                     </div>
-                    <div className="text-xs space-y-1.5">
+                    <div className="text-xs space-y-2">
                       <p className="text-slate-300"><span className="text-slate-500 font-semibold">Dato observado:</span> {deb.capaA_evidencia}</p>
-                      <p className="text-indigo-200 font-medium"><span className="text-indigo-400 font-semibold">Plan de ataque:</span> {deb.capaC_propuestaIndautxu}</p>
+                      <div className="pt-1 border-t border-slate-800/60">
+                        <span className="text-[10px] font-bold text-emerald-400 uppercase flex items-center gap-1 mb-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                          Plan de ataque Indautxu:
+                        </span>
+                        <CapaCStructuredView text={deb.capaC_propuestaIndautxu} compact />
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -567,14 +577,17 @@ function ScoutingPhaseCard({
             )}
 
             {/* CAPA C — PROPUESTA PARA SD INDAUTXU */}
-            <div className="bg-emerald-950/20 p-3 rounded-xl border border-emerald-900/40 space-y-1">
-              <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1">
+            <div className="bg-emerald-950/20 p-3.5 rounded-xl border border-emerald-900/40 space-y-2">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5 pb-1 border-b border-emerald-900/40">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                 Capa C — Propuesta SD Indautxu (1-4-2-3-1)
               </div>
-              <p className="text-emerald-200 pl-2.5 font-medium leading-relaxed">
-                {block.capaC_propuestaIndautxu || 'Mantener principios del modelo de juego Indautxu.'}
-              </p>
+              <div className="pt-0.5">
+                <CapaCStructuredView
+                  text={block.capaC_propuestaIndautxu}
+                  fallbackText="Mantener principios del modelo de juego Indautxu."
+                />
+              </div>
             </div>
           </div>
         ) : (

@@ -495,6 +495,12 @@ DIRECTRICES CRÍTICAS Y VINCULANTES:
    - CAPA A (Evidencia del Rival): Cita literal o síntesis rigurosa de lo observado en los informes aprobados. NUNCA inventes comportamientos. Debes incluir en 'evidenciasIds' los IDs de las observaciones que sustentan este punto.
    - CAPA B (Interpretación IA): Explicación analítica de la ventaja, vulnerabilidad o patrón táctico que genera ese comportamiento del rival.
    - CAPA C (Propuesta SD Indautxu): Consigna táctica específica adaptando nuestro sistema 1-4-2-3-1 y la doctrina oficial del club para contrarrestar o explotar esa situación.
+     * FORMATO OBLIGATORIO DE CAPA C: NO redactar en un párrafo corrido. Estructurar siempre en bloques y puntos tácticos bajo el principio: UNA IDEA TÁCTICA = UN PUNTO / UNA ACCIÓN = UNA CONSIGNA.
+     * Estructura:
+       CONCEPTO/ETIQUETA [→ DETALLE]
+       • Consigna de acción 1
+       • Consigna de acción 2
+         - Subpunto / emparejamiento si afecta a puestos específicos (ej: Extremo → ..., Lateral → ...)
 
 2. REGLA DE AUSENCIA DE DATOS:
    - Si no existe evidencia aprobada en los informes sobre un aspecto específico (por ejemplo, si no hay datos de córneres o de repliegue), ESTÁ ESTRICTAMENTE PROHIBIDO inventar o asumir patrones del rival.
@@ -524,49 +530,49 @@ ESTRUCTURA JSON REQUERIDA STRICTAMENTE:
   "comoDefenderles": {
     "capaA_evidencias": ["Evidencias reales de cómo atacan o progresan..."],
     "capaB_interpretacion": "Qué peligros genera su estructura ofensiva...",
-    "capaC_propuestaIndautxu": "Cómo nos organizamos en Bloque Medio 1-4-1-3-2 / Bloque Bajo 1-4-4-2 para neutralizarlos...",
+    "capaC_propuestaIndautxu": "BLOQUE MEDIO → 1-4-1-3-2\\n• Cerrar pasillos interiores.\\n\\nACTIVADOR DE PRESIÓN → PASE A SU LATERAL\\n• Basculación intensa.\\n• Emparejamientos al hombre.\\n\\nSI NOS HUNDEN → BLOQUE BAJO 1-4-4-2\\n• Cambio de marca en banda:\\n  - Extremo → jugador que entra en zona.\\n  - Lateral → jugador exterior.\\n• Defensa del área:\\n  - Centrales → posicionados por delante del portero.\\n  - Pivotes → llegadas desde segunda línea.",
     "evidenciasIds": ["id_obs_1", "id_obs_2"]
   },
   "comoAtacarles": {
     "capaA_evidencias": ["Evidencias reales de cómo defienden o sus puntos débiles..."],
     "capaB_interpretacion": "Dónde conceden espacios o qué desajustes sufren...",
-    "capaC_propuestaIndautxu": "Cómo progresar con 3º hombre, cuadrado de salida y fijar para dividir...",
+    "capaC_propuestaIndautxu": "INICIO COMBINATIVO\\n• Cuadrado de superioridad:\\n  - Centrales\\n  - Doble pivote\\n\\nOBJETIVO\\n• Atraer su presión alta.\\n\\nPROGRESIÓN\\n• Buscar tercer hombre.\\n• Fijar mediante conducción para dividir.\\n\\nSUPERADA SU PRIMERA LÍNEA → ACELERAR\\n• Envíos rápidos.\\n• Diagonales a la espalda de sus laterales.\\n\\nEXTREMOS\\n• Explotar en carrera el espacio generado a la espalda.",
     "evidenciasIds": ["id_obs_3"]
   },
   "presionYActivadores": {
     "capaA_evidencias": ["Evidencias de su salida de balón o juego bajo acoso..."],
     "capaB_interpretacion": "Cuándo y dónde son más vulnerables al inicio...",
-    "capaC_propuestaIndautxu": "Activador de presión de Indautxu: orientar a su lateral, emparejamientos y saltos...",
+    "capaC_propuestaIndautxu": "ACTIVADOR DE PRESIÓN\\n• Orientar salida hacia su lateral.\\n• Emparejamientos y saltos agresivos del mediapunta y extremos.",
     "evidenciasIds": []
   },
   "salidaBalon": {
     "capaA_evidencias": ["Evidencias de cómo presionan ellos nuestra salida..."],
     "capaB_interpretacion": "Qué altura de bloque usan y dónde colocan sus marcas...",
-    "capaC_propuestaIndautxu": "Solución con pivotes en diagonal y cuadrado de centrales...",
+    "capaC_propuestaIndautxu": "SALIDA ANTE SU PRESIÓN\\n• Pivotes escalonados en diagonal para generar línea de pase.\\n• Cuadrado de centrales para fijar y encontrar tercer hombre libre.",
     "evidenciasIds": []
   },
   "transicionOfensiva": {
     "capaA_evidencias": ["Evidencias de su repliegue tras perder el balón..."],
     "capaB_interpretacion": "Espacios que dejan a la espalda de sus laterales o lentitud de pivotes...",
-    "capaC_propuestaIndautxu": "Contraataque directo o cambio de carril según zona de robo (Indautxu DH)...",
+    "capaC_propuestaIndautxu": "TRAS RECUPERAR BALÓN\\n• Contraataque directo o cambio de carril según zona de robo (Indautxu DH).\\n• Explotar desajuste antes de su repliegue.",
     "evidenciasIds": []
   },
   "transicionDefensiva": {
     "capaA_evidencias": ["Evidencias de su contraataque o verticalidad tras recuperar..."],
     "capaB_interpretacion": "Jugadores a los que buscan inmediatamente y velocidad de despliegue...",
-    "capaC_propuestaIndautxu": "Presión 6-8s condicionada o repliegue inmediato a bloque compacto máx 40m...",
+    "capaC_propuestaIndautxu": "TRAS PÉRDIDA\\n• Presión intensa 6-8 segundos condicionada.\\n• Si superan presión → repliegue inmediato a bloque compacto máx 40m.",
     "evidenciasIds": []
   },
   "abpOfensivo": {
     "capaA_evidencias": ["Evidencias de su defensa a balón parado (marcas zonales/mixtas)..."],
     "capaB_interpretacion": "Dónde sufren en córneres o faltas laterales...",
-    "capaC_propuestaIndautxu": "Diseño de jugada ensayada o zona de remate a cargar...",
+    "capaC_propuestaIndautxu": "PLAN ABP OFENSIVO\\n• Jugada ensayada cargando su punto vulnerable.\\n• Bloqueos y llegadas en segunda jugada.",
     "evidenciasIds": []
   },
   "abpDefensivo": {
     "capaA_evidencias": ["Evidencias de sus jugadas a balón parado a favor...", "Rematadores principales..."],
     "capaB_interpretacion": "Patrones ensayados (primer palo, bloqueos, segundo palo)...",
-    "capaC_propuestaIndautxu": "Organización defensiva de Indautxu para contrarrestarlo...",
+    "capaC_propuestaIndautxu": "ORGANIZACIÓN DEFENSIVA ABP\\n• Asignación estricta de marcas y vigilancias en segundo palo.\\n• Portero dominando área pequeña y rechaces.",
     "evidenciasIds": []
   },
   "amenazasPrincipales": [
@@ -577,7 +583,7 @@ ESTRUCTURA JSON REQUERIDA STRICTAMENTE:
       "peligro": "critico | alto | medio",
       "capaA_evidencia": "Evidencia literal observada...",
       "capaB_interpretacion": "Por qué es una amenaza para nosotros...",
-      "capaC_propuestaIndautxu": "Consigna de marcaje / ayudas del lateral o central de Indautxu...",
+      "capaC_propuestaIndautxu": "CONSIGNA DE MARCAJE\\n• Vigilancias cercanas.\\n• Ayudas del lateral o central.",
       "evidenciaId": "id_obs_amenaza"
     }
   ],
@@ -586,7 +592,7 @@ ESTRUCTURA JSON REQUERIDA STRICTAMENTE:
       "aspecto": "Nombre de la debilidad detectada",
       "capaA_evidencia": "Evidencia literal del informe...",
       "capaB_interpretacion": "Diagnóstico táctico...",
-      "capaC_propuestaIndautxu": "Plan de explotación en partido...",
+      "capaC_propuestaIndautxu": "PLAN DE EXPLOTACIÓN\\n• Acciones dirigidas a esa zona débil.",
       "evidenciaId": "id_obs_debilidad"
     }
   ],

@@ -5,6 +5,7 @@ import { Observation, FlexibleReportExtraction, RivalPlayerThreat } from '@/type
 import { Button } from '@/components/ui/Button';
 import { useEditMode } from '@/context/EditModeContext';
 import { CheckCircle2, XCircle, AlertCircle, ShieldAlert, UserCheck, Sparkles, Compass } from 'lucide-react';
+import CapaCStructuredView from '@/components/rivales/scouting/CapaCStructuredView';
 
 interface ReviewExtractedReportModalProps {
   isOpen: boolean;
@@ -501,11 +502,11 @@ export function ReviewExtractedReportModal({
 
                       {/* Capa C: Propuesta Modelo Indautxu */}
                       {obs.propuestaIndautxu && (
-                        <div className="p-2.5 rounded-xl bg-emerald-950/30 border border-emerald-900/40 text-[11px] text-emerald-200 flex flex-col gap-0.5">
+                        <div className="p-2.5 rounded-xl bg-emerald-950/30 border border-emerald-900/40 text-[11px] text-emerald-200 flex flex-col gap-1">
                           <span className="font-bold text-emerald-400 flex items-center gap-1 text-[10px] uppercase">
                             <Compass className="h-3 w-3" /> Capa C — Propuesta Modelo Indautxu:
                           </span>
-                          <span>{obs.propuestaIndautxu}</span>
+                          <CapaCStructuredView text={obs.propuestaIndautxu} compact />
                         </div>
                       )}
                     </div>
@@ -597,9 +598,9 @@ export function ReviewExtractedReportModal({
                     )}
 
                     {t.propuestaIndautxu && (
-                      <div className="p-2.5 rounded-xl bg-emerald-950/30 border border-emerald-900/40 text-xs text-emerald-200">
+                      <div className="p-2.5 rounded-xl bg-emerald-950/30 border border-emerald-900/40 text-xs text-emerald-200 flex flex-col gap-1">
                         <strong className="text-emerald-400 block text-[10px] uppercase mb-0.5">Capa C — Propuesta Modelo Indautxu:</strong>
-                        {t.propuestaIndautxu}
+                        <CapaCStructuredView text={t.propuestaIndautxu} compact />
                       </div>
                     )}
                   </div>
