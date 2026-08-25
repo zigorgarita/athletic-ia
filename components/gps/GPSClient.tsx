@@ -5,7 +5,7 @@ import * as XLSX from 'xlsx';
 import { supabase } from '@/lib/supabase';
 import { usePlayers } from '@/hooks/usePlayers';
 import { useEditMode } from '@/context/EditModeContext';
-import { GPSSession, GPSData, Player, GPSPlayerMapping } from '@/types';
+import { GPSSession, GPSData, Player, GPSPlayerMapping, TournamentMatch } from '@/types';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
@@ -15,7 +15,7 @@ import { GPSComparisonView } from './GPSComparisonView';
 import { 
   Activity, Upload, Calendar, ChevronRight, 
   Trash2, AlertCircle, ArrowUpDown, Award, Lock, CheckCircle2,
-  Zap, Gauge, AlertTriangle, HelpCircle, ArrowRightLeft
+  Zap, Gauge, AlertTriangle, HelpCircle, ArrowRightLeft, Trophy
 } from 'lucide-react';
 
 interface Match {
@@ -120,6 +120,10 @@ export function GPSClient() {
   const [sortField, setSortField] = useState<keyof GPSData | 'm_per_min'>('distancia_total');
   const [sortAsc, setSortAsc] = useState(false);
 
+  // Tournament sub-match states (Opción C)
+  const [tournamentMatches, setTournamentMatches] = useState<TournamentMatch[]>([]);
+  const [selectedTournamentMatchId, setSelectedTournamentMatchId] = useState<string>('');
+
   // Load list of matches from `matches` table
   const loadMatches = useCallback(async () => {
     setLoadingMatches(true);
@@ -183,6 +187,46 @@ export function GPSClient() {
     }
   }, [players]);
 
+  // Load session & data for selected tournament sub-match (does not touch normal match flow)
+  const loadSessionForTournamentMatch = useCallback(async (tournamentMatchId: string) => {
+    if (!tournamentMatchId) return;
+    setLoadingSession(true);
+    setCurrentSession(null);
+    setSessionData([]);
+
+    try {
+      const { data: sessionRows, error: sessionErr } = await supabase
+        .from('gps_sessions')
+        .select('*')
+        .eq('tournament_match_id', tournamentMatchId)
+        .limit(1);
+
+      if (sessionErr) throw sessionErr;
+
+      if (sessionRows && sessionRows.length > 0) {
+        const session = sessionRows[0];
+        setCurrentSession(session);
+
+        const { data: dataRows, error: dataErr } = await supabase
+          .from('gps_data')
+          .select('*')
+          .eq('session_id', session.id);
+
+        if (dataErr) throw dataErr;
+
+        const mapped = (dataRows || []).map((d: GPSData) => ({
+          ...d,
+          player: players.find(p => p.id === d.player_id)
+        }));
+        setSessionData(mapped);
+      }
+    } catch (err) {
+      console.error('Error loading GPS session for tournament match:', err);
+    } finally {
+      setLoadingSession(false);
+    }
+  }, [players]);
+
   useEffect(() => {
     loadMatches();
   }, [loadMatches]);
@@ -209,11 +253,40 @@ export function GPSClient() {
     loadAllSessionsAndData();
   }, [loadAllSessionsAndData]);
 
+  // On match change: detect tournament sub-matches first, then route accordingly
   useEffect(() => {
-    if (selectedMatchId) {
-      loadSessionForMatch(selectedMatchId);
-    }
+    if (!selectedMatchId) return;
+    setTournamentMatches([]);
+    setSelectedTournamentMatchId('');
+
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from('tournament_matches')
+          .select('*')
+          .eq('match_id', selectedMatchId)
+          .order('orden', { ascending: true });
+        const rows = data || [];
+        setTournamentMatches(rows);
+        if (rows.length > 0) {
+          // Tournament: select first sub-match (triggers loadSessionForTournamentMatch)
+          setSelectedTournamentMatchId(rows[0].id);
+        } else {
+          // Normal match: existing GPS session flow unchanged
+          loadSessionForMatch(selectedMatchId);
+        }
+      } catch {
+        loadSessionForMatch(selectedMatchId);
+      }
+    })();
   }, [selectedMatchId, loadSessionForMatch]);
+
+  // On tournament sub-match selection change: load its GPS session
+  useEffect(() => {
+    if (selectedTournamentMatchId) {
+      loadSessionForTournamentMatch(selectedTournamentMatchId);
+    }
+  }, [selectedTournamentMatchId, loadSessionForTournamentMatch]);
 
   // Force activeTab to 'session' if edit mode is disabled while on 'compare' tab
   useEffect(() => {
@@ -223,6 +296,8 @@ export function GPSClient() {
   }, [isEditMode, activeTab]);
 
   const selectedMatch = matches.find(m => m.id === selectedMatchId);
+  const isTournamentMode = tournamentMatches.length > 0;
+  const selectedTournamentMatch = tournamentMatches.find(tm => tm.id === selectedTournamentMatchId) || null;
 
   // Delete session for current match (Edit mode required)
   async function handleDeleteSession() {
@@ -236,7 +311,10 @@ export function GPSClient() {
       return;
     }
 
-    if (!confirm(`¿Seguro que deseas eliminar los datos GPS cargados para el partido vs ${selectedMatch.rival}?`)) return;
+    const confirmMsg = isTournamentMode && selectedTournamentMatch
+      ? `¿Seguro que deseas eliminar los datos GPS de vs ${selectedTournamentMatch.rival} (${selectedMatch.rival})?`
+      : `¿Seguro que deseas eliminar los datos GPS cargados para el partido vs ${selectedMatch.rival}?`;
+    if (!confirm(confirmMsg)) return;
 
     try {
       const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
@@ -554,26 +632,48 @@ export function GPSClient() {
         }
       }
 
-      // 2. Create / Update session in `gps_sessions` preserving match date & readable description
-      const matchTypeLabel = selectedMatch.tipo_partido || selectedMatch.competicion || 'PARTIDO';
-      const sessionDesc = selectedMatch.jornada 
-        ? `J${selectedMatch.jornada}: vs ${selectedMatch.rival} (${matchTypeLabel})`
-        : `vs ${selectedMatch.rival} (${matchTypeLabel})`;
+      // 2. Create / Update session in `gps_sessions`
+      const isTmMode = isTournamentMode && !!selectedTournamentMatchId;
+      const tmMatch = tournamentMatches.find(tm => tm.id === selectedTournamentMatchId);
 
-      const { data: sessionRes, error: sessionErr } = await supabase.rpc('exec_secure_upsert', {
-        target_table: 'gps_sessions',
-        payload: {
-          id: currentSession?.id || undefined,
-          match_id: selectedMatch.id,
-          fecha: selectedMatch.fecha,
-          descripcion: sessionDesc
-        },
-        conflict_columns: ['match_id'],
-        staff_passkey: passkey
-      });
+      let targetSessionId: string;
 
-      if (sessionErr) throw sessionErr;
-      const targetSessionId = sessionRes.id;
+      if (isTmMode && tmMatch) {
+        // TOURNAMENT branch: session linked via tournament_match_id (match_id stays null)
+        const sessionDesc = `Torneo ${selectedMatch.rival}: vs ${tmMatch.rival}`;
+        const { data: sessionRes, error: sessionErr } = await supabase.rpc('exec_secure_upsert', {
+          target_table: 'gps_sessions',
+          payload: {
+            id: currentSession?.id || undefined,
+            tournament_match_id: selectedTournamentMatchId,
+            fecha: tmMatch.fecha,
+            descripcion: sessionDesc
+          },
+          conflict_columns: ['tournament_match_id'],
+          staff_passkey: passkey
+        });
+        if (sessionErr) throw sessionErr;
+        targetSessionId = sessionRes.id;
+      } else {
+        // NORMAL MATCH branch: existing behavior unchanged
+        const matchTypeLabel = selectedMatch.tipo_partido || selectedMatch.competicion || 'PARTIDO';
+        const sessionDesc = selectedMatch.jornada 
+          ? `J${selectedMatch.jornada}: vs ${selectedMatch.rival} (${matchTypeLabel})`
+          : `vs ${selectedMatch.rival} (${matchTypeLabel})`;
+        const { data: sessionRes, error: sessionErr } = await supabase.rpc('exec_secure_upsert', {
+          target_table: 'gps_sessions',
+          payload: {
+            id: currentSession?.id || undefined,
+            match_id: selectedMatch.id,
+            fecha: selectedMatch.fecha,
+            descripcion: sessionDesc
+          },
+          conflict_columns: ['match_id'],
+          staff_passkey: passkey
+        });
+        if (sessionErr) throw sessionErr;
+        targetSessionId = sessionRes.id;
+      }
 
       // 3. If reimporting, clear previous gps_data rows for this session
       if (currentSession) {
@@ -611,7 +711,11 @@ export function GPSClient() {
       // 5. Complete & reload
       setIsModalOpen(false);
       resetImportWizard();
-      await loadSessionForMatch(selectedMatch.id);
+      if (isTmMode && selectedTournamentMatchId) {
+        await loadSessionForTournamentMatch(selectedTournamentMatchId);
+      } else {
+        await loadSessionForMatch(selectedMatch.id);
+      }
       await loadAllSessionsAndData();
 
     } catch (err: unknown) {
@@ -727,10 +831,13 @@ export function GPSClient() {
               variant="primary" 
               onClick={() => { resetImportWizard(); setIsModalOpen(true); }}
               className="flex items-center gap-2 self-start"
-              disabled={!selectedMatch}
+              disabled={!selectedMatch || (isTournamentMode && !selectedTournamentMatchId)}
             >
               <Upload className="h-4 w-4" />
-              {currentSession ? 'Reimportar GPS Partido' : 'Importar GPS Partido'}
+              {isTournamentMode
+                ? (currentSession ? 'Reimportar GPS Sub-Partido' : 'Importar GPS Sub-Partido')
+                : (currentSession ? 'Reimportar GPS Partido' : 'Importar GPS Partido')
+              }
             </Button>
           )}
         </div>
@@ -825,6 +932,31 @@ export function GPSClient() {
             )}
           </div>
         )}
+
+        {/* Tournament sub-match selector — only shown when match has sub-matches */}
+        {isTournamentMode && (
+          <div className="mt-3 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl">
+            <div className="flex items-center gap-2 mb-2.5">
+              <Trophy className="h-4 w-4 text-amber-400 shrink-0" />
+              <span className="text-xs font-bold text-amber-300">Torneo — selecciona el partido a ver o importar:</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {tournamentMatches.map((tm) => (
+                <button
+                  key={tm.id}
+                  onClick={() => setSelectedTournamentMatchId(tm.id)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    selectedTournamentMatchId === tm.id
+                      ? 'bg-amber-500 text-white shadow-md shadow-amber-900/40'
+                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-slate-100'
+                  }`}
+                >
+                  P{tm.orden} — vs {tm.rival}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Main Content Area */}
@@ -840,7 +972,13 @@ export function GPSClient() {
       ) : !currentSession ? (
         <div className="p-12 text-center border border-dashed border-slate-800 bg-slate-900/10 rounded-2xl flex flex-col items-center justify-center space-y-3">
           <Activity className="h-10 w-10 text-slate-600" />
-          <h3 className="text-sm font-bold text-slate-300">Sin datos GPS cargados para {getMatchTitle(selectedMatch)}</h3>
+          <h3 className="text-sm font-bold text-slate-300">
+            Sin datos GPS cargados para{' '}
+            {isTournamentMode && selectedTournamentMatch
+              ? `vs ${selectedTournamentMatch.rival} (${selectedMatch.rival})`
+              : getMatchTitle(selectedMatch)
+            }
+          </h3>
           <p className="text-xs text-slate-400 max-w-md">
             Este partido no tiene un archivo de rendimiento físico GPS asociado todavía.
             {!isEditMode ? ' Activa el Modo Edición para poder importar el archivo Excel/CSV del partido.' : ''}
@@ -1041,7 +1179,11 @@ export function GPSClient() {
       )}
 
       {/* Modal Wizard Importador GPS (.xlsx / .csv) */}
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={`Importar GPS — ${selectedMatch ? getMatchTitle(selectedMatch) : ''}`}>
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={
+        isTournamentMode && selectedTournamentMatch
+          ? `Importar GPS — Torneo ${selectedMatch ? selectedMatch.rival : ''}: vs ${selectedTournamentMatch.rival}`
+          : `Importar GPS — ${selectedMatch ? getMatchTitle(selectedMatch) : ''}`
+      }>
         {errorMsg && (
           <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-xs flex items-center gap-2">
             <AlertCircle className="h-4 w-4 shrink-0" />
@@ -1060,11 +1202,26 @@ export function GPSClient() {
         {importStep === 1 && selectedMatch && (
           <div className="space-y-4">
             <div className="p-3 bg-slate-950/40 border border-slate-850 rounded-xl text-xs space-y-1">
-              <span className="text-slate-400 block font-bold">Partido Objetivo:</span>
-              <div className="text-slate-200 font-bold flex items-center gap-2">
-                <span>{selectedMatch.fecha}</span> — <span>{getMatchTitle(selectedMatch)}</span>
+              <span className="text-slate-400 block font-bold">
+                {isTournamentMode ? 'Sub-Partido Objetivo:' : 'Partido Objetivo:'}
+              </span>
+              <div className="text-slate-200 font-bold flex items-center gap-2 flex-wrap">
+                <span>
+                  {isTournamentMode && selectedTournamentMatch
+                    ? selectedTournamentMatch.fecha
+                    : selectedMatch.fecha}
+                </span>
+                {' — '}
+                {isTournamentMode && selectedTournamentMatch ? (
+                  <span>
+                    <span className="text-amber-300">vs {selectedTournamentMatch.rival}</span>
+                    <span className="text-slate-400"> · {selectedMatch.rival}</span>
+                  </span>
+                ) : (
+                  <span>{getMatchTitle(selectedMatch)}</span>
+                )}
                 <span className="text-[10px] text-[#CC0E21] bg-[#CC0E21]/10 px-2 py-0.5 rounded font-black uppercase">
-                  {selectedMatch.tipo_partido || selectedMatch.competicion || 'PARTIDO'}
+                  {isTournamentMode ? 'TORNEO' : (selectedMatch.tipo_partido || selectedMatch.competicion || 'PARTIDO')}
                 </span>
               </div>
             </div>
@@ -1170,7 +1327,7 @@ export function GPSClient() {
             <div className="flex justify-between items-center pt-4 border-t border-slate-800">
               <Button variant="ghost" onClick={() => setImportStep(2)}>Volver</Button>
               <Button variant="primary" onClick={handleSaveImport} loading={isSaving}>
-                Guardar e Importar Partido
+                {isTournamentMode ? 'Guardar e Importar Sub-Partido' : 'Guardar e Importar Partido'}
               </Button>
             </div>
           </div>

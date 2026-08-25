@@ -286,7 +286,19 @@ export interface MatchPlayerStats {
 export interface GPSSession {
   id: string;
   match_id?: string | null;
+  tournament_match_id?: string | null; // Sub-partido de torneo (Opción C)
   fecha: string;
+  descripcion: string | null;
+  created_at: string;
+}
+
+export interface TournamentMatch {
+  id: string;
+  match_id: string;
+  rival: string;
+  orden: number;
+  fecha: string;
+  resultado: string | null;
   descripcion: string | null;
   created_at: string;
 }
