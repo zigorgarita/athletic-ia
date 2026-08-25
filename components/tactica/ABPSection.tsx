@@ -579,6 +579,19 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
   const [uploadProgress, setUploadProgress] = useState<UploadProgressInfo | null>(null);
   const dropFileInputRef = useRef<HTMLInputElement>(null);
 
+  // Controlled Delete Play States
+  const [playToDelete, setPlayToDelete] = useState<{
+    playId: string;
+    playTitle: string;
+    playType: string;
+    plansCount: number;
+    assignmentsCount: number;
+    rolesCount: number;
+    planIds: string[];
+  } | null>(null);
+  const [isCheckingDependencies, setIsCheckingDependencies] = useState(false);
+  const [isDeletingPlay, setIsDeletingPlay] = useState(false);
+
   // Helper reutilizable para subir vídeos ABP a Google Drive (APP INDAUTXU - VIDEOS / 2026-27 / 04_ABP / <TIPO> / <TITULO>)
   const uploadAbpVideoToDrive = async (
     file: File,
@@ -1158,28 +1171,100 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
     }
   }
 
-  // --- DELETE PLAY ---
-  async function handleDeletePlay(playId: string) {
-    if (!confirm('¿Seguro que deseas eliminar esta jugada de estrategia? Se borrarán todas las posiciones y roles.')) return;
+  // --- CONTROLLED DELETE PLAY ---
+  const handleRequestDeletePlay = async (play: ABPPlay) => {
+    setIsCheckingDependencies(true);
+    setErrorMsg(null);
+
+    try {
+      // 1. Consultar planes de partido que utilizan esta jugada
+      const { data: plans, error: plansErr } = await supabase
+        .from('match_abp_plans')
+        .select('id')
+        .eq('abp_play_id', play.id);
+
+      if (plansErr) throw plansErr;
+
+      const planIds = (plans || []).map(p => p.id);
+      const plansCount = planIds.length;
+
+      // 2. Consultar asignaciones de jugadores dependientes de esos planes
+      let assignmentsCount = 0;
+      if (planIds.length > 0) {
+        const { count, error: assignErr } = await supabase
+          .from('match_abp_player_assignments')
+          .select('id', { count: 'exact', head: true })
+          .in('match_abp_plan_id', planIds);
+
+        if (assignErr) throw assignErr;
+        assignmentsCount = count || 0;
+      }
+
+      // 3. Consultar roles/puestos tácticos vinculados
+      const { count: rolesCount, error: rolesErr } = await supabase
+        .from('abp_player_roles')
+        .select('id', { count: 'exact', head: true })
+        .eq('abp_play_id', play.id);
+
+      if (rolesErr) throw rolesErr;
+
+      setPlayToDelete({
+        playId: play.id,
+        playTitle: play.titulo,
+        playType: play.tipo,
+        plansCount,
+        assignmentsCount,
+        rolesCount: rolesCount || 0,
+        planIds
+      });
+    } catch (err: unknown) {
+      const error = err as Error;
+      console.error('Error al comprobar dependencias de la jugada:', error);
+      setErrorMsg(`No se pudieron verificar las dependencias de la jugada: ${error.message || 'Error desconocido'}`);
+    } finally {
+      setIsCheckingDependencies(false);
+    }
+  };
+
+  const executeControlledDeletePlay = async () => {
+    if (!playToDelete) return;
+
+    setIsDeletingPlay(true);
+    setErrorMsg(null);
+
     try {
       const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
-      const { error } = await supabase.rpc('exec_secure_delete', {
-        target_table: 'abp_plays',
-        record_id: playId,
+
+      // Ejecución atómica y transaccional (Todo o Nada)
+      const { error: rpcError } = await supabase.rpc('delete_abp_play_atomic', {
+        p_play_id: playToDelete.playId,
         staff_passkey: passkey
       });
-      if (error) throw error;
-      
-      if (selectedPlay?.id === playId) {
-        setSelectedPlay(null);
+
+      if (rpcError) {
+        throw new Error(rpcError.message || 'Fallo en la transacción de borrado');
       }
-      setSuccessMsg('Jugada eliminada.');
-      loadPlays();
-    } catch (err) {
-      console.error('Error deleting play:', err);
-      setErrorMsg('Error al eliminar la jugada.');
+
+      // Limpiar selección si correspondía a la jugada borrada
+      if (selectedPlay?.id === playToDelete.playId) {
+        setSelectedPlay(null);
+        setPlayRoles([]);
+        if (viewMode === 'play-editor') {
+          setViewMode('category-detail');
+        }
+      }
+
+      setSuccessMsg(`Jugada "${playToDelete.playTitle}" eliminada correctamente.`);
+      setPlayToDelete(null);
+      await loadPlays();
+    } catch (err: unknown) {
+      const error = err as Error;
+      console.error('Error durante el borrado controlado:', error);
+      setErrorMsg(`Error al eliminar la jugada: ${error.message || 'Error desconocido'}`);
+    } finally {
+      setIsDeletingPlay(false);
     }
-  }
+  };
 
   // --- SAVE CURRENT TACTICAL POSITIONS & ROLES ---
   async function handleSavePositions() {
@@ -1658,12 +1743,15 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
                 >
                   <div className="flex justify-between items-start">
                     <span className="font-extrabold text-slate-200 line-clamp-2 pr-4">{play.titulo}</span>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleDeletePlay(play.id); }}
-                      className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-500/20 text-slate-500 hover:text-red-400 rounded transition-all shrink-0"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    {isEditMode && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleRequestDeletePlay(play); }}
+                        className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-500/20 text-slate-500 hover:text-red-400 rounded transition-all shrink-0"
+                        title="Eliminar jugada"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
                   </div>
                   <div className="text-[10px] text-slate-500 flex items-center gap-1.5">
                     <Film className="h-3 w-3" />
@@ -1706,6 +1794,15 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
                     </Button>
                     <Button variant="secondary" onClick={handleDuplicatePlay} loading={isDuplicating} className="text-xs border-slate-800 py-1.5 px-3">
                       <Copy className="h-3.5 w-3.5 mr-1.5" /> Duplicar
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      onClick={() => handleRequestDeletePlay(selectedPlay)} 
+                      loading={isCheckingDependencies}
+                      className="text-xs text-slate-500 hover:text-red-400 hover:bg-red-500/10 py-1.5 px-2.5 border border-slate-800"
+                      title="Eliminar jugada"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                     <Button variant="primary" onClick={handleSavePositions} loading={isSaving} className="text-xs bg-[#CC0E21] hover:bg-red-500 text-white font-bold py-1.5 px-4 shadow-lg shadow-red-900/20">
                       <Save className="h-3.5 w-3.5 mr-1.5" /> Guardar Pizarra
@@ -2413,6 +2510,77 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
             </Button>
           </div>
         </div>
+      </Modal>
+
+      {/* ========================================================================= */}
+      {/* MODAL: CONFIRMAR BORRADO CONTROLADO DE JUGADA ABP */}
+      {/* ========================================================================= */}
+      <Modal
+        isOpen={!!playToDelete}
+        onClose={() => {
+          if (!isDeletingPlay) setPlayToDelete(null);
+        }}
+        title="Eliminar Jugada ABP"
+      >
+        {playToDelete && (
+          <div className="space-y-4">
+            {playToDelete.plansCount > 0 ? (
+              /* Caso con dependencias en planes de partido */
+              <div className="space-y-3">
+                <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-start gap-3">
+                  <AlertCircle className="h-5 w-5 text-amber-400 shrink-0 mt-0.5" />
+                  <div className="text-xs space-y-1.5 text-slate-200">
+                    <p className="font-bold text-amber-300">
+                      Esta jugada tiene dependencias activas en planes de partido.
+                    </p>
+                    <p className="leading-relaxed">
+                      La jugada <strong className="text-white">&quot;{playToDelete.playTitle}&quot;</strong> está utilizada en{' '}
+                      <strong className="text-amber-200">{playToDelete.plansCount} {playToDelete.plansCount === 1 ? 'plan de partido' : 'planes de partido'}</strong> y contiene{' '}
+                      <strong className="text-amber-200">{playToDelete.assignmentsCount} {playToDelete.assignmentsCount === 1 ? 'asignación de jugador' : 'asignaciones de jugadores'}</strong>.
+                    </p>
+                    <p className="text-slate-400 text-[11px]">
+                      Si continúas, se eliminarán de forma controlada esas referencias de planes ABP vinculadas a esta jugada, sin afectar a ningún otro partido ni jugador.
+                    </p>
+                  </div>
+                </div>
+
+                <p className="text-xs text-slate-300">
+                  ¿Confirmas el borrado definitivo de esta jugada y sus dependencias asociadas?
+                </p>
+              </div>
+            ) : (
+              /* Caso sin dependencias en planes */
+              <div className="space-y-3 text-xs text-slate-300">
+                <p>
+                  ¿Seguro que deseas eliminar la jugada <strong className="text-white">&quot;{playToDelete.playTitle}&quot;</strong>?
+                </p>
+                <p className="text-slate-400 text-[11px]">
+                  Se eliminarán también sus {playToDelete.rolesCount} puestos tácticos en la pizarra. Esta acción no se puede deshacer.
+                </p>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+              <Button
+                variant="ghost"
+                type="button"
+                disabled={isDeletingPlay}
+                onClick={() => setPlayToDelete(null)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                variant="primary"
+                type="button"
+                loading={isDeletingPlay}
+                onClick={executeControlledDeletePlay}
+                className="bg-[#CC0E21] hover:bg-red-500 text-white font-bold"
+              >
+                {playToDelete.plansCount > 0 ? 'Confirmar y Eliminar' : 'Eliminar Jugada'}
+              </Button>
+            </div>
+          </div>
+        )}
       </Modal>
 
       {/* Hidden container for high-res PDF Export */}
