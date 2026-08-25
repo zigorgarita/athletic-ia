@@ -1,16 +1,18 @@
 'use client';
 import React, { useState, useMemo } from 'react';
-import { ClubSeason } from '@/hooks/useClubs';
+import { Club, ClubSeason } from '@/hooks/useClubs';
 import { useClubPlayers, ClubPlayer } from '@/hooks/useClubPlayers';
 import { useEditMode } from '@/context/EditModeContext';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
-import { Users, Plus, Search, Filter } from 'lucide-react';
+import { Users, Plus, Search, Filter, Camera } from 'lucide-react';
 import { PlayerCard } from '@/components/players/PlayerCard';
 import { Player, Demarcacion } from '@/types';
+import { ImportPlantillaModal } from '../modals/ImportPlantillaModal';
 
 interface PlayersTabProps {
   season: ClubSeason | null;
+  club?: Club | null;
 }
 
 const POSICIONES = [
@@ -28,14 +30,15 @@ const POSICIONES = [
   'Delantero Centro'
 ];
 
-export function PlayersTab({ season }: PlayersTabProps) {
-  const { players, loading, savePlayer, deletePlayer } = useClubPlayers(season?.id);
+export function PlayersTab({ season, club }: PlayersTabProps) {
+  const { players, loading, savePlayer, insertBulkPlayers, deletePlayer } = useClubPlayers(season?.id);
   const { isEditMode } = useEditMode();
   
   const [searchTerm, setSearchTerm] = useState('');
   const [filterPos, setFilterPos] = useState('');
   
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [editingPlayer, setEditingPlayer] = useState<Partial<ClubPlayer> | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -179,10 +182,20 @@ export function PlayersTab({ season }: PlayersTabProps) {
         </div>
 
         {isEditMode && (
-          <Button onClick={() => handleOpenModal()} variant="primary" className="shrink-0 flex items-center gap-2">
-            <Plus className="h-4 w-4" />
-            Nuevo Jugador
-          </Button>
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <Button
+              onClick={() => setIsImportModalOpen(true)}
+              variant="secondary"
+              className="flex items-center gap-2 text-xs"
+            >
+              <Camera className="h-4 w-4 text-[#CC0E21]" />
+              Escanear Alineación / Foto
+            </Button>
+            <Button onClick={() => handleOpenModal()} variant="primary" className="flex items-center gap-2 text-xs">
+              <Plus className="h-4 w-4" />
+              Nuevo Jugador
+            </Button>
+          </div>
         )}
       </div>
 
@@ -198,9 +211,16 @@ export function PlayersTab({ season }: PlayersTabProps) {
           <h3 className="text-lg font-bold text-slate-300">Plantilla vacía</h3>
           <p className="text-slate-500 text-sm mt-2">Aún no hay jugadores registrados para este rival.</p>
           {isEditMode && (
-            <Button onClick={() => handleOpenModal()} variant="secondary" className="mt-6">
-              Añadir el primero
-            </Button>
+            <div className="flex flex-wrap items-center justify-center gap-3 mt-6">
+              <Button onClick={() => setIsImportModalOpen(true)} variant="secondary" className="flex items-center gap-2">
+                <Camera className="h-4 w-4 text-[#CC0E21]" />
+                Escanear Alineación / Foto
+              </Button>
+              <Button onClick={() => handleOpenModal()} variant="primary" className="flex items-center gap-2">
+                <Plus className="h-4 w-4" />
+                Añadir Manualmente
+              </Button>
+            </div>
           )}
         </div>
       ) : (
@@ -320,6 +340,17 @@ export function PlayersTab({ season }: PlayersTabProps) {
           </form>
         )}
       </Modal>
+
+      {/* Modal Digitalizar Plantilla desde Foto / Documento */}
+      {isImportModalOpen && (
+        <ImportPlantillaModal
+          isOpen={isImportModalOpen}
+          onClose={() => setIsImportModalOpen(false)}
+          rivalName={club?.nombre || 'Rival'}
+          existingPlayers={players}
+          onImport={insertBulkPlayers}
+        />
+      )}
 
     </div>
   );

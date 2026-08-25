@@ -252,7 +252,7 @@ export function RivalDetailsClient({ rivalId }: { rivalId: string }) {
           <GeneralTab club={club} onUpdate={updateClub} />
         )}
         {activeTab === 'PLANTILLA' && (
-          <PlayersTab season={season} />
+          <PlayersTab season={season} club={club} />
         )}
         {activeTab === 'STAFF' && (
           <StaffTab season={season} />

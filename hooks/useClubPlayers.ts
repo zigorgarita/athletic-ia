@@ -18,6 +18,7 @@ export interface ClubPlayer {
   fortalezas: string | null;
   debilidades: string | null;
   observaciones: string | null;
+  origen?: 'manual' | 'documento' | 'fvf' | null;
   created_at: string;
 }
 
@@ -60,7 +61,7 @@ export function useClubPlayers(seasonId: string | undefined) {
       const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
       
       const isNew = !data.id;
-      const payload = { ...data, club_season_id: seasonId };
+      const payload = { ...data, club_season_id: seasonId, origen: data.origen || 'manual' };
       
       const { error: rpcErr } = await supabase.rpc('exec_secure_upsert', {
         target_table: 'club_players',
@@ -74,6 +75,38 @@ export function useClubPlayers(seasonId: string | undefined) {
       return true;
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Error al guardar jugador');
+      return false;
+    }
+  };
+
+  const insertBulkPlayers = async (newPlayers: Array<Pick<ClubPlayer, 'nombre'> & Partial<ClubPlayer>>): Promise<boolean> => {
+    try {
+      if (!seasonId) throw new Error('No season ID');
+      if (newPlayers.length === 0) return true;
+      verifyWritePermission();
+      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
+
+      const payloads = newPlayers.map(p => ({
+        club_season_id: seasonId,
+        nombre: p.nombre.trim(),
+        dorsal: p.dorsal ?? null,
+        posicion: p.posicion ?? null,
+        origen: p.origen || 'documento',
+        minutos_jugados: 0,
+      }));
+
+      const { error: rpcErr } = await supabase.rpc('exec_secure_bulk_upsert', {
+        target_table: 'club_players',
+        payloads: payloads,
+        conflict_columns: null, // Solo inserción limpia de nuevos jugadores
+        staff_passkey: passkey,
+      });
+
+      if (rpcErr) throw rpcErr;
+      await loadPlayers();
+      return true;
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Error al importar jugadores');
       return false;
     }
   };
@@ -97,5 +130,5 @@ export function useClubPlayers(seasonId: string | undefined) {
     }
   };
 
-  return { players, loading, error, refetch: loadPlayers, savePlayer, deletePlayer };
+  return { players, loading, error, refetch: loadPlayers, savePlayer, insertBulkPlayers, deletePlayer };
 }
