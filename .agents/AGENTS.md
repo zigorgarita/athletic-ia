@@ -32,3 +32,15 @@ Este archivo define las directrices y normas acordadas con el usuario para el de
   - No se sustituirá un componente funcional únicamente por razones estéticas.
   - Priorizar: extender, reutilizar y encapsular antes que reescribir.
   - Solo se permitirá una reescritura completa cuando exista una justificación técnica clara y se apruebe previamente.
+
+## Organización Documental de Rivales en Google Drive
+
+- **Ruta Canónica Obligatoria:** A partir de la temporada 2026/27, cualquier trabajo documental de un rival debe guardarse bajo:
+  `APP INDAUTXU - VIDEOS / 2026-27 / 02_RIVALES / <NOMBRE_RIVAL>/`
+- **Carpeta de Plantilla:** Para trabajos de plantilla e informes de plantilla, utilizar o crear exclusivamente:
+  `<NOMBRE_RIVAL>/PLANTILLA`
+- **Reutilización y Cero Duplicados:** Reutilizar siempre las carpetas existentes antes de crear nuevas, evitando estrictamente crear estructuras paralelas o carpetas duplicadas.
+- **Preservación e Inmutabilidad de Contenidos Existentes:** Respetar rigurosamente todo el contenido y archivos que ya existan. Está terminantemente prohibido borrar, sustituir, sobrescribir o reorganizar carpetas o documentos existentes sin autorización expresa previa del usuario.
+- **Estándar Universal:** Esta jerarquía es el estándar oficial para todos los rivales de Juvenil División de Honor 2026/27.
+
+
