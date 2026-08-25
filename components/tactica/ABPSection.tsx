@@ -21,6 +21,8 @@ import { ABPFieldExport } from './ABPFieldExport';
 import { ABPPlanPartido } from './ABPPlanPartido';
 import { ABPPlayerNode, LabelPosition } from './ABPPlayerNode';
 import { normalizeRoleName, normalizeRoleLabel, ROLE_ABBRS } from '@/lib/abpUtils';
+import { DriveResumableUploader, UploadProgressInfo } from '@/lib/drive-resumable';
+import { parseVideoUrl } from '@/lib/video';
 
 interface ABPSectionProps {
   players: Player[];
@@ -574,22 +576,37 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
   const [isDraggingVideo, setIsDraggingVideo] = useState(false);
   const [pendingReplaceVideoFile, setPendingReplaceVideoFile] = useState<File | null>(null);
   const [isConfirmReplaceOpen, setIsConfirmReplaceOpen] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<UploadProgressInfo | null>(null);
   const dropFileInputRef = useRef<HTMLInputElement>(null);
 
-  // Helper reutilizable para subir vídeos ABP a Supabase Storage (match-videos/abp-videos/)
-  const uploadAbpVideo = async (file: File): Promise<string> => {
-    const fileExt = file.name.split('.').pop()?.toLowerCase() || 'mp4';
-    const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 9)}.${fileExt}`;
-    const filePath = `abp-videos/${fileName}`;
+  // Helper reutilizable para subir vídeos ABP a Google Drive (APP INDAUTXU - VIDEOS / 2026-27 / 04_ABP / <TIPO> / <TITULO>)
+  const uploadAbpVideoToDrive = async (
+    file: File,
+    playType: string,
+    playTitle: string,
+    onProgress?: (info: UploadProgressInfo) => void
+  ): Promise<string> => {
+    const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
 
-    const { error: uploadError } = await supabase.storage
-      .from('match-videos')
-      .upload(filePath, file);
+    const uploader = new DriveResumableUploader({
+      file,
+      passkey,
+      uploadContext: {
+        season: '2026-27',
+        module: 'ABP',
+        entityName: playType,
+        subCategory: playTitle,
+      },
+      onProgress,
+    });
 
-    if (uploadError) throw uploadError;
+    const result = await uploader.start();
 
-    const { data } = supabase.storage.from('match-videos').getPublicUrl(filePath);
-    return data.publicUrl;
+    if (result.status === 'fallido' || !result.videoUrl) {
+      throw new Error(result.errorMessage || 'Error durante la subida del vídeo a Google Drive.');
+    }
+
+    return result.videoUrl;
   };
 
   // Prevenir comportamiento nativo del navegador al arrastrar archivos fuera de la drop zone
@@ -847,7 +864,7 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
 
       // Handle video upload if selected
       if (videoFile) {
-        videoUrl = await uploadAbpVideo(videoFile);
+        videoUrl = await uploadAbpVideoToDrive(videoFile, playType, playTitle);
       }
 
       const isThrowIn = playType === 'Saque de banda ofensivo' || playType === 'Saque de banda defensivo';
@@ -940,7 +957,7 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
 
       // Handle video upload if selected
       if (videoFile) {
-        videoUrl = await uploadAbpVideo(videoFile);
+        videoUrl = await uploadAbpVideoToDrive(videoFile, playType, playTitle);
       }
 
       const isThrowIn = playType === 'Saque de banda ofensivo' || playType === 'Saque de banda defensivo';
@@ -1018,10 +1035,16 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
   const executeVideoUpload = async (file: File, targetPlay: ABPPlay) => {
     setIsUploadingVideo(true);
     setErrorMsg(null);
+    setUploadProgress(null);
 
     try {
-      // 1. Subir archivo al bucket match-videos/abp-videos/
-      const publicUrl = await uploadAbpVideo(file);
+      // 1. Subir archivo a Google Drive (Ruta canónica: 2026-27 / 04_ABP / <tipo> / <titulo>)
+      const publicUrl = await uploadAbpVideoToDrive(
+        file,
+        targetPlay.tipo,
+        targetPlay.titulo,
+        (info) => setUploadProgress(info)
+      );
 
       // 2. Asociar exclusivamente a la abp_play seleccionada
       const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
@@ -1050,15 +1073,16 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
       setSelectedPlay(updatedPlay);
       setPlays(prev => prev.map(p => p.id === targetPlay.id ? updatedPlay : p));
 
-      setSuccessMsg('Vídeo táctico asociado correctamente a la jugada.');
+      setSuccessMsg('Vídeo táctico subido a Google Drive y asociado correctamente a la jugada.');
     } catch (err: unknown) {
       const error = err as Error;
-      console.error('Error asociando vídeo ABP:', error);
-      setErrorMsg(error.message || 'Error al subir el archivo de vídeo.');
+      console.error('Error asociando vídeo ABP a Google Drive:', error);
+      setErrorMsg(error.message || 'Error al subir el vídeo a Google Drive.');
     } finally {
       setIsUploadingVideo(false);
       setPendingReplaceVideoFile(null);
       setIsConfirmReplaceOpen(false);
+      setUploadProgress(null);
     }
   };
 
@@ -1488,23 +1512,7 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const filteredPlays = plays.filter(p => activeFilter === 'Todos' || p.tipo === activeFilter);
 
-  // Helper to extract YouTube video ID if present
-  const getEmbedVideoUrl = (url: string | null) => {
-    if (!url) return null;
-    try {
-      if (url.includes('youtube.com/watch')) {
-        const urlParams = new URLSearchParams(new URL(url).search);
-        const videoId = urlParams.get('v');
-        return videoId ? `https://www.youtube.com/embed/${videoId}` : null;
-      } else if (url.includes('youtu.be/')) {
-        const videoId = url.split('youtu.be/')[1]?.split('?')[0];
-        return videoId ? `https://www.youtube.com/embed/${videoId}` : null;
-      }
-    } catch {
-      console.warn('URL parsing failed, falling back to raw video tag.');
-    }
-    return null;
-  };
+
 
   return (
     <div className="space-y-6">
@@ -2000,10 +2008,29 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
 
                     {/* Estado: Subiendo vídeo */}
                     {isUploadingVideo ? (
-                      <div className="flex-1 rounded-xl border border-slate-800 bg-slate-950/80 flex flex-col items-center justify-center gap-2 text-center p-4">
+                      <div className="flex-1 rounded-xl border border-slate-800 bg-slate-950/90 flex flex-col items-center justify-center gap-2 text-center p-4">
                         <Loader2 className="h-7 w-7 text-[#CC0E21] animate-spin" />
-                        <span className="text-xs font-bold text-slate-200">Subiendo vídeo a la jugada...</span>
-                        <span className="text-[10px] text-slate-500">Guardando en match-videos/abp-videos</span>
+                        <div className="space-y-1">
+                          <span className="text-xs font-bold text-slate-200 block">
+                            Subiendo vídeo a Google Drive... {uploadProgress ? `${uploadProgress.percent}%` : ''}
+                          </span>
+                          {uploadProgress && uploadProgress.speedMBps > 0 && (
+                            <span className="text-[10px] text-slate-400 block">
+                              {uploadProgress.speedMBps.toFixed(1)} MB/s ({Math.round(uploadProgress.bytesUploaded / (1024 * 1024))} / {Math.round(uploadProgress.totalBytes / (1024 * 1024))} MB)
+                            </span>
+                          )}
+                          <span className="text-[10px] text-slate-500 block">
+                            04_ABP / {selectedPlay.tipo} / {selectedPlay.titulo}
+                          </span>
+                        </div>
+                        {uploadProgress && (
+                          <div className="w-48 bg-slate-800 rounded-full h-1.5 overflow-hidden mt-1">
+                            <div 
+                              className="bg-[#CC0E21] h-full transition-all duration-200 rounded-full" 
+                              style={{ width: `${uploadProgress.percent}%` }}
+                            />
+                          </div>
+                        )}
                       </div>
                     ) : selectedPlay.video_url ? (
                       /* Vídeo presente con overlay si se arrastra encima */
@@ -2015,20 +2042,26 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
                             <p className="text-[10px] text-slate-400 mt-1">Se solicitará confirmación antes de guardar</p>
                           </div>
                         )}
-                        {getEmbedVideoUrl(selectedPlay.video_url) ? (
-                          <iframe
-                            src={getEmbedVideoUrl(selectedPlay.video_url) || ''}
-                            className="absolute inset-0 w-full h-full border-0"
-                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                            allowFullScreen
-                          />
-                        ) : (
-                          <video
-                            src={selectedPlay.video_url}
-                            controls
-                            className="absolute inset-0 w-full h-full object-contain"
-                          />
-                        )}
+                        {(() => {
+                          const videoInfo = parseVideoUrl(selectedPlay.video_url);
+                          if (videoInfo.type === 'direct') {
+                            return (
+                              <video
+                                src={selectedPlay.video_url}
+                                controls
+                                className="absolute inset-0 w-full h-full object-contain"
+                              />
+                            );
+                          }
+                          return (
+                            <iframe
+                              src={videoInfo.embedUrl || selectedPlay.video_url}
+                              className="absolute inset-0 w-full h-full border-0"
+                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                              allowFullScreen
+                            />
+                          );
+                        })()}
                       </div>
                     ) : (
                       /* Drop Zone interactiva sin vídeo */
