@@ -31,7 +31,8 @@ import {
   BookOpen, Plus, FolderOpen, Save, Trash2, FileText, ClipboardList,
   Eye, Download, Upload, AlertCircle, Brain, TrendingUp, Lightbulb,
   AlertTriangle, Activity, CheckCircle2, User, Calendar, RefreshCw,
-  Sparkles, PlayCircle, Target, Sun, Clock, Star, Paperclip, Link2, ExternalLink, Loader2
+  Sparkles, PlayCircle, Target, Clock, Paperclip, Link2, ExternalLink, Loader2,
+  BarChart3, Zap
 } from 'lucide-react';
 
 interface LineupAnalysisResult {
@@ -2105,16 +2106,9 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
                   </div>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-4">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Estado:</span>
-                    <span className={`text-[10px] px-2 py-0.5 rounded font-extrabold border ${stateColor}`}>{matchState}</span>
-                  </div>
-                  <div className="h-4 w-px bg-slate-850 hidden sm:block" />
-                  <div className="flex items-center gap-4 text-xs text-slate-450">
-                    <span className="flex items-center gap-1.5"><User className="h-3.5 w-3.5 text-slate-550" /> Col. Arbitral (RFEF)</span>
-                    <span className="flex items-center gap-1.5"><Sun className="h-3.5 w-3.5 text-slate-550" /> Despejado, 21°C</span>
-                  </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Estado:</span>
+                  <span className={`text-[10px] px-2.5 py-0.5 rounded font-extrabold border ${stateColor}`}>{matchState}</span>
                 </div>
               </div>
 
@@ -2124,141 +2118,43 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
                 {/* COLUMNA IZQUIERDA: LÍNEA TEMPORAL DE EVENTOS (7 cols) */}
                 <div className="lg:col-span-7 space-y-6">
                   <div className="p-5 bg-slate-900/30 border border-slate-800 rounded-2xl space-y-5">
-                    <h4 className="text-xs font-black uppercase text-slate-200 tracking-widest border-b border-slate-850 pb-2.5">
-                      Línea Temporal de Eventos
-                    </h4>
+                    <div className="flex items-center justify-between border-b border-slate-850 pb-2.5">
+                      <h4 className="text-xs font-black uppercase text-slate-200 tracking-widest">
+                        Línea Temporal de Eventos
+                      </h4>
+                      <span className="text-[9px] font-bold text-slate-400 bg-slate-950 px-2 py-0.5 rounded-full border border-slate-800 uppercase tracking-wider">
+                        DIE LIGEN · Pendiente conexión
+                      </span>
+                    </div>
 
-                    {isPlayed ? (
-                      <div className="relative border-l border-slate-850 ml-3 pl-6 space-y-6">
-                        
-                        {/* Evento 1 */}
-                        <div className="relative">
-                          <div className="absolute -left-[30px] top-1.5 h-4 w-4 rounded-full bg-slate-950 border border-slate-800 flex items-center justify-center">
-                            <div className="h-2 w-2 rounded-full bg-slate-500" />
-                          </div>
-                          <div className="space-y-1">
-                            <span className="text-[10px] font-bold text-slate-500">Minuto 0&apos;</span>
-                            <p className="text-xs text-slate-300">Silbato inicial. Comienza el encuentro de fútbol en el {matchCampo || 'campo'}.</p>
-                          </div>
-                        </div>
-
-                        {/* Evento 2 (Tarjeta Amarilla Mock) */}
-                        <div className="relative">
-                          <div className="absolute -left-[30px] top-1.5 h-4 w-4 rounded-full bg-slate-950 border border-slate-800 flex items-center justify-center">
-                            <div className="h-2 w-2 rounded-full bg-amber-500" />
-                          </div>
-                          <div className="space-y-1">
-                            <span className="text-[10px] font-bold text-amber-500">Minuto 15&apos; - Tarjeta Amarilla</span>
-                            <p className="text-xs text-slate-350">Amonestación para el pivote de la SD Indautxu por cortar una transición rival.</p>
-                          </div>
-                        </div>
-
-                        {/* Evento 3 (Goles favor) */}
-                        {gf > 0 && (
-                          <div className="relative">
-                            <div className="absolute -left-[30px] top-1.5 h-4 w-4 rounded-full bg-slate-950 border border-[#CC0E21]/40 flex items-center justify-center">
-                              <div className="h-2 w-2 rounded-full bg-[#CC0E21]" />
-                            </div>
-                            <div className="space-y-1">
-                              <span className="text-[10px] font-bold text-[#CC0E21]">Minuto 28&apos; - ¡GOOOL DE INDAUTXU! (1-0)</span>
-                              <p className="text-xs text-slate-300">Jugada rápida combinada por banda izquierda. Finalización precisa del delantero centro cruzando el balón.</p>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Evento 4 (Goles contra) */}
-                        {gc > 0 && (
-                          <div className="relative">
-                            <div className="absolute -left-[30px] top-1.5 h-4 w-4 rounded-full bg-slate-950 border-red-500/30 flex items-center justify-center">
-                              <div className="h-2 w-2 rounded-full bg-red-400" />
-                            </div>
-                            <div className="space-y-1">
-                              <span className="text-[10px] font-bold text-red-400">Minuto 41&apos; - Gol de {rival} (1-1)</span>
-                              <p className="text-xs text-slate-355">El equipo rival aprovecha una segunda jugada tras saque de esquina para empatar.</p>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Evento 5 (Descanso) */}
-                        <div className="relative">
-                          <div className="absolute -left-[30px] top-1.5 h-4 w-4 rounded-full bg-slate-950 border border-slate-800 flex items-center justify-center">
-                            <div className="h-2 w-2 rounded-full bg-slate-500" />
-                          </div>
-                          <div className="space-y-1">
-                            <span className="text-[10px] font-bold text-slate-500">Minuto 45&apos; - Descanso</span>
-                            <p className="text-xs text-slate-300">El árbitro decreta el final de la primera parte. Charla de ajustes en vestuarios.</p>
-                          </div>
-                        </div>
-
-                        {/* Evento 6 (Cambio Mock) */}
-                        <div className="relative">
-                          <div className="absolute -left-[30px] top-1.5 h-4 w-4 rounded-full bg-slate-950 border border-slate-800 flex items-center justify-center">
-                            <div className="h-2 w-2 rounded-full bg-blue-400" />
-                          </div>
-                          <div className="space-y-1">
-                            <span className="text-[10px] font-bold text-blue-400">Minuto 62&apos; - Cambios</span>
-                            <p className="text-xs text-slate-355">Doble sustitución en SD Indautxu para dar frescura física a la línea de medios.</p>
-                          </div>
-                        </div>
-
-                        {/* Evento 7 (Goles favor superior) */}
-                        {gf > 1 && (
-                          <div className="relative">
-                            <div className="absolute -left-[30px] top-1.5 h-4 w-4 rounded-full bg-slate-950 border border-[#CC0E21]/40 flex items-center justify-center">
-                              <div className="h-2 w-2 rounded-full bg-[#CC0E21]" />
-                            </div>
-                            <div className="space-y-1">
-                              <span className="text-[10px] font-bold text-[#CC0E21]">Minuto 76&apos; - ¡GOOOL DE INDAUTXU! ({gf}-{gc})</span>
-                              <p className="text-xs text-slate-300">Presión alta tras pérdida de balón. Recuperación del mediocentro y disparo cruzado desde el borde del área.</p>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Evento 8 (Final) */}
-                        <div className="relative">
-                          <div className="absolute -left-[30px] top-1.5 h-4 w-4 rounded-full bg-slate-950 border border-slate-800 flex items-center justify-center">
-                            <div className="h-2 w-2 rounded-full bg-slate-500" />
-                          </div>
-                          <div className="space-y-1">
-                            <span className="text-[10px] font-bold text-slate-500">Minuto 90&apos; - Final del Partido</span>
-                            <p className="text-xs text-slate-300">Concluye el encuentro. El equipo celebra con la afición el trabajo realizado.</p>
-                          </div>
-                        </div>
-
+                    <div className="p-8 text-center text-slate-500 space-y-3 bg-slate-950/20 border border-dashed border-slate-800/80 rounded-xl">
+                      <Activity className="h-8 w-8 text-slate-700 mx-auto" />
+                      <div className="max-w-md mx-auto space-y-1">
+                        <h5 className="text-xs font-bold text-slate-300">Registro de Eventos en Tiempo Real</h5>
+                        <p className="text-[11px] text-slate-500 leading-relaxed">
+                          Espacio reservado para la sincronización automática de goles, tarjetas, sustituciones e incidencias cronológicas a través de Die Ligen.
+                        </p>
                       </div>
-                    ) : (
-                      <div className="p-8 text-center text-slate-500 space-y-4 bg-slate-950/20 border border-slate-850 rounded-xl">
-                        <ClipboardList className="h-8 w-8 text-slate-700 mx-auto" />
-                        <div className="max-w-md mx-auto space-y-1.5">
-                          <h5 className="text-xs font-bold text-slate-300">Partido en Planificación</h5>
-                          <p className="text-[10px] text-slate-500 leading-relaxed">
-                            Los eventos en tiempo real (goles, cambios y tarjetas) se registrarán una vez el colegiado inicie el encuentro.
-                          </p>
-                        </div>
-                        <div className="pt-2 flex justify-center gap-3">
-                          <Button disabled className="text-[10px] py-1 px-3 bg-slate-900 border border-slate-850 text-slate-500 select-none">
-                            Preparar Minuto a Minuto
-                          </Button>
-                          <Button disabled variant="secondary" className="text-[10px] py-1 px-3 select-none">
-                            Registrar Evento Live
-                          </Button>
-                        </div>
-                      </div>
-                    )}
+                    </div>
                   </div>
                 </div>
 
-                {/* COLUMNA DERECHA: MARCADOR, ESTADÍSTICAS E INTEGRACIONES (5 cols) */}
+                {/* COLUMNA DERECHA: MARCADOR Y ESTADÍSTICAS (5 cols) */}
                 <div className="lg:col-span-5 space-y-6">
                   
-                  {/* AREA 2 y 4: MARCADOR Y RESUMEN FINAL */}
+                  {/* AREA 2: MARCADOR Y RESULTADO */}
                   <div className="p-5 bg-slate-900/30 border border-slate-800 rounded-2xl space-y-4">
-                    <h4 className="text-xs font-black uppercase text-slate-200 tracking-widest border-b border-slate-850 pb-2">
-                      Resultado Final
-                    </h4>
+                    <div className="flex items-center justify-between border-b border-slate-850 pb-2">
+                      <h4 className="text-xs font-black uppercase text-slate-200 tracking-widest">
+                        Resultado Final
+                      </h4>
+                      <span className="text-[9px] font-bold text-slate-400 bg-slate-950 px-2 py-0.5 rounded-full border border-slate-800 uppercase tracking-wider">
+                        DIE LIGEN · Pendiente conexión
+                      </span>
+                    </div>
                     
-                    <div className="p-5 bg-slate-950/60 border border-slate-850 rounded-xl text-center space-y-4">
-                      {/* Marcador */}
+                    <div className="p-5 bg-slate-950/60 border border-slate-850 rounded-xl text-center">
+                      {/* Marcador real de Supabase */}
                       <div className="flex items-center justify-center gap-6">
                         <div>
                           <span className="text-xs font-black text-slate-400 block uppercase">Indautxu</span>
@@ -2270,118 +2166,75 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
                           <span className="text-3xl font-black text-slate-100">{isPlayed ? gc : '-'}</span>
                         </div>
                       </div>
-
-                      {/* MVP (Placeholder) */}
-                      {isPlayed && (
-                        <div className="border-t border-slate-850/60 pt-3 flex items-center justify-center gap-2 text-xs text-slate-350">
-                          <Star className="h-4 w-4 text-amber-500 fill-amber-500" />
-                          <span>MVP del Partido: <strong className="text-slate-200">Eneko Garita</strong></span>
-                        </div>
-                      )}
                     </div>
-
-                    {/* ESTADÍSTICAS PRINCIPALES */}
-                    {isPlayed ? (
-                      <div className="space-y-3.5 bg-slate-950/20 p-4 rounded-xl border border-slate-850/50 text-xs">
-                        <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider block mb-1">Estadísticas de Juego</span>
-                        
-                        {/* Posesión */}
-                        <div className="space-y-1">
-                          <div className="flex justify-between text-slate-400">
-                            <span>Posesión</span>
-                            <span>52% - 48%</span>
-                          </div>
-                          <div className="w-full bg-slate-900 h-1.5 rounded-full flex overflow-hidden">
-                            <div className="bg-[#CC0E21] h-full" style={{ width: '52%' }} />
-                            <div className="bg-slate-750 h-full" style={{ width: '48%' }} />
-                          </div>
-                        </div>
-
-                        {/* Tiros */}
-                        <div className="space-y-1">
-                          <div className="flex justify-between text-slate-400">
-                            <span>Tiros a Puerta</span>
-                            <span>6 - 4</span>
-                          </div>
-                          <div className="w-full bg-slate-900 h-1.5 rounded-full flex overflow-hidden">
-                            <div className="bg-[#CC0E21] h-full" style={{ width: '60%' }} />
-                            <div className="bg-slate-750 h-full" style={{ width: '40%' }} />
-                          </div>
-                        </div>
-
-                        {/* Corners */}
-                        <div className="space-y-1">
-                          <div className="flex justify-between text-slate-400">
-                            <span>Saques de Esquina</span>
-                            <span>5 - 3</span>
-                          </div>
-                          <div className="w-full bg-slate-900 h-1.5 rounded-full flex overflow-hidden">
-                            <div className="bg-[#CC0E21] h-full" style={{ width: '62%' }} />
-                            <div className="bg-slate-750 h-full" style={{ width: '38%' }} />
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="p-4 bg-slate-950/20 text-center rounded-xl border border-slate-850/40 text-slate-550 text-[10px]">
-                        Las estadísticas se completarán al finalizar el encuentro.
-                      </div>
-                    )}
                   </div>
 
-                  {/* AREA 5: FUTURAS INTEGRACIONES */}
+                  {/* AREA 3: ESTADÍSTICAS */}
+                  <div className="p-5 bg-slate-900/30 border border-slate-800 rounded-2xl space-y-4">
+                    <div className="flex items-center justify-between border-b border-slate-850 pb-2">
+                      <h4 className="text-xs font-black uppercase text-slate-200 tracking-widest">
+                        Estadísticas del Encuentro
+                      </h4>
+                      <span className="text-[9px] font-bold text-slate-400 bg-slate-950 px-2 py-0.5 rounded-full border border-slate-800 uppercase tracking-wider">
+                        DIE LIGEN · Pendiente conexión
+                      </span>
+                    </div>
+
+                    <div className="p-6 text-center text-slate-500 space-y-2 bg-slate-950/20 border border-dashed border-slate-850/80 rounded-xl">
+                      <BarChart3 className="h-7 w-7 text-slate-700 mx-auto" />
+                      <div className="max-w-sm mx-auto space-y-1">
+                        <p className="text-xs font-bold text-slate-300">Estadísticas Oficiales del Partido</p>
+                        <p className="text-[11px] text-slate-500 leading-relaxed">
+                          Métricas de juego reservadas para la conexión e importación de datos desde Die Ligen.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* AREA 4: RENDIMIENTO FÍSICO Y POSICIONAL (12 cols) */}
+                <div className="lg:col-span-12">
                   <div className="p-5 bg-slate-900/30 border border-slate-800 rounded-2xl space-y-4">
                     <h4 className="text-xs font-black uppercase text-slate-200 tracking-widest border-b border-slate-850 pb-2">
-                      Módulos Operativos Live
+                      Rendimiento Físico y Posicional
                     </h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       
-                      {/* Live Tracking */}
-                      <div className="p-3 bg-slate-950/20 border border-slate-850 rounded-xl flex items-center gap-3 opacity-50 select-none">
-                        <div className="h-8 w-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-500">
-                          <Activity className="h-4 w-4" />
+                      {/* Campos de calor */}
+                      <div className="p-4 bg-slate-950/30 border border-slate-850 rounded-xl flex items-start justify-between gap-4">
+                        <div className="space-y-1.5">
+                          <div className="flex items-center gap-2">
+                            <Activity className="h-4 w-4 text-[#CC0E21]" />
+                            <h5 className="text-xs font-bold text-slate-200">Campos de Calor</h5>
+                          </div>
+                          <p className="text-[11px] text-slate-500 leading-relaxed">
+                            Visualización de ocupación espacial y mapas de calor del equipo sobre el terreno de juego.
+                          </p>
                         </div>
-                        <div>
-                          <h5 className="text-xs font-bold text-slate-350">Live Tracking GPS</h5>
-                          <span className="text-[8px] text-slate-500 font-semibold block mt-0.5">Próximamente</span>
-                        </div>
+                        <span className="text-[9px] font-bold text-slate-400 bg-slate-900 px-2 py-1 rounded border border-slate-800 whitespace-nowrap uppercase tracking-wider shrink-0">
+                          GPS · Pendiente integración
+                        </span>
                       </div>
 
-                      {/* Sincronización RFEF */}
-                      <div className="p-3 bg-slate-950/20 border border-slate-850 rounded-xl flex items-center gap-3 opacity-50 select-none">
-                        <div className="h-8 w-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-500">
-                          <RefreshCw className="h-4 w-4" />
+                      {/* Métricas físicas */}
+                      <div className="p-4 bg-slate-950/30 border border-slate-850 rounded-xl flex items-start justify-between gap-4">
+                        <div className="space-y-1.5">
+                          <div className="flex items-center gap-2">
+                            <Zap className="h-4 w-4 text-amber-500" />
+                            <h5 className="text-xs font-bold text-slate-200">Métricas Físicas</h5>
+                          </div>
+                          <p className="text-[11px] text-slate-500 leading-relaxed">
+                            Métricas de esfuerzo, cargas e intensidades de desplazamiento registradas durante el partido.
+                          </p>
                         </div>
-                        <div>
-                          <h5 className="text-xs font-bold text-slate-350">Sincronización RFEF</h5>
-                          <span className="text-[8px] text-slate-500 font-semibold block mt-0.5">Próximamente</span>
-                        </div>
-                      </div>
-
-                      {/* IA Postpartido */}
-                      <div className="p-3 bg-slate-950/20 border border-slate-850 rounded-xl flex items-center gap-3 opacity-50 select-none">
-                        <div className="h-8 w-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-550">
-                          <Brain className="h-4 w-4" />
-                        </div>
-                        <div>
-                          <h5 className="text-xs font-bold text-slate-355">IA Post-Partido</h5>
-                          <span className="text-[8px] text-slate-500 font-semibold block mt-0.5">Próximamente</span>
-                        </div>
-                      </div>
-
-                      {/* Exportar Informe PDF */}
-                      <div className="p-3 bg-slate-950/20 border border-[#CC0E21]/20 rounded-xl flex items-center gap-3 opacity-50 select-none">
-                        <div className="h-8 w-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-500">
-                          <Download className="h-4 w-4" />
-                        </div>
-                        <div>
-                          <h5 className="text-xs font-bold text-slate-350">Exportar Reporte</h5>
-                          <span className="text-[8px] text-slate-500 font-semibold block mt-0.5">Próximamente</span>
-                        </div>
+                        <span className="text-[9px] font-bold text-slate-400 bg-slate-900 px-2 py-1 rounded border border-slate-800 whitespace-nowrap uppercase tracking-wider shrink-0">
+                          GPS · Pendiente integración
+                        </span>
                       </div>
 
                     </div>
                   </div>
-
                 </div>
 
               </div>
