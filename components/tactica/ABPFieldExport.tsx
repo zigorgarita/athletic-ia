@@ -71,59 +71,61 @@ export function ABPFieldExport({ playRoles, playType, playZona }: ABPFieldExport
       {(() => {
         if (view === 'full') {
           return (
-            <svg viewBox="0 0 400 300" className="absolute inset-0 w-full h-full pointer-events-none opacity-85">
-              <rect x="15" y="15" width="370" height="270" fill="none" stroke="#166534" strokeWidth="2.5" />
-              <line x1="200" y1="15" x2="200" y2="285" stroke="#166534" strokeWidth="2.5" />
-              <circle cx="200" cy="150" r="45" fill="none" stroke="#166534" strokeWidth="2.5" />
-              <circle cx="200" cy="150" r="3" fill="#166534" />
-              <rect x="15" y="65" width="60" height="170" fill="none" stroke="#166534" strokeWidth="2.5" />
-              <rect x="15" y="105" width="22" height="90" fill="none" stroke="#166534" strokeWidth="2.5" />
-              <circle cx="55" cy="150" r="2.5" fill="#166534" />
-              <path d="M 75 115 A 40 40 0 0 1 75 185" fill="none" stroke="#166534" strokeWidth="2.5" />
-              <rect x="7" y="115" width="8" height="70" fill="none" stroke="#166534" strokeWidth="3" />
-              <rect x="325" y="65" width="60" height="170" fill="none" stroke="#166534" strokeWidth="2.5" />
-              <rect x="363" y="105" width="22" height="90" fill="none" stroke="#166534" strokeWidth="2.5" />
-              <circle cx="345" cy="150" r="2.5" fill="#166534" />
-              <path d="M 325 115 A 40 40 0 0 0 325 185" fill="none" stroke="#166534" strokeWidth="2.5" />
-              <rect x="385" y="115" width="8" height="70" fill="none" stroke="#166534" strokeWidth="3" />
+            <svg viewBox="0 0 507 535" className="absolute inset-0 w-full h-full pointer-events-none opacity-85">
+              <rect x="20" y="20" width="467" height="495" rx="12" fill="none" stroke="#166534" strokeWidth="2.5" />
+              <line x1="20" y1="267.5" x2="487" y2="267.5" stroke="#166534" strokeWidth="2.5" />
+              <circle cx="253.5" cy="267.5" r="60" fill="none" stroke="#166534" strokeWidth="2.5" />
+              <circle cx="253.5" cy="267.5" r="3.5" fill="#166534" />
+              {/* Área Superior */}
+              <rect x="135" y="20" width="237" height="90" fill="none" stroke="#166534" strokeWidth="2.5" />
+              <rect x="188.5" y="20" width="130" height="30" fill="none" stroke="#166534" strokeWidth="2.5" />
+              <circle cx="253.5" cy="75" r="3" fill="#166534" />
+              <path d="M 203.5 110 A 50 50 0 0 0 303.5 110" fill="none" stroke="#166534" strokeWidth="2.5" />
+              <rect x="218.5" y="10" width="70" height="10" fill="none" stroke="#166534" strokeWidth="3" />
+              {/* Área Inferior */}
+              <rect x="135" y="425" width="237" height="90" fill="none" stroke="#166534" strokeWidth="2.5" />
+              <rect x="188.5" y="485" width="130" height="30" fill="none" stroke="#166534" strokeWidth="2.5" />
+              <circle cx="253.5" cy="460" r="3" fill="#166534" />
+              <path d="M 203.5 425 A 50 50 0 0 1 303.5 425" fill="none" stroke="#166534" strokeWidth="2.5" />
+              <rect x="218.5" y="515" width="70" height="10" fill="none" stroke="#166534" strokeWidth="3" />
             </svg>
           );
         } else if (view === 'midfield') {
           return (
-            <svg viewBox="0 0 400 300" className="absolute inset-0 w-full h-full pointer-events-none opacity-85">
-              <rect x="15" y="15" width="370" height="270" fill="none" stroke="#166534" strokeWidth="2.5" />
-              <line x1="200" y1="15" x2="200" y2="285" stroke="#166534" strokeWidth="2.5" />
-              <circle cx="200" cy="150" r="45" fill="none" stroke="#166534" strokeWidth="2.5" />
-              <circle cx="200" cy="150" r="3" fill="#166534" />
-              <text x="200" y="260" fill="#166534" fontSize="12" fontWeight="bold" textAnchor="middle" opacity="0.85">ZONA MEDIA (MEDIO CAMPO)</text>
+            <svg viewBox="0 0 507 535" className="absolute inset-0 w-full h-full pointer-events-none opacity-85">
+              <rect x="20" y="20" width="467" height="495" rx="12" fill="none" stroke="#166534" strokeWidth="2.5" />
+              <line x1="20" y1="267.5" x2="487" y2="267.5" stroke="#166534" strokeWidth="2.5" />
+              <circle cx="253.5" cy="267.5" r="60" fill="none" stroke="#166534" strokeWidth="2.5" />
+              <circle cx="253.5" cy="267.5" r="3.5" fill="#166534" />
+              <text x="253.5" y="440" fill="#166534" fontSize="12" fontWeight="bold" textAnchor="middle" opacity="0.85">ZONA MEDIA (MEDIO CAMPO)</text>
             </svg>
           );
         } else if (view === 'defense') {
           return (
-            <svg viewBox="0 0 400 300" className="absolute inset-0 w-full h-full pointer-events-none opacity-85">
-              <rect x="0" y="0" width="400" height="300" fill="none" stroke="#166534" strokeWidth="2.5" />
-              <path d="M 0 10 A 10 10 0 0 1 10 0" fill="none" stroke="#166534" strokeWidth="3" />
-              <path d="M 400 10 A 10 10 0 0 0 390 0" fill="none" stroke="#166534" strokeWidth="3" />
-              <rect x="75" y="0" width="250" height="110" fill="none" stroke="#166534" strokeWidth="2.5" />
-              <rect x="140" y="0" width="120" height="40" fill="none" stroke="#166534" strokeWidth="2.5" />
-              <circle cx="200" cy="80" r="3" fill="#166534" />
-              <path d="M 150 110 A 60 60 0 0 0 250 110" fill="none" stroke="#166534" strokeWidth="2.5" />
-              <rect x="165" y="-6" width="70" height="6" fill="none" stroke="#166534" strokeWidth="3" />
-              <text x="200" y="140" fill="#166534" fontSize="12" fontWeight="bold" textAnchor="middle" opacity="0.85">ÁREA PROPIA (DEFENSA)</text>
+            <svg viewBox="0 0 507 535" className="absolute inset-0 w-full h-full pointer-events-none opacity-85">
+              <rect x="20" y="20" width="467" height="495" rx="12" fill="none" stroke="#166534" strokeWidth="2.5" />
+              <path d="M 20 38 A 18 18 0 0 1 38 20" fill="none" stroke="#166534" strokeWidth="2.5" />
+              <path d="M 487 38 A 18 18 0 0 0 469 20" fill="none" stroke="#166534" strokeWidth="2.5" />
+              <rect x="210" y="10" width="87" height="10" fill="none" stroke="#166534" strokeWidth="3" />
+              <rect x="178.5" y="20" width="150" height="55" fill="none" stroke="#166534" strokeWidth="2.5" />
+              <rect x="96" y="20" width="315" height="155" fill="none" stroke="#166534" strokeWidth="2.5" />
+              <circle cx="253.5" cy="120" r="3.5" fill="#166534" />
+              <path d="M 196 175 A 60 60 0 0 0 311 175" fill="none" stroke="#166534" strokeWidth="2.5" />
+              <text x="253.5" y="225" fill="#166534" fontSize="12" fontWeight="bold" textAnchor="middle" opacity="0.85">ÁREA PROPIA (DEFENSA)</text>
             </svg>
           );
         } else {
           return (
-            <svg viewBox="0 0 400 300" className="absolute inset-0 w-full h-full pointer-events-none opacity-85">
-              <rect x="0" y="0" width="400" height="300" fill="none" stroke="#166534" strokeWidth="2.5" />
-              <path d="M 0 10 A 10 10 0 0 1 10 0" fill="none" stroke="#166534" strokeWidth="3" />
-              <path d="M 400 10 A 10 10 0 0 0 390 0" fill="none" stroke="#166534" strokeWidth="3" />
-              <rect x="75" y="0" width="250" height="110" fill="none" stroke="#166534" strokeWidth="2.5" />
-              <rect x="140" y="0" width="120" height="40" fill="none" stroke="#166534" strokeWidth="2.5" />
-              <circle cx="200" cy="80" r="3" fill="#166534" />
-              <path d="M 150 110 A 60 60 0 0 0 250 110" fill="none" stroke="#166534" strokeWidth="2.5" />
-              <rect x="165" y="-6" width="70" height="6" fill="none" stroke="#166534" strokeWidth="3" />
-              <text x="200" y="140" fill="#166534" fontSize="12" fontWeight="bold" textAnchor="middle" opacity="0.85">ÁREA RIVAL (ATAQUE)</text>
+            <svg viewBox="0 0 507 535" className="absolute inset-0 w-full h-full pointer-events-none opacity-85">
+              <rect x="20" y="20" width="467" height="495" rx="12" fill="none" stroke="#166534" strokeWidth="2.5" />
+              <path d="M 20 38 A 18 18 0 0 1 38 20" fill="none" stroke="#166534" strokeWidth="2.5" />
+              <path d="M 487 38 A 18 18 0 0 0 469 20" fill="none" stroke="#166534" strokeWidth="2.5" />
+              <rect x="210" y="10" width="87" height="10" fill="none" stroke="#166534" strokeWidth="3" />
+              <rect x="178.5" y="20" width="150" height="55" fill="none" stroke="#166534" strokeWidth="2.5" />
+              <rect x="96" y="20" width="315" height="155" fill="none" stroke="#166534" strokeWidth="2.5" />
+              <circle cx="253.5" cy="120" r="3.5" fill="#166534" />
+              <path d="M 196 175 A 60 60 0 0 0 311 175" fill="none" stroke="#166534" strokeWidth="2.5" />
+              <text x="253.5" y="225" fill="#166534" fontSize="12" fontWeight="bold" textAnchor="middle" opacity="0.85">ÁREA RIVAL (ATAQUE)</text>
             </svg>
           );
         }
