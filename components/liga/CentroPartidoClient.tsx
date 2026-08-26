@@ -8,12 +8,13 @@ import { useEditMode } from '@/context/EditModeContext';
 import {
   Player, Match, MatchPlayerStats,
   MatchFullVideo, MatchVideoClip, MatchStrategicAction, MatchCustomVideo, MatchDocument,
-  TacticalLineup, GameModelAnalysis, MatchABPPlan
+  TacticalLineup, GameModelAnalysis, MatchABPPlan, GPSSession, GPSData
 } from '@/types';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { Badge } from '@/components/ui/Badge';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { Avatar } from '@/components/ui/Avatar';
 import { VideoPlayerModal } from './VideoPlayerModal';
 import { MatchHeader } from './MatchHeader';
 import { MatchTabs } from './MatchTabs';
@@ -32,7 +33,7 @@ import {
   Eye, Download, Upload, AlertCircle, Brain, TrendingUp, Lightbulb,
   AlertTriangle, Activity, CheckCircle2, User, Calendar, RefreshCw,
   Sparkles, PlayCircle, Target, Clock, Paperclip, Link2, ExternalLink, Loader2,
-  BarChart3, Zap
+  BarChart3, Zap, Award, Gauge
 } from 'lucide-react';
 
 interface LineupAnalysisResult {
@@ -172,6 +173,10 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
   const [abpModuleTabFilter, setAbpModuleTabFilter] = useState<'TODOS' | 'FAVOR' | 'CONTRA'>('TODOS');
   const [selectedOfficialPlanId, setSelectedOfficialPlanId] = useState<string | null>(null);
   const [expandedPlanId, setExpandedPlanId] = useState<string | null>(null);
+
+  // GPS Session & Data states
+  const [gpsSession, setGpsSession] = useState<GPSSession | null>(null);
+  const [gpsData, setGpsData] = useState<(GPSData & { player?: Player })[]>([]);
 
   const openAnalysisDocModal = (type: string, origin: 'Archivo' | 'Enlace') => {
     setDocType(type);
@@ -445,6 +450,37 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
         } else {
           setNodesPropio([]);
         }
+      }
+
+      // 11. GPS Session & Data
+      const { data: gpsSessionRows, error: gpsSessionErr } = await supabase
+        .from('gps_sessions')
+        .select('*')
+        .eq('match_id', matchId)
+        .limit(1);
+
+      if (!gpsSessionErr && gpsSessionRows && gpsSessionRows.length > 0) {
+        const session = gpsSessionRows[0];
+        setGpsSession(session);
+
+        const { data: gpsDataRows, error: gpsDataErr } = await supabase
+          .from('gps_data')
+          .select('*')
+          .eq('session_id', session.id);
+
+        if (!gpsDataErr && gpsDataRows) {
+          const playersList = playersData || [];
+          const mapped = gpsDataRows.map((d: GPSData) => ({
+            ...d,
+            player: playersList.find(p => p.id === d.player_id)
+          }));
+          setGpsData(mapped);
+        } else {
+          setGpsData([]);
+        }
+      } else {
+        setGpsSession(null);
+        setGpsData([]);
       }
 
     } catch (err: unknown) {
@@ -2193,47 +2229,215 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
 
                 </div>
 
-                {/* AREA 4: RENDIMIENTO FÍSICO Y POSICIONAL (12 cols) */}
+                {/* AREA 4: RENDIMIENTO FÍSICO GPS (12 cols) */}
                 <div className="lg:col-span-12">
                   <div className="p-5 bg-slate-900/30 border border-slate-800 rounded-2xl space-y-4">
-                    <h4 className="text-xs font-black uppercase text-slate-200 tracking-widest border-b border-slate-850 pb-2">
-                      Rendimiento Físico y Posicional
-                    </h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      
-                      {/* Campos de calor */}
-                      <div className="p-4 bg-slate-950/30 border border-slate-850 rounded-xl flex items-start justify-between gap-4">
-                        <div className="space-y-1.5">
-                          <div className="flex items-center gap-2">
-                            <Activity className="h-4 w-4 text-[#CC0E21]" />
-                            <h5 className="text-xs font-bold text-slate-200">Campos de Calor</h5>
-                          </div>
-                          <p className="text-[11px] text-slate-500 leading-relaxed">
-                            Visualización de ocupación espacial y mapas de calor del equipo sobre el terreno de juego.
-                          </p>
-                        </div>
-                        <span className="text-[9px] font-bold text-slate-400 bg-slate-900 px-2 py-1 rounded border border-slate-800 whitespace-nowrap uppercase tracking-wider shrink-0">
-                          GPS · Pendiente integración
-                        </span>
+                    <div className="flex items-center justify-between border-b border-slate-850 pb-2">
+                      <div className="flex items-center gap-2">
+                        <Activity className="h-4 w-4 text-[#CC0E21]" />
+                        <h4 className="text-xs font-black uppercase text-slate-200 tracking-widest">
+                          Rendimiento Físico GPS
+                        </h4>
+                        {gpsSession?.descripcion && (
+                          <span className="text-[10px] text-slate-500 font-normal hidden sm:inline">
+                            • {gpsSession.descripcion}
+                          </span>
+                        )}
                       </div>
-
-                      {/* Métricas físicas */}
-                      <div className="p-4 bg-slate-950/30 border border-slate-850 rounded-xl flex items-start justify-between gap-4">
-                        <div className="space-y-1.5">
-                          <div className="flex items-center gap-2">
-                            <Zap className="h-4 w-4 text-amber-500" />
-                            <h5 className="text-xs font-bold text-slate-200">Métricas Físicas</h5>
-                          </div>
-                          <p className="text-[11px] text-slate-500 leading-relaxed">
-                            Métricas de esfuerzo, cargas e intensidades de desplazamiento registradas durante el partido.
-                          </p>
-                        </div>
-                        <span className="text-[9px] font-bold text-slate-400 bg-slate-900 px-2 py-1 rounded border border-slate-800 whitespace-nowrap uppercase tracking-wider shrink-0">
-                          GPS · Pendiente integración
-                        </span>
-                      </div>
-
+                      <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider ${
+                        gpsData.length > 0
+                          ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                          : 'bg-slate-950 text-slate-400 border-slate-800'
+                      }`}>
+                        {gpsData.length > 0 ? 'GPS · Datos del Partido' : 'GPS · Sin datos'}
+                      </span>
                     </div>
+
+                    {(() => {
+                      const getMetersPerMin = (dist: number | null | undefined, mins: number | null | undefined) => {
+                        if (!mins || mins <= 0 || !dist || dist <= 0) return 0;
+                        return Math.round(dist / mins);
+                      };
+
+                      if (gpsData.length === 0) {
+                        return (
+                          <div className="p-8 text-center text-slate-500 space-y-3 bg-slate-950/20 border border-dashed border-slate-850/80 rounded-xl">
+                            <Activity className="h-8 w-8 text-slate-700 mx-auto" />
+                            <div className="max-w-md mx-auto space-y-1">
+                              <h5 className="text-xs font-bold text-slate-300">Sin datos GPS asociados a este partido</h5>
+                              <p className="text-[11px] text-slate-500 leading-relaxed">
+                                Puedes importar el archivo de rendimiento físico de este encuentro desde la pestaña{' '}
+                                <Link href="/gps" className="text-[#CC0E21] hover:underline font-bold">
+                                  GPS
+                                </Link>.
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      // Cálculo de los 4 líderes reales del partido
+                      const maxDist = Math.max(...gpsData.map(d => d.distancia_total || 0));
+                      const maxSpeed = Math.max(...gpsData.map(d => d.velocidad_maxima || 0));
+                      const maxSprints = Math.max(...gpsData.map(d => d.num_sprints || 0));
+                      const maxIntensity = Math.max(...gpsData.map(d => getMetersPerMin(d.distancia_total, d.minutos)));
+
+                      const topDistRow = gpsData.find(d => (d.distancia_total || 0) === maxDist && maxDist > 0);
+                      const topSpeedRow = gpsData.find(d => (d.velocidad_maxima || 0) === maxSpeed && maxSpeed > 0);
+                      const topSprintsRow = gpsData.find(d => (d.num_sprints || 0) === maxSprints && maxSprints > 0);
+                      const topIntensityRow = gpsData.find(d => getMetersPerMin(d.distancia_total, d.minutos) === maxIntensity && maxIntensity > 0);
+
+                      return (
+                        <div className="space-y-4">
+                          {/* 4 Indicadores / Líderes del Partido */}
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            
+                            {/* 1. Mayor Distancia */}
+                            <div className="p-3.5 bg-slate-950/60 border border-slate-850 rounded-xl flex flex-col justify-between">
+                              <div className="flex justify-between items-start">
+                                <span className="text-[9px] uppercase font-black tracking-wider text-slate-500">Mayor Distancia</span>
+                                <Award className="h-4 w-4 text-emerald-500" />
+                              </div>
+                              <div className="mt-2.5">
+                                <span className="text-lg font-black text-slate-100">
+                                  {maxDist > 0 ? `${(maxDist / 1000).toFixed(2)} km` : '—'}
+                                </span>
+                                <div className="text-[10px] text-slate-400 mt-1 flex items-center gap-1.5 truncate">
+                                  {topDistRow?.player && (
+                                    <Avatar src={topDistRow.player.foto_url} name={topDistRow.player.nombre} size="sm" className="h-5 w-5 text-[9px]" />
+                                  )}
+                                  <span className="truncate">
+                                    {topDistRow?.player ? `${topDistRow.player.nombre} ${topDistRow.player.apellidos}` : topDistRow?.gps_id || '—'}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* 2. Mayor Intensidad */}
+                            <div className="p-3.5 bg-slate-950/60 border border-slate-850 rounded-xl flex flex-col justify-between">
+                              <div className="flex justify-between items-start">
+                                <span className="text-[9px] uppercase font-black tracking-wider text-slate-500">Mayor Intensidad</span>
+                                <Gauge className="h-4 w-4 text-cyan-400" />
+                              </div>
+                              <div className="mt-2.5">
+                                <span className="text-lg font-black text-slate-100">
+                                  {maxIntensity > 0 ? `${maxIntensity} m/min` : '—'}
+                                </span>
+                                <div className="text-[10px] text-slate-400 mt-1 flex items-center gap-1.5 truncate">
+                                  {topIntensityRow?.player && (
+                                    <Avatar src={topIntensityRow.player.foto_url} name={topIntensityRow.player.nombre} size="sm" className="h-5 w-5 text-[9px]" />
+                                  )}
+                                  <span className="truncate">
+                                    {topIntensityRow?.player ? `${topIntensityRow.player.nombre} ${topIntensityRow.player.apellidos}` : topIntensityRow?.gps_id || '—'}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* 3. Velocidad Máxima */}
+                            <div className="p-3.5 bg-slate-950/60 border border-slate-850 rounded-xl flex flex-col justify-between">
+                              <div className="flex justify-between items-start">
+                                <span className="text-[9px] uppercase font-black tracking-wider text-slate-500">Velocidad Máxima</span>
+                                <Zap className="h-4 w-4 text-amber-500" />
+                              </div>
+                              <div className="mt-2.5">
+                                <span className="text-lg font-black text-slate-100">
+                                  {maxSpeed > 0 ? `${maxSpeed.toFixed(1)} km/h` : '—'}
+                                </span>
+                                <div className="text-[10px] text-slate-400 mt-1 flex items-center gap-1.5 truncate">
+                                  {topSpeedRow?.player && (
+                                    <Avatar src={topSpeedRow.player.foto_url} name={topSpeedRow.player.nombre} size="sm" className="h-5 w-5 text-[9px]" />
+                                  )}
+                                  <span className="truncate">
+                                    {topSpeedRow?.player ? `${topSpeedRow.player.nombre} ${topSpeedRow.player.apellidos}` : topSpeedRow?.gps_id || '—'}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* 4. Más Sprints */}
+                            <div className="p-3.5 bg-slate-950/60 border border-slate-850 rounded-xl flex flex-col justify-between">
+                              <div className="flex justify-between items-start">
+                                <span className="text-[9px] uppercase font-black tracking-wider text-slate-500">Más Sprints</span>
+                                <Activity className="h-4 w-4 text-blue-500" />
+                              </div>
+                              <div className="mt-2.5">
+                                <span className="text-lg font-black text-slate-100">
+                                  {maxSprints > 0 ? `${maxSprints}` : '—'}
+                                </span>
+                                <div className="text-[10px] text-slate-400 mt-1 flex items-center gap-1.5 truncate">
+                                  {topSprintsRow?.player && (
+                                    <Avatar src={topSprintsRow.player.foto_url} name={topSprintsRow.player.nombre} size="sm" className="h-5 w-5 text-[9px]" />
+                                  )}
+                                  <span className="truncate">
+                                    {topSprintsRow?.player ? `${topSprintsRow.player.nombre} ${topSprintsRow.player.apellidos}` : topSprintsRow?.gps_id || '—'}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+
+                          </div>
+
+                          {/* Resumen Compacto por Jugador */}
+                          <div className="border border-slate-850 bg-slate-950/40 rounded-xl overflow-x-auto">
+                            <table className="w-full text-left border-collapse text-[11px]">
+                              <thead>
+                                <tr className="bg-slate-950/80 border-b border-slate-850 text-slate-400 font-bold uppercase select-none">
+                                  <th className="px-3 py-2.5">Jugador</th>
+                                  <th className="px-2.5 py-2.5 text-center">Min</th>
+                                  <th className="px-2.5 py-2.5 text-right">Distancia (m)</th>
+                                  <th className="px-2.5 py-2.5 text-right">m/min</th>
+                                  <th className="px-2.5 py-2.5 text-right">Vel. Máx (km/h)</th>
+                                  <th className="px-2.5 py-2.5 text-center">Sprints</th>
+                                  <th className="px-2.5 py-2.5 text-right">Sprint / HSR (m)</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-850/60 text-slate-300">
+                                {gpsData.map((row) => {
+                                  const mPerMin = getMetersPerMin(row.distancia_total, row.minutos);
+                                  return (
+                                    <tr key={row.id} className="hover:bg-slate-900/40 transition-colors">
+                                      <td className="px-3 py-2 font-semibold text-slate-200">
+                                        {row.player ? (
+                                          <div className="flex items-center gap-2">
+                                            <Avatar src={row.player.foto_url} name={row.player.nombre} size="sm" className="h-5 w-5 text-[8px]" />
+                                            <span className="truncate">{row.player.nombre} {row.player.apellidos}</span>
+                                            <span className="text-[9px] text-slate-500 font-bold">#{row.player.dorsal}</span>
+                                          </div>
+                                        ) : (
+                                          <span className="text-slate-400">{row.gps_id}</span>
+                                        )}
+                                      </td>
+                                      <td className="px-2.5 py-2 text-center text-slate-400">{row.minutos}&apos;</td>
+                                      <td className="px-2.5 py-2 text-right font-medium text-slate-200">
+                                        {row.distancia_total ? `${row.distancia_total.toLocaleString('es-ES')} m` : '—'}
+                                      </td>
+                                      <td className="px-2.5 py-2 text-right font-semibold text-[#CC0E21]">
+                                        {mPerMin > 0 ? mPerMin : '—'}
+                                      </td>
+                                      <td className="px-2.5 py-2 text-right text-slate-200">
+                                        {row.velocidad_maxima ? `${row.velocidad_maxima.toFixed(1)}` : '—'}
+                                      </td>
+                                      <td className="px-2.5 py-2 text-center text-slate-200">
+                                        {row.num_sprints ?? '—'}
+                                      </td>
+                                      <td className="px-2.5 py-2 text-right text-slate-300">
+                                        {row.sprint_distance
+                                          ? `${row.sprint_distance.toLocaleString('es-ES')} m`
+                                          : row.hsr
+                                          ? `${row.hsr.toLocaleString('es-ES')} m`
+                                          : '—'}
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
                   </div>
                 </div>
 
