@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Player, ABPPlayerRole, MatchABPPlayerAssignment, ABPType } from '@/types';
 import { Avatar } from '@/components/ui/Avatar';
-import { X, Search } from 'lucide-react';
+import { X, Search, Maximize2 } from 'lucide-react';
 import { ABPPlayerNode, LabelPosition } from './ABPPlayerNode';
 import { normalizeRoleLabel } from '@/lib/abpUtils';
 import { getPlayerDisplayName } from '@/lib/playerUtils';
@@ -57,6 +57,125 @@ const getFieldView = (type: ABPType, zona?: string | null): 'full' | 'attack' | 
   return 'attack';
 };
 
+interface FieldPitchContentProps {
+  view: 'full' | 'attack' | 'defense' | 'midfield';
+  roles: RoleWithAssignment[];
+  selectedRoleId?: string | null;
+  readOnly?: boolean;
+  onNodeClick?: (roleId: string) => void;
+  onUpdateLabelPosition?: (roleId: string, position: LabelPosition) => void;
+}
+
+function FieldPitchContent({
+  view,
+  roles,
+  selectedRoleId,
+  readOnly = false,
+  onNodeClick,
+  onUpdateLabelPosition,
+}: FieldPitchContentProps) {
+  return (
+    <>
+      {/* Renderizado del campo según la vista */}
+      {(() => {
+        if (view === 'full') {
+          return (
+            <svg viewBox="0 0 507 535" className="absolute inset-0 w-full h-full pointer-events-none opacity-35">
+              <rect x="20" y="20" width="467" height="495" rx="12" fill="none" stroke="#fff" strokeWidth="2" />
+              <line x1="20" y1="267.5" x2="487" y2="267.5" stroke="#fff" strokeWidth="2" />
+              <circle cx="253.5" cy="267.5" r="60" fill="none" stroke="#fff" strokeWidth="2" />
+              <circle cx="253.5" cy="267.5" r="3.5" fill="#fff" />
+              {/* Área Superior */}
+              <rect x="135" y="20" width="237" height="90" fill="none" stroke="#fff" strokeWidth="2" />
+              <rect x="188.5" y="20" width="130" height="30" fill="none" stroke="#fff" strokeWidth="2" />
+              <circle cx="253.5" cy="75" r="3" fill="#fff" />
+              <path d="M 203.5 110 A 50 50 0 0 0 303.5 110" fill="none" stroke="#fff" strokeWidth="2" />
+              <rect x="218.5" y="10" width="70" height="10" fill="none" stroke="#fff" strokeWidth="2.2" />
+              {/* Área Inferior */}
+              <rect x="135" y="425" width="237" height="90" fill="none" stroke="#fff" strokeWidth="2" />
+              <rect x="188.5" y="485" width="130" height="30" fill="none" stroke="#fff" strokeWidth="2" />
+              <circle cx="253.5" cy="460" r="3" fill="#fff" />
+              <path d="M 203.5 425 A 50 50 0 0 1 303.5 425" fill="none" stroke="#fff" strokeWidth="2" />
+              <rect x="218.5" y="515" width="70" height="10" fill="none" stroke="#fff" strokeWidth="2.2" />
+            </svg>
+          );
+        } else if (view === 'midfield') {
+          return (
+            <svg viewBox="0 0 507 535" className="absolute inset-0 w-full h-full pointer-events-none opacity-35">
+              <rect x="20" y="20" width="467" height="495" rx="12" fill="none" stroke="#fff" strokeWidth="2" />
+              <line x1="20" y1="267.5" x2="487" y2="267.5" stroke="#fff" strokeWidth="2" />
+              <circle cx="253.5" cy="267.5" r="60" fill="none" stroke="#fff" strokeWidth="2" />
+              <circle cx="253.5" cy="267.5" r="3.5" fill="#fff" />
+              <text x="253.5" y="440" fill="#fff" fontSize="10" fontWeight="bold" textAnchor="middle" opacity="0.4">ZONA MEDIA (MEDIO CAMPO)</text>
+            </svg>
+          );
+        } else if (view === 'defense') {
+          return (
+            <svg viewBox="0 0 507 535" className="absolute inset-0 w-full h-full pointer-events-none opacity-35">
+              <rect x="20" y="20" width="467" height="495" rx="12" fill="none" stroke="#fff" strokeWidth="2" />
+              <path d="M 20 38 A 18 18 0 0 1 38 20" fill="none" stroke="#fff" strokeWidth="2" />
+              <path d="M 487 38 A 18 18 0 0 0 469 20" fill="none" stroke="#fff" strokeWidth="2" />
+              <rect x="210" y="10" width="87" height="10" fill="none" stroke="#fff" strokeWidth="2.2" />
+              <rect x="178.5" y="20" width="150" height="55" fill="none" stroke="#fff" strokeWidth="2" />
+              <rect x="96" y="20" width="315" height="155" fill="none" stroke="#fff" strokeWidth="2" />
+              <circle cx="253.5" cy="120" r="3.5" fill="#fff" />
+              <path d="M 196 175 A 60 60 0 0 0 311 175" fill="none" stroke="#fff" strokeWidth="2" />
+              <text x="253.5" y="225" fill="#fff" fontSize="10" fontWeight="bold" textAnchor="middle" opacity="0.4">ÁREA PROPIA (DEFENSA)</text>
+            </svg>
+          );
+        } else {
+          return (
+            <svg viewBox="0 0 507 535" className="absolute inset-0 w-full h-full pointer-events-none opacity-35">
+              <rect x="20" y="20" width="467" height="495" rx="12" fill="none" stroke="#fff" strokeWidth="2" />
+              <path d="M 20 38 A 18 18 0 0 1 38 20" fill="none" stroke="#fff" strokeWidth="2" />
+              <path d="M 487 38 A 18 18 0 0 0 469 20" fill="none" stroke="#fff" strokeWidth="2" />
+              <rect x="210" y="10" width="87" height="10" fill="none" stroke="#fff" strokeWidth="2.2" />
+              <rect x="178.5" y="20" width="150" height="55" fill="none" stroke="#fff" strokeWidth="2" />
+              <rect x="96" y="20" width="315" height="155" fill="none" stroke="#fff" strokeWidth="2" />
+              <circle cx="253.5" cy="120" r="3.5" fill="#fff" />
+              <path d="M 196 175 A 60 60 0 0 0 311 175" fill="none" stroke="#fff" strokeWidth="2" />
+              <text x="253.5" y="225" fill="#fff" fontSize="10" fontWeight="bold" textAnchor="middle" opacity="0.4">ÁREA RIVAL (ATAQUE)</text>
+            </svg>
+          );
+        }
+      })()}
+
+      {/* Nodos de la jugada */}
+      {roles.map((role) => {
+        const isSelected = !readOnly && selectedRoleId === role.id;
+        const px = role.posicion_x !== null ? role.posicion_x : 50;
+        const py = role.posicion_y !== null ? role.posicion_y : 50;
+        const roleLabel = normalizeRoleLabel(role.etiqueta) || role.rol_asignado;
+
+        return (
+          <div
+            key={role.id}
+            className={`absolute -translate-x-1/2 -translate-y-1/2 transition-all ${
+              readOnly
+                ? 'z-10'
+                : isSelected
+                  ? 'scale-110 z-30 ring-2 ring-[#CC0E21] ring-offset-2 ring-offset-emerald-950 rounded-full cursor-pointer'
+                  : 'z-10 hover:scale-105 cursor-pointer'
+            }`}
+            style={{ left: `${px}%`, top: `${py}%` }}
+            onClick={readOnly ? undefined : () => onNodeClick?.(role.id)}
+          >
+            <ABPPlayerNode
+              role={{ ...role, player: role.assignedPlayer }}
+              roleLabel={roleLabel}
+              isExport={false}
+              onChangeLabelPosition={
+                !readOnly && onUpdateLabelPosition
+                  ? (pos) => onUpdateLabelPosition(role.id, pos)
+                  : undefined
+              }
+            />
+          </div>
+        );
+      })}
+    </>
+  );
+}
 
 export function ABPPlanField({
   planId,
@@ -72,6 +191,17 @@ export function ABPPlanField({
   const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  // Cerrar con Escape
+  useEffect(() => {
+    if (!isExpanded) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsExpanded(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isExpanded]);
 
   const abpType = getABPType(tipo);
   const view = getFieldView(abpType, zona);
@@ -166,105 +296,72 @@ export function ABPPlanField({
   };
 
   return (
-    <div className="relative w-full flex flex-col xl:flex-row items-start gap-4">
-      {/* Campo de fútbol */}
-      <div id={`abp-plan-field-${planId}`} className="relative w-full xl:flex-1 aspect-[507/535] bg-emerald-950/80 rounded-2xl border-2 border-emerald-500/25 overflow-hidden select-none">
-        {/* Renderizado del campo según la vista */}
-        {(() => {
-          if (view === 'full') {
-            return (
-              <svg viewBox="0 0 507 535" className="absolute inset-0 w-full h-full pointer-events-none opacity-35">
-                <rect x="20" y="20" width="467" height="495" rx="12" fill="none" stroke="#fff" strokeWidth="2" />
-                <line x1="20" y1="267.5" x2="487" y2="267.5" stroke="#fff" strokeWidth="2" />
-                <circle cx="253.5" cy="267.5" r="60" fill="none" stroke="#fff" strokeWidth="2" />
-                <circle cx="253.5" cy="267.5" r="3.5" fill="#fff" />
-                {/* Área Superior */}
-                <rect x="135" y="20" width="237" height="90" fill="none" stroke="#fff" strokeWidth="2" />
-                <rect x="188.5" y="20" width="130" height="30" fill="none" stroke="#fff" strokeWidth="2" />
-                <circle cx="253.5" cy="75" r="3" fill="#fff" />
-                <path d="M 203.5 110 A 50 50 0 0 0 303.5 110" fill="none" stroke="#fff" strokeWidth="2" />
-                <rect x="218.5" y="10" width="70" height="10" fill="none" stroke="#fff" strokeWidth="2.2" />
-                {/* Área Inferior */}
-                <rect x="135" y="425" width="237" height="90" fill="none" stroke="#fff" strokeWidth="2" />
-                <rect x="188.5" y="485" width="130" height="30" fill="none" stroke="#fff" strokeWidth="2" />
-                <circle cx="253.5" cy="460" r="3" fill="#fff" />
-                <path d="M 203.5 425 A 50 50 0 0 1 303.5 425" fill="none" stroke="#fff" strokeWidth="2" />
-                <rect x="218.5" y="515" width="70" height="10" fill="none" stroke="#fff" strokeWidth="2.2" />
-              </svg>
-            );
-          } else if (view === 'midfield') {
-            return (
-              <svg viewBox="0 0 507 535" className="absolute inset-0 w-full h-full pointer-events-none opacity-35">
-                <rect x="20" y="20" width="467" height="495" rx="12" fill="none" stroke="#fff" strokeWidth="2" />
-                <line x1="20" y1="267.5" x2="487" y2="267.5" stroke="#fff" strokeWidth="2" />
-                <circle cx="253.5" cy="267.5" r="60" fill="none" stroke="#fff" strokeWidth="2" />
-                <circle cx="253.5" cy="267.5" r="3.5" fill="#fff" />
-                <text x="253.5" y="440" fill="#fff" fontSize="10" fontWeight="bold" textAnchor="middle" opacity="0.4">ZONA MEDIA (MEDIO CAMPO)</text>
-              </svg>
-            );
-          } else if (view === 'defense') {
-            return (
-              <svg viewBox="0 0 507 535" className="absolute inset-0 w-full h-full pointer-events-none opacity-35">
-                <rect x="20" y="20" width="467" height="495" rx="12" fill="none" stroke="#fff" strokeWidth="2" />
-                <path d="M 20 38 A 18 18 0 0 1 38 20" fill="none" stroke="#fff" strokeWidth="2" />
-                <path d="M 487 38 A 18 18 0 0 0 469 20" fill="none" stroke="#fff" strokeWidth="2" />
-                <rect x="210" y="10" width="87" height="10" fill="none" stroke="#fff" strokeWidth="2.2" />
-                <rect x="178.5" y="20" width="150" height="55" fill="none" stroke="#fff" strokeWidth="2" />
-                <rect x="96" y="20" width="315" height="155" fill="none" stroke="#fff" strokeWidth="2" />
-                <circle cx="253.5" cy="120" r="3.5" fill="#fff" />
-                <path d="M 196 175 A 60 60 0 0 0 311 175" fill="none" stroke="#fff" strokeWidth="2" />
-                <text x="253.5" y="225" fill="#fff" fontSize="10" fontWeight="bold" textAnchor="middle" opacity="0.4">ÁREA PROPIA (DEFENSA)</text>
-              </svg>
-            );
-          } else {
-            return (
-              <svg viewBox="0 0 507 535" className="absolute inset-0 w-full h-full pointer-events-none opacity-35">
-                <rect x="20" y="20" width="467" height="495" rx="12" fill="none" stroke="#fff" strokeWidth="2" />
-                <path d="M 20 38 A 18 18 0 0 1 38 20" fill="none" stroke="#fff" strokeWidth="2" />
-                <path d="M 487 38 A 18 18 0 0 0 469 20" fill="none" stroke="#fff" strokeWidth="2" />
-                <rect x="210" y="10" width="87" height="10" fill="none" stroke="#fff" strokeWidth="2.2" />
-                <rect x="178.5" y="20" width="150" height="55" fill="none" stroke="#fff" strokeWidth="2" />
-                <rect x="96" y="20" width="315" height="155" fill="none" stroke="#fff" strokeWidth="2" />
-                <circle cx="253.5" cy="120" r="3.5" fill="#fff" />
-                <path d="M 196 175 A 60 60 0 0 0 311 175" fill="none" stroke="#fff" strokeWidth="2" />
-                <text x="253.5" y="225" fill="#fff" fontSize="10" fontWeight="bold" textAnchor="middle" opacity="0.4">ÁREA RIVAL (ATAQUE)</text>
-              </svg>
-            );
-          }
-        })()}
+    <>
+      <div className="relative w-full flex flex-col xl:flex-row items-start gap-4">
+        {/* Campo de fútbol */}
+        <div id={`abp-plan-field-${planId}`} className="relative w-full xl:flex-1 aspect-[507/535] bg-emerald-950/80 rounded-2xl border-2 border-emerald-500/25 overflow-hidden select-none">
+          {/* Botón Ampliar ⛶ */}
+          <button
+            type="button"
+            onClick={() => setIsExpanded(true)}
+            className="absolute top-2.5 right-2.5 z-20 p-2 rounded-xl bg-slate-950/80 hover:bg-slate-900 text-slate-300 hover:text-white border border-slate-700/60 shadow-lg backdrop-blur-sm transition-all hover:scale-105 active:scale-95"
+            title="Ampliar pizarra táctica (⛶)"
+            aria-label="Ampliar pizarra táctica"
+          >
+            <Maximize2 className="w-4 h-4" />
+          </button>
 
-        {/* Nodos de la jugada */}
-        {roles.map((role) => {
-          const isSelected = selectedRoleId === role.id;
+          <FieldPitchContent
+            view={view}
+            roles={roles}
+            selectedRoleId={selectedRoleId}
+            readOnly={false}
+            onNodeClick={handleNodeClick}
+            onUpdateLabelPosition={onUpdateLabelPosition}
+          />
+        </div>
 
-          const px = role.posicion_x !== null ? role.posicion_x : 50;
-          const py = role.posicion_y !== null ? role.posicion_y : 50;
+        {/* Modal Ampliado a Pantalla Completa (Solo Lectura) */}
+        {isExpanded && (
+          <div
+            className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-3 md:p-6 select-none animate-in fade-in duration-200"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setIsExpanded(false);
+            }}
+          >
+            <div className="relative w-full max-w-4xl max-h-[96vh] flex flex-col items-center">
+              {/* Header con título y botón de cierre */}
+              <div className="w-full flex items-center justify-between mb-2.5 px-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs md:text-sm font-bold text-slate-200 uppercase tracking-widest">{tipo}</span>
+                  {zona && (
+                    <span className="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded-md font-semibold border border-slate-700">
+                      {zona}
+                    </span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsExpanded(false)}
+                  className="p-1.5 text-slate-400 hover:text-white bg-slate-900/80 hover:bg-slate-800 border border-slate-700/60 rounded-xl transition-all shadow-md"
+                  title="Cerrar modal (Esc)"
+                  aria-label="Cerrar"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
 
-          // Etiqueta del rol (misma lógica que ABPFieldExport)
-          const roleLabel = normalizeRoleLabel(role.etiqueta) || role.rol_asignado;
-
-          return (
-            <div
-              key={role.id}
-              className={`absolute -translate-x-1/2 -translate-y-1/2 cursor-pointer transition-all ${
-                isSelected ? 'scale-110 z-30 ring-2 ring-[#CC0E21] ring-offset-2 ring-offset-emerald-950 rounded-full' : 'z-10 hover:scale-105'
-              }`}
-              style={{ left: `${px}%`, top: `${py}%` }}
-              onClick={() => handleNodeClick(role.id)}
-            >
-              <ABPPlayerNode
-                role={{ ...role, player: role.assignedPlayer }}
-                roleLabel={roleLabel}
-                isExport={false}
-                onChangeLabelPosition={onUpdateLabelPosition
-                  ? (pos) => onUpdateLabelPosition(role.id, pos)
-                  : undefined
-                }
-              />
+              {/* Campo ampliado a escala completa manteniendo proporción */}
+              <div className="relative w-full aspect-[507/535] max-h-[85vh] bg-emerald-950/90 rounded-2xl border-2 border-emerald-500/30 overflow-hidden shadow-2xl">
+                <FieldPitchContent
+                  view={view}
+                  roles={roles}
+                  readOnly={true}
+                />
+              </div>
             </div>
-          );
-        })}
-      </div>
+          </div>
+        )}
 
       {/* Panel lateral persistent de Plantilla / Once Inicial */}
       <div className="w-full xl:w-72 bg-slate-900/80 rounded-2xl border border-slate-800/80 flex flex-col p-4">
@@ -398,5 +495,6 @@ export function ABPPlanField({
         </div>
       </div>
     </div>
-  );
+  </>
+);
 }
