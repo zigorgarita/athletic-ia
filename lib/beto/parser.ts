@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import * as XLSX from 'xlsx';
 
 export interface ParsedOliverPlayerRow {
@@ -127,9 +128,9 @@ export function parseOliverFile(
   let detectedSessionId: string | null = null;
   let detectedSessionName: string | null = null;
   let detectedDate: string | null = null;
-  let detectedStartTime: string | null = null;
-  let detectedEndTime: string | null = null;
-  let detectedDuration: number | null = null;
+  const detectedStartTime: string | null = null;
+  const detectedEndTime: string | null = null;
+  const detectedDuration: number | null = null;
   let detectedType: 'ENTRENAMIENTO' | 'PARTIDO' | 'OTRO' = fallbackOptions?.defaultType || 'ENTRENAMIENTO';
 
   // Buscar en los metadatos de cabecera

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { getSupabaseServerClient } from '@/lib/supabase-server';
@@ -134,7 +135,7 @@ export async function POST(req: NextRequest) {
     let driveFileId: string | null = null;
     let driveFileUrl: string | null = null;
     let driveFolderId: string | null = null;
-    let drivePath: string = `${activeSeason}/07_BETO/${parsedData.session_date}_${parsedData.session_name.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+    const drivePath: string = `${activeSeason}/07_BETO/${parsedData.session_date}_${parsedData.session_name.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
 
     try {
       driveFolderId = await getOrCreateDriveFolderPath({

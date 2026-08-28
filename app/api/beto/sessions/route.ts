@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseServerClient } from '@/lib/supabase-server';
 import { getActiveSeason } from '@/lib/season';
@@ -66,7 +67,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Listar historial de importaciones recientes
-    const { data: imports, error: importsErr } = await supabase
+    const { data: imports } = await supabase
       .from('beto_imports')
       .select('*')
       .eq('season', season)

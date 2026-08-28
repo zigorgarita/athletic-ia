@@ -1,6 +1,8 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @next/next/no-img-element */
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Zap,
   UploadCloud,
@@ -14,26 +16,21 @@ import {
   Trash2,
   Database,
   Search,
-  CheckCircle2,
-  AlertCircle,
-  Clock,
   HardDrive,
   UserCheck,
-  UserPlus,
   RefreshCw,
   FileSpreadsheet,
 } from 'lucide-react';
-import { BetoSession, BetoPlayerSession, BetoImport, Player } from '@/types';
+import { BetoSession, BetoPlayerSession, Player } from '@/types';
 import { BetoImportModal } from './BetoImportModal';
 import { BetoRawMetricsModal } from './BetoRawMetricsModal';
 import { useEditMode } from '@/context/EditModeContext';
-import { getActiveSeason, getAvailableSeasons } from '@/lib/season';
+import { getActiveSeason } from '@/lib/season';
 
 export function BetoClient() {
   const { isEditMode } = useEditMode();
-  const [season, setSeason] = useState(getActiveSeason());
+  const [season] = useState(getActiveSeason());
   const [sessions, setSessions] = useState<BetoSession[]>([]);
-  const [recentImports, setRecentImports] = useState<BetoImport[]>([]);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [activeSession, setActiveSession] = useState<BetoSession | null>(null);
   const [playerSessions, setPlayerSessions] = useState<BetoPlayerSession[]>([]);
@@ -47,17 +44,32 @@ export function BetoClient() {
 
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [rawMetricsPlayer, setRawMetricsPlayer] = useState<BetoPlayerSession | null>(null);
-  const [mappingPlayerId, setMappingPlayerId] = useState<string | null>(null);
 
-  // 1. Cargar lista de sesiones e importaciones
-  const loadSessions = async (targetSessionId?: string) => {
+  // 1. Cargar detalle de una sesión específica
+  const loadSessionDetail = useCallback(async (sessionId: string) => {
+    setSessionLoading(true);
+    try {
+      const res = await fetch(`/api/beto/sessions?id=${sessionId}`);
+      const data = await res.json();
+      if (data.session) {
+        setActiveSession(data.session);
+        setPlayerSessions(data.player_sessions || []);
+      }
+    } catch (err) {
+      console.error('Error al cargar detalle de sesión:', err);
+    } finally {
+      setSessionLoading(false);
+    }
+  }, []);
+
+  // 2. Cargar lista de sesiones e importaciones
+  const loadSessions = useCallback(async (targetSessionId?: string) => {
     setLoading(true);
     try {
       const res = await fetch(`/api/beto/sessions?season=${season}`);
       const data = await res.json();
       if (data.sessions) {
         setSessions(data.sessions);
-        setRecentImports(data.recent_imports || []);
 
         const toSelect = targetSessionId || selectedSessionId || (data.sessions.length > 0 ? data.sessions[0].id : null);
         if (toSelect) {
@@ -73,27 +85,10 @@ export function BetoClient() {
     } finally {
       setLoading(false);
     }
-  };
-
-  // 2. Cargar detalle de una sesión específica
-  const loadSessionDetail = async (sessionId: string) => {
-    setSessionLoading(true);
-    try {
-      const res = await fetch(`/api/beto/sessions?id=${sessionId}`);
-      const data = await res.json();
-      if (data.session) {
-        setActiveSession(data.session);
-        setPlayerSessions(data.player_sessions || []);
-      }
-    } catch (err) {
-      console.error('Error al cargar detalle de sesión:', err);
-    } finally {
-      setSessionLoading(false);
-    }
-  };
+  }, [season, selectedSessionId, loadSessionDetail]);
 
   // 3. Cargar plantilla de jugadores para mapeos
-  const loadRoster = async () => {
+  const loadRoster = useCallback(async () => {
     try {
       const res = await fetch('/api/players');
       if (res.ok) {
@@ -103,12 +98,12 @@ export function BetoClient() {
     } catch (err) {
       console.warn('No se pudo cargar la plantilla completa:', err);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadSessions();
     loadRoster();
-  }, [season]);
+  }, [season, loadSessions, loadRoster]);
 
   const handleSelectSession = (id: string) => {
     setSelectedSessionId(id);
@@ -280,7 +275,7 @@ export function BetoClient() {
             </div>
             <h3 className="text-base font-bold text-white">No hay sesiones de OLIVER importadas todavía</h3>
             <p className="text-xs text-slate-400 max-w-md mx-auto">
-              Haz clic en <strong>"Importar sesión OLIVER"</strong> para cargar tu primer archivo Excel o CSV de rendimiento físico.
+              Haz clic en <strong>&quot;Importar sesión OLIVER&quot;</strong> para cargar tu primer archivo Excel o CSV de rendimiento físico.
             </p>
             <button
               onClick={() => setIsImportModalOpen(true)}
