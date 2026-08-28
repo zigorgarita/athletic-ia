@@ -108,3 +108,90 @@ export async function uploadVideoBufferToDrive(
     name: fileName,
   };
 }
+
+/**
+ * Sube un buffer genérico (Excel, CSV, PDF, Imagen, etc.) a una carpeta específica de Google Drive.
+ */
+export async function uploadGenericBufferToDrive(
+  buffer: Buffer,
+  fileName: string,
+  mimeType: string,
+  targetFolderId?: string
+): Promise<DriveUploadResult> {
+  const accessToken = await getGoogleDriveAccessToken();
+  const folderId = targetFolderId || process.env.GOOGLE_DRIVE_FOLDER_ID;
+
+  const metadata: Record<string, unknown> = {
+    name: fileName,
+    mimeType: mimeType || 'application/octet-stream',
+  };
+
+  if (folderId) {
+    metadata.parents = [folderId];
+  }
+
+  const boundary = '-------314159265358979323846';
+  const delimiter = `\r\n--${boundary}\r\n`;
+  const closeDelimiter = `\r\n--${boundary}--`;
+
+  const multipartRequestBody = Buffer.concat([
+    Buffer.from(
+      delimiter +
+        'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
+        JSON.stringify(metadata) +
+        delimiter +
+        `Content-Type: ${mimeType || 'application/octet-stream'}\r\n\r\n`
+    ),
+    buffer,
+    Buffer.from(closeDelimiter),
+  ]);
+
+  const uploadRes = await fetch(
+    'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink,webContentLink',
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': `multipart/related; boundary="${boundary}"`,
+      },
+      body: multipartRequestBody,
+    }
+  );
+
+  if (!uploadRes.ok) {
+    const errText = await uploadRes.text();
+    throw new Error(`Error al subir el archivo a Google Drive (HTTP ${uploadRes.status}): ${errText}`);
+  }
+
+  const fileData = await uploadRes.json();
+  const fileId = fileData.id as string;
+
+  return {
+    driveFileId: fileId,
+    url: `https://drive.google.com/file/d/${fileId}/view`,
+    embedUrl: `https://drive.google.com/file/d/${fileId}/preview`,
+    name: fileName,
+  };
+}
+
+/**
+ * Elimina un archivo de Google Drive por su fileId (para rollbacks ante fallos transaccionales).
+ */
+export async function deleteDriveFile(driveFileId: string): Promise<boolean> {
+  if (!driveFileId) return false;
+  try {
+    const accessToken = await getGoogleDriveAccessToken();
+    const res = await fetch(`https://www.googleapis.com/drive/v3/files/${driveFileId}`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+    return res.ok || res.status === 404;
+  } catch (err) {
+    console.warn('Advertencia al intentar eliminar archivo en Drive durante rollback:', err);
+    return false;
+  }
+}
+
+

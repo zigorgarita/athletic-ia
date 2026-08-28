@@ -37,6 +37,7 @@ export interface Player {
   equipo?: string;
   categoria?: string;
   temporada?: string;
+  oliver_player_id?: string | null;
   metadata_personal?: Record<string, any>;
   created_at: string;
   updated_at: string;
@@ -1130,6 +1131,83 @@ export interface PlayerMultimediaItem {
   player_ids: string[];
   is_primary?: boolean;
 }
+
+// ====================================================================
+// BETO MODULE TYPES (GPS OLIVER)
+// ====================================================================
+
+export type BetoImportStatus = 'processing' | 'completed' | 'failed';
+
+export interface BetoImport {
+  id: string;
+  file_name: string;
+  file_hash: string;
+  file_size_bytes: number | null;
+  mime_type: string | null;
+  drive_file_id: string | null;
+  drive_file_url: string | null;
+  drive_folder_id: string | null;
+  drive_path: string | null;
+  oliver_session_id: string | null;
+  session_name: string | null;
+  session_date: string | null;
+  season: string;
+  status: BetoImportStatus;
+  error_message: string | null;
+  metadata: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BetoSession {
+  id: string;
+  import_id?: string | null;
+  oliver_session_id: string | null;
+  session_name: string;
+  session_date: string;
+  start_time: string | null;
+  end_time: string | null;
+  duration_minutes: number | null;
+  session_type: 'ENTRENAMIENTO' | 'PARTIDO' | 'OTRO';
+  season: string;
+  version: number;
+  total_players: number;
+  raw_header_data: Record<string, any>;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  beto_imports?: BetoImport | null;
+}
+
+export interface BetoPlayerSession {
+  id: string;
+  session_id: string;
+  import_id: string;
+  player_id: string | null;
+  oliver_player_id: string | null;
+  source_player_name: string;
+  dorsal: number | null;
+  posicion: string | null;
+  minutos: number | null;
+  distancia_metros: number | null;
+  metros_minuto: number | null;
+  velocidad_maxima: number | null;
+  distancia_sprint: number | null;
+  distancia_alta_intensidad: number | null;
+  sprints_count: number | null;
+  aceleraciones_count: number | null;
+  deceleraciones_count: number | null;
+  aceleraciones_max: number | null;
+  deceleraciones_max: number | null;
+  impactos_count: number | null;
+  golpes_balon: number | null;
+  carga_total: number | null;
+  raw_metrics: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+  players?: Player | null;
+}
+
 
 
 

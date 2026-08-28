@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Users, Shield, Trophy, BarChart3, Activity, Layout, ArrowRightLeft, Calendar, CheckSquare, HelpCircle, Unlock, LogOut, AlertTriangle } from 'lucide-react';
+import { Users, Shield, Trophy, BarChart3, Activity, Layout, ArrowRightLeft, Calendar, CheckSquare, HelpCircle, Unlock, LogOut, AlertTriangle, Zap } from 'lucide-react';
 import { LoginScreen } from './LoginScreen';
 import { useEditMode } from '@/context/EditModeContext';
 import { EditModeModal } from './EditModeModal';
@@ -27,6 +27,7 @@ const navigation: NavItem[] = [
   { name: 'Rivales', href: '/rivales', icon: Shield },
   { name: 'Dashboard Plantilla', href: '/dashboard', icon: BarChart3 },
   { name: 'GPS', href: '/gps', icon: Activity },
+  { name: 'BETO', href: '/beto', icon: Zap },
   { name: 'Comparador Plantilla', href: '/comparador', icon: ArrowRightLeft },
   { name: 'Ayuda / Guía', href: '/guia', icon: HelpCircle },
 ];

@@ -1,9 +1,10 @@
 import { getGoogleDriveAccessToken } from '@/lib/google-drive';
 import { getSupabaseServerClient } from '@/lib/supabase-server';
+import { getActiveSeason } from '@/lib/season';
 
 export interface DriveUploadContext {
-  season?: string; // Default: '2026-27'
-  module: 'PARTIDOS' | 'RIVALES' | 'ENTRENAMIENTOS' | 'ABP' | 'BIBLIOTECA' | 'SCOUTING';
+  season?: string; // Por defecto: getActiveSeason()
+  module: 'PARTIDOS' | 'RIVALES' | 'ENTRENAMIENTOS' | 'ABP' | 'BIBLIOTECA' | 'SCOUTING' | 'BETO';
   entityName?: string; // Ej: "2026-09-06_J01_Real_Sociedad"
   subCategory?: string; // Ej: "Cortes"
 }
@@ -16,6 +17,7 @@ const MODULE_MAP: Record<string, string> = {
   ABP: '04_ABP',
   BIBLIOTECA: '05_BIBLIOTECA',
   SCOUTING: '06_SCOUTING',
+  BETO: '07_BETO',
 };
 
 // Caché en memoria durante la ejecución del proceso Node.js (vía singleton)
@@ -41,7 +43,8 @@ export function sanitizeFolderName(name: string): string {
  * Construye la lista de segmentos sanitizados a partir del contexto del cliente.
  */
 export function buildPathSegments(context: DriveUploadContext): { segments: string[]; pathKey: string } {
-  const season = sanitizeFolderName(context.season || '2026-27') || '2026-27';
+  const currentSeason = getActiveSeason();
+  const season = sanitizeFolderName(context.season || currentSeason) || currentSeason;
   
   const rawModule = (context.module || '').toUpperCase();
   const mappedModule = MODULE_MAP[rawModule];
