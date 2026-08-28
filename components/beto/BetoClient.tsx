@@ -20,6 +20,7 @@ import {
   UserCheck,
   RefreshCw,
   FileSpreadsheet,
+  ChevronDown,
 } from 'lucide-react';
 import { BetoSession, BetoPlayerSession, Player } from '@/types';
 import { BetoImportModal } from './BetoImportModal';
@@ -71,11 +72,16 @@ export function BetoClient() {
       if (data.sessions) {
         setSessions(data.sessions);
 
+        // Seleccionar por defecto la sesión recién importada o la primera de la lista
         const toSelect = targetSessionId || selectedSessionId || (data.sessions.length > 0 ? data.sessions[0].id : null);
-        if (toSelect) {
+        if (toSelect && data.sessions.some((s: BetoSession) => s.id === toSelect)) {
           setSelectedSessionId(toSelect);
           await loadSessionDetail(toSelect);
+        } else if (data.sessions.length > 0) {
+          setSelectedSessionId(data.sessions[0].id);
+          await loadSessionDetail(data.sessions[0].id);
         } else {
+          setSelectedSessionId(null);
           setActiveSession(null);
           setPlayerSessions([]);
         }
@@ -110,8 +116,8 @@ export function BetoClient() {
     loadSessionDetail(id);
   };
 
-  const handleDeleteSession = async (sessionId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleDeleteSession = async (sessionId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     if (!confirm('¿Estás seguro de eliminar esta sesión y todas sus métricas?')) return;
 
     try {
@@ -186,7 +192,17 @@ export function BetoClient() {
 
   // Métricas agregadas de la sesión activa
   const sessionStats = useMemo(() => {
-    if (playerSessions.length === 0) return null;
+    if (playerSessions.length === 0) {
+      return {
+        totalDistKm: '0.00',
+        avgDistMeters: 0,
+        maxSpeed: '0.0',
+        totalSprints: 0,
+        totalAccels: 0,
+        avgIntensity: '0.0',
+        mappedCount: 0,
+      };
+    }
 
     const totalDist = playerSessions.reduce((acc, p) => acc + (p.distancia_metros || 0), 0);
     const avgDist = totalDist / playerSessions.length;
@@ -211,25 +227,23 @@ export function BetoClient() {
   }, [playerSessions]);
 
   return (
-    <div className="space-y-8 pb-16">
+    <div className="space-y-6 pb-16">
       {/* 1. Header Principal */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800/80 pb-6">
-        <div>
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-2xl bg-gradient-to-br from-red-600 to-red-900 text-white shadow-lg shadow-red-500/20">
-              <Zap className="w-6 h-6" />
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800/80 pb-5">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-2xl bg-gradient-to-br from-red-600 to-red-900 text-white shadow-lg shadow-red-500/20">
+            <Zap className="w-6 h-6" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-black text-white tracking-tight">BETO</h1>
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-500/10 text-[#CC0E21] border border-red-500/20">
+                OLIVER GPS
+              </span>
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-2xl font-black text-white tracking-tight">BETO</h1>
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-500/10 text-[#CC0E21] border border-red-500/20">
-                  OLIVER GPS v1
-                </span>
-              </div>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Ingesta, análisis físico y archivo en Google Drive de sesiones GPS exportadas desde OLIVER.
-              </p>
-            </div>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Ingesta, análisis físico y archivo en Google Drive de sesiones GPS exportadas desde OLIVER.
+            </p>
           </div>
         </div>
 
@@ -252,443 +266,408 @@ export function BetoClient() {
         </div>
       </div>
 
-      {/* 2. Selector de Sesiones / Carrusel */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+      {/* 2. Barra de Control de Sesión & Selector */}
+      <div className="p-4 bg-slate-900/80 border border-slate-800 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-lg">
+        {/* Selector de Sesión */}
+        <div className="flex items-center gap-3 flex-1 flex-wrap">
+          <div className="flex items-center gap-2 text-xs font-bold text-slate-300 uppercase tracking-wider">
             <Calendar className="w-4 h-4 text-red-500" />
-            Sesiones Registradas ({sessions.length})
-          </h2>
-          <span className="text-xs text-slate-500">Temporada: {season}</span>
-        </div>
-
-        {loading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="h-24 bg-slate-900/60 border border-slate-800 rounded-xl animate-pulse" />
-            ))}
+            <span>Sesión:</span>
           </div>
-        ) : sessions.length === 0 ? (
-          <div className="p-8 text-center bg-slate-900/40 border border-dashed border-slate-800 rounded-2xl space-y-3">
-            <div className="w-12 h-12 rounded-full bg-red-500/10 text-red-400 flex items-center justify-center mx-auto">
-              <FileSpreadsheet className="w-6 h-6" />
+
+          {sessions.length > 0 ? (
+            <div className="relative min-w-[260px] max-w-md flex-1">
+              <select
+                value={selectedSessionId || ''}
+                onChange={(e) => handleSelectSession(e.target.value)}
+                className="w-full appearance-none px-4 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-red-500/50 pr-9 cursor-pointer"
+              >
+                {sessions.map((sess) => (
+                  <option key={sess.id} value={sess.id}>
+                    {sess.session_date} — {sess.session_name} ({sess.session_type})
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             </div>
-            <h3 className="text-base font-bold text-white">No hay sesiones de OLIVER importadas todavía</h3>
-            <p className="text-xs text-slate-400 max-w-md mx-auto">
-              Haz clic en <strong>&quot;Importar sesión OLIVER&quot;</strong> para cargar tu primer archivo Excel o CSV de rendimiento físico.
-            </p>
-            <button
-              onClick={() => setIsImportModalOpen(true)}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-xl border border-slate-700 transition-colors"
-            >
-              <UploadCloud className="w-4 h-4" />
-              Importar ahora
-            </button>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            {sessions.map((sess) => {
-              const isSelected = sess.id === selectedSessionId;
-              return (
-                <div
-                  key={sess.id}
-                  onClick={() => handleSelectSession(sess.id)}
-                  className={`p-4 rounded-xl border cursor-pointer transition-all relative group flex flex-col justify-between ${
-                    isSelected
-                      ? 'bg-gradient-to-b from-slate-900 to-slate-950 border-red-500/60 shadow-lg shadow-red-500/5 ring-1 ring-red-500/30'
-                      : 'bg-slate-900/60 border-slate-800 hover:border-slate-700 hover:bg-slate-900/90'
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md ${
-                            sess.session_type === 'PARTIDO'
-                              ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                              : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
-                          }`}
-                        >
-                          {sess.session_type}
-                        </span>
-                        <span className="text-xs font-semibold text-slate-400">{sess.session_date}</span>
-                      </div>
-                      <h4 className="text-sm font-bold text-white mt-1.5 line-clamp-1">{sess.session_name}</h4>
-                    </div>
+          ) : (
+            <div className="px-4 py-2 bg-slate-950/60 border border-slate-800 rounded-xl text-xs text-slate-500 italic">
+              Sin sesiones registradas aún
+            </div>
+          )}
 
-                    {isEditMode && (
-                      <button
-                        onClick={(e) => handleDeleteSession(sess.id, e)}
-                        className="opacity-0 group-hover:opacity-100 p-1 text-slate-500 hover:text-red-400 rounded-lg hover:bg-slate-800 transition-all"
-                        title="Eliminar sesión"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-800/60 text-xs text-slate-400">
-                    <div className="flex items-center gap-1.5">
-                      <Users className="w-3.5 h-3.5 text-slate-500" />
-                      <span>{sess.total_players} Jugadores</span>
-                    </div>
-
-                    {sess.beto_imports?.drive_file_url && (
-                      <a
-                        href={sess.beto_imports.drive_file_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className="flex items-center gap-1 text-slate-500 hover:text-blue-400 transition-colors"
-                        title="Ver original en Google Drive"
-                      >
-                        <HardDrive className="w-3.5 h-3.5" />
-                        <ExternalLink className="w-3 h-3" />
-                      </a>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* 3. Detalle de la Sesión Activa */}
-      {activeSession && (
-        <div className="space-y-6">
-          {/* Header de Sesión & Tarjetas KPI */}
-          <div className="p-6 bg-slate-900/70 border border-slate-800 rounded-2xl space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-4">
-              <div>
-                <div className="flex items-center gap-2.5">
-                  <h3 className="text-xl font-black text-white">{activeSession.session_name}</h3>
-                  <span className="text-xs px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 font-semibold border border-slate-700">
-                    {activeSession.session_date}
-                  </span>
-                  {activeSession.oliver_session_id && (
-                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-slate-800/80 text-slate-400 font-mono">
-                      ID OLIVER: {activeSession.oliver_session_id}
-                    </span>
-                  )}
-                </div>
-                <p className="text-xs text-slate-400 mt-1">
-                  Tipo: <strong className="text-slate-200">{activeSession.session_type}</strong> • Duración:{' '}
-                  <strong className="text-slate-200">
-                    {activeSession.duration_minutes ? `${activeSession.duration_minutes} min` : 'No especificada'}
-                  </strong>
-                </p>
-              </div>
-
-              {activeSession.beto_imports?.drive_file_url && (
-                <a
-                  href={activeSession.beto_imports.drive_file_url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 transition-colors shrink-0"
-                >
-                  <HardDrive className="w-4 h-4 text-blue-400" />
-                  <span>Archivo Original en Google Drive</span>
-                  <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
-                </a>
+          {activeSession && (
+            <div className="flex items-center gap-2">
+              <span
+                className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md ${
+                  activeSession.session_type === 'PARTIDO'
+                    ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                    : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                }`}
+              >
+                {activeSession.session_type}
+              </span>
+              {activeSession.oliver_session_id && (
+                <span className="text-[10px] px-2 py-0.5 rounded-md bg-slate-800 text-slate-400 font-mono">
+                  ID: {activeSession.oliver_session_id}
+                </span>
               )}
             </div>
+          )}
+        </div>
 
-            {/* KPI Cards */}
-            {sessionStats && (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-                <div className="p-3.5 bg-slate-950/60 border border-slate-800/80 rounded-xl space-y-1">
-                  <div className="flex items-center gap-1.5 text-slate-400 text-xs">
-                    <Users className="w-3.5 h-3.5 text-blue-400" />
-                    <span>Jugadores</span>
-                  </div>
-                  <p className="text-lg font-black text-white">
-                    {playerSessions.length}{' '}
-                    <span className="text-[10px] text-emerald-400 font-normal">
-                      ({sessionStats.mappedCount} vinc.)
-                    </span>
-                  </p>
-                </div>
+        {/* Acciones de la Sesión: Acceso a Drive & Eliminar */}
+        <div className="flex items-center gap-2">
+          {activeSession?.beto_imports?.drive_file_url ? (
+            <a
+              href={activeSession.beto_imports.drive_file_url}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-2 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 transition-colors shadow-sm"
+              title="Abrir copia original en Google Drive"
+            >
+              <HardDrive className="w-3.5 h-3.5 text-blue-400" />
+              <span>Archivo original OLIVER</span>
+              <ExternalLink className="w-3 h-3 text-slate-400" />
+            </a>
+          ) : (
+            <div className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-950/40 border border-slate-800/80 rounded-xl text-xs text-slate-600">
+              <HardDrive className="w-3.5 h-3.5" />
+              <span>Archivo original OLIVER (Drive)</span>
+            </div>
+          )}
 
-                <div className="p-3.5 bg-slate-950/60 border border-slate-800/80 rounded-xl space-y-1">
-                  <div className="flex items-center gap-1.5 text-slate-400 text-xs">
-                    <Activity className="w-3.5 h-3.5 text-red-400" />
-                    <span>Distancia Total</span>
-                  </div>
-                  <p className="text-lg font-black text-white">{sessionStats.totalDistKm} km</p>
-                </div>
+          {isEditMode && activeSession && (
+            <button
+              onClick={() => handleDeleteSession(activeSession.id)}
+              className="p-2 text-slate-500 hover:text-red-400 bg-slate-950 hover:bg-slate-800 border border-slate-800 rounded-xl transition-all"
+              title="Eliminar sesión seleccionada"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      </div>
 
-                <div className="p-3.5 bg-slate-950/60 border border-slate-800/80 rounded-xl space-y-1">
-                  <div className="flex items-center gap-1.5 text-slate-400 text-xs">
-                    <Gauge className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Media Distancia</span>
-                  </div>
-                  <p className="text-lg font-black text-white">{sessionStats.avgDistMeters} m</p>
-                </div>
+      {/* 3. Tarjetas KPI de Rendimiento de la Carátula */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="p-3.5 bg-slate-900/60 border border-slate-800/80 rounded-xl space-y-1">
+          <div className="flex items-center gap-1.5 text-slate-400 text-xs">
+            <Users className="w-3.5 h-3.5 text-blue-400" />
+            <span>Jugadores</span>
+          </div>
+          <p className="text-lg font-black text-white">
+            {playerSessions.length}{' '}
+            <span className="text-[10px] text-emerald-400 font-normal">
+              ({sessionStats.mappedCount} vinc.)
+            </span>
+          </p>
+        </div>
 
-                <div className="p-3.5 bg-slate-950/60 border border-slate-800/80 rounded-xl space-y-1">
-                  <div className="flex items-center gap-1.5 text-slate-400 text-xs">
-                    <Flame className="w-3.5 h-3.5 text-orange-400" />
-                    <span>Metros / Min</span>
-                  </div>
-                  <p className="text-lg font-black text-white">{sessionStats.avgIntensity} m/min</p>
-                </div>
+        <div className="p-3.5 bg-slate-900/60 border border-slate-800/80 rounded-xl space-y-1">
+          <div className="flex items-center gap-1.5 text-slate-400 text-xs">
+            <Activity className="w-3.5 h-3.5 text-red-400" />
+            <span>Distancia Total</span>
+          </div>
+          <p className="text-lg font-black text-white">{sessionStats.totalDistKm} km</p>
+        </div>
 
-                <div className="p-3.5 bg-slate-950/60 border border-slate-800/80 rounded-xl space-y-1">
-                  <div className="flex items-center gap-1.5 text-slate-400 text-xs">
-                    <Gauge className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Vel. Máx Sesión</span>
-                  </div>
-                  <p className="text-lg font-black text-white">{sessionStats.maxSpeed} km/h</p>
-                </div>
+        <div className="p-3.5 bg-slate-900/60 border border-slate-800/80 rounded-xl space-y-1">
+          <div className="flex items-center gap-1.5 text-slate-400 text-xs">
+            <Gauge className="w-3.5 h-3.5 text-amber-400" />
+            <span>Media Distancia</span>
+          </div>
+          <p className="text-lg font-black text-white">{sessionStats.avgDistMeters} m</p>
+        </div>
 
-                <div className="p-3.5 bg-slate-950/60 border border-slate-800/80 rounded-xl space-y-1">
-                  <div className="flex items-center gap-1.5 text-slate-400 text-xs">
-                    <Zap className="w-3.5 h-3.5 text-purple-400" />
-                    <span>Sprints / Acel</span>
-                  </div>
-                  <p className="text-lg font-black text-white">
-                    {sessionStats.totalSprints} / {sessionStats.totalAccels}
-                  </p>
-                </div>
-              </div>
-            )}
+        <div className="p-3.5 bg-slate-900/60 border border-slate-800/80 rounded-xl space-y-1">
+          <div className="flex items-center gap-1.5 text-slate-400 text-xs">
+            <Flame className="w-3.5 h-3.5 text-orange-400" />
+            <span>Metros / Min</span>
+          </div>
+          <p className="text-lg font-black text-white">{sessionStats.avgIntensity} m/min</p>
+        </div>
+
+        <div className="p-3.5 bg-slate-900/60 border border-slate-800/80 rounded-xl space-y-1">
+          <div className="flex items-center gap-1.5 text-slate-400 text-xs">
+            <Gauge className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Vel. Máx Sesión</span>
+          </div>
+          <p className="text-lg font-black text-white">{sessionStats.maxSpeed} km/h</p>
+        </div>
+
+        <div className="p-3.5 bg-slate-900/60 border border-slate-800/80 rounded-xl space-y-1">
+          <div className="flex items-center gap-1.5 text-slate-400 text-xs">
+            <Zap className="w-3.5 h-3.5 text-purple-400" />
+            <span>Sprints / Acel</span>
+          </div>
+          <p className="text-lg font-black text-white">
+            {sessionStats.totalSprints} / {sessionStats.totalAccels}
+          </p>
+        </div>
+      </div>
+
+      {/* 4. Tabla Principal de Rendimiento por Jugador */}
+      <div className="space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <h3 className="text-base font-bold text-white">Rendimiento Físico por Jugador</h3>
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300">
+              {filteredPlayers.length}
+            </span>
           </div>
 
-          {/* Tabla de Jugadores y Métricas */}
-          <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <h3 className="text-base font-bold text-white">Rendimiento Físico por Jugador</h3>
-                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300">
-                  {filteredPlayers.length}
-                </span>
-              </div>
-
-              <div className="relative w-full sm:w-72">
-                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Buscar por jugador o dorsal..."
-                  value={searchFilter}
-                  onChange={(e) => setSearchFilter(e.target.value)}
-                  className="w-full pl-9 pr-4 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-red-500/50"
-                />
-              </div>
-            </div>
-
-            {sessionLoading ? (
-              <div className="p-12 text-center text-slate-400 text-sm">Cargando métricas de la sesión...</div>
-            ) : (
-              <div className="border border-slate-800 rounded-2xl overflow-x-auto bg-slate-900/60 shadow-xl">
-                <table className="w-full text-left text-xs whitespace-nowrap">
-                  <thead>
-                    <tr className="border-b border-slate-800 bg-slate-800/40 text-slate-400 font-semibold uppercase tracking-wider">
-                      <th className="py-3 px-4">Jugador</th>
-                      <th className="py-3 px-4">Estado Plantilla</th>
-                      <th
-                        onClick={() => handleSort('minutos')}
-                        className="py-3 px-4 cursor-pointer hover:text-white transition-colors"
-                      >
-                        <div className="flex items-center gap-1">
-                          <span>Minutos</span>
-                          <ArrowUpDown className="w-3 h-3" />
-                        </div>
-                      </th>
-                      <th
-                        onClick={() => handleSort('distancia_metros')}
-                        className="py-3 px-4 cursor-pointer hover:text-white transition-colors"
-                      >
-                        <div className="flex items-center gap-1">
-                          <span>Distancia</span>
-                          <ArrowUpDown className="w-3 h-3" />
-                        </div>
-                      </th>
-                      <th
-                        onClick={() => handleSort('metros_minuto')}
-                        className="py-3 px-4 cursor-pointer hover:text-white transition-colors"
-                      >
-                        <div className="flex items-center gap-1">
-                          <span>m / min</span>
-                          <ArrowUpDown className="w-3 h-3" />
-                        </div>
-                      </th>
-                      <th
-                        onClick={() => handleSort('velocidad_maxima')}
-                        className="py-3 px-4 cursor-pointer hover:text-white transition-colors"
-                      >
-                        <div className="flex items-center gap-1">
-                          <span>Vel. Máx</span>
-                          <ArrowUpDown className="w-3 h-3" />
-                        </div>
-                      </th>
-                      <th
-                        onClick={() => handleSort('distancia_sprint')}
-                        className="py-3 px-4 cursor-pointer hover:text-white transition-colors"
-                      >
-                        <div className="flex items-center gap-1">
-                          <span>Dist. Sprint</span>
-                          <ArrowUpDown className="w-3 h-3" />
-                        </div>
-                      </th>
-                      <th
-                        onClick={() => handleSort('sprints_count')}
-                        className="py-3 px-4 cursor-pointer hover:text-white transition-colors"
-                      >
-                        <div className="flex items-center gap-1">
-                          <span>Sprints</span>
-                          <ArrowUpDown className="w-3 h-3" />
-                        </div>
-                      </th>
-                      <th
-                        onClick={() => handleSort('aceleraciones_count')}
-                        className="py-3 px-4 cursor-pointer hover:text-white transition-colors"
-                      >
-                        <div className="flex items-center gap-1">
-                          <span>Acel / Decel</span>
-                          <ArrowUpDown className="w-3 h-3" />
-                        </div>
-                      </th>
-                      <th
-                        onClick={() => handleSort('impactos_count')}
-                        className="py-3 px-4 cursor-pointer hover:text-white transition-colors"
-                      >
-                        <div className="flex items-center gap-1">
-                          <span>Impactos / Golpes</span>
-                          <ArrowUpDown className="w-3 h-3" />
-                        </div>
-                      </th>
-                      <th className="py-3 px-4 text-center">Detalle Raw</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800/60">
-                    {filteredPlayers.length === 0 ? (
-                      <tr>
-                        <td colSpan={11} className="py-8 text-center text-slate-500">
-                          No se encontraron jugadores que coincidan con la búsqueda.
-                        </td>
-                      </tr>
-                    ) : (
-                      filteredPlayers.map((p) => {
-                        const dbPlayer = p.players;
-                        return (
-                          <tr key={p.id} className="hover:bg-slate-800/30 transition-colors">
-                            {/* Jugador */}
-                            <td className="py-3 px-4">
-                              <div className="flex items-center gap-3">
-                                {dbPlayer?.foto_url ? (
-                                  <img
-                                    src={dbPlayer.foto_url}
-                                    alt={p.source_player_name}
-                                    className="w-8 h-8 rounded-full object-cover border border-slate-700"
-                                  />
-                                ) : (
-                                  <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-xs font-bold text-slate-300">
-                                    {p.dorsal || p.source_player_name.slice(0, 2).toUpperCase()}
-                                  </div>
-                                )}
-                                <div>
-                                  <p className="font-bold text-white flex items-center gap-1.5">
-                                    {p.dorsal ? <span className="text-red-400 font-mono">#{p.dorsal}</span> : null}
-                                    {p.source_player_name}
-                                  </p>
-                                  <p className="text-[11px] text-slate-400">
-                                    {dbPlayer ? `${dbPlayer.demarcacion || ''}` : p.posicion || 'Posición N/A'}
-                                  </p>
-                                </div>
-                              </div>
-                            </td>
-
-                            {/* Estado Vinculación */}
-                            <td className="py-3 px-4">
-                              {dbPlayer ? (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                                  <UserCheck className="w-3 h-3" />
-                                  <span>Vinculado</span>
-                                </span>
-                              ) : (
-                                <div className="flex items-center gap-2">
-                                  <select
-                                    onChange={(e) => handleMapPlayer(p.id, p.oliver_player_id, e.target.value)}
-                                    defaultValue=""
-                                    className="px-2 py-1 bg-slate-950 border border-amber-500/30 rounded-lg text-[11px] text-amber-300 focus:outline-none focus:border-amber-400"
-                                  >
-                                    <option value="" disabled>
-                                      + Vincular a jugador...
-                                    </option>
-                                    {playersRoster.map((rp) => (
-                                      <option key={rp.id} value={rp.id}>
-                                        #{rp.dorsal} {rp.nombre} {rp.apellidos}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </div>
-                              )}
-                            </td>
-
-                            {/* Minutos */}
-                            <td className="py-3 px-4 font-mono font-medium text-slate-200">
-                              {p.minutos ? `${p.minutos} min` : '-'}
-                            </td>
-
-                            {/* Distancia Total */}
-                            <td className="py-3 px-4 font-mono font-bold text-white">
-                              {p.distancia_metros ? `${p.distancia_metros.toLocaleString()} m` : '-'}
-                            </td>
-
-                            {/* Metros / Minuto */}
-                            <td className="py-3 px-4 font-mono font-semibold text-emerald-400">
-                              {p.metros_minuto ? `${p.metros_minuto} m/min` : '-'}
-                            </td>
-
-                            {/* Vel. Máx */}
-                            <td className="py-3 px-4 font-mono font-semibold text-amber-300">
-                              {p.velocidad_maxima ? `${p.velocidad_maxima} km/h` : '-'}
-                            </td>
-
-                            {/* Dist. Sprint */}
-                            <td className="py-3 px-4 font-mono text-slate-300">
-                              {p.distancia_sprint ? `${p.distancia_sprint} m` : '-'}
-                            </td>
-
-                            {/* Sprints Count */}
-                            <td className="py-3 px-4 font-mono text-slate-300">
-                              {p.sprints_count !== null && p.sprints_count !== undefined ? p.sprints_count : '-'}
-                            </td>
-
-                            {/* Accel / Decel */}
-                            <td className="py-3 px-4 font-mono text-slate-300">
-                              {(p.aceleraciones_count ?? '-') + ' / ' + (p.deceleraciones_count ?? '-')}
-                            </td>
-
-                            {/* Impactos / Golpes */}
-                            <td className="py-3 px-4 font-mono text-slate-400">
-                              {(p.impactos_count ?? '-') + ' / ' + (p.golpes_balon ?? '-')}
-                            </td>
-
-                            {/* Acciones */}
-                            <td className="py-3 px-4 text-center">
-                              <button
-                                onClick={() => setRawMetricsPlayer(p)}
-                                className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg text-[11px] font-semibold border border-slate-700 transition-colors"
-                              >
-                                <Database className="w-3 h-3 text-red-400" />
-                                <span>Ver Raw</span>
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            )}
+          <div className="relative w-full sm:w-72">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Buscar por jugador o dorsal..."
+              value={searchFilter}
+              onChange={(e) => setSearchFilter(e.target.value)}
+              className="w-full pl-9 pr-4 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-red-500/50"
+            />
           </div>
         </div>
-      )}
 
-      {/* 4. Modales */}
+        {/* Tabla Estructurada */}
+        <div className="border border-slate-800 rounded-2xl overflow-x-auto bg-slate-900/60 shadow-xl">
+          <table className="w-full text-left text-xs whitespace-nowrap">
+            <thead>
+              <tr className="border-b border-slate-800 bg-slate-800/40 text-slate-400 font-semibold uppercase tracking-wider">
+                <th className="py-3 px-4">Jugador</th>
+                <th className="py-3 px-4">Estado Plantilla</th>
+                <th
+                  onClick={() => handleSort('minutos')}
+                  className="py-3 px-4 cursor-pointer hover:text-white transition-colors"
+                >
+                  <div className="flex items-center gap-1">
+                    <span>Minutos</span>
+                    <ArrowUpDown className="w-3 h-3" />
+                  </div>
+                </th>
+                <th
+                  onClick={() => handleSort('distancia_metros')}
+                  className="py-3 px-4 cursor-pointer hover:text-white transition-colors"
+                >
+                  <div className="flex items-center gap-1">
+                    <span>Distancia</span>
+                    <ArrowUpDown className="w-3 h-3" />
+                  </div>
+                </th>
+                <th
+                  onClick={() => handleSort('metros_minuto')}
+                  className="py-3 px-4 cursor-pointer hover:text-white transition-colors"
+                >
+                  <div className="flex items-center gap-1">
+                    <span>m / min</span>
+                    <ArrowUpDown className="w-3 h-3" />
+                  </div>
+                </th>
+                <th
+                  onClick={() => handleSort('velocidad_maxima')}
+                  className="py-3 px-4 cursor-pointer hover:text-white transition-colors"
+                >
+                  <div className="flex items-center gap-1">
+                    <span>Vel. Máx</span>
+                    <ArrowUpDown className="w-3 h-3" />
+                  </div>
+                </th>
+                <th
+                  onClick={() => handleSort('distancia_sprint')}
+                  className="py-3 px-4 cursor-pointer hover:text-white transition-colors"
+                >
+                  <div className="flex items-center gap-1">
+                    <span>Dist. Sprint</span>
+                    <ArrowUpDown className="w-3 h-3" />
+                  </div>
+                </th>
+                <th
+                  onClick={() => handleSort('sprints_count')}
+                  className="py-3 px-4 cursor-pointer hover:text-white transition-colors"
+                >
+                  <div className="flex items-center gap-1">
+                    <span>Sprints</span>
+                    <ArrowUpDown className="w-3 h-3" />
+                  </div>
+                </th>
+                <th
+                  onClick={() => handleSort('aceleraciones_count')}
+                  className="py-3 px-4 cursor-pointer hover:text-white transition-colors"
+                >
+                  <div className="flex items-center gap-1">
+                    <span>Acel / Decel</span>
+                    <ArrowUpDown className="w-3 h-3" />
+                  </div>
+                </th>
+                <th
+                  onClick={() => handleSort('impactos_count')}
+                  className="py-3 px-4 cursor-pointer hover:text-white transition-colors"
+                >
+                  <div className="flex items-center gap-1">
+                    <span>Impactos / Golpes</span>
+                    <ArrowUpDown className="w-3 h-3" />
+                  </div>
+                </th>
+                <th className="py-3 px-4 text-center">Detalle Raw</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-800/60">
+              {loading || sessionLoading ? (
+                <tr>
+                  <td colSpan={11} className="py-12 text-center text-slate-400">
+                    <div className="flex items-center justify-center gap-2">
+                      <RefreshCw className="w-4 h-4 animate-spin text-red-500" />
+                      <span>Cargando datos de rendimiento...</span>
+                    </div>
+                  </td>
+                </tr>
+              ) : sessions.length === 0 ? (
+                <tr>
+                  <td colSpan={11} className="py-16 text-center">
+                    <div className="max-w-md mx-auto space-y-3">
+                      <div className="w-10 h-10 rounded-full bg-red-500/10 text-red-400 flex items-center justify-center mx-auto">
+                        <FileSpreadsheet className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-white">No hay datos de sesión cargados aún</p>
+                        <p className="text-xs text-slate-400 mt-1">
+                          Haz clic en el botón de abajo para importar tu primer archivo Excel o CSV de OLIVER.
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setIsImportModalOpen(true)}
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-[#CC0E21] hover:bg-red-700 text-white text-xs font-bold rounded-xl shadow-lg shadow-red-500/10 transition-all cursor-pointer"
+                      >
+                        <UploadCloud className="w-4 h-4" />
+                        <span>Importar sesión OLIVER</span>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ) : filteredPlayers.length === 0 ? (
+                <tr>
+                  <td colSpan={11} className="py-12 text-center text-slate-500">
+                    No se encontraron jugadores que coincidan con la búsqueda.
+                  </td>
+                </tr>
+              ) : (
+                filteredPlayers.map((p) => {
+                  const dbPlayer = p.players;
+                  return (
+                    <tr key={p.id} className="hover:bg-slate-800/30 transition-colors">
+                      {/* Jugador */}
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-3">
+                          {dbPlayer?.foto_url ? (
+                            <img
+                              src={dbPlayer.foto_url}
+                              alt={p.source_player_name}
+                              className="w-8 h-8 rounded-full object-cover border border-slate-700"
+                            />
+                          ) : (
+                            <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-xs font-bold text-slate-300">
+                              {p.dorsal || p.source_player_name.slice(0, 2).toUpperCase()}
+                            </div>
+                          )}
+                          <div>
+                            <p className="font-bold text-white flex items-center gap-1.5">
+                              {p.dorsal ? <span className="text-red-400 font-mono">#{p.dorsal}</span> : null}
+                              {p.source_player_name}
+                            </p>
+                            <p className="text-[11px] text-slate-400">
+                              {dbPlayer ? `${dbPlayer.demarcacion || ''}` : p.posicion || 'Posición N/A'}
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Estado Vinculación */}
+                      <td className="py-3 px-4">
+                        {dbPlayer ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                            <UserCheck className="w-3 h-3" />
+                            <span>Vinculado</span>
+                          </span>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <select
+                              onChange={(e) => handleMapPlayer(p.id, p.oliver_player_id, e.target.value)}
+                              defaultValue=""
+                              className="px-2 py-1 bg-slate-950 border border-amber-500/30 rounded-lg text-[11px] text-amber-300 focus:outline-none focus:border-amber-400"
+                            >
+                              <option value="" disabled>
+                                + Vincular a jugador...
+                              </option>
+                              {playersRoster.map((rp) => (
+                                <option key={rp.id} value={rp.id}>
+                                  #{rp.dorsal} {rp.nombre} {rp.apellidos}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Minutos */}
+                      <td className="py-3 px-4 font-mono font-medium text-slate-200">
+                        {p.minutos ? `${p.minutos} min` : '-'}
+                      </td>
+
+                      {/* Distancia Total */}
+                      <td className="py-3 px-4 font-mono font-bold text-white">
+                        {p.distancia_metros ? `${p.distancia_metros.toLocaleString()} m` : '-'}
+                      </td>
+
+                      {/* Metros / Minuto */}
+                      <td className="py-3 px-4 font-mono font-semibold text-emerald-400">
+                        {p.metros_minuto ? `${p.metros_minuto} m/min` : '-'}
+                      </td>
+
+                      {/* Vel. Máx */}
+                      <td className="py-3 px-4 font-mono font-semibold text-amber-300">
+                        {p.velocidad_maxima ? `${p.velocidad_maxima} km/h` : '-'}
+                      </td>
+
+                      {/* Dist. Sprint */}
+                      <td className="py-3 px-4 font-mono text-slate-300">
+                        {p.distancia_sprint ? `${p.distancia_sprint} m` : '-'}
+                      </td>
+
+                      {/* Sprints Count */}
+                      <td className="py-3 px-4 font-mono text-slate-300">
+                        {p.sprints_count !== null && p.sprints_count !== undefined ? p.sprints_count : '-'}
+                      </td>
+
+                      {/* Accel / Decel */}
+                      <td className="py-3 px-4 font-mono text-slate-300">
+                        {(p.aceleraciones_count ?? '-') + ' / ' + (p.deceleraciones_count ?? '-')}
+                      </td>
+
+                      {/* Impactos / Golpes */}
+                      <td className="py-3 px-4 font-mono text-slate-400">
+                        {(p.impactos_count ?? '-') + ' / ' + (p.golpes_balon ?? '-')}
+                      </td>
+
+                      {/* Acciones */}
+                      <td className="py-3 px-4 text-center">
+                        <button
+                          onClick={() => setRawMetricsPlayer(p)}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg text-[11px] font-semibold border border-slate-700 transition-colors"
+                        >
+                          <Database className="w-3 h-3 text-red-400" />
+                          <span>Ver Raw</span>
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* 5. Modales */}
       <BetoImportModal
         isOpen={isImportModalOpen}
         onClose={() => setIsImportModalOpen(false)}
