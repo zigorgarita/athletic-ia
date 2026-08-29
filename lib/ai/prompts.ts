@@ -180,7 +180,7 @@ Divide la charla en:
 1. Portería (POR): Tareas en salida corta, pase largo lateral ante duda, tapar primer palo e instrucciones de mando.
 2. Línea Defensiva (LD, DFC, LI): Conducir para fijar, seguridad interior, coberturas, coordinación de carril lateral-extremo y basculación colectiva.
 3. Línea de Medios (MCD, MC, MCO): Principio transversal de BASE, pocos toques, juego en los cuadrados entre líneas y llegadas de segunda línea.
-4. Línea Delantera (ED, EI, DC): Fijación de centrales, ataque al primer palo por delante del defensor, 1v1 con valentía, retorno defensivo y remate en segundo palo.
+4. Línea Delantera (ED, EI, DC): Fijación de centrales, ataque al área por delante del primer defensor, 1v1 con valentía, retorno defensivo y remate en segundo palo.
 `,
 
   generateLineTasks: (ctx: PromptContext) => `
@@ -299,7 +299,7 @@ Estructura JSON requerida estrictamente:
     "mediapunta": "Instrucciones detalladas de fase ofensiva (jugar en los cuadrados entre líneas, remate 2ª línea), defensiva (tapar pivote rival), transiciones y consigna clave para el Mediapunta.",
     "extremoIzquierdo": "Instrucciones detalladas de fase ofensiva (1v1, remate al 2º palo), defensiva (salto a lateral en bloque medio, ayuda al lateral propio), transiciones y consigna clave para el Extremo Izquierdo.",
     "extremoDerecho": "Instrucciones detalladas de fase ofensiva, defensiva, transiciones y consigna clave para el Extremo Derecho.",
-    "delantero": "Instrucciones detalladas de fase ofensiva (fijar ambos centrales, 3º hombre de cara, atacar 1º palo por delante del defensa), defensiva (orientar salida y tapar retorno), transiciones y consigna clave para el Delantero Centro."
+    "delantero": "Instrucciones detalladas de fase ofensiva (fijar ambos centrales, 3º hombre de cara, atacar el área por delante del primer defensor), defensiva (orientar salida y tapar retorno), transiciones y consigna clave para el Delantero Centro."
   }
 }
 `,
@@ -444,7 +444,7 @@ ESTRUCTURA JSON REQUERIDA STRICTAMENTE:
   "comoAtacarles": {
     "capaA_evidencias": ["Evidencias reales de cómo defienden o sus puntos débiles..."],
     "capaB_interpretacion": "Dónde conceden espacios o qué desajustes sufren...",
-    "capaC_propuestaIndautxu": "INICIO COMBINATIVO\\n• Salida limpia con centrales y pivotes (mantener BASE).\\n• Conducir para fijar y liberar hombre libre.\\n\\nPROGRESIÓN\\n• Buscar tercer hombre y juego en los cuadrados entre líneas.\\n• Juntar y girar en banda de atracción.\\n\\nFINALIZACIÓN\\n• Llegada masiva y centros tipificados (primer palo por delante del defensor o segundo palo).",
+    "capaC_propuestaIndautxu": "INICIO COMBINATIVO\\n• Salida limpia con centrales y pivotes (mantener BASE).\\n• Conducir para fijar y liberar hombre libre.\\n\\nPROGRESIÓN\\n• Buscar tercer hombre y juego en los cuadrados entre líneas.\\n• Juntar y girar en banda de atracción.\\n\\nFINALIZACIÓN\\n• Llegada masiva y centros tipificados (por delante del primer defensor o segundo palo).",
     "evidenciasIds": ["id_obs_3"]
   },
   "presionYActivadores": {
@@ -456,7 +456,7 @@ ESTRUCTURA JSON REQUERIDA STRICTAMENTE:
   "salidaBalon": {
     "capaA_evidencias": ["Evidencias de cómo presionan ellos nuestra salida..."],
     "capaB_interpretacion": "Qué altura de bloque usan y dónde colocan sus marcas...",
-    "capaC_propuestaIndautxu": "SALIDA ANTE SU PRESIÓN\\n• Si presionan con 2 puntas: Salida de 3 con pivote incrustado o lateralizado.\\n• Si presionan con 1 punta: Central conduce para fijar.\\n• Si se acumulan fallos en corto: Abandonar e iniciar juego directo lateralizado.",
+    "capaC_propuestaIndautxu": "SALIDA ANTE SU PRESIÓN\\n• Si presionan con 2 puntas: Salida de 3 con pivote incrustado o lateralizado.\\n• Si presionan con 1 punta: Central conduce para fijar.\\n• Si se acumulan fallos en corto: Dejar de insistir temporalmente y jugar directo lateralizado.",
     "evidenciasIds": []
   },
   "transicionOfensiva": {
@@ -508,7 +508,7 @@ ESTRUCTURA JSON REQUERIDA STRICTAMENTE:
     "porteria": "Consignas para el Portero (salida de balón, balón largo a banda ante duda, tapar primer palo).",
     "defensa": "Consignas para Centrales y Laterales (conducir para fijar, duelos 1v1, coberturas, saltos de atrás a adelante).",
     "mediocampo": "Consignas para Doble Pivote y Mediapunta (mantener BASE, juego en los cuadrados entre líneas, 3º hombre).",
-    "delantera": "Consignas para Extremos y Delantero (fijar centrales, atacar 1º palo por delante del defensa, 1v1 y centros tensos)."
+    "delantera": "Consignas para Extremos y Delantero (fijar centrales, atacar el área por delante del primer defensa, 1v1 y centros tensos)."
   },
   "riesgosDelPlan": [
     "Riesgo táctico 1 asumido en este emparejamiento...",

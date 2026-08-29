@@ -137,9 +137,9 @@ export const COMPORTAMIENTOS_ADAPTATIVOS_INDAUTXU = {
   },
 
   // Criterios de Abandono
-  CRITERIO_ABANDONO_PRESIÓN_ALTA: 'Abandonar si: no se llega al salto, 1ª línea superada, fatiga física o saltos tardíos -> Transición inmediata a Bloque Medio 1-4-1-3-2',
-  CRITERIO_ABANDONO_PRESIÓN_PERDIDA: 'Si la presión tras pérdida es superada o no se dan las condiciones de acoso -> Abandono inmediato y repliegue a Bloque Medio 1-4-1-3-2 (máx 40m)',
-  CRITERIO_ABANDONO_SALIDA_CORTO: 'Si se acumulan varios fallos en salida corta -> Abandonar temporalmente e iniciar Juego Directo hacia banda con estructura de disputa + prolongación + 2ª jugada',
+  CRITERIO_ABANDONO_PRESIÓN_ALTA: 'Abandonar si: no se llega al salto, 1ª línea superada, fatiga física o saltos tardíos -> Transición ordenada a Bloque Medio 1-4-1-3-2',
+  CRITERIO_ABANDONO_PRESIÓN_PERDIDA: 'Si la presión tras pérdida es superada o no se dan las condiciones de acoso -> Dejar de perseguir y replegar a Bloque Medio 1-4-1-3-2 (máx 40m)',
+  CRITERIO_ABANDONO_SALIDA_CORTO: 'Cuando se acumulan varios fallos intentando salir en corto, dejamos de insistir temporalmente y podemos jugar directo hacia banda con estructura de disputa + prolongación + 2ª jugada',
 
   // Transición D->O (Tras Recuperación)
   TRANSICION_RECUPERACION_REGLAS: {
@@ -208,10 +208,10 @@ export const GAME_MODEL_INDAUTXU: GameModelStructure = {
         'Identificar el carril de atracción antes de cambiar de orientación'
       ],
       criterios_abandono: [
-        'Si se acumulan fallos consecutivos en corto: ABANDONAR salida corta y activar juego directo lateralizado con estructura de disputa y segunda jugada'
+        'Cuando se acumulan varios fallos intentando salir en corto: Dejamos de insistir temporalmente y podemos jugar directo hacia banda con estructura de disputa y segunda jugada'
       ],
       automatismos: [
-        'Lateral entra por dentro -> Extremo desciende a banda arrastrando marca -> Lateral rompe al espacio libre (extremo y lateral jamás ocupan el mismo carril)'
+        'Lateral entra por dentro -> Extremo desciende a banda arrastrando marca -> Lateral rompe al espacio libre (extremo y lateral no deben ocupar el mismo carril)'
       ]
     },
 
@@ -238,10 +238,10 @@ export const GAME_MODEL_INDAUTXU: GameModelStructure = {
       nombre_fase: 'Finalización de Jugada',
       premisas_fundamentales: [
         'Llegar con mucha gente al área rival',
-        'El Delantero (9) fija a ambos centrales y ataca el primer palo por delante del primer defensor',
+        'El Delantero (9) fija a ambos centrales y ataca el área por delante del primer defensor',
         'Mediapunta (MCO) llega con potencia desde segunda línea en la frontal',
         'Extremo contrario cierra al segundo palo para remate o segunda acción',
-        'Criterio de buena finalización: Balón entre los tres palos o forzar córner/reinicio'
+        'Criterio de buena finalización: Balón entre los tres palos / finalización a portería'
       ],
       subprincipios: [
         'Centrar exclusivamente cuando existan rematadores posicionados en el área',
@@ -462,7 +462,7 @@ export const GAME_MODEL_INDAUTXU: GameModelStructure = {
 
   catalogo_centros: [
     { tipo: 'Tenso entre portero y centrales', descripcion: 'Envío raso o a media altura en el pasillo de incertidumbre con atacantes entrando en carrera.' },
-    { tipo: 'Tenso por delante del primer defensor', descripcion: 'Envío al primer palo atacado agresivamente por el delantero centro.' },
+    { tipo: 'Tenso por delante del primer defensor', descripcion: 'Envío atacado agresivamente por el delantero centro por delante de su marca.' },
     { tipo: 'Pasado al segundo palo', descripcion: 'Envío alto buscando al extremo contrario para remate directo o pase atrás de segunda acción.' }
   ],
 
