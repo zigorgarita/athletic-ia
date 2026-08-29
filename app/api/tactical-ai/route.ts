@@ -5,6 +5,7 @@ import { SYSTEM_PROMPT_BASE, PROMPTS, PromptContext } from '@/lib/ai/prompts';
 import { TacticalAIContext, AIAction, TacticalRoleCard } from '@/types';
 
 import { verifyServerAuthorization } from '@/lib/auth-server';
+import { fetchRelevantKnowledge } from '@/lib/ai/knowledgeRetriever';
 
 // Rate limiting simple en memoria
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
@@ -108,19 +109,16 @@ export async function POST(request: Request) {
       }
     }
 
-    // D) Cargar conocimiento táctico de la biblioteca
+    // D) Cargar conocimiento táctico de la biblioteca y precedentes de Aitor (RAG Común)
     try {
-      const { data: knowledge } = await supabase
-        .from('knowledge_entries')
-        .select('titulo, categoria, principio_clave, descripcion, consignas')
-        .eq('activo', true)
-        .or(`sistema_asociado.eq.${context.systemOwn},sistema_asociado.eq.${context.systemRival},sistema_asociado.is.null`)
-        .limit(10);
-
-      if (knowledge && knowledge.length > 0) {
-        promptCtx.relevantKnowledge = knowledge
-          .map(k => `[${k.categoria}] Título: ${k.titulo}\n- Resumen: ${k.principio_clave}\n- Consignas: ${k.consignas?.join(', ') || 'N/A'}`)
-          .join('\n\n');
+      const knowledgeText = await fetchRelevantKnowledge(supabase, {
+        systemOwn: context.systemOwn,
+        systemRival: context.systemRival,
+        includePrecedents: true,
+        limit: 10
+      });
+      if (knowledgeText) {
+        promptCtx.relevantKnowledge = knowledgeText;
       }
     } catch (kErr) {
       console.warn('Error al leer biblioteca de conocimiento en API Route:', kErr);

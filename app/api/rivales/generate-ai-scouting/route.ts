@@ -4,6 +4,8 @@ import { verifyServerAuthorization } from '@/lib/auth-server';
 import { createProvider } from '@/lib/ai/provider';
 import { SYSTEM_PROMPT_BASE, generateRivalScoutingPlan, RivalScoutingPromptContext } from '@/lib/ai/prompts';
 
+import { fetchRelevantKnowledge } from '@/lib/ai/knowledgeRetriever';
+
 export const maxDuration = 120; // 120s timeout para análisis exhaustivo con Gemini
 
 export async function POST(req: Request) {
@@ -157,7 +159,15 @@ export async function POST(req: Request) {
       );
     }
 
-    // 7. ENSAMBLAR CONTEXTO DEL SCOUTING
+    // 7. RECUPERAR CONOCIMIENTO TÁCTICO RELEVANTE Y PRECEDENTES DE AITOR
+    const relevantKnowledge = await fetchRelevantKnowledge(supabaseServer, {
+      systemOwn: '1-4-2-3-1',
+      systemRival: (playModelData?.sistema_principal as string) || undefined,
+      includePrecedents: true,
+      limit: 8
+    });
+
+    // 8. ENSAMBLAR CONTEXTO DEL SCOUTING
     const promptCtx: RivalScoutingPromptContext = {
       rivalName: resolvedRivalName,
       season: season || '2026-27',
@@ -165,10 +175,11 @@ export async function POST(req: Request) {
       rivalPlayModel: playModelData || null,
       misterReport: misterReportData || null,
       approvedObservations,
+      relevantKnowledge,
       reportSourcesLabels,
     };
 
-    // 8. EJECUTAR LLAMADA A GEMINI MEDIANTE EL PROVEEDOR OFICIAL
+    // 9. EJECUTAR LLAMADA A GEMINI MEDIANTE EL PROVEEDOR OFICIAL
     const provider = createProvider();
     const promptText = generateRivalScoutingPlan(promptCtx);
 
