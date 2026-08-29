@@ -54,7 +54,6 @@ export interface GameModelStructure {
   catalogo_centros: Array<{ tipo: string; descripcion: string }>;
   adaptaciones_matchup: Record<string, { regla: string; tipo: 'DOCTRINA' | 'PENDIENTE' }>;
   escenarios_partido: Array<{ escenario: string; consigna: string }>;
-  precedentes_entrenador: Array<{ situacion: string; decision_precedente: string }>;
   reglas_prioridad: string[];
 }
 
@@ -486,13 +485,6 @@ export const GAME_MODEL_INDAUTXU: GameModelStructure = {
     { escenario: 'En desventaja en el marcador', consigna: 'Objetivo táctico: Llegar vivos al minuto 80 (máximo a 1 gol de distancia) antes del asalto final.' }
   ],
 
-  precedentes_entrenador: [
-    { situacion: 'Min 80, 1-0 arriba, rival acumula muchos atacantes', decision_precedente: 'Transición a Bloque Bajo 1-5-4-1 con línea de 5 para cerrar centros.' },
-    { situacion: 'Min 65, 2-0 arriba, pérdidas interiores repetidas en salida', decision_precedente: 'Abandonar salida corta y pasar a juego directo hacia banda.' },
-    { situacion: 'Min 30, empate, rival supera continuamente la presión alta', decision_precedente: 'Reorganizar en Bloque Medio 1-4-1-3-2 cerrando pasillos interiores.' },
-    { situacion: 'Min 85, 0-1 abajo, rival con 5 defensas atrás', decision_precedente: 'Doble delantero centro + centros laterales continuos (un central puede subir de 2º punta).' }
-  ],
-
   reglas_prioridad: [
     '1. Instrucciones introducidas directamente por el Entrenador (Prioridad 1 Absoluta)',
     '2. Modelo de Juego Oficial S.D. Indautxu DH (1-4-2-3-1 V1 Ampliado)',
@@ -570,9 +562,6 @@ ${Object.entries(m.adaptaciones_matchup).map(([k, v]) => `- ${k}: ${v.regla} [${
 
 11. ESCENARIOS COMPETITIVOS Y GESTIÓN DE PARTIDO:
 ${m.escenarios_partido.map(e => `- ${e.escenario} -> ${e.consigna}`).join('\n')}
-
-12. PRECEDENTES TÁCTICOS DEL ENTRENADOR (REFERENCIAS CONTEXTUALES, NO LEYES RÍGIDAS):
-${m.precedentes_entrenador.map(p => `- Situación: "${p.situacion}" -> Decisión de Aitor: "${p.decision_precedente}"`).join('\n')}
 =================================================================
 `.trim();
 }
