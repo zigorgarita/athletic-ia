@@ -1,6 +1,7 @@
 'use client';
 import React, { useState, useEffect, useCallback } from 'react';
 import { useEditMode } from '@/context/EditModeContext';
+import { supabase } from '@/lib/supabase';
 import {
   CloudCheck,
   CloudOff,
@@ -33,7 +34,21 @@ export function DieLigenTab() {
   const checkConnection = useCallback(async () => {
     setLoading(true);
     try {
-      const headers: Record<string, string> = {};
+      const headers: Record<string, string> = {
+        Accept: 'application/json',
+      };
+
+      // 1. Si existe sesión activa de Supabase Auth, enviar token Bearer
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (sessionData?.session?.access_token) {
+          headers['Authorization'] = `Bearer ${sessionData.session.access_token}`;
+        }
+      } catch {
+        // Continuar si no hay sesión o si se opera en modo offline
+      }
+
+      // 2. Si el usuario está identificado en modo edición, enviar credenciales de staff
       if (currentUser?.id && currentUser?.pass) {
         headers['x-editor-user'] = currentUser.id;
         headers['x-editor-pass'] = currentUser.pass;
