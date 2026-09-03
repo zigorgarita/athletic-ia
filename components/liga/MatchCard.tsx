@@ -153,10 +153,10 @@ export function MatchCard({
         </div>
 
         {/* Marcador o VS */}
-        <div className="flex flex-col items-center justify-center px-2">
+        <div className="flex flex-col items-center justify-center shrink-0">
           {match.jugado ? (
             <div className="flex flex-col items-center gap-1">
-              <span className="text-xl font-black text-white tracking-widest bg-slate-950/70 border border-slate-850 px-3.5 py-1 rounded-xl shadow-inner">
+              <span className="text-xl font-black text-white tracking-widest bg-slate-950/70 border border-slate-850 px-3.5 py-1 rounded-xl shadow-inner whitespace-nowrap min-w-[84px] text-center">
                 {match.es_local 
                   ? `${match.goles_favor} - ${match.goles_contra}`
                   : `${match.goles_contra} - ${match.goles_favor}`
