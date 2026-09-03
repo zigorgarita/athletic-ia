@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Eye, EyeOff, ShieldCheck, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { setStaffPasskey } from '@/lib/passkey';
 
 interface LoginScreenProps {
   children: React.ReactNode;
@@ -33,8 +34,10 @@ export function LoginScreen({ children }: LoginScreenProps) {
 
     if (password === correctPasskey) {
       localStorage.setItem('coach_authorized', 'true');
+      setStaffPasskey(password);
       setIsAuthorized(true);
-    } else {
+    }
+ else {
       setIsShaking(true);
       setError('Contraseña de acceso incorrecta');
       setTimeout(() => setIsShaking(false), 500);
