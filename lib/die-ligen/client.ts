@@ -19,20 +19,22 @@ export type DieLigenErrorCode =
 
 export interface DieLigenSeasonYear {
   id: string | number;
-  season_year_id?: string | number;
-  name?: string;
-  year?: string;
-  season?: string;
+  seasonYearLabel?: string;
+  startYear?: number | string;
+  endYear?: number | string;
   currentSeasonYear?: boolean;
   [key: string]: unknown;
 }
 
-export interface DieLigenContest {
+export interface DieLigenContestItem {
   id?: string | number;
   name?: string;
-  contest_name?: string;
-  title?: string;
-  group?: string;
+  [key: string]: unknown;
+}
+
+export interface DieLigenSubscribedContestsResponse {
+  subscribedContests?: DieLigenContestItem[];
+  recommendedContests?: DieLigenContestItem[];
   [key: string]: unknown;
 }
 
@@ -215,32 +217,36 @@ export async function getDieLigenStatus(): Promise<DieLigenStatusResult> {
       currentSeason = seasonYears.find((sy) => sy.currentSeasonYear === true) || seasonYears[0] || null;
     }
 
-    const seasonYearId = currentSeason?.season_year_id ?? currentSeason?.id;
+    const seasonYearId = currentSeason?.id;
     let competiciones: string[] = [];
 
     // 4. Obtener competiciones suscritas para esa temporada
     if (seasonYearId !== undefined && seasonYearId !== null) {
-      const contests = await fetchDieLigen<DieLigenContest[]>(`/subscribed-contests/${seasonYearId}`);
-      if (Array.isArray(contests)) {
-        competiciones = contests
-          .map((c) => {
-            if (typeof c === 'string') return c;
-            const name = c.name || c.contest_name || c.title || '';
-            const group = c.group ? ` (Grupo ${c.group})` : '';
-            return `${name}${group}`.trim();
-          })
-          .filter(Boolean);
-      }
+      const response = await fetchDieLigen<DieLigenSubscribedContestsResponse | DieLigenContestItem[]>(
+        `/subscribed-contests/${seasonYearId}`
+      );
+
+      const contestList = Array.isArray(response)
+        ? response
+        : Array.isArray((response as DieLigenSubscribedContestsResponse)?.subscribedContests)
+        ? (response as DieLigenSubscribedContestsResponse).subscribedContests || []
+        : [];
+
+      competiciones = contestList
+        .map((c) => {
+          if (typeof c === 'string') return (c as string).trim();
+          return (c?.name || '').trim();
+        })
+        .filter(Boolean);
     }
 
-    const temporadaNombre = currentSeason
-      ? String(currentSeason.name || currentSeason.season || currentSeason.year || currentSeason.id || '')
-      : null;
+    // temporadaActual debe devolver seasonYearLabel, nunca id
+    const temporadaNombre = currentSeason?.seasonYearLabel?.trim() || null;
 
     return {
       connected: true,
       errorCode: null,
-      temporadaActual: temporadaNombre || null,
+      temporadaActual: temporadaNombre,
       competiciones,
       error: null,
     };

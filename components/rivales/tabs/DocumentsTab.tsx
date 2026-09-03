@@ -344,9 +344,6 @@ export function DocumentsTab({ club, season }: DocumentsTabProps) {
           {/* Logo textual Die Ligen */}
           <span className="font-black tracking-tight">DL</span>
           Die Ligen
-          <span className="ml-0.5 text-[8px] font-bold text-slate-500 bg-slate-900 border border-slate-700 px-1.5 py-0.5 rounded-full uppercase tracking-wider">
-            Próximo
-          </span>
         </button>
       </div>
 

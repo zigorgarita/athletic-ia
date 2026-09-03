@@ -217,11 +217,6 @@ export function DieLigenTab() {
             Cuando haya partidos sincronizados aparecerán aquí para analizarlos,
             revisar sus conclusiones y aprobarlas.
           </p>
-
-          <div className="mt-6 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-950 border border-slate-800 text-[11px] font-medium text-slate-400">
-            <span className="w-1.5 h-1.5 rounded-full bg-slate-600" />
-            0 partidos sincronizados en local
-          </div>
         </div>
       ) : (
         /* ────────────────────────────────────────────────────────────
