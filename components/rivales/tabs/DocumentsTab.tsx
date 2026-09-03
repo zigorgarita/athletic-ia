@@ -8,11 +8,14 @@ import { Modal } from '@/components/ui/Modal';
 import { ReviewExtractedReportModal } from '../modals/ReviewExtractedReportModal';
 import { FlexibleReportExtraction } from '@/types';
 import { DriveResumableUploader, UploadProgressInfo } from '@/lib/drive-resumable';
+import { DieLigenTab } from './DieLigenTab';
 import {
   FolderOpen, Plus, Trash2, Search, ExternalLink, Calendar,
   File, FileText, Image as ImageIcon, Link as LinkIcon,
   Sparkles, Upload, UploadCloud, CheckCircle2,
 } from 'lucide-react';
+
+type DocSubTab = 'pdf' | 'die-ligen';
 
 interface DocumentsTabProps {
   club: Club | null;
@@ -27,6 +30,9 @@ type UploadMode = 'file' | 'url';
 export function DocumentsTab({ club, season }: DocumentsTabProps) {
   const { documents, loading, saveDocument, deleteDocument, refetch } = useClubDocuments(club?.id, season?.id);
   const { isEditMode, currentUser } = useEditMode();
+
+  // ── Selector de sub-pestaña interna ──────────────────────────
+  const [docSubTab, setDocSubTab] = useState<DocSubTab>('pdf');
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDoc, setEditingDoc] = useState<Partial<ClubDocument> | null>(null);
@@ -299,6 +305,71 @@ export function DocumentsTab({ club, season }: DocumentsTabProps) {
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-[1200px] mx-auto">
 
+      {/* ──────────────────────────────────────────────────────────
+          Selector de sub-pestañas internas: INFORMES PDF / DIE LIGEN
+      ────────────────────────────────────────────────────────── */}
+      <div
+        role="tablist"
+        aria-label="Tipo de documentación"
+        className="flex items-center gap-1 p-1 bg-slate-950/70 border border-slate-800/80 rounded-2xl w-fit"
+      >
+        <button
+          role="tab"
+          id="doctab-pdf"
+          aria-selected={docSubTab === 'pdf'}
+          aria-controls="doctab-pdf-panel"
+          onClick={() => setDocSubTab('pdf')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#CC0E21]/60 ${
+            docSubTab === 'pdf'
+              ? 'bg-slate-800 text-slate-100 border border-slate-700 shadow-sm'
+              : 'text-slate-500 hover:text-slate-300'
+          }`}
+        >
+          <FileText className="h-3.5 w-3.5" />
+          Informes PDF
+        </button>
+
+        <button
+          role="tab"
+          id="doctab-die-ligen"
+          aria-selected={docSubTab === 'die-ligen'}
+          aria-controls="doctab-die-ligen-panel"
+          onClick={() => setDocSubTab('die-ligen')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#CC0E21]/60 ${
+            docSubTab === 'die-ligen'
+              ? 'bg-slate-800 text-slate-100 border border-slate-700 shadow-sm'
+              : 'text-slate-500 hover:text-slate-300'
+          }`}
+        >
+          {/* Logo textual Die Ligen */}
+          <span className="font-black tracking-tight">DL</span>
+          Die Ligen
+          <span className="ml-0.5 text-[8px] font-bold text-slate-500 bg-slate-900 border border-slate-700 px-1.5 py-0.5 rounded-full uppercase tracking-wider">
+            Próximo
+          </span>
+        </button>
+      </div>
+
+      {/* Panel: Die Ligen (se muestra antes del bloque PDF para no interrumpir el flujo de los modales) */}
+      {docSubTab === 'die-ligen' && (
+        <div
+          role="tabpanel"
+          id="doctab-die-ligen-panel"
+          aria-labelledby="doctab-die-ligen"
+        >
+          <DieLigenTab />
+        </div>
+      )}
+
+      {/* Panel: Informes PDF — contiene íntegramente el contenido original */}
+      {docSubTab === 'pdf' && (
+        <div
+          role="tabpanel"
+          id="doctab-pdf-panel"
+          aria-labelledby="doctab-pdf"
+          className="space-y-6"
+        >
+
       {/* Cabecera y Buscador */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-900/40 p-4 rounded-3xl border border-slate-800/80">
         <div className="flex flex-1 gap-3 w-full sm:w-auto">
@@ -443,9 +514,13 @@ export function DocumentsTab({ club, season }: DocumentsTabProps) {
         </div>
       )}
 
+        </div>
+      )}
+
       {/* ─────────────────────────────────────────────────────────
-          MODAL Crear / Editar Documento
+          MODAL Crear / Editar Documento — siempre montado fuera de los paneles
       ───────────────────────────────────────────────────────── */}
+
       <Modal isOpen={isModalOpen} onClose={handleCloseModal} title={editingDoc?.id ? 'Editar Documento' : 'Añadir Documento'}>
         {editingDoc && (
           <form onSubmit={handleSave} className="space-y-5">
