@@ -12,9 +12,10 @@ export async function GET(req: Request) {
       return NextResponse.json(
         {
           connected: false,
+          errorCode: 'APP_AUTH_UNAUTHORIZED',
           temporadaActual: null,
           competiciones: [],
-          error: authCheck.error || 'Acceso no autorizado al servicio de Die Ligen.',
+          error: authCheck.error || 'Acceso no autorizado en la aplicación (APP_AUTH_UNAUTHORIZED).',
         },
         { status: 401 }
       );
@@ -29,6 +30,7 @@ export async function GET(req: Request) {
     return NextResponse.json(
       {
         connected: false,
+        errorCode: 'DIE_LIGEN_UPSTREAM_ERROR',
         temporadaActual: null,
         competiciones: [],
         error: errorMsg,

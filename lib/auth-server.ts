@@ -59,10 +59,18 @@ export async function verifyServerAuthorization(req: Request): Promise<AuthVerif
     julen: process.env.EDIT_PASSWORD_JULEN,
   };
 
-  // Si no se proporcionaron credenciales o vienen vacías, permitir acceso con perfil de staff por defecto ('aitor')
-  if (!editorUser && !editorPass) {
-    editorUser = 'aitor';
-    editorPass = serverPasswords.aitor;
+  // Si no se proporcionó contraseña válida, o ambas vienen vacías, permitir acceso con perfil de staff por defecto
+  if (!editorPass) {
+    if (editorUser && serverPasswords[editorUser]?.trim()) {
+      editorPass = serverPasswords[editorUser]?.trim();
+    } else {
+      // Buscar el primer usuario con contraseña configurada en variables de servidor (aitor, zigor, nacho, julen)
+      const fallbackUser = Object.keys(serverPasswords).find((u) => Boolean(serverPasswords[u]?.trim()));
+      if (fallbackUser) {
+        editorUser = fallbackUser;
+        editorPass = serverPasswords[fallbackUser]?.trim();
+      }
+    }
   }
 
   if (editorUser && editorPass && serverPasswords[editorUser]) {

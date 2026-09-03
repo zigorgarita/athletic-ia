@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect, useCallback } from 'react';
 import { useEditMode } from '@/context/EditModeContext';
-import { supabase } from '@/lib/supabase';
+import { getStaffPasskey } from '@/lib/passkey';
 import {
   CloudCheck,
   CloudOff,
@@ -10,21 +10,62 @@ import {
   Trophy,
   Calendar,
   AlertCircle,
+  ShieldAlert,
 } from 'lucide-react';
+
+export type DieLigenErrorCode =
+  | 'APP_AUTH_UNAUTHORIZED'
+  | 'DIE_LIGEN_CONFIG_MISSING'
+  | 'DIE_LIGEN_TOKEN_FAILED'
+  | 'DIE_LIGEN_UPSTREAM_UNAUTHORIZED'
+  | 'DIE_LIGEN_UPSTREAM_ERROR';
 
 interface DieLigenStatusResponse {
   connected: boolean;
+  errorCode: DieLigenErrorCode | null;
+  error: string | null;
   temporadaActual: string | null;
   competiciones: string[];
-  error: string | null;
 }
+
+const ERROR_PHASE_CONFIG: Record<
+  DieLigenErrorCode,
+  { label: string; title: string; hint: string }
+> = {
+  APP_AUTH_UNAUTHORIZED: {
+    label: 'Error Autenticación App (401)',
+    title: 'Autorización de aplicación requerida',
+    hint: 'La ruta interna /api/die-ligen/status no pudo validar las credenciales de cuerpo técnico de la app. Activa el modo edición o verifica las claves de staff.',
+  },
+  DIE_LIGEN_CONFIG_MISSING: {
+    label: 'Configuración Incompleta',
+    title: 'Variables no configuradas en servidor',
+    hint: 'Faltan DIE_LIGEN_USERNAME o DIE_LIGEN_PASSWORD en las variables de entorno de Vercel.',
+  },
+  DIE_LIGEN_TOKEN_FAILED: {
+    label: 'Fallo de Token Externo',
+    title: 'Credenciales de Die Ligen rechazadas',
+    hint: 'El endpoint POST /oauth/token de Die Ligen rechazó las credenciales configuradas en el servidor.',
+  },
+  DIE_LIGEN_UPSTREAM_UNAUTHORIZED: {
+    label: 'Token Rechazado por Die Ligen (401)',
+    title: 'Acceso no autorizado en Die Ligen',
+    hint: 'La API externa de Die Ligen rechazó el token de autorización tras el intento de renovación.',
+  },
+  DIE_LIGEN_UPSTREAM_ERROR: {
+    label: 'Error de Red / Servicio Externo',
+    title: 'Error de comunicación con Die Ligen',
+    hint: 'Se produjo un error al consultar los endpoints de temporadas o competiciones en coaches.ligen.football.',
+  },
+};
 
 /**
  * DieLigenTab — Fase 2A (Conexión Segura con Die Ligen)
  *
  * Conecta exclusivamente a la ruta interna de servidor /api/die-ligen/status.
- * Muestra el estado de la conexión, temporada actual, competiciones suscritas
- * y el estado de partidos sin exponer jamás credenciales ni almacenar datos.
+ * Utiliza exactamente el mismo patrón de autorización que los hooks existentes:
+ * envía x-editor-user y x-editor-pass únicamente si hay contraseña disponible,
+ * permitiendo que el fallback del servidor funcione si no hay credenciales activas.
  */
 export function DieLigenTab() {
   const { currentUser } = useEditMode();
@@ -38,20 +79,15 @@ export function DieLigenTab() {
         Accept: 'application/json',
       };
 
-      // 1. Si existe sesión activa de Supabase Auth, enviar token Bearer
-      try {
-        const { data: sessionData } = await supabase.auth.getSession();
-        if (sessionData?.session?.access_token) {
-          headers['Authorization'] = `Bearer ${sessionData.session.access_token}`;
-        }
-      } catch {
-        // Continuar si no hay sesión o si se opera en modo offline
-      }
+      // Mismo origen y formato de credenciales que hooks existentes (useClubDocuments, useClubAIReports)
+      const staffPass = (currentUser?.pass || getStaffPasskey() || '').trim();
+      const staffUser = (currentUser?.id || 'zigor').trim().toLowerCase();
 
-      // 2. Si el usuario está identificado en modo edición, enviar credenciales de staff
-      if (currentUser?.id && currentUser?.pass) {
-        headers['x-editor-user'] = currentUser.id;
-        headers['x-editor-pass'] = currentUser.pass;
+      // Enviar credenciales de staff ÚNICAMENTE si existe contraseña no vacía
+      // para evitar que una cabecera vacía anule el fallback del servidor
+      if (staffPass) {
+        headers['x-editor-user'] = staffUser;
+        headers['x-editor-pass'] = staffPass;
       }
 
       const res = await fetch('/api/die-ligen/status', {
@@ -66,9 +102,10 @@ export function DieLigenTab() {
       const msg = err instanceof Error ? err.message : 'Error de comunicación con el servidor';
       setStatus({
         connected: false,
+        errorCode: 'DIE_LIGEN_UPSTREAM_ERROR',
+        error: msg,
         temporadaActual: null,
         competiciones: [],
-        error: msg,
       });
     } finally {
       setLoading(false);
@@ -78,15 +115,6 @@ export function DieLigenTab() {
   useEffect(() => {
     checkConnection();
   }, [checkConnection]);
-
-  // Formateador amigable de la temporada
-  const formatSeason = (raw: string | null): string => {
-    if (!raw) return 'Temporada 26/27';
-    if (raw.includes('26') || raw.includes('2026') || raw.includes('27') || raw.includes('2027')) {
-      return 'Temporada 26/27';
-    }
-    return `Temporada ${raw}`;
-  };
 
   // ────────────────────────────────────────────────────────────
   // ESTADO 1: Comprobando conexión
@@ -113,13 +141,12 @@ export function DieLigenTab() {
   }
 
   const isConnected = Boolean(status?.connected);
-  const competiciones = status?.competiciones && status.competiciones.length > 0
-    ? status.competiciones
-    : ['División de Honor Juvenil Grupo 2'];
+  const errorCode = status?.errorCode;
+  const errorConfig = errorCode ? ERROR_PHASE_CONFIG[errorCode] : null;
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
-      {/* Barra de estado de conexión y contexto */}
+      {/* Barra superior de estado */}
       <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex flex-wrap items-center gap-3">
           {/* Badge de estado */}
@@ -131,29 +158,33 @@ export function DieLigenTab() {
           ) : (
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-950/60 border border-amber-800/60 text-amber-400">
               <AlertCircle className="w-3.5 h-3.5" />
-              Error de conexión
+              {errorConfig?.label || 'Error de conexión'}
             </span>
           )}
 
-          {/* Temporada */}
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-semibold bg-slate-950 border border-slate-800 text-slate-300">
-            <Calendar className="w-3.5 h-3.5 text-slate-500" />
-            {formatSeason(status?.temporadaActual || null)}
-          </span>
-
-          {/* Competición asignada */}
-          {competiciones.map((comp, idx) => (
-            <span
-              key={idx}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-semibold bg-slate-950 border border-slate-800 text-slate-300"
-            >
-              <Trophy className="w-3.5 h-3.5 text-amber-500" />
-              {comp}
+          {/* TEMPORADA: se muestra ÚNICAMENTE si está conectado y viene un valor real */}
+          {isConnected && status?.temporadaActual && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-semibold bg-slate-950 border border-slate-800 text-slate-300">
+              <Calendar className="w-3.5 h-3.5 text-slate-500" />
+              Temporada {status.temporadaActual}
             </span>
-          ))}
+          )}
+
+          {/* COMPETICIONES: se muestran ÚNICAMENTE si está conectado y vienen en la respuesta */}
+          {isConnected && status?.competiciones && status.competiciones.length > 0 && (
+            status.competiciones.map((comp, idx) => (
+              <span
+                key={idx}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-semibold bg-slate-950 border border-slate-800 text-slate-300"
+              >
+                <Trophy className="w-3.5 h-3.5 text-amber-500" />
+                {comp}
+              </span>
+            ))
+          )}
         </div>
 
-        {/* Botón de recarga manual */}
+        {/* Botón de comprobación manual */}
         <button
           onClick={checkConnection}
           disabled={loading}
@@ -190,32 +221,44 @@ export function DieLigenTab() {
         </div>
       ) : (
         /* ────────────────────────────────────────────────────────────
-           ESTADO 3: Error de conexión
+           ESTADO 3: Error de conexión detallado por fase
            ──────────────────────────────────────────────────────────── */
-        <div className="flex flex-col items-center justify-center py-20 px-6 text-center bg-slate-900/20 border border-slate-800/60 rounded-3xl">
+        <div className="flex flex-col items-center justify-center py-16 px-6 text-center bg-slate-900/20 border border-slate-800/60 rounded-3xl max-w-2xl mx-auto">
           <div className="h-16 w-16 rounded-2xl bg-amber-950/30 border border-amber-800/40 flex items-center justify-center mb-5">
-            <CloudOff className="h-8 w-8 text-amber-500" />
+            {errorCode === 'APP_AUTH_UNAUTHORIZED' ? (
+              <ShieldAlert className="h-8 w-8 text-amber-500" />
+            ) : (
+              <CloudOff className="h-8 w-8 text-amber-500" />
+            )}
           </div>
 
+          {/* Código de fase del error */}
+          {errorCode && (
+            <span className="inline-block mb-2 font-mono text-[10px] font-bold uppercase tracking-wider text-amber-400/90 bg-amber-950/50 border border-amber-800/40 px-2 py-0.5 rounded">
+              Fase: {errorCode}
+            </span>
+          )}
+
           <h3 className="text-base font-bold text-slate-200 mb-2">
-            Error de conexión con Die Ligen
+            {errorConfig?.title || 'Error de conexión con Die Ligen'}
           </h3>
 
-          <p className="text-sm text-slate-400 max-w-md leading-relaxed mb-4">
-            {status?.error || 'No se pudo establecer comunicación con el servicio de Die Ligen.'}
+          <p className="text-sm text-slate-400 max-w-md leading-relaxed mb-3">
+            {status?.error || 'No se pudo establecer comunicación con el servicio.'}
           </p>
 
-          <p className="text-xs text-slate-500 max-w-sm">
-            Verifica que las variables de entorno <code className="text-slate-400 font-mono">DIE_LIGEN_USERNAME</code> y{' '}
-            <code className="text-slate-400 font-mono">DIE_LIGEN_PASSWORD</code> estén configuradas en el servidor.
-          </p>
+          {errorConfig?.hint && (
+            <p className="text-xs text-slate-500 max-w-sm leading-relaxed mb-6">
+              {errorConfig.hint}
+            </p>
+          )}
 
           <button
             onClick={checkConnection}
-            className="mt-6 px-4 py-2 text-xs font-bold text-slate-200 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl transition-all flex items-center gap-2"
+            className="px-4 py-2 text-xs font-bold text-slate-200 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl transition-all flex items-center gap-2"
           >
             <RefreshCw className="w-3.5 h-3.5" />
-            Reintentar conexión
+            Reintentar comprobación
           </button>
         </div>
       )}

@@ -10,6 +10,13 @@ import 'server-only';
  * 4. Token en memoria volátil únicamente durante la sesión del servidor.
  */
 
+export type DieLigenErrorCode =
+  | 'APP_AUTH_UNAUTHORIZED'
+  | 'DIE_LIGEN_CONFIG_MISSING'
+  | 'DIE_LIGEN_TOKEN_FAILED'
+  | 'DIE_LIGEN_UPSTREAM_UNAUTHORIZED'
+  | 'DIE_LIGEN_UPSTREAM_ERROR';
+
 export interface DieLigenSeasonYear {
   id: string | number;
   season_year_id?: string | number;
@@ -31,9 +38,19 @@ export interface DieLigenContest {
 
 export interface DieLigenStatusResult {
   connected: boolean;
+  errorCode: DieLigenErrorCode | null;
+  error: string | null;
   temporadaActual: string | null;
   competiciones: string[];
-  error: string | null;
+}
+
+class DieLigenError extends Error {
+  code: DieLigenErrorCode;
+  constructor(message: string, code: DieLigenErrorCode) {
+    super(message);
+    this.code = code;
+    this.name = 'DieLigenError';
+  }
 }
 
 const DEFAULT_BASE_URL = 'https://coaches.ligen.football/external-api/v1/analysis';
@@ -62,25 +79,36 @@ export async function getDieLigenToken(forceRefresh = false): Promise<string> {
   const password = process.env.DIE_LIGEN_PASSWORD?.trim();
 
   if (!username || !password) {
-    throw new Error('Credenciales de Die Ligen (DIE_LIGEN_USERNAME / DIE_LIGEN_PASSWORD) no configuradas en el servidor.');
+    throw new DieLigenError(
+      'Variables de entorno DIE_LIGEN_USERNAME o DIE_LIGEN_PASSWORD no configuradas en el servidor.',
+      'DIE_LIGEN_CONFIG_MISSING'
+    );
   }
 
   const baseUrl = getBaseUrl();
   const tokenUrl = `${baseUrl}/oauth/token`;
 
-  const res = await fetch(tokenUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: '*/*',
-    },
-    body: JSON.stringify({ username, password }),
-    cache: 'no-store',
-  });
+  let res: Response;
+  try {
+    res = await fetch(tokenUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: '*/*',
+      },
+      body: JSON.stringify({ username, password }),
+      cache: 'no-store',
+    });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Error de red';
+    throw new DieLigenError(`No se pudo contactar con el endpoint de token de Die Ligen: ${msg}`, 'DIE_LIGEN_TOKEN_FAILED');
+  }
 
   if (!res.ok) {
-    const errorText = await res.text().catch(() => '');
-    throw new Error(`Fallo de autenticación en Die Ligen [${res.status}]: ${errorText || res.statusText}`);
+    throw new DieLigenError(
+      `Fallo de autenticación en Die Ligen (código HTTP ${res.status}). Credenciales rechazadas.`,
+      'DIE_LIGEN_TOKEN_FAILED'
+    );
   }
 
   // La API devuelve el token en texto plano, no como JSON
@@ -88,7 +116,7 @@ export async function getDieLigenToken(forceRefresh = false): Promise<string> {
   const token = rawToken.trim();
 
   if (!token) {
-    throw new Error('Token vacío recibido de Die Ligen.');
+    throw new DieLigenError('Respuesta de token vacía recibida de Die Ligen.', 'DIE_LIGEN_TOKEN_FAILED');
   }
 
   memoryToken = token;
@@ -128,11 +156,20 @@ export async function fetchDieLigen<T>(endpoint: string, options: RequestInit = 
       },
       cache: 'no-store',
     });
+
+    if (res.status === 401) {
+      throw new DieLigenError(
+        'La API de Die Ligen rechazó el token de acceso tras el reintento de autenticación (401).',
+        'DIE_LIGEN_UPSTREAM_UNAUTHORIZED'
+      );
+    }
   }
 
   if (!res.ok) {
-    const errBody = await res.text().catch(() => '');
-    throw new Error(`Error en Die Ligen [${res.status}] en ${cleanEndpoint}: ${errBody || res.statusText}`);
+    throw new DieLigenError(
+      `Error en respuesta externa de Die Ligen en ${cleanEndpoint} (HTTP ${res.status}).`,
+      'DIE_LIGEN_UPSTREAM_ERROR'
+    );
   }
 
   const contentType = res.headers.get('content-type') || '';
@@ -158,9 +195,10 @@ export async function getDieLigenStatus(): Promise<DieLigenStatusResult> {
   if (!username || !password) {
     return {
       connected: false,
+      errorCode: 'DIE_LIGEN_CONFIG_MISSING',
+      error: 'Variables DIE_LIGEN_USERNAME o DIE_LIGEN_PASSWORD no configuradas en el servidor.',
       temporadaActual: null,
       competiciones: [],
-      error: 'Variables DIE_LIGEN_USERNAME o DIE_LIGEN_PASSWORD no configuradas en las variables de entorno del servidor.',
     };
   }
 
@@ -196,27 +234,35 @@ export async function getDieLigenStatus(): Promise<DieLigenStatusResult> {
     }
 
     const temporadaNombre = currentSeason
-      ? String(currentSeason.name || currentSeason.season || currentSeason.year || currentSeason.id || '26/27')
+      ? String(currentSeason.name || currentSeason.season || currentSeason.year || currentSeason.id || '')
       : null;
 
     return {
       connected: true,
-      temporadaActual: temporadaNombre,
+      errorCode: null,
+      temporadaActual: temporadaNombre || null,
       competiciones,
       error: null,
     };
   } catch (err: unknown) {
-    const rawError = err instanceof Error ? err.message : 'Error desconocido al comunicar con Die Ligen';
-    // Sanitizar mensaje para evitar filtrar tokens o datos sensibles
-    const sanitizedError = rawError
-      .replace(/Bearer\s+[A-Za-z0-9\-_.]+/gi, 'Bearer ***')
-      .replace(/[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+/g, '***');
+    let errorCode: DieLigenErrorCode = 'DIE_LIGEN_UPSTREAM_ERROR';
+    let safeMessage = 'Error de comunicación con la API externa de Die Ligen.';
+
+    if (err instanceof DieLigenError) {
+      errorCode = err.code;
+      safeMessage = err.message;
+    } else if (err instanceof Error) {
+      safeMessage = err.message
+        .replace(/Bearer\s+[A-Za-z0-9\-_.]+/gi, 'Bearer ***')
+        .replace(/[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+/g, '***');
+    }
 
     return {
       connected: false,
+      errorCode,
+      error: safeMessage,
       temporadaActual: null,
       competiciones: [],
-      error: sanitizedError,
     };
   }
 }
