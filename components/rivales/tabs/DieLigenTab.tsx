@@ -1,7 +1,8 @@
 'use client';
 import React, { useState, useEffect, useCallback } from 'react';
 import { useEditMode } from '@/context/EditModeContext';
-import { getStaffPasskey } from '@/lib/passkey';
+import { getStaffPasskey, setStaffPasskey } from '@/lib/passkey';
+import { StaffPasskeyModal } from '@/components/common/StaffPasskeyModal';
 import {
   CloudCheck,
   CloudOff,
@@ -11,6 +12,7 @@ import {
   Calendar,
   AlertCircle,
   ShieldAlert,
+  Key,
 } from 'lucide-react';
 
 export type DieLigenErrorCode =
@@ -71,8 +73,9 @@ export function DieLigenTab() {
   const { currentUser } = useEditMode();
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<DieLigenStatusResponse | null>(null);
+  const [isPasskeyModalOpen, setIsPasskeyModalOpen] = useState(false);
 
-  const checkConnection = useCallback(async () => {
+  const checkConnection = useCallback(async (explicitPass?: string) => {
     setLoading(true);
     try {
       const headers: Record<string, string> = {
@@ -80,7 +83,7 @@ export function DieLigenTab() {
       };
 
       // Mismo origen y formato de credenciales que hooks existentes (useClubDocuments, useClubAIReports)
-      const staffPass = (currentUser?.pass || getStaffPasskey() || '').trim();
+      const staffPass = (explicitPass || currentUser?.pass || getStaffPasskey() || '').trim();
       const staffUser = (currentUser?.id || 'zigor').trim().toLowerCase();
 
       // Enviar credenciales de staff ÚNICAMENTE si existe contraseña no vacía
@@ -186,7 +189,8 @@ export function DieLigenTab() {
 
         {/* Botón de comprobación manual */}
         <button
-          onClick={checkConnection}
+          type="button"
+          onClick={() => checkConnection()}
           disabled={loading}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-400 hover:text-slate-200 bg-slate-950 hover:bg-slate-900 border border-slate-800 rounded-xl transition-all disabled:opacity-50"
           title="Reintentar comprobación"
@@ -253,15 +257,51 @@ export function DieLigenTab() {
             </p>
           )}
 
-          <button
-            onClick={checkConnection}
-            className="px-4 py-2 text-xs font-bold text-slate-200 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl transition-all flex items-center gap-2"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-            Reintentar comprobación
-          </button>
+          {errorCode === 'APP_AUTH_UNAUTHORIZED' ? (
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => setIsPasskeyModalOpen(true)}
+                className="px-4 py-2 text-xs font-bold text-white bg-[#CC0E21] hover:bg-red-700 rounded-xl transition-all flex items-center gap-2 shadow-lg shadow-red-900/20"
+              >
+                <Key className="w-3.5 h-3.5" />
+                Introducir clave de entrenador
+              </button>
+              <button
+                type="button"
+                onClick={() => checkConnection()}
+                className="px-4 py-2 text-xs font-bold text-slate-300 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl transition-all flex items-center gap-2"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                Reintentar
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => checkConnection()}
+              className="px-4 py-2 text-xs font-bold text-slate-200 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl transition-all flex items-center gap-2"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              Reintentar comprobación
+            </button>
+          )}
         </div>
       )}
+
+      {/* Modal de autorización con clave de staff cuando falte o sea requerida */}
+      <StaffPasskeyModal
+        isOpen={isPasskeyModalOpen}
+        onClose={() => setIsPasskeyModalOpen(false)}
+        onSuccess={(newKey) => {
+          setStaffPasskey(newKey);
+          setIsPasskeyModalOpen(false);
+          checkConnection(newKey);
+        }}
+        title="Autorización del Cuerpo Técnico"
+        description="Introduce la clave de acceso privada del cuerpo técnico para autorizar la conexión con Die Ligen."
+        errorMsg={status?.errorCode === 'APP_AUTH_UNAUTHORIZED' ? status.error : null}
+      />
     </div>
   );
 }
