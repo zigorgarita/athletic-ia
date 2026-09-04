@@ -18,8 +18,38 @@ export interface ClubPlayer {
   fortalezas: string | null;
   debilidades: string | null;
   observaciones: string | null;
-  origen?: 'manual' | 'documento' | 'fvf' | null;
+  origen?: 'manual' | 'documento' | 'fvf' | 'die_ligen' | 'combinado' | null;
   created_at: string;
+  // Campos de participación visual (opcionales)
+  partidos_disponibles?: number | null;
+  partidos_jugados?: number | null;
+  titularidades?: number | null;
+  entradas_banquillo?: number | null;
+  partidos_completos?: number | null;
+  minutos_posibles?: number | null;
+  porcentaje_participacion?: number | null;
+  minuto_habitual_cambio?: string | null;
+  goles?: number | null;
+  tarjetas_amarillas?: number | null;
+  tarjetas_rojas?: number | null;
+  goles_encajados?: number | null;
+  porterias_cero?: number | null;
+  ultimas_jornadas?: Array<{ jornada: number | string; estado: 'T' | 'S' | 'NC' | 'SD'; minutos?: number }>;
+  historial_partidos?: Array<{
+    jornada: string | number;
+    partido: string;
+    fecha?: string;
+    titular: boolean;
+    minutos: number;
+    minuto_entrada?: number | null;
+    minuto_salida?: number | null;
+    posicion?: string | null;
+    goles?: number;
+    goles_encajados?: number;
+    tarjetas_amarillas?: number;
+    tarjetas_rojas?: number;
+    sistema?: string | null;
+  }>;
 }
 
 export function useClubPlayers(seasonId: string | undefined) {

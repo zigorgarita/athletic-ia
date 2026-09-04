@@ -6,9 +6,10 @@ interface ModalProps {
   onClose: () => void;
   title: string;
   children: React.ReactNode;
+  maxWidth?: string;
 }
 
-export function Modal({ isOpen, onClose, title, children }: ModalProps) {
+export function Modal({ isOpen, onClose, title, children, maxWidth = 'max-w-lg' }: ModalProps) {
   // Manejo de la tecla Esc para cerrar
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -43,7 +44,7 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
       />
 
       {/* Contenedor del Modal */}
-      <div className="relative bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden z-10 transition-all duration-300 animate-in fade-in zoom-in-95 duration-200">
+      <div className={`relative bg-slate-900 border border-slate-800 rounded-2xl w-full ${maxWidth} shadow-2xl overflow-hidden z-10 transition-all duration-300 animate-in fade-in zoom-in-95 duration-200`}>
         {/* Cabecera */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800/80 bg-slate-950/20">
           <h2 className="text-lg font-bold text-slate-100">{title}</h2>
