@@ -16,6 +16,7 @@ import { useTacticalSystems } from '@/hooks/useTacticalSystems';
 import { useTacticalRoleCards } from '@/hooks/useTacticalRoleCards';
 import { useTacticalAnalyst } from '@/hooks/useTacticalAnalyst';
 import { exportToPDF, buildTacticaFilename } from '@/lib/exportPdf';
+import { exportMisterToPDF } from '@/lib/exportMisterPdf';
 import { TacticalField } from './TacticalField';
 import { TacticalFieldExport } from './TacticalFieldExport';
 
@@ -99,6 +100,7 @@ export function TacticaClient() {
   const [loadingLineups, setLoadingLineups] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isPdfExporting, setIsPdfExporting] = useState(false);
+  const [isPdfMisterExporting, setIsPdfMisterExporting] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -687,6 +689,45 @@ export function TacticaClient() {
     }
   };
 
+  // --- Export PDF Míster (Informe textual A4 portrait) ---
+  const handleExportPDFMister = async () => {
+    setIsPdfMisterExporting(true);
+    try {
+      const match = matches.find(m => m.id === selectedMatchId);
+      await exportMisterToPDF({
+        jornada: match?.jornada,
+        rival: match?.rival,
+        fecha: match?.fecha,
+        esLocal: match?.es_local,
+        tipoPartido: match?.tipo_partido,
+        sistemaPropio: selectedFormation,
+        sistemaRival: rivalFormation,
+        lineupName: lineupName || undefined,
+        lineupNotes: lineupNotes || undefined,
+        ventajas: ventajas || undefined,
+        desventajas: desventajas || undefined,
+        zonaConflicto: zonaConflicto || undefined,
+        dueloClave: dueloClave || undefined,
+        tareasLineas: tareasLineas || undefined,
+        analisisModeloJuego: analisisModeloJuego && Object.keys(analisisModeloJuego).length > 0
+          ? analisisModeloJuego
+          : undefined,
+        nodesPropio,
+        players,
+        roleCards: roleCards.length > 0 ? roleCards : undefined,
+        approvedObservations: approvedReportObservations.length > 0
+          ? approvedReportObservations
+          : undefined,
+        sourcesLabels: activeSourcesLabels.length > 0 ? activeSourcesLabels : undefined,
+      });
+    } catch (err) {
+      console.error('[PDF Míster] Error:', err);
+      setErrorMsg('Error al generar el PDF Míster. Inténtalo de nuevo.');
+    } finally {
+      setIsPdfMisterExporting(false);
+    }
+  };
+
   // --- Auto-load pizarra when a match is selected ---
   const handleMatchIdChange = async (matchId: string) => {
     setSelectedMatchId(matchId);
@@ -1080,6 +1121,18 @@ export function TacticaClient() {
             >
               <FileDown className="h-3.5 w-3.5 text-[#CC0E21]" />
               {isPdfExporting ? 'Generando...' : 'Exportar PDF'}
+            </Button>
+          )}
+          {/* PDF Míster — informe textual A4 para imprimir */}
+          {(lineupName || ventajas || (analisisModeloJuego && Object.keys(analisisModeloJuego).length > 0)) && (
+            <Button
+              variant="secondary"
+              onClick={handleExportPDFMister}
+              loading={isPdfMisterExporting}
+              className="flex items-center gap-1.5 text-xs bg-slate-900/60 border-slate-700 text-slate-200 hover:border-[#CC0E21]/50"
+            >
+              <FileDown className="h-3.5 w-3.5 text-emerald-400" />
+              {isPdfMisterExporting ? 'Generando...' : 'PDF Míster'}
             </Button>
           )}
           {currentLineupId && isEditMode && (
