@@ -559,64 +559,193 @@ export async function exportMisterToPDF(config: MisterPdfConfig): Promise<void> 
     }
   }
 
-  // ── SECCIÓN: FICHAS DE ROL (si existen y son distintas del Modelo de Juego) ─
+  // ── SECCIÓN: FICHAS DE ROL (filtradas, estructuradas y sin fragmentos corruptos) ─
 
   if (config.roleCards && config.roleCards.length > 0) {
-    const hasRoleCardContent = config.roleCards.some(rc =>
-      hasContent(rc.fase_ofensiva) || hasContent(rc.fase_defensiva) ||
-      hasContent(rc.transiciones) || hasContent(rc.instrucciones_especificas)
-    );
+    // Whitelist estricta de demarcaciones tácticas reales reconocibles
+    const VALID_ROLE_LABELS = new Set([
+      'POR',
+      'LD', 'LI', 'DFC', 'DCD', 'DCI', 'CAD', 'CAI', 'CT',
+      'MCD', 'MC', 'MCO', 'MCDD', 'MCDI', 'MD', 'MI',
+      'ED', 'EI', 'DC', 'SD', 'EXD', 'EXI'
+    ]);
 
-    if (hasRoleCardContent) {
+    const ROLE_ORDER: Record<string, number> = {
+      POR: 1,
+      LD: 2, DCD: 3, DFC: 4, DCI: 5, CAD: 6, LI: 7, CAI: 8, CT: 9,
+      MCD: 10, MCDD: 11, MCDI: 12, MC: 13, MD: 14, MI: 15, MCO: 16,
+      ED: 17, EXD: 18, EI: 19, EXI: 20, DC: 21, SD: 22
+    };
+
+    const getValidRoleLine = (label: string, fallbackLinea?: string): string => {
+      if (label === 'POR') return 'Portería';
+      if (['LD', 'LI', 'DFC', 'DCD', 'DCI', 'CAD', 'CAI', 'CT'].includes(label)) return 'Defensa';
+      if (['MCD', 'MC', 'MCO', 'MCDD', 'MCDI', 'MD', 'MI'].includes(label)) return 'Mediocampo';
+      if (['ED', 'EI', 'DC', 'SD', 'EXD', 'EXI'].includes(label)) return 'Delantera';
+      return fallbackLinea || 'Táctica';
+    };
+
+    const cleanRoleCardField = (raw?: string | null, currentRival?: string): string => {
+      if (!raw) return '';
+      let s = clean(raw);
+
+      // 1. Limpiar repetidamente prefijos y residuos de parsing
+      let prev = '';
+      while (s !== prev) {
+        prev = s;
+        s = s.replace(/^(?:(?:instrucci[oó]n\s+)?espec[íi]fica:?|ón\s+espec[íi]fica:?|instrucci[oó]n:?|instrucciones:?|tarea:?|rol:?|consigna:?)\s*/i, '');
+        s = s.replace(/^(?:transiciones:?|ones:?|transici[oó]n:?)\s*/i, '');
+        s = s.replace(/^(?:fase\s+ofensiva:?|ofensiva:?|ataque:?)\s*/i, '');
+        s = s.replace(/^(?:fase\s+defensiva:?|defensiva:?|defensa:?)\s*/i, '');
+        s = s.replace(/^[-*•\d.]+\s*/, '');
+        s = s.trim();
+      }
+
+      // 2. Descartar si el contenido es un fragmento roto o no accionable (< 10 caracteres)
+      if (s.length < 10) return '';
+
+      // 3. Descartar placeholders conocidos
+      const lower = s.toLowerCase();
+      const placeholders = [
+        'sin definir', 'sin consigna', 'sin instrucción', 'sin marcas', 'sin marcas específicas',
+        'placeholder', 'texto aquí', 'añade o edita', 'no definido', 'n/a', 'ninguna', 'ninguno'
+      ];
+      if (placeholders.some(p => lower === p || lower.startsWith(p))) {
+        return '';
+      }
+
+      // 4. Descartar fragmentos de frases rotas que terminan en conectores
+      const brokenEndings = /\b(?:para|por|con|sin|de|en|el|la|los|las|un|una|que|y|o|a)\s*$/i;
+      if (brokenEndings.test(s) && s.length < 40) {
+        return '';
+      }
+
+      // 5. Descartar contenido narrativo que no corresponde a una ficha de rol
+      if (/^(?:en este partido|el an[áa]lisis|ajustes del m[íi]ster|conclusiones?:|informe:)\b/i.test(s)) {
+        return '';
+      }
+
+      // 6. Descartar referencias explícitas a otro rival distinto al del partido actual
+      if (currentRival) {
+        const rivalLower = currentRival.toLowerCase();
+        const otherRivals = [
+          'alavés', 'alaves', 'antiguoko', 'danok bat', 'danok', 'eibar', 'athletic',
+          'osasuna', 'santutxu', 'arenas', 'leioa', 'txantrea', 'tudelano', 'gazte berriak', 'logroñés', 'logrones', 'vasconia'
+        ];
+        for (const r of otherRivals) {
+          if (!rivalLower.includes(r)) {
+            const regexOther = new RegExp(`\\b(?:frente\\s+al?|contra\\s+el?|vs\\.?|ante\\s+el?)\\s+${r}\\b`, 'i');
+            if (regexOther.test(s)) {
+              return '';
+            }
+          }
+        }
+      }
+
+      // Asegurar mayúscula inicial
+      s = s.charAt(0).toUpperCase() + s.slice(1);
+      return s;
+    };
+
+    interface ValidRoleItem {
+      label: string;
+      linea: string;
+      ofensiva: string;
+      defensiva: string;
+      transiciones: string;
+      especifica: string;
+    }
+
+    const validCardsMap = new Map<string, ValidRoleItem>();
+
+    for (const rc of config.roleCards) {
+      const label = (rc.posicion_label || '').trim().toUpperCase();
+      // Omitir bloques basura no posicionales como [ASIM], [STER], [PIDA], [NEAS], [EST], [FASE], [BAL]
+      if (!VALID_ROLE_LABELS.has(label)) continue;
+
+      const of = cleanRoleCardField(rc.fase_ofensiva, config.rival);
+      const def = cleanRoleCardField(rc.fase_defensiva, config.rival);
+      const tr = cleanRoleCardField(rc.transiciones, config.rival);
+      const esp = cleanRoleCardField(rc.instrucciones_especificas, config.rival);
+
+      // Ante la duda, si no tiene ningún campo válido real, omitir el bloque
+      if (!of && !def && !tr && !esp) continue;
+
+      const item: ValidRoleItem = {
+        label,
+        linea: getValidRoleLine(label, rc.linea),
+        ofensiva: of,
+        defensiva: def,
+        transiciones: tr,
+        especifica: esp,
+      };
+
+      // Si ya existía la posición, conservar la ficha con mayor información
+      const existing = validCardsMap.get(label);
+      if (!existing) {
+        validCardsMap.set(label, item);
+      } else {
+        const lenNew = of.length + def.length + tr.length + esp.length;
+        const lenEx = existing.ofensiva.length + existing.defensiva.length + existing.transiciones.length + existing.especifica.length;
+        if (lenNew > lenEx) {
+          validCardsMap.set(label, item);
+        }
+      }
+    }
+
+    const sortedValidCards = Array.from(validCardsMap.values()).sort((a, b) => {
+      const ordA = ROLE_ORDER[a.label] ?? 99;
+      const ordB = ROLE_ORDER[b.label] ?? 99;
+      return ordA - ordB;
+    });
+
+    if (sortedValidCards.length > 0) {
       renderSectionHeader(ctx, 'Fichas de Rol — Posiciones Configuradas');
 
-      config.roleCards.forEach(rc => {
-        if (!hasContent(rc.fase_ofensiva) && !hasContent(rc.fase_defensiva) &&
-            !hasContent(rc.transiciones) && !hasContent(rc.instrucciones_especificas)) return;
-
+      sortedValidCards.forEach(card => {
         ensureSpace(ctx, 8);
         // Cabecera de posición
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(SZ_BODY);
         doc.setTextColor(RED);
-        doc.text(`[${rc.posicion_label}] ${rc.linea}`, MARGIN, ctx.y);
+        doc.text(`[${card.label}] ${card.linea}`, MARGIN, ctx.y);
         ctx.y += 5;
 
-        if (hasContent(rc.fase_ofensiva)) {
+        if (card.ofensiva) {
           doc.setFont('helvetica', 'bold');
           doc.setFontSize(SZ_SMALL);
           doc.setTextColor(MUTED);
           ensureSpace(ctx, 4);
           doc.text('Ofensiva:', MARGIN + 4, ctx.y);
           ctx.y += 4;
-          renderBodyText(ctx, rc.fase_ofensiva || '');
+          renderBodyText(ctx, card.ofensiva);
         }
-        if (hasContent(rc.fase_defensiva)) {
+        if (card.defensiva) {
           doc.setFont('helvetica', 'bold');
           doc.setFontSize(SZ_SMALL);
           doc.setTextColor(MUTED);
           ensureSpace(ctx, 4);
           doc.text('Defensiva:', MARGIN + 4, ctx.y);
           ctx.y += 4;
-          renderBodyText(ctx, rc.fase_defensiva || '');
+          renderBodyText(ctx, card.defensiva);
         }
-        if (hasContent(rc.transiciones)) {
+        if (card.transiciones) {
           doc.setFont('helvetica', 'bold');
           doc.setFontSize(SZ_SMALL);
           doc.setTextColor(MUTED);
           ensureSpace(ctx, 4);
           doc.text('Transiciones:', MARGIN + 4, ctx.y);
           ctx.y += 4;
-          renderBodyText(ctx, rc.transiciones || '');
+          renderBodyText(ctx, card.transiciones);
         }
-        if (hasContent(rc.instrucciones_especificas)) {
+        if (card.especifica) {
           doc.setFont('helvetica', 'bold');
           doc.setFontSize(SZ_SMALL);
           doc.setTextColor(MUTED);
           ensureSpace(ctx, 4);
-          doc.text('Específicas:', MARGIN + 4, ctx.y);
+          doc.text('Específica:', MARGIN + 4, ctx.y);
           ctx.y += 4;
-          renderBodyText(ctx, rc.instrucciones_especificas || '');
+          renderBodyText(ctx, card.especifica);
         }
         ctx.y += 1;
       });
