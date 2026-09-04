@@ -6,8 +6,8 @@ import { useEditMode } from '@/context/EditModeContext';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { Users, Plus, Search, Filter, Camera } from 'lucide-react';
-import { PlayerCard } from '@/components/players/PlayerCard';
-import { Player, Demarcacion } from '@/types';
+import { RivalPlayerCard } from '../RivalPlayerCard';
+import { RivalPlayerDetailModal } from '../modals/RivalPlayerDetailModal';
 import { ImportPlantillaModal } from '../modals/ImportPlantillaModal';
 
 interface PlayersTabProps {
@@ -41,6 +41,10 @@ export function PlayersTab({ season, club }: PlayersTabProps) {
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [editingPlayer, setEditingPlayer] = useState<Partial<ClubPlayer> | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Estado para la ficha de detalle de jugador rival
+  const [selectedPlayerForDetail, setSelectedPlayerForDetail] = useState<ClubPlayer | null>(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
 
   const filteredPlayers = useMemo(() => {
     return players.filter(p => {
@@ -86,6 +90,11 @@ export function PlayersTab({ season, club }: PlayersTabProps) {
     setIsModalOpen(true);
   };
 
+  const handlePlayerClick = (player: ClubPlayer) => {
+    setSelectedPlayerForDetail(player);
+    setIsDetailModalOpen(true);
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingPlayer || !editingPlayer.nombre) return;
@@ -96,10 +105,12 @@ export function PlayersTab({ season, club }: PlayersTabProps) {
     
     if (success) {
       setIsModalOpen(false);
+      // Si el jugador editado estaba abierto en el detalle, actualizarlo
+      if (selectedPlayerForDetail && editingPlayer.id === selectedPlayerForDetail.id) {
+        setSelectedPlayerForDetail(prev => prev ? { ...prev, ...editingPlayer } as ClubPlayer : null);
+      }
     }
   };
-
-
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -113,40 +124,13 @@ export function PlayersTab({ season, club }: PlayersTabProps) {
   const inputClass = "w-full bg-slate-950/50 border border-slate-800 rounded-xl px-4 py-2.5 text-slate-200 focus:outline-none focus:border-[#CC0E21]/50 focus:ring-1 focus:ring-[#CC0E21]/30 transition-all";
   const labelClass = "block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5";
 
-  const mapToPlayer = (cp: ClubPlayer): Player => {
-    let demar: Demarcacion = 'Centrocampista';
-    const pos = cp.posicion || '';
-    if (pos.includes('Portero')) demar = 'Portero';
-    else if (pos.includes('Lateral') || pos.includes('Central') || pos.includes('Defensa')) demar = 'Defensa';
-    else if (pos.includes('Delantero') || pos.includes('Extremo') || pos.includes('Punta')) demar = 'Delantero';
-
-    return {
-      id: cp.id,
-      nombre: cp.nombre,
-      apellidos: '',
-      dorsal: cp.dorsal || 0,
-      demarcacion: demar,
-      posicion_secundaria: pos !== demar ? pos : null,
-      fecha_nacimiento: cp.fecha_nacimiento || new Date().toISOString(),
-      altura: cp.altura,
-      peso: cp.peso,
-      pierna_dominante: cp.pierna_dominante || 'Diestro',
-      estado: 'Disponible',
-      rol_abp: null,
-      foto_url: cp.foto_url,
-      created_at: cp.created_at,
-      updated_at: cp.created_at,
-    };
-  };
-
-  const handleEditAdapter = (player: Player) => {
-    const original = players.find(p => p.id === player.id);
-    if (original) handleOpenModal(original);
-  };
-
   const handleDeleteAdapter = async (id: string) => {
     if (confirm('¿Estás seguro de que deseas eliminar este jugador de la plantilla?')) {
       await deletePlayer(id);
+      if (selectedPlayerForDetail?.id === id) {
+        setIsDetailModalOpen(false);
+        setSelectedPlayerForDetail(null);
+      }
     }
   };
 
@@ -238,11 +222,13 @@ export function PlayersTab({ season, club }: PlayersTabProps) {
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                   {groupPlayers.map(player => (
-                    <PlayerCard 
-                      key={player.id} 
-                      player={mapToPlayer(player)} 
-                      onEdit={handleEditAdapter} 
-                      onDelete={handleDeleteAdapter} 
+                    <RivalPlayerCard
+                      key={player.id}
+                      player={player}
+                      onClick={handlePlayerClick}
+                      onEdit={handleOpenModal}
+                      onDelete={handleDeleteAdapter}
+                      isEditMode={isEditMode}
                     />
                   ))}
                 </div>
@@ -351,6 +337,19 @@ export function PlayersTab({ season, club }: PlayersTabProps) {
           onImport={insertBulkPlayers}
         />
       )}
+
+      {/* Modal Ficha y Detalle de Jugador Rival */}
+      <RivalPlayerDetailModal
+        player={selectedPlayerForDetail}
+        isOpen={isDetailModalOpen}
+        onClose={() => {
+          setIsDetailModalOpen(false);
+          setSelectedPlayerForDetail(null);
+        }}
+        clubName={club?.nombre}
+        onEdit={handleOpenModal}
+        isEditMode={isEditMode}
+      />
 
     </div>
   );
