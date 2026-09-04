@@ -71,6 +71,8 @@ export function RivalPlayerCard({
     ? 'bg-rose-500' 
     : 'bg-slate-600';
 
+  const hasRealParticipation = player.partidos_jugados !== undefined && player.partidos_jugados !== null;
+
   // Badge de origen de datos
   const getSourceBadge = () => {
     const orig = player.origen || 'manual';
@@ -170,12 +172,14 @@ export function RivalPlayerCard({
           )}
         </div>
 
-        {/* Nombre del jugador */}
-        <h3 className="font-bold text-slate-100 text-base line-clamp-1 mb-1 group-hover:text-white transition-colors">
-          {player.nombre}
-        </h3>
+        {/* Nombre del jugador (hasta 2 líneas con altura uniforme) */}
+        <div className="h-12 flex items-center justify-center mb-1">
+          <h3 className="font-bold text-slate-100 text-sm sm:text-[15px] leading-snug line-clamp-2 group-hover:text-white transition-colors">
+            {player.nombre}
+          </h3>
+        </div>
 
-        {/* Posición y edad */}
+        {/* Posición y edad (solo muestra edad si existe fecha confirmada) */}
         <div className="flex flex-wrap items-center justify-center gap-1.5 mb-3">
           <Badge 
             variant="default" 
@@ -183,13 +187,9 @@ export function RivalPlayerCard({
           >
             {player.posicion || 'Sin Posición'}
           </Badge>
-          {age !== null ? (
+          {age !== null && (
             <span className="text-[11px] text-slate-400 font-medium">
               {age} años
-            </span>
-          ) : (
-            <span className="text-[11px] text-slate-500 italic">
-              Sin datos edad
             </span>
           )}
         </div>
@@ -212,8 +212,8 @@ export function RivalPlayerCard({
               <Activity className="h-3 w-3 text-slate-500" />
               Participación
             </span>
-            <span className="text-[10px] text-slate-400 tabular-nums">
-              {player.minutos_jugados > 0 ? `${player.minutos_jugados}'` : '0 min'}
+            <span className={`text-[10px] font-semibold tabular-nums ${hasRealParticipation ? 'text-slate-300' : 'text-slate-500 tracking-wider'}`}>
+              {hasRealParticipation ? `${player.minutos_jugados}'` : 'SIN DATOS'}
             </span>
           </div>
 
@@ -222,7 +222,7 @@ export function RivalPlayerCard({
             <div className="bg-slate-900/80 border border-slate-800/80 rounded-lg py-1 px-1">
               <div className="text-[9px] text-slate-400 uppercase font-semibold">PJ</div>
               <div className="text-xs font-bold text-slate-200 tabular-nums">
-                {player.partidos_jugados ?? (player.minutos_jugados > 0 ? '—' : '0')}
+                {hasRealParticipation ? player.partidos_jugados : '—'}
               </div>
             </div>
 
@@ -230,7 +230,7 @@ export function RivalPlayerCard({
             <div className="bg-slate-900/80 border border-slate-800/80 rounded-lg py-1 px-1">
               <div className="text-[9px] text-slate-400 uppercase font-semibold">Titular</div>
               <div className="text-xs font-bold text-slate-200 tabular-nums">
-                {player.titularidades ?? '—'}
+                {hasRealParticipation ? (player.titularidades ?? '—') : '—'}
               </div>
             </div>
 
@@ -240,9 +240,9 @@ export function RivalPlayerCard({
                 {isPortero ? 'Encajados' : 'Goles'}
               </div>
               <div className="text-xs font-bold text-slate-200 tabular-nums">
-                {isPortero 
-                  ? (player.goles_encajados ?? '—')
-                  : (player.goles ?? '0')}
+                {hasRealParticipation
+                  ? (isPortero ? (player.goles_encajados ?? '—') : (player.goles ?? '—'))
+                  : '—'}
               </div>
             </div>
           </div>

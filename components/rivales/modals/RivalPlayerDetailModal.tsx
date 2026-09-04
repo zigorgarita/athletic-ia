@@ -66,6 +66,7 @@ export function RivalPlayerDetailModal({
 
   const pos = (player.posicion || '').toLowerCase();
   const isPortero = pos.includes('portero');
+  const hasRealParticipation = player.partidos_jugados !== undefined && player.partidos_jugados !== null;
 
   // Badge de origen
   const getSourceBadge = () => {
@@ -238,151 +239,163 @@ export function RivalPlayerDetailModal({
         {/* CONTENIDO TAB 1: PARTICIPACIÓN */}
         {activeTab === 'participacion' && (
           <div className="space-y-6">
-            {/* Tarjetas KPI de Participación */}
-            <div>
-              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
-                Métricas Acumuladas
-              </h4>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {/* Partidos Jugados */}
-                <div className="bg-slate-900/50 border border-slate-800 p-3 rounded-xl">
-                  <div className="text-[11px] font-semibold text-slate-400 uppercase">Partidos Jugados</div>
-                  <div className="text-xl font-bold text-white mt-1 tabular-nums">
-                    {player.partidos_jugados ?? (player.minutos_jugados > 0 ? 'Sin datos' : '0')}
-                  </div>
-                  <div className="text-[10px] text-slate-500 mt-0.5">
-                    Disponibles: {player.partidos_disponibles ?? 'Sin datos'}
-                  </div>
-                </div>
-
-                {/* Titularidades / Suplencias */}
-                <div className="bg-slate-900/50 border border-slate-800 p-3 rounded-xl">
-                  <div className="text-[11px] font-semibold text-slate-400 uppercase">Titular / Suplente</div>
-                  <div className="text-xl font-bold text-white mt-1 tabular-nums">
-                    {player.titularidades ?? '—'} <span className="text-xs text-slate-500 font-normal">/ {player.entradas_banquillo ?? '—'}</span>
-                  </div>
-                  <div className="text-[10px] text-slate-500 mt-0.5">
-                    Partidos completos: {player.partidos_completos ?? 'Sin datos'}
-                  </div>
-                </div>
-
-                {/* Minutos Jugados */}
-                <div className="bg-slate-900/50 border border-slate-800 p-3 rounded-xl">
-                  <div className="text-[11px] font-semibold text-slate-400 uppercase">Minutos Jugados</div>
-                  <div className="text-xl font-bold text-white mt-1 tabular-nums">
-                    {player.minutos_jugados > 0 ? `${player.minutos_jugados}'` : '0 min'}
-                  </div>
-                  <div className="text-[10px] text-slate-500 mt-0.5">
-                    Posibles: {player.minutos_posibles ? `${player.minutos_posibles}'` : 'Sin datos'}
-                  </div>
-                </div>
-
-                {/* % Participación */}
-                <div className="bg-slate-900/50 border border-slate-800 p-3 rounded-xl">
-                  <div className="text-[11px] font-semibold text-slate-400 uppercase">% Participación</div>
-                  <div className="text-xl font-bold text-white mt-1 tabular-nums">
-                    {player.porcentaje_participacion != null ? `${player.porcentaje_participacion}%` : 'Sin datos'}
-                  </div>
-                  <div className="text-[10px] text-slate-500 mt-0.5">
-                    Minuto cambio: {player.minuto_habitual_cambio || 'Sin datos'}
-                  </div>
-                </div>
-
-                {/* Goles */}
-                <div className="bg-slate-900/50 border border-slate-800 p-3 rounded-xl">
-                  <div className="text-[11px] font-semibold text-slate-400 uppercase">Goles Marcados</div>
-                  <div className="text-xl font-bold text-white mt-1 tabular-nums">
-                    {player.goles ?? '0'}
-                  </div>
-                  <div className="text-[10px] text-slate-500 mt-0.5">
-                    {isPortero ? 'Goles a favor' : 'En la competición'}
-                  </div>
-                </div>
-
-                {/* Tarjetas */}
-                <div className="bg-slate-900/50 border border-slate-800 p-3 rounded-xl">
-                  <div className="text-[11px] font-semibold text-slate-400 uppercase">Tarjetas</div>
-                  <div className="text-sm font-bold text-white mt-1 tabular-nums flex items-center gap-2">
-                    <span className="inline-flex items-center gap-1">
-                      <span className="w-2.5 h-3.5 bg-yellow-400 rounded-sm inline-block" />
-                      {player.tarjetas_amarillas || 0}
-                    </span>
-                    <span className="text-slate-600">·</span>
-                    <span className="inline-flex items-center gap-1">
-                      <span className="w-2.5 h-3.5 bg-red-600 rounded-sm inline-block" />
-                      {player.tarjetas_rojas || 0}
-                    </span>
-                  </div>
-                  <div className="text-[10px] text-slate-500 mt-0.5">
-                    Amarillas y Rojas
-                  </div>
-                </div>
-
-                {/* Métricas específicas si es Portero */}
-                {isPortero && (
-                  <>
-                    <div className="bg-slate-900/50 border border-slate-800 p-3 rounded-xl">
-                      <div className="text-[11px] font-semibold text-slate-400 uppercase">Goles Encajados</div>
-                      <div className="text-xl font-bold text-white mt-1 tabular-nums">
-                        {player.goles_encajados ?? 'Sin datos'}
-                      </div>
-                      <div className="text-[10px] text-slate-500 mt-0.5">
-                        Estando en el campo
-                      </div>
-                    </div>
-
-                    <div className="bg-slate-900/50 border border-slate-800 p-3 rounded-xl">
-                      <div className="text-[11px] font-semibold text-slate-400 uppercase">Porterías a Cero</div>
-                      <div className="text-xl font-bold text-white mt-1 tabular-nums">
-                        {player.porterias_cero ?? 'Sin datos'}
-                      </div>
-                      <div className="text-[10px] text-slate-500 mt-0.5">
-                        Partidos sin encajar
-                      </div>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-
-            {/* Bloque Últimas 5-6 Jornadas */}
-            <div className="bg-slate-900/40 p-4 rounded-xl border border-slate-800">
-              <div className="flex items-center justify-between mb-3">
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                  Últimas 5-6 Jornadas
+              {/* Tarjetas KPI de Participación */}
+              <div>
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
+                  Métricas Acumuladas
                 </h4>
-                <span className="text-[10px] text-slate-500">
-                  T = Titular · S = Suplente · NC = No convocado · SD = Sin datos
-                </span>
-              </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {/* Partidos Jugados */}
+                  <div className="bg-slate-900/50 border border-slate-800 p-3 rounded-xl">
+                    <div className="text-[11px] font-semibold text-slate-400 uppercase">Partidos Jugados</div>
+                    <div className={`text-xl font-bold mt-1 tabular-nums ${hasRealParticipation ? 'text-white' : 'text-slate-400 font-semibold'}`}>
+                      {hasRealParticipation ? player.partidos_jugados : 'Sin datos'}
+                    </div>
+                    <div className="text-[10px] text-slate-500 mt-0.5">
+                      Disponibles: {hasRealParticipation && player.partidos_disponibles != null ? player.partidos_disponibles : 'Sin datos'}
+                    </div>
+                  </div>
 
-              {player.ultimas_jornadas && player.ultimas_jornadas.length > 0 ? (
-                <div className="flex gap-2">
-                  {player.ultimas_jornadas.map((j, idx) => (
-                    <div
-                      key={idx}
-                      className="flex-1 text-center p-2 rounded-lg bg-slate-950 border border-slate-800"
-                    >
-                      <div className="text-[10px] font-bold text-slate-500">J{j.jornada}</div>
-                      <div className={`text-sm font-extrabold mt-1 ${
-                        j.estado === 'T' ? 'text-emerald-400' :
-                        j.estado === 'S' ? 'text-amber-400' :
-                        j.estado === 'NC' ? 'text-red-400' : 'text-slate-600'
-                      }`}>
-                        {j.estado}
-                      </div>
-                      {j.minutos !== undefined && (
-                        <div className="text-[9px] text-slate-500 tabular-nums">{j.minutos}&apos;</div>
+                  {/* Titularidades / Suplencias */}
+                  <div className="bg-slate-900/50 border border-slate-800 p-3 rounded-xl">
+                    <div className="text-[11px] font-semibold text-slate-400 uppercase">Titular / Suplente</div>
+                    <div className={`text-xl font-bold mt-1 tabular-nums ${hasRealParticipation ? 'text-white' : 'text-slate-400 font-semibold'}`}>
+                      {hasRealParticipation ? (
+                        <>
+                          {player.titularidades ?? 0} <span className="text-xs text-slate-500 font-normal">/ {player.entradas_banquillo ?? 0}</span>
+                        </>
+                      ) : (
+                        '— / —'
                       )}
                     </div>
-                  ))}
+                    <div className="text-[10px] text-slate-500 mt-0.5">
+                      Partidos completos: {hasRealParticipation && player.partidos_completos != null ? player.partidos_completos : 'Sin datos'}
+                    </div>
+                  </div>
+
+                  {/* Minutos Jugados */}
+                  <div className="bg-slate-900/50 border border-slate-800 p-3 rounded-xl">
+                    <div className="text-[11px] font-semibold text-slate-400 uppercase">Minutos Jugados</div>
+                    <div className={`text-xl font-bold mt-1 tabular-nums ${hasRealParticipation ? 'text-white' : 'text-slate-400 font-semibold'}`}>
+                      {hasRealParticipation ? `${player.minutos_jugados}'` : 'Sin datos'}
+                    </div>
+                    <div className="text-[10px] text-slate-500 mt-0.5">
+                      Posibles: {hasRealParticipation && player.minutos_posibles != null ? `${player.minutos_posibles}'` : 'Sin datos'}
+                    </div>
+                  </div>
+
+                  {/* % Participación */}
+                  <div className="bg-slate-900/50 border border-slate-800 p-3 rounded-xl">
+                    <div className="text-[11px] font-semibold text-slate-400 uppercase">% Participación</div>
+                    <div className={`text-xl font-bold mt-1 tabular-nums ${hasRealParticipation ? 'text-white' : 'text-slate-400 font-semibold'}`}>
+                      {hasRealParticipation && player.porcentaje_participacion != null ? `${player.porcentaje_participacion}%` : 'Sin datos'}
+                    </div>
+                    <div className="text-[10px] text-slate-500 mt-0.5">
+                      Minuto cambio: {hasRealParticipation && player.minuto_habitual_cambio ? player.minuto_habitual_cambio : 'Sin datos'}
+                    </div>
+                  </div>
+
+                  {/* Goles */}
+                  <div className="bg-slate-900/50 border border-slate-800 p-3 rounded-xl">
+                    <div className="text-[11px] font-semibold text-slate-400 uppercase">Goles Marcados</div>
+                    <div className={`text-xl font-bold mt-1 tabular-nums ${hasRealParticipation ? 'text-white' : 'text-slate-400 font-semibold'}`}>
+                      {hasRealParticipation ? (player.goles ?? 0) : 'Sin datos'}
+                    </div>
+                    <div className="text-[10px] text-slate-500 mt-0.5">
+                      {isPortero ? 'Goles a favor' : 'En la competición'}
+                    </div>
+                  </div>
+
+                  {/* Tarjetas */}
+                  <div className="bg-slate-900/50 border border-slate-800 p-3 rounded-xl">
+                    <div className="text-[11px] font-semibold text-slate-400 uppercase">Tarjetas</div>
+                    <div className="text-sm font-bold text-white mt-1 tabular-nums flex items-center gap-2">
+                      {hasRealParticipation ? (
+                        <>
+                          <span className="inline-flex items-center gap-1">
+                            <span className="w-2.5 h-3.5 bg-yellow-400 rounded-sm inline-block" />
+                            {player.tarjetas_amarillas || 0}
+                          </span>
+                          <span className="text-slate-600">·</span>
+                          <span className="inline-flex items-center gap-1">
+                            <span className="w-2.5 h-3.5 bg-red-600 rounded-sm inline-block" />
+                            {player.tarjetas_rojas || 0}
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-slate-400 font-semibold">— / —</span>
+                      )}
+                    </div>
+                    <div className="text-[10px] text-slate-500 mt-0.5">
+                      Amarillas y Rojas
+                    </div>
+                  </div>
+
+                  {/* Métricas específicas si es Portero */}
+                  {isPortero && (
+                    <>
+                      <div className="bg-slate-900/50 border border-slate-800 p-3 rounded-xl">
+                        <div className="text-[11px] font-semibold text-slate-400 uppercase">Goles Encajados</div>
+                        <div className={`text-xl font-bold mt-1 tabular-nums ${hasRealParticipation ? 'text-white' : 'text-slate-400 font-semibold'}`}>
+                          {hasRealParticipation ? (player.goles_encajados ?? 0) : 'Sin datos'}
+                        </div>
+                        <div className="text-[10px] text-slate-500 mt-0.5">
+                          Estando en el campo
+                        </div>
+                      </div>
+
+                      <div className="bg-slate-900/50 border border-slate-800 p-3 rounded-xl">
+                        <div className="text-[11px] font-semibold text-slate-400 uppercase">Porterías a Cero</div>
+                        <div className={`text-xl font-bold mt-1 tabular-nums ${hasRealParticipation ? 'text-white' : 'text-slate-400 font-semibold'}`}>
+                          {hasRealParticipation ? (player.porterias_cero ?? 0) : 'Sin datos'}
+                        </div>
+                        <div className="text-[10px] text-slate-500 mt-0.5">
+                          Partidos sin encajar
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
-              ) : (
-                <div className="text-center py-4 bg-slate-950/50 rounded-lg border border-slate-800/60 text-slate-500 text-xs">
-                  A la espera del inicio de competición para registrar la secuencia de convocatorias y minutos.
+              </div>
+
+              {/* Bloque Últimas 5-6 Jornadas */}
+              <div className="bg-slate-900/40 p-4 rounded-xl border border-slate-800">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                    Últimas 5-6 Jornadas
+                  </h4>
+                  <span className="text-[10px] text-slate-500">
+                    T = Titular · S = Suplente · NC = No convocado · SD = Sin datos
+                  </span>
                 </div>
-              )}
-            </div>
+
+                {player.ultimas_jornadas && player.ultimas_jornadas.length > 0 ? (
+                  <div className="flex gap-2">
+                    {player.ultimas_jornadas.map((j, idx) => (
+                      <div
+                        key={idx}
+                        className="flex-1 text-center p-2 rounded-lg bg-slate-950 border border-slate-800"
+                      >
+                        <div className="text-[10px] font-bold text-slate-500">J{j.jornada}</div>
+                        <div className={`text-sm font-extrabold mt-1 ${
+                          j.estado === 'T' ? 'text-emerald-400' :
+                          j.estado === 'S' ? 'text-amber-400' :
+                          j.estado === 'NC' ? 'text-red-400' : 'text-slate-600'
+                        }`}>
+                          {j.estado}
+                        </div>
+                        {j.minutos !== undefined && (
+                          <div className="text-[9px] text-slate-500 tabular-nums">{j.minutos}&apos;</div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-4 bg-slate-950/50 rounded-lg border border-slate-800/60 text-slate-500 text-xs">
+                    Aún no hay partidos sincronizados con datos de participación.
+                  </div>
+                )}
+              </div>
 
             {/* Historial Jornada a Jornada */}
             <div className="space-y-3">
