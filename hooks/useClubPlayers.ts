@@ -89,9 +89,32 @@ export function useClubPlayers(seasonId: string | undefined) {
       if (!seasonId) throw new Error('No season ID');
       verifyWritePermission();
       const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
-      
+
       const isNew = !data.id;
-      const payload = { ...data, club_season_id: seasonId, origen: data.origen || 'manual' };
+
+      // Lista explícita y blindada de campos reales y persistentes de la tabla club_players
+      // Se excluyen rigurosamente todas las propiedades calculadas o visuales de participación
+      const payload: Record<string, unknown> = {
+        club_season_id: seasonId,
+        nombre: data.nombre ? data.nombre.trim() : '',
+        foto_url: data.foto_url !== undefined ? data.foto_url : null,
+        fecha_nacimiento: data.fecha_nacimiento || null,
+        altura: data.altura !== undefined && data.altura !== null && (data.altura as unknown) !== '' ? Number(data.altura) : null,
+        peso: data.peso !== undefined && data.peso !== null && (data.peso as unknown) !== '' ? Number(data.peso) : null,
+        pierna_dominante: data.pierna_dominante || null,
+        posicion: data.posicion || null,
+        dorsal: data.dorsal !== undefined && data.dorsal !== null && (data.dorsal as unknown) !== '' ? Number(data.dorsal) : null,
+        minutos_jugados: data.minutos_jugados !== undefined && data.minutos_jugados !== null ? Number(data.minutos_jugados) : 0,
+        caracteristicas: data.caracteristicas || null,
+        fortalezas: data.fortalezas || null,
+        debilidades: data.debilidades || null,
+        observaciones: data.observaciones || null,
+        origen: data.origen || 'manual',
+      };
+
+      if (!isNew && data.id) {
+        payload.id = data.id;
+      }
       
       const { error: rpcErr } = await supabase.rpc('exec_secure_upsert', {
         target_table: 'club_players',
