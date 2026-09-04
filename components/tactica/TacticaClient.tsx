@@ -17,6 +17,7 @@ import { useTacticalRoleCards } from '@/hooks/useTacticalRoleCards';
 import { useTacticalAnalyst } from '@/hooks/useTacticalAnalyst';
 import { exportToPDF, buildTacticaFilename } from '@/lib/exportPdf';
 import { exportMisterToPDF } from '@/lib/exportMisterPdf';
+import { exportJugadoresToPDF } from '@/lib/exportJugadoresPdf';
 import { TacticalField } from './TacticalField';
 import { TacticalFieldExport } from './TacticalFieldExport';
 
@@ -101,6 +102,7 @@ export function TacticaClient() {
   const [isSaving, setIsSaving] = useState(false);
   const [isPdfExporting, setIsPdfExporting] = useState(false);
   const [isPdfMisterExporting, setIsPdfMisterExporting] = useState(false);
+  const [isPdfJugadoresExporting, setIsPdfJugadoresExporting] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -728,6 +730,44 @@ export function TacticaClient() {
     }
   };
 
+  // --- Export PDF Jugadores (Consignas de vestuario A4 portrait) ---
+  const handleExportPDFJugadores = async () => {
+    setIsPdfJugadoresExporting(true);
+    try {
+      const match = matches.find(m => m.id === selectedMatchId);
+      await exportJugadoresToPDF({
+        fieldElementId: 'tactical-field-export-container',
+        jornada: match?.jornada,
+        rival: match?.rival,
+        fecha: match?.fecha,
+        esLocal: match?.es_local,
+        tipoPartido: match?.tipo_partido,
+        sistemaPropio: selectedFormation,
+        sistemaRival: rivalFormation,
+        lineupName: lineupName || undefined,
+        ventajas: ventajas || undefined,
+        desventajas: desventajas || undefined,
+        zonaConflicto: zonaConflicto || undefined,
+        dueloClave: dueloClave || undefined,
+        tareasLineas: tareasLineas || undefined,
+        analisisModeloJuego: analisisModeloJuego && Object.keys(analisisModeloJuego).length > 0
+          ? analisisModeloJuego
+          : undefined,
+        nodesPropio,
+        players,
+        roleCards: roleCards.length > 0 ? roleCards : undefined,
+        approvedObservations: approvedReportObservations.length > 0
+          ? approvedReportObservations
+          : undefined,
+      });
+    } catch (err) {
+      console.error('[PDF Jugadores] Error:', err);
+      setErrorMsg('Error al generar el PDF Jugadores. Inténtalo de nuevo.');
+    } finally {
+      setIsPdfJugadoresExporting(false);
+    }
+  };
+
   // --- Auto-load pizarra when a match is selected ---
   const handleMatchIdChange = async (matchId: string) => {
     setSelectedMatchId(matchId);
@@ -1133,6 +1173,18 @@ export function TacticaClient() {
             >
               <FileDown className="h-3.5 w-3.5 text-emerald-400" />
               {isPdfMisterExporting ? 'Generando...' : 'PDF Míster'}
+            </Button>
+          )}
+          {/* PDF Jugadores — consignas de vestuario A4 para jugadores */}
+          {(lineupName || ventajas || (analisisModeloJuego && Object.keys(analisisModeloJuego).length > 0) || nodesPropio.some(n => n.player_id)) && (
+            <Button
+              variant="secondary"
+              onClick={handleExportPDFJugadores}
+              loading={isPdfJugadoresExporting}
+              className="flex items-center gap-1.5 text-xs bg-slate-900/60 border-slate-700 text-slate-200 hover:border-[#CC0E21]/50"
+            >
+              <FileDown className="h-3.5 w-3.5 text-amber-400" />
+              {isPdfJugadoresExporting ? 'Generando...' : 'PDF Jugadores'}
             </Button>
           )}
           {currentLineupId && isEditMode && (
