@@ -71,6 +71,13 @@ export function RivalPlayerDetailModal({
   // Badge de origen
   const getSourceBadge = () => {
     const orig = player.origen || 'manual';
+    if (orig === 'rfef') {
+      return (
+        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-sky-950/70 text-sky-300 border border-sky-800/40">
+          Fuente: RFEF
+        </span>
+      );
+    }
     if (orig === 'die_ligen') {
       return (
         <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-950/70 text-purple-300 border border-purple-800/40">
@@ -135,16 +142,23 @@ export function RivalPlayerDetailModal({
               </div>
             )}
 
-            {/* Dorsal */}
-            {player.dorsal !== null && player.dorsal !== undefined && player.dorsal > 0 ? (
-              <div className="absolute -bottom-2 -right-2 bg-slate-950 border border-slate-600 text-white font-extrabold h-8 w-8 rounded-xl flex items-center justify-center text-xs shadow-lg tabular-nums">
-                #{player.dorsal}
-              </div>
-            ) : (
-              <div className="absolute -bottom-2 -right-2 bg-slate-950/90 border border-slate-800 text-slate-500 font-semibold h-8 w-8 rounded-xl flex items-center justify-center text-xs">
-                #-
-              </div>
-            )}
+            {/* Dorsal (prioridad dorsal fijo de plantilla, fallback último dorsal oficial en partido) */}
+            {(() => {
+              const displayDorsal = (player.dorsal !== null && player.dorsal !== undefined && player.dorsal > 0)
+                ? player.dorsal
+                : (player.dorsal_partido_reciente !== null && player.dorsal_partido_reciente !== undefined && player.dorsal_partido_reciente > 0)
+                ? player.dorsal_partido_reciente
+                : null;
+              return displayDorsal !== null ? (
+                <div className="absolute -bottom-2 -right-2 bg-slate-950 border border-slate-600 text-white font-extrabold h-8 w-8 rounded-xl flex items-center justify-center text-xs shadow-lg tabular-nums">
+                  #{displayDorsal}
+                </div>
+              ) : (
+                <div className="absolute -bottom-2 -right-2 bg-slate-950/90 border border-slate-800 text-slate-500 font-semibold h-8 w-8 rounded-xl flex items-center justify-center text-xs">
+                  #-
+                </div>
+              );
+            })()}
           </div>
 
           {/* Datos principales */}
@@ -312,14 +326,17 @@ export function RivalPlayerDetailModal({
                     <div className="text-sm font-bold text-white mt-1 tabular-nums flex items-center gap-2">
                       {hasRealParticipation ? (
                         <>
-                          <span className="inline-flex items-center gap-1">
+                          <span className="inline-flex items-center gap-1" title="Tarjetas amarillas">
                             <span className="w-2.5 h-3.5 bg-yellow-400 rounded-sm inline-block" />
                             {player.tarjetas_amarillas || 0}
                           </span>
                           <span className="text-slate-600">·</span>
-                          <span className="inline-flex items-center gap-1">
+                          <span
+                            className="inline-flex items-center gap-1"
+                            title={`Expulsiones totales: ${player.expulsiones_totales ?? player.tarjetas_rojas ?? 0} (${player.rojas_directas || 0} directas, ${player.dobles_amarillas || 0} por segunda amarilla)`}
+                          >
                             <span className="w-2.5 h-3.5 bg-red-600 rounded-sm inline-block" />
-                            {player.tarjetas_rojas || 0}
+                            {player.expulsiones_totales ?? player.tarjetas_rojas ?? 0}
                           </span>
                         </>
                       ) : (
@@ -327,7 +344,7 @@ export function RivalPlayerDetailModal({
                       )}
                     </div>
                     <div className="text-[10px] text-slate-500 mt-0.5">
-                      Amarillas y Rojas
+                      Amarillas y Expulsiones
                     </div>
                   </div>
 
@@ -433,8 +450,12 @@ export function RivalPlayerDetailModal({
                           <td className="p-3">{h.posicion || '—'}</td>
                           <td className="p-3 tabular-nums">{isPortero ? (h.goles_encajados ?? 0) : (h.goles ?? 0)}</td>
                           <td className="p-3">
-                            {(h.tarjetas_amarillas || 0) > 0 && <span>🟨 </span>}
-                            {(h.tarjetas_rojas || 0) > 0 && <span>🟥 </span>}
+                            {(h.tarjetas_amarillas || 0) > 0 && <span title={`${h.tarjetas_amarillas} tarjeta(s) amarilla(s)`}>🟨 </span>}
+                            {(h.tarjetas_rojas || 0) > 0 && (
+                              <span title={h.roja_directa ? 'Roja directa' : h.doble_amarilla ? 'Expulsión por segunda amarilla' : 'Expulsión'}>
+                                🟥 
+                              </span>
+                            )}
                             {!(h.tarjetas_amarillas || 0) && !(h.tarjetas_rojas || 0) && '—'}
                           </td>
                         </tr>

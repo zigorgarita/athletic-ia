@@ -76,6 +76,13 @@ export function RivalPlayerCard({
   // Badge de origen de datos
   const getSourceBadge = () => {
     const orig = player.origen || 'manual';
+    if (orig === 'rfef') {
+      return (
+        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold bg-sky-950/70 text-sky-300 border border-sky-800/40">
+          RFEF
+        </span>
+      );
+    }
     if (orig === 'die_ligen') {
       return (
         <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold bg-purple-950/70 text-purple-300 border border-purple-800/40">
@@ -175,16 +182,23 @@ export function RivalPlayerCard({
               </div>
             )}
 
-            {/* Dorsal */}
-            {player.dorsal !== null && player.dorsal !== undefined && player.dorsal > 0 ? (
-              <div className="absolute -bottom-1.5 -right-1.5 bg-slate-950 border border-slate-700 text-white font-extrabold h-6 w-6 rounded-lg flex items-center justify-center text-[11px] shadow-md tabular-nums">
-                #{player.dorsal}
-              </div>
-            ) : (
-              <div className="absolute -bottom-1.5 -right-1.5 bg-slate-950/90 border border-slate-800 text-slate-500 font-semibold h-6 w-6 rounded-lg flex items-center justify-center text-[10px]">
-                #-
-              </div>
-            )}
+            {/* Dorsal (prioridad dorsal fijo de plantilla, fallback último dorsal oficial en partido) */}
+            {(() => {
+              const displayDorsal = (player.dorsal !== null && player.dorsal !== undefined && player.dorsal > 0)
+                ? player.dorsal
+                : (player.dorsal_partido_reciente !== null && player.dorsal_partido_reciente !== undefined && player.dorsal_partido_reciente > 0)
+                ? player.dorsal_partido_reciente
+                : null;
+              return displayDorsal !== null ? (
+                <div className="absolute -bottom-1.5 -right-1.5 bg-slate-950 border border-slate-700 text-white font-extrabold h-6 w-6 rounded-lg flex items-center justify-center text-[11px] shadow-md tabular-nums">
+                  #{displayDorsal}
+                </div>
+              ) : (
+                <div className="absolute -bottom-1.5 -right-1.5 bg-slate-950/90 border border-slate-800 text-slate-500 font-semibold h-6 w-6 rounded-lg flex items-center justify-center text-[10px]">
+                  #-
+                </div>
+              );
+            })()}
           </div>
 
           {/* Nombre del jugador (hasta 2 líneas con altura uniforme) */}
@@ -228,7 +242,11 @@ export function RivalPlayerCard({
                 Participación
               </span>
               <span className={`text-[10px] font-semibold tabular-nums ${hasRealParticipation ? 'text-slate-300' : 'text-slate-500 tracking-wider'}`}>
-                {hasRealParticipation ? `${player.minutos_jugados}'` : 'SIN DATOS'}
+                {hasRealParticipation && player.minutos_posibles && player.minutos_posibles > 0
+                  ? `${player.minutos_jugados}' / ${player.minutos_posibles}' · ${player.porcentaje_participacion ?? 0}%`
+                  : hasRealParticipation
+                  ? `${player.minutos_jugados}'`
+                  : 'SIN DATOS'}
               </span>
             </div>
 

@@ -31,7 +31,11 @@ const POSICIONES = [
 ];
 
 export function PlayersTab({ season, club }: PlayersTabProps) {
-  const { players, loading, savePlayer, insertBulkPlayers, deletePlayer } = useClubPlayers(season?.id);
+  const { players, loading, savePlayer, insertBulkPlayers, deletePlayer } = useClubPlayers(
+    season?.id,
+    season?.club_id || club?.id,
+    season?.temporada
+  );
   const { isEditMode } = useEditMode();
   
   const [searchTerm, setSearchTerm] = useState('');
