@@ -54,6 +54,13 @@ export function RivalPlayerCard({
     return name.slice(0, 2).toUpperCase();
   };
 
+  // Formato español del porcentaje (ej. 67,8%, 100%, 0%)
+  const formatPct = (pct: number | null | undefined): string => {
+    if (pct === null || pct === undefined) return '0%';
+    const str = Number(pct).toFixed(1);
+    return str.endsWith('.0') ? `${Math.round(pct)}%` : `${str.replace('.', ',')}%`;
+  };
+
   // Color de acento según demarcación
   const pos = (player.posicion || '').toLowerCase();
   const isPortero = pos.includes('portero');
@@ -236,18 +243,20 @@ export function RivalPlayerCard({
 
           {/* Zona de participación acumulada (Capa 2 - Adaptable y sin datos ficticios) */}
           <div className="w-full mt-auto pt-2 border-t border-slate-800/70 bg-slate-950/20 rounded-xl p-2 text-left">
-            <div className="flex items-center justify-between text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
-              <span className="flex items-center gap-1">
-                <Activity className="h-3 w-3 text-slate-500" />
-                Participación
-              </span>
-              <span className={`text-[10px] font-semibold tabular-nums ${hasRealParticipation ? 'text-slate-300' : 'text-slate-500 tracking-wider'}`}>
-                {hasRealParticipation && player.minutos_posibles && player.minutos_posibles > 0
-                  ? `${player.minutos_jugados}' / ${player.minutos_posibles}' · ${player.porcentaje_participacion ?? 0}%`
-                  : hasRealParticipation
-                  ? `${player.minutos_jugados}'`
-                  : 'SIN DATOS'}
-              </span>
+            <div className="mb-2">
+              <div className="flex items-center gap-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                <Activity className="h-3 w-3 text-slate-500 shrink-0" />
+                <span>Participación</span>
+              </div>
+              <div className="h-5 flex items-center mt-0.5">
+                <span className={`tabular-nums ${hasRealParticipation ? 'text-xs font-semibold text-slate-200' : 'text-[10px] font-semibold text-slate-500 tracking-wider'}`}>
+                  {hasRealParticipation && player.minutos_posibles && player.minutos_posibles > 0
+                    ? `${player.minutos_jugados}' / ${player.minutos_posibles}' · ${formatPct(player.porcentaje_participacion)}`
+                    : hasRealParticipation
+                    ? `${player.minutos_jugados}'`
+                    : 'SIN DATOS'}
+                </span>
+              </div>
             </div>
 
             <div className="grid grid-cols-3 gap-1.5 text-center">
