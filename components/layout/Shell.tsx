@@ -23,6 +23,7 @@ const navigation: NavItem[] = [
   { name: 'Pizarra Táctica', href: '/tactica', icon: Layout },
   { name: 'ABP', href: '/abp', icon: Shield },
   { name: 'Liga', href: '/liga', icon: Trophy },
+  { name: 'DATOS INDAUTXU DE LIGA', href: '/datos-indautxu-liga', icon: Trophy },
   { name: 'Amistosos', href: '/amistosos', icon: Trophy },
   { name: 'Rivales', href: '/rivales', icon: Shield },
   { name: 'Dashboard Plantilla', href: '/dashboard', icon: BarChart3 },

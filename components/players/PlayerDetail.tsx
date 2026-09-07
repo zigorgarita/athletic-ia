@@ -1092,8 +1092,17 @@ export function PlayerDetail({ player, onBack, initialTab }: PlayerDetailProps) 
                     <span className="font-bold text-white">{leagueSummary?.minutos || 0}m</span>
                   </div>
                   <div className="flex justify-between items-center pt-2 border-t border-slate-800/50">
-                    <span className="text-slate-400">Goles / Asistencias</span>
-                    <span className="font-bold text-green-400">{leagueSummary?.goles || 0} / {leagueSummary?.asistencias || 0}</span>
+                    {currentPlayer.demarcacion === 'Portero' ? (
+                      <>
+                        <span className="text-slate-400">Goles Encajados</span>
+                        <span className="font-bold text-red-400">{leagueSummary?.goles_encajados ?? 0}</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-slate-400">Goles</span>
+                        <span className="font-bold text-green-400">{leagueSummary?.goles || 0}</span>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>

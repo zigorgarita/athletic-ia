@@ -38,6 +38,7 @@ export interface Player {
   categoria?: string;
   temporada?: string;
   oliver_player_id?: string | null;
+  rfef_player_id?: number | null;
   metadata_personal?: Record<string, any>;
   created_at: string;
   updated_at: string;
@@ -262,6 +263,7 @@ export interface Match {
   jugado: boolean;
   created_at: string;
   tipo_partido?: 'LIGA' | 'AMISTOSO';
+  official_match_id?: string | null;
   hora?: string | null;
   campo?: string | null;
 }
@@ -282,6 +284,18 @@ export interface MatchPlayerStats {
   pases_completados: number;
   pases_totales: number;
   created_at: string;
+  // Campos oficiales RFEF (Paso 1)
+  convocado?: boolean | null;
+  suplente?: boolean | null;
+  entro_banquillo?: boolean | null;
+  minuto_entrada?: number | null;
+  minuto_salida?: number | null;
+  goles_encajados?: number | null;
+  doble_amarilla?: boolean | null;
+  roja_directa?: boolean | null;
+  dorsal_partido?: number | null;
+  origen?: 'manual' | 'rfef';
+  rfef_acta_id?: number | null;
 }
 
 export interface GPSSession {
@@ -1206,6 +1220,95 @@ export interface BetoPlayerSession {
   created_at: string;
   updated_at: string;
   players?: Player | null;
+}
+
+// --- TIPOS DE COMPETICIÓN Y CLASIFICACIÓN OFICIAL RFEF (PASO 7) ---
+
+export interface OfficialStanding {
+  id: string;
+  temporada: string;
+  jornada: number;
+  posicion: number;
+  club_id: string;
+  pj: number;
+  g: number;
+  e: number;
+  p: number;
+  gf: number;
+  gc: number;
+  dg: number;
+  puntos: number;
+  source: string;
+  created_at: string;
+  updated_at: string;
+  club?: {
+    id: string;
+    nombre: string;
+    nombre_corto?: string | null;
+    escudo_url?: string | null;
+    rfef_club_id?: number | null;
+  } | null;
+}
+
+export interface OfficialMatch {
+  id: string;
+  rfef_cod_acta: number | null;
+  temporada: string;
+  competicion: string;
+  grupo: string;
+  jornada: number;
+  fecha: string;
+  hora: string | null;
+  local_club_id: string;
+  visitor_club_id: string;
+  goles_local: number | null;
+  goles_visitante: number | null;
+  jugado: boolean;
+  campo: string | null;
+  superficie: string | null;
+  arbitro: string | null;
+  asistentes: string | null;
+  oficiales: string | null;
+  source: string;
+  last_synced_at: string | null;
+  created_at: string;
+  updated_at: string;
+  local_club?: {
+    id: string;
+    nombre: string;
+    nombre_corto?: string | null;
+    escudo_url?: string | null;
+    rfef_club_id?: number | null;
+  } | null;
+  visitor_club?: {
+    id: string;
+    nombre: string;
+    nombre_corto?: string | null;
+    escudo_url?: string | null;
+    rfef_club_id?: number | null;
+  } | null;
+}
+
+export interface IndautxuLeagueCalendarMatch {
+  id: string;
+  jornada: number;
+  fecha: string;
+  hora: string | null;
+  campo: string | null;
+  es_local: boolean;
+  rivalNombre: string;
+  rivalClubId: string | null;
+  rivalEscudoUrl: string | null;
+  jugado: boolean;
+  golesIndautxu: number | null;
+  golesRival: number | null;
+  resultadoTexto: string | null;
+  signoResultado: 'V' | 'E' | 'D' | null;
+  isOfficialSynced: boolean;
+  officialMatchId: string | null;
+  officialCodActa: number | null;
+  arbitro: string | null;
+  superficie: string | null;
 }
 
 
