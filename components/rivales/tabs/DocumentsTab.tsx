@@ -50,6 +50,7 @@ export function DocumentsTab({ club, season }: DocumentsTabProps) {
   const [uploadProgress, setUploadProgress] = useState<UploadProgressInfo | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploaderRef = useRef<DriveResumableUploader | null>(null);
 
@@ -153,6 +154,7 @@ export function DocumentsTab({ club, season }: DocumentsTabProps) {
     setUploadProgress(null);
     setIsUploading(false);
     setSelectedFileName(null);
+    setIsDragging(false);
     uploaderRef.current = null;
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
@@ -180,10 +182,7 @@ export function DocumentsTab({ club, season }: DocumentsTabProps) {
   // ────────────────────────────────────────────────────────────
   // Subida a Google Drive con DriveResumableUploader (existente)
   // ────────────────────────────────────────────────────────────
-  const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  const processFile = async (file: File) => {
     // Validar formato
     if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
       alert('Solo se admiten archivos PDF en este campo. Para otros formatos usa la opción "Enlace externo".');
@@ -246,6 +245,35 @@ export function DocumentsTab({ club, season }: DocumentsTabProps) {
       const msg = err instanceof Error ? err.message : String(err);
       alert(`Error al subir el PDF a Google Drive: ${msg}`);
       resetUploadState();
+    }
+  };
+
+  const handleFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      processFile(file);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isDragging) setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      processFile(file);
     }
   };
 
@@ -585,12 +613,19 @@ export function DocumentsTab({ club, season }: DocumentsTabProps) {
                 {!uploadProgress && !editingDoc.url && (
                   <label
                     htmlFor="pdf-file-input"
-                    className="flex flex-col items-center justify-center gap-3 w-full border-2 border-dashed border-slate-700 rounded-xl p-8 cursor-pointer hover:border-[#CC0E21]/50 hover:bg-slate-900/30 transition-all group"
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                    className={`flex flex-col items-center justify-center gap-3 w-full border-2 border-dashed rounded-xl p-8 cursor-pointer transition-all group ${
+                      isDragging
+                        ? 'border-[#CC0E21] bg-[#CC0E21]/10'
+                        : 'border-slate-700 hover:border-[#CC0E21]/50 hover:bg-slate-900/30'
+                    }`}
                   >
-                    <Upload className="h-8 w-8 text-slate-500 group-hover:text-[#CC0E21] transition-colors" />
+                    <Upload className={`h-8 w-8 transition-colors ${isDragging ? 'text-[#CC0E21]' : 'text-slate-500 group-hover:text-[#CC0E21]'}`} />
                     <div className="text-center">
                       <p className="text-sm font-semibold text-slate-300 group-hover:text-white transition-colors">
-                        Haz clic para seleccionar un PDF
+                        {isDragging ? 'Suelta el archivo PDF aquí' : 'Haz clic para seleccionar o arrastra un PDF'}
                       </p>
                       <p className="text-xs text-slate-500 mt-1">Se subirá a Google Drive · Máx. 25 MB</p>
                     </div>
