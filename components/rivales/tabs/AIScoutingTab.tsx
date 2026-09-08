@@ -24,8 +24,10 @@ import {
   Layers,
   Sparkles,
   RefreshCw,
+  FileDown,
 } from 'lucide-react';
 import CapaCStructuredView from '@/components/rivales/scouting/CapaCStructuredView';
+import { exportScoutingToPdf } from '@/lib/exportScoutingPdf';
 
 interface AIScoutingTabProps {
   club?: Club | null;
@@ -87,6 +89,29 @@ export function AIScoutingTab({ club, season }: AIScoutingTabProps) {
     e.stopPropagation();
     if (confirm('¿Estás seguro de que deseas eliminar este informe de IA?')) {
       await deleteReport(id);
+    }
+  };
+
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+
+  const handleExportPdf = async () => {
+    if (!club || !activeReport) return;
+    try {
+      setIsExportingPdf(true);
+      const versionIdx = reports.findIndex(r => r.id === activeReport.id);
+      await exportScoutingToPdf({
+        club,
+        season,
+        report: activeReport,
+        parsedPlan: parsedActivePlan,
+        versionIndex: versionIdx >= 0 ? versionIdx : 0,
+        totalVersions: reports.length,
+      });
+    } catch (err) {
+      console.error('Error generando PDF de IA Scouting:', err);
+      alert('Hubo un error al generar el PDF de IA Scouting.');
+    } finally {
+      setIsExportingPdf(false);
     }
   };
 
@@ -257,15 +282,37 @@ export function AIScoutingTab({ club, season }: AIScoutingTabProps) {
                 </h4>
               </div>
 
-              {isEditMode && (
-                <button
-                  onClick={(e) => handleDelete(activeReport.id, e)}
-                  className="p-2 rounded-xl bg-slate-800/60 text-slate-400 hover:text-red-400 hover:bg-red-950/30 transition-all shrink-0"
-                  title="Eliminar este informe de IA"
+              <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
+                <Button
+                  onClick={handleExportPdf}
+                  disabled={isExportingPdf}
+                  variant="primary"
+                  className="bg-[#CC0E21] hover:bg-[#b00c1c] text-white font-bold py-2 px-3.5 rounded-xl flex items-center gap-2 shadow-md shadow-[#CC0E21]/20 text-xs transition-all border-none"
+                  title="Descargar informe táctico completo en PDF"
                 >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              )}
+                  {isExportingPdf ? (
+                    <>
+                      <RefreshCw className="h-3.5 w-3.5 animate-spin text-white" />
+                      <span>Generando PDF...</span>
+                    </>
+                  ) : (
+                    <>
+                      <FileDown className="h-4 w-4" />
+                      <span>PDF IA Scouting</span>
+                    </>
+                  )}
+                </Button>
+
+                {isEditMode && (
+                  <button
+                    onClick={(e) => handleDelete(activeReport.id, e)}
+                    className="p-2 rounded-xl bg-slate-800/60 text-slate-400 hover:text-red-400 hover:bg-red-950/30 transition-all shrink-0"
+                    title="Eliminar este informe de IA"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Resumen Ejecutivo */}
