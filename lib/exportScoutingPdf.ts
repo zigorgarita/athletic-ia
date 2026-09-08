@@ -78,6 +78,7 @@ interface RenderCtx {
   clubName: string;
   reportDate: string;
   reportType: string;
+  currentBlockTitle?: string | null; // Título del bloque o fase activa para encabezado de continuación
 }
 
 // ─── Helpers de Limpieza y Formato ─────────────────────────────────────────────
@@ -132,12 +133,27 @@ async function loadBase64Image(url?: string | null): Promise<string | null> {
 /**
  * Comprueba si quedan al menos `needed` mm disponibles en la página.
  * Si no caben, añade página nueva e inicializa la cabecera/cursor.
+ * Si hay un bloque o fase activa, añade un encabezado discreto de continuación.
  */
 function ensureSpace(ctx: RenderCtx, needed: number): void {
   if (ctx.y + needed > PAGE_H - MARGIN) {
     ctx.doc.addPage();
     ctx.y = MARGIN + 4;
     drawTopBar(ctx.doc);
+
+    // Encabezado discreto de continuación cuando un bloque/fase se divide entre páginas
+    if (ctx.currentBlockTitle) {
+      const { doc } = ctx;
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(SZ_TINY + 1);
+      doc.setTextColor(MUTED_TEXT);
+      doc.text(`${clean(ctx.currentBlockTitle)} — continuación`, MARGIN + 2, ctx.y + 2.5);
+
+      doc.setDrawColor(LIGHT_LINE);
+      doc.setLineWidth(0.2);
+      doc.line(MARGIN, ctx.y + 4.5, PAGE_W - MARGIN, ctx.y + 4.5);
+      ctx.y += 8;
+    }
   }
 }
 
@@ -153,6 +169,7 @@ function drawTopBar(doc: jsPDF): void {
  * Cabecera de Bloque Principal (Bloques 1 a 5)
  */
 function renderBlockHeader(ctx: RenderCtx, num: number, title: string): void {
+  ctx.currentBlockTitle = `${num}. ${title}`;
   // Evitar encabezados huérfanos: asegurar espacio para el encabezado + al menos 18 mm de contenido posterior
   ensureSpace(ctx, 24);
   const { doc } = ctx;
@@ -419,6 +436,7 @@ function renderTacticalPhase(
   fallbackText?: string | null,
   sistemaIndautxu?: string
 ): void {
+  ctx.currentBlockTitle = title;
   renderPhaseHeader(ctx, title, badgeText);
 
   if (block) {
@@ -436,6 +454,7 @@ function renderTacticalPhase(
   ctx.doc.setLineWidth(0.2);
   ctx.doc.line(MARGIN, ctx.y, PAGE_W - MARGIN, ctx.y);
   ctx.y += 4;
+  ctx.currentBlockTitle = null;
 }
 
 // ─── Pie de Página (Footer) ───────────────────────────────────────────────────
@@ -720,38 +739,51 @@ export async function exportScoutingToPdf(config: ScoutingPdfConfig): Promise<vo
     ctx.y += 8;
   } else {
     amenazas.forEach((threat, idx) => {
+      const playerName = threat.jugador || `Jugador Rival #${idx + 1}`;
+      ctx.currentBlockTitle = `Amenaza: ${playerName}`;
+
       // Cabecera de la ficha del jugador (asegurar espacio para encabezado + evidencia inicial)
       ensureSpace(ctx, 22);
 
       const dangerLevel = (threat.peligro || 'alto').toUpperCase();
       const dangerColor = dangerLevel === 'CRITICO' ? RED : dangerLevel === 'ALTO' ? '#EA580C' : '#CA8A04';
 
-      // Fila de título del jugador
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(SZ_SUBTITLE + 1);
-      doc.setTextColor(DARK_SLATE);
-      const playerName = threat.jugador || `Jugador Rival #${idx + 1}`;
-      const dorsalText = threat.dorsal ? `[#${threat.dorsal}] ` : '';
-      doc.text(`${dorsalText}${playerName}`, MARGIN + 2, ctx.y + 4);
-
-      if (threat.posicion) {
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(SZ_SMALL);
-        doc.setTextColor(MUTED_TEXT);
-        doc.text(`(${clean(threat.posicion)})`, MARGIN + doc.getTextWidth(`${dorsalText}${playerName} `) + 2, ctx.y + 4);
-      }
-
-      // Badge de Nivel de Peligro
+      // Badge de Nivel de Peligro alineado a la derecha
       const badgeText = `AMENAZA ${dangerLevel}`;
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(SZ_TINY);
-      const bW = doc.getTextWidth(badgeText) + 4;
+      const bW = doc.getTextWidth(badgeText) + 5;
+      const bH = 5;
+      const badgeX = PAGE_W - MARGIN - bW;
       doc.setFillColor(dangerColor);
-      doc.roundedRect(PAGE_W - MARGIN - bW, ctx.y, bW, 4.8, 0.8, 0.8, 'F');
+      doc.roundedRect(badgeX, ctx.y, bW, bH, 0.8, 0.8, 'F');
       doc.setTextColor('#FFFFFF');
-      doc.text(badgeText, PAGE_W - MARGIN - bW + 2, ctx.y + 3.4);
+      doc.text(badgeText, badgeX + 2.5, ctx.y + 3.5);
 
-      ctx.y += 8;
+      // Nombre del jugador a la izquierda con ancho restringido para no tocar el badge
+      const maxNameW = COL_W - bW - 6;
+      const dorsalText = threat.dorsal ? `[#${threat.dorsal}] ` : '';
+      const fullPlayerName = `${dorsalText}${playerName}`;
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(SZ_SUBTITLE + 1);
+      doc.setTextColor(DARK_SLATE);
+      const nameLines = wrapLines(doc, fullPlayerName, maxNameW, SZ_SUBTITLE + 1);
+      nameLines.forEach(nLine => {
+        doc.text(nLine, MARGIN + 2, ctx.y + 4);
+        ctx.y += 4.5;
+      });
+
+      // Posición en línea propia debajo del nombre (robusto: nunca se solapa con el nombre ni con el badge)
+      if (threat.posicion) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(SZ_SMALL);
+        doc.setTextColor(MUTED_TEXT);
+        doc.text(`Posición: ${clean(threat.posicion)}`, MARGIN + 2, ctx.y + 2.5);
+        ctx.y += 6;
+      } else {
+        ctx.y += 2;
+      }
 
       // Evidencia del jugador
       if (threat.capaA_evidencia) {
@@ -810,6 +842,7 @@ export async function exportScoutingToPdf(config: ScoutingPdfConfig): Promise<vo
       doc.setLineWidth(0.2);
       doc.line(MARGIN + 4, ctx.y, PAGE_W - MARGIN - 4, ctx.y);
       ctx.y += 5;
+      ctx.currentBlockTitle = null;
     });
   }
 
@@ -820,6 +853,7 @@ export async function exportScoutingToPdf(config: ScoutingPdfConfig): Promise<vo
   renderBlockHeader(ctx, 4, 'Vulnerabilidades del Rival y Consignas por Líneas');
 
   // 4.1 Vulnerabilidades a explotar
+  ctx.currentBlockTitle = '4.1 Vulnerabilidades y Debilidades a Explotar';
   const debilidades: WeaknessItem[] = parsedPlan?.debilidadesExplotar || [];
 
   doc.setFont('helvetica', 'bold');
@@ -881,8 +915,10 @@ export async function exportScoutingToPdf(config: ScoutingPdfConfig): Promise<vo
   }
 
   ctx.y += 4;
+  ctx.currentBlockTitle = null;
 
   // 4.2 Consignas Específicas por Líneas
+  ctx.currentBlockTitle = `4.2 Consignas por Líneas (SD Indautxu ${sistemaIndautxu})`;
   const lineas: LineInstructions | undefined = parsedPlan?.consignasPorLineas;
 
   ensureSpace(ctx, 20);
@@ -927,12 +963,14 @@ export async function exportScoutingToPdf(config: ScoutingPdfConfig): Promise<vo
     doc.text('Sin consignas específicas por líneas registradas en este informe.', MARGIN + 3, ctx.y);
     ctx.y += 6;
   }
+  ctx.currentBlockTitle = null;
 
   // ═════════════════════════════════════════════════════════════════════════════
   // BLOQUE 5: RIESGOS Y PUNTOS CRÍTICOS
   // ═════════════════════════════════════════════════════════════════════════════
 
   renderBlockHeader(ctx, 5, 'Riesgos Asumidos y Puntos Críticos del Plan');
+  ctx.currentBlockTitle = '5. Riesgos Asumidos y Puntos Críticos del Plan';
 
   const riesgos: string[] = parsedPlan?.riesgosDelPlan || (report.riesgos ? [report.riesgos] : []);
 
@@ -974,6 +1012,8 @@ export async function exportScoutingToPdf(config: ScoutingPdfConfig): Promise<vo
       ctx.y += cardHeight + 3;
     });
   }
+
+  ctx.currentBlockTitle = null;
 
   // ═════════════════════════════════════════════════════════════════════════════
   // NUMERACIÓN DE PÁGINAS Y PIES DE PÁGINA GLOBALES
