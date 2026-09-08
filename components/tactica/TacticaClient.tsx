@@ -25,12 +25,15 @@ import { TacticalFieldExport } from './TacticalFieldExport';
 import { FormationSelector } from './systems/FormationSelector';
 import { SystemCard } from './systems/SystemCard';
 import { PlayerAssignmentSidebar } from './shared/PlayerAssignmentSidebar';
+import { RivalPlayerAssignmentSidebar } from './shared/RivalPlayerAssignmentSidebar';
 import { LineupManager } from './shared/LineupManager';
 import { MatchPlanSelector } from './analysis/MatchPlanSelector';
 import { TacticalAnalysisPanel } from './analysis/TacticalAnalysisPanel';
 import { GameModelAnalysisPanel } from './analysis/GameModelAnalysisPanel';
 import { useTacticalAI } from '@/hooks/useTacticalAI';
 import { GameModelAnalysis, GameModelRoleInstructions, TacticalAIContext } from '@/types';
+import { ClubPlayer } from '@/hooks/useClubPlayers';
+import { useRivalSquadForMatch } from '@/hooks/useRivalSquadForMatch';
 
 // Subblock 4C Components
 import { RoleCardDrawer } from './roles/RoleCardDrawer';
@@ -119,6 +122,19 @@ export function TacticaClient() {
   } = useTacticalReportSelections(currentLineupId, rivalClubId, undefined, currentMatch?.rival || null);
 
   const { documents: availableRivalDocs } = useClubDocuments(rivalClubId || resolvedTargetClubId || undefined, undefined);
+
+  // Plantilla Real del Club Rival asociado al partido seleccionado
+  const {
+    rivalClub,
+    rivalPlayers,
+    loading: loadingRivalPlayers,
+  } = useRivalSquadForMatch(currentMatch);
+
+  const assignedRivalPlayerIds = useMemo(() => {
+    return nodesRival
+      .map(n => n.player_id)
+      .filter((id): id is string => !!id);
+  }, [nodesRival]);
 
   // Subblock 4C Role Cards states
   const [roleCards, setRoleCards] = useState<TacticalRoleCard[]>([]);
@@ -986,6 +1002,33 @@ export function TacticaClient() {
     }
   };
 
+  const handleRivalRosterClick = (player: ClubPlayer) => {
+    if (!isEditMode) return;
+    const isAssigned = assignedRivalPlayerIds.includes(player.id);
+    if (isAssigned) {
+      // Si el jugador rival ya está colocado en el campo, retirarlo
+      setNodesRival(prev => prev.map(n => n.player_id === player.id ? {
+        ...n,
+        player_id: null,
+        customName: undefined,
+        customNumber: undefined
+      } : n));
+    } else {
+      // Buscar la primera posición libre en el campo rival
+      const emptyNode = nodesRival.find(n => !n.player_id);
+      if (emptyNode) {
+        setNodesRival(prev => prev.map(n => n.id === emptyNode.id ? {
+          ...n,
+          player_id: player.id,
+          customName: player.nombre,
+          customNumber: player.dorsal ? String(player.dorsal) : undefined
+        } : n));
+      } else {
+        alert('El campo rival tiene sus 11 posiciones ocupadas. Quita o sustituye un jugador.');
+      }
+    }
+  };
+
   // Helper to open node editor
   const handleOpenNodeEditor = async (team: 'propio' | 'rival', node: PositionNode) => {
     if (team === 'propio') {
@@ -1348,6 +1391,7 @@ export function TacticaClient() {
             team="rival"
             nodes={nodesRival}
             players={players}
+            rivalPlayers={rivalPlayers}
             isEditMode={isEditMode}
             onNodesChange={setNodesRival}
             onNodeClick={(node) => handleOpenNodeEditor('rival', node)}
@@ -1355,13 +1399,25 @@ export function TacticaClient() {
           />
         </div>
 
-        {/* Right column: Roster sidebar (3/12 on large screens) */}
-        <div className="xl:col-span-3">
+        {/* Right column: Roster sidebars (3/12 on large screens) */}
+        <div className="xl:col-span-3 space-y-8">
+          {/* Plantilla Nuestro Equipo (DH) - INTOCABLE */}
           <PlayerAssignmentSidebar
             players={players}
             assignedPlayerIds={getAssignedPlayerIds()}
             isEditMode={isEditMode}
             onPlayerClick={handleRosterClick}
+          />
+
+          {/* Plantilla Equipo Rival (Frente) */}
+          <RivalPlayerAssignmentSidebar
+            rivalClub={rivalClub}
+            rivalPlayers={rivalPlayers}
+            assignedPlayerIds={assignedRivalPlayerIds}
+            isEditMode={isEditMode}
+            loading={loadingRivalPlayers}
+            selectedMatchName={currentMatch?.rival || null}
+            onPlayerClick={handleRivalRosterClick}
           />
         </div>
       </div>

@@ -2,6 +2,7 @@
 
 import React, { useRef } from 'react';
 import { Player } from '@/types';
+import { ClubPlayer } from '@/hooks/useClubPlayers';
 import { Avatar } from '@/components/ui/Avatar';
 import { ChevronDown, X } from 'lucide-react';
 import { getPlayerDisplayName } from '@/lib/playerUtils';
@@ -21,6 +22,7 @@ interface TacticalFieldProps {
   team: 'propio' | 'rival';
   nodes: PositionNode[];
   players: Player[];
+  rivalPlayers?: ClubPlayer[];
   isEditMode: boolean;
   onNodesChange: (newNodes: PositionNode[]) => void;
   onNodeClick: (node: PositionNode) => void;
@@ -34,6 +36,7 @@ export function TacticalField({
   team,
   nodes,
   players,
+  rivalPlayers = [],
   isEditMode,
   onNodesChange,
   onNodeClick,
@@ -98,45 +101,110 @@ export function TacticalField({
 
   // --- HTML5 Drag & Drop from squad list ---
   const handlePitchNodeDrop = (e: React.DragEvent, targetNodeId: number) => {
-    if (!isEditMode || team === 'rival') return;
+    if (!isEditMode) return;
     e.preventDefault();
     const rawData = e.dataTransfer.getData('text/plain');
     if (!rawData) return;
 
-    // Dragging from one node to another within the pitch
-    if (rawData.startsWith('node:')) {
-      const parts = rawData.split(':');
-      const sourceNodeId = parseInt(parts[1]);
-      const sourcePlayerId = parts[2];
+    if (team === 'propio') {
+      // BLINDAJE: Rechazar inmediatamente cualquier elemento que provenga de la plantilla rival
+      if (rawData.startsWith('rival:')) return;
 
-      const targetNode = nodes.find((n) => n.id === targetNodeId);
-      const targetPlayerId = targetNode ? targetNode.player_id : null;
+      // Dragging from one node to another within the pitch
+      if (rawData.startsWith('node:')) {
+        const parts = rawData.split(':');
+        const sourceNodeId = parseInt(parts[1]);
+        const sourcePlayerId = parts[2];
 
-      onNodesChange(
-        nodes.map((n) => {
-          if (n.id === targetNodeId) {
-            return { ...n, player_id: sourcePlayerId };
-          }
-          if (n.id === sourceNodeId) {
-            return { ...n, player_id: targetPlayerId };
-          }
-          return n;
-        })
-      );
-    } else {
-      // Dragging a player from the sidebar roster
-      const playerId = rawData;
-      onNodesChange(
-        nodes.map((n) => {
-          if (n.id === targetNodeId) {
-            return { ...n, player_id: playerId };
-          }
-          if (playerId && n.player_id === playerId && n.id !== targetNodeId) {
-            return { ...n, player_id: null };
-          }
-          return n;
-        })
-      );
+        const targetNode = nodes.find((n) => n.id === targetNodeId);
+        const targetPlayerId = targetNode ? targetNode.player_id : null;
+
+        onNodesChange(
+          nodes.map((n) => {
+            if (n.id === targetNodeId) {
+              return { ...n, player_id: sourcePlayerId };
+            }
+            if (n.id === sourceNodeId) {
+              return { ...n, player_id: targetPlayerId };
+            }
+            return n;
+          })
+        );
+      } else {
+        // Dragging a player from the sidebar roster
+        const playerId = rawData;
+        onNodesChange(
+          nodes.map((n) => {
+            if (n.id === targetNodeId) {
+              return { ...n, player_id: playerId };
+            }
+            if (playerId && n.player_id === playerId && n.id !== targetNodeId) {
+              return { ...n, player_id: null };
+            }
+            return n;
+          })
+        );
+      }
+    } else if (team === 'rival') {
+      // Drag & Drop sobre EQUIPO RIVAL (FRENTE)
+      if (rawData.startsWith('node:rival:')) {
+        // Movimiento o intercambio entre nodos del propio campo rival
+        const parts = rawData.split(':');
+        const sourceNodeId = parseInt(parts[2]);
+        const sourcePlayerId = parts[3] || null;
+
+        const sourceNode = nodes.find((n) => n.id === sourceNodeId);
+        const targetNode = nodes.find((n) => n.id === targetNodeId);
+
+        onNodesChange(
+          nodes.map((n) => {
+            if (n.id === targetNodeId) {
+              return {
+                ...n,
+                player_id: sourcePlayerId,
+                customName: sourceNode?.customName,
+                customNumber: sourceNode?.customNumber,
+              };
+            }
+            if (n.id === sourceNodeId) {
+              return {
+                ...n,
+                player_id: targetNode?.player_id || null,
+                customName: targetNode?.customName,
+                customNumber: targetNode?.customNumber,
+              };
+            }
+            return n;
+          })
+        );
+      } else if (rawData.startsWith('rival:')) {
+        // Arrastrado desde el panel de plantilla rival
+        const rivalPlayerId = rawData.replace('rival:', '');
+        const rivalPlayer = rivalPlayers?.find((rp) => rp.id === rivalPlayerId);
+
+        onNodesChange(
+          nodes.map((n) => {
+            if (n.id === targetNodeId) {
+              return {
+                ...n,
+                player_id: rivalPlayerId,
+                customName: rivalPlayer ? rivalPlayer.nombre : n.customName,
+                customNumber: rivalPlayer?.dorsal ? String(rivalPlayer.dorsal) : n.customNumber,
+              };
+            }
+            // Evitar duplicados en el campo: si ya estaba colocado en otro nodo rival, se limpia
+            if (rivalPlayerId && n.player_id === rivalPlayerId && n.id !== targetNodeId) {
+              return {
+                ...n,
+                player_id: null,
+                customName: undefined,
+                customNumber: undefined,
+              };
+            }
+            return n;
+          })
+        );
+      }
     }
   };
 
@@ -176,7 +244,7 @@ export function TacticalField({
         ref={containerRef}
         className="relative w-full aspect-[2/3] max-w-[700px] bg-emerald-950/90 rounded-[2.5rem] border border-emerald-500/20 overflow-hidden shadow-2xl select-none"
         onDragOver={(e) => {
-          if (isEditMode && team === 'propio') {
+          if (isEditMode) {
             e.preventDefault();
           }
         }}
@@ -218,16 +286,21 @@ export function TacticalField({
         {/* Render Nodes / Players */}
         {nodes.map((node) => {
           const assignedPlayer = team === 'propio' ? players.find((p) => p.id === node.player_id) : null;
+          const assignedRivalPlayer = team === 'rival' && rivalPlayers ? rivalPlayers.find((rp) => rp.id === node.player_id) : null;
           const isSelected = !!(node.player_id && node.player_id === selectedPlayerId);
-          const hasCustomDetails = node.customName || node.customNumber;
+          const hasCustomDetails = !!(node.customName || node.customNumber || assignedRivalPlayer);
 
           // Determine label details
           const displayName = assignedPlayer
             ? getPlayerDisplayName(assignedPlayer, 'tactical')
+            : assignedRivalPlayer
+            ? (assignedRivalPlayer.nombre ? assignedRivalPlayer.nombre.split(' ')[0] : node.label)
             : (node.customName ? node.customName.split(' ')[0] : node.label);
 
           const displayNumber = assignedPlayer
             ? assignedPlayer.dorsal
+            : assignedRivalPlayer
+            ? (assignedRivalPlayer.dorsal ? String(assignedRivalPlayer.dorsal) : (node.customNumber || ''))
             : (node.customNumber || '');
 
           // Calculate Y visual position (both teams now oriented like the rival team: GK at top, attacking downwards)
@@ -245,16 +318,21 @@ export function TacticalField({
               onMouseDown={(e) => handleDragStart(e, node.id)}
               onTouchStart={(e) => handleDragStart(e, node.id)}
               onDragOver={(e) => {
-                if (isEditMode && team === 'propio') {
+                if (isEditMode) {
                   e.preventDefault();
                 }
               }}
               onDrop={(e) => handlePitchNodeDrop(e, node.id)}
               draggable={isEditMode && (!!node.player_id || team === 'rival')}
               onDragStart={(e) => {
-                if (isEditMode && node.player_id && team === 'propio') {
-                  e.dataTransfer.setData('text/plain', `node:${node.id}:${node.player_id}`);
-                  e.dataTransfer.effectAllowed = 'move';
+                if (isEditMode) {
+                  if (team === 'propio' && node.player_id) {
+                    e.dataTransfer.setData('text/plain', `node:${node.id}:${node.player_id}`);
+                    e.dataTransfer.effectAllowed = 'move';
+                  } else if (team === 'rival' && (node.player_id || node.customName)) {
+                    e.dataTransfer.setData('text/plain', `node:rival:${node.id}:${node.player_id || ''}`);
+                    e.dataTransfer.effectAllowed = 'move';
+                  }
                 }
               }}
               onClick={() => onNodeClick(node)}
@@ -273,6 +351,8 @@ export function TacticalField({
               >
                 {assignedPlayer ? (
                   <Avatar src={assignedPlayer.foto_url} name={assignedPlayer.nombre} size="sm" className="w-full h-full" />
+                ) : assignedRivalPlayer?.foto_url ? (
+                  <Avatar src={assignedRivalPlayer.foto_url} name={assignedRivalPlayer.nombre} size="sm" className="w-full h-full" />
                 ) : hasCustomDetails ? (
                   <div className="flex flex-col items-center justify-center">
                     <span className="text-[10px] font-black text-blue-400">{displayNumber}</span>
@@ -314,13 +394,14 @@ export function TacticalField({
                     </div>
 
                     {/* Clear button */}
-                    {(assignedPlayer || hasCustomDetails) && (
+                    {(assignedPlayer || assignedRivalPlayer || hasCustomDetails) && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           handleClearPlayer(node.id);
                         }}
                         className="ml-0.5 text-slate-500 hover:text-red-400"
+                        title="Quitar jugador de esta posición"
                       >
                         <X className="h-2 w-2" />
                       </button>
