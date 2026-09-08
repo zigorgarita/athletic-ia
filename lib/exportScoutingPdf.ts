@@ -896,12 +896,6 @@ export async function exportScoutingToPdf(config: ScoutingPdfConfig): Promise<vo
 
   const debilidades: WeaknessItem[] = parsedPlan?.debilidadesExplotar || [];
 
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(SZ_SUBTITLE);
-  doc.setTextColor(DARK_SLATE);
-  doc.text('4.1 VULNERABILIDADES Y DEBILIDADES A EXPLOTAR', MARGIN, ctx.y);
-  ctx.y += 5;
-
   if (debilidades.length === 0) {
     ensureSpace(ctx, 6);
     doc.setFont('helvetica', 'italic');
