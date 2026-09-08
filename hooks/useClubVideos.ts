@@ -18,6 +18,8 @@ export interface ClubVideo {
   etiquetas: string[];
   fecha: string | null;
   drive_file_id?: string | null;
+  tamano_bytes?: number | null;
+  estado?: string | null;
   created_at: string;
 }
 
@@ -56,9 +58,9 @@ export function useClubVideos(clubId: string | undefined, seasonId: string | und
     loadVideos();
   }, [loadVideos]);
 
-  const saveVideo = async (data: Partial<ClubVideo>): Promise<boolean> => {
+  const saveVideo = async (data: Partial<ClubVideo>): Promise<{ success: boolean; error?: string }> => {
     try {
-      if (!clubId) throw new Error('No club ID');
+      if (!clubId) throw new Error('No se ha especificado el club destino.');
       verifyWritePermission();
       const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
       
@@ -72,16 +74,18 @@ export function useClubVideos(clubId: string | undefined, seasonId: string | und
       const { error: rpcErr } = await supabase.rpc('exec_secure_upsert', {
         target_table: 'club_videos',
         payload: payload,
-        conflict_columns: isNew ? null : '{id}',
+        conflict_columns: isNew ? null : ['id'],
         staff_passkey: passkey,
       });
 
       if (rpcErr) throw rpcErr;
       await loadVideos();
-      return true;
+      setError(null);
+      return { success: true };
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Error al guardar vídeo');
-      return false;
+      const msg = err instanceof Error ? err.message : 'Error al guardar vídeo en base de datos';
+      setError(msg);
+      return { success: false, error: msg };
     }
   };
 

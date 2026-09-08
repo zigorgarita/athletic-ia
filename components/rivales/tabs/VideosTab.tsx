@@ -5,7 +5,7 @@ import { useClubVideos, ClubVideo } from '@/hooks/useClubVideos';
 import { useEditMode } from '@/context/EditModeContext';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
-import { Film, Plus, Search } from 'lucide-react';
+import { Film, Plus, Search, AlertCircle } from 'lucide-react';
 import { VideoCard } from '@/components/videos/VideoCard';
 import { VideoUploader } from '@/components/ui/VideoUploader';
 import { VideoPlayerModal } from '@/components/liga/VideoPlayerModal';
@@ -28,6 +28,7 @@ export function VideosTab({ club, season }: VideosTabProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingVideo, setEditingVideo] = useState<Partial<ClubVideo> | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
   const filteredVideos = videos.filter(v => {
@@ -39,6 +40,7 @@ export function VideosTab({ club, season }: VideosTabProps) {
   });
 
   const handleOpenModal = (video?: ClubVideo) => {
+    setSaveError(null);
     if (video) {
       setEditingVideo(video);
     } else {
@@ -56,12 +58,16 @@ export function VideosTab({ club, season }: VideosTabProps) {
     e.preventDefault();
     if (!editingVideo || !editingVideo.titulo || !editingVideo.url) return;
     
+    setSaveError(null);
     setIsSaving(true);
-    const success = await saveVideo(editingVideo);
+    const result = await saveVideo(editingVideo);
     setIsSaving(false);
     
-    if (success) {
+    if (result.success) {
       setIsModalOpen(false);
+      setEditingVideo(null);
+    } else {
+      setSaveError(result.error || 'Error al guardar el vídeo en la base de datos.');
     }
   };
 
@@ -171,11 +177,17 @@ export function VideosTab({ club, season }: VideosTabProps) {
             {/* Incorporador Universal de Vídeos (Drag & Drop + URL + FileInput) */}
             <VideoUploader
               initialUrl={editingVideo.url || ''}
-              onVideoSelected={({ url, driveFileId, fileType, fileName }) => {
+              uploadContext={{
+                module: 'RIVALES',
+                entityName: club.nombre || club.nombre_corto || 'Rival',
+              }}
+              onVideoSelected={({ url, driveFileId, fileType, fileName, tamanoBytes }) => {
+                setSaveError(null);
                 setEditingVideo(prev => prev ? {
                   ...prev,
                   url,
                   drive_file_id: driveFileId || prev.drive_file_id,
+                  tamano_bytes: tamanoBytes !== undefined ? tamanoBytes : prev.tamano_bytes,
                   tipo_origen: fileType,
                   titulo: prev.titulo || fileName || ''
                 } : null);
@@ -207,6 +219,16 @@ export function VideosTab({ club, season }: VideosTabProps) {
               <label className={labelClass}>Descripción / Notas</label>
               <textarea name="descripcion" value={editingVideo.descripcion || ''} onChange={handleChange} rows={3} className={inputClass} placeholder="Anotaciones sobre este corte..." />
             </div>
+
+            {saveError && (
+              <div className="p-3.5 bg-red-500/10 border border-red-500/30 rounded-xl text-xs text-red-400 flex items-start gap-2.5">
+                <AlertCircle className="h-4 w-4 shrink-0 text-red-400 mt-0.5" />
+                <div className="space-y-0.5">
+                  <p className="font-semibold text-red-300">Error al registrar en la aplicación</p>
+                  <p className="text-[11px] text-red-400/90 leading-relaxed">{saveError}</p>
+                </div>
+              </div>
+            )}
 
             <div className="pt-4 flex justify-end gap-3 border-t border-slate-800">
               <Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)} disabled={isSaving}>Cancelar</Button>

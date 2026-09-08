@@ -4,6 +4,7 @@ import React, { useState, useRef } from 'react';
 import { Upload, Link as LinkIcon, Film, AlertCircle, CheckCircle2, Loader2, Pause, Play, X } from 'lucide-react';
 import { isValidVideoUrl, parseVideoUrl } from '@/lib/video';
 import { DriveResumableUploader, UploadProgressInfo } from '@/lib/drive-resumable';
+import { DriveUploadContext } from '@/lib/drive-folders';
 
 interface VideoUploaderProps {
   initialUrl?: string;
@@ -16,9 +17,10 @@ interface VideoUploaderProps {
     tamanoBytes?: number;
   }) => void;
   className?: string;
+  uploadContext?: DriveUploadContext;
 }
 
-export function VideoUploader({ initialUrl = '', onVideoSelected, className = '' }: VideoUploaderProps) {
+export function VideoUploader({ initialUrl = '', onVideoSelected, className = '', uploadContext }: VideoUploaderProps) {
   const [activeTab, setActiveTab] = useState<'url' | 'upload'>('url');
   const [urlInput, setUrlInput] = useState(initialUrl);
   const [urlError, setUrlError] = useState<string | null>(null);
@@ -65,6 +67,7 @@ export function VideoUploader({ initialUrl = '', onVideoSelected, className = ''
     const newUploader = new DriveResumableUploader({
       file,
       passkey,
+      uploadContext,
       onProgress: (info) => {
         setProgressInfo(info);
         if (info.status === 'completado' && info.driveFileId) {
@@ -285,7 +288,7 @@ export function VideoUploader({ initialUrl = '', onVideoSelected, className = ''
             <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-xl text-xs text-green-400 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
-                <span>Vídeo subido y registrado con éxito en Google Drive.</span>
+                <span>Archivo subido a Drive. Pulsa &quot;Guardar Vídeo&quot; para registrarlo en la aplicación.</span>
               </div>
               <button
                 type="button"
