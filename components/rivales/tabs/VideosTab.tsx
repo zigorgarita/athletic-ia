@@ -71,13 +71,16 @@ export function VideosTab({ club, season }: VideosTabProps) {
     }
   };
 
-  // Adaptador para usar VideoCard
+  // Adaptador para usar VideoCard con metadatos completos
   const mapToMatchVideo = (cv: ClubVideo): MatchVideo => ({
     id: cv.id,
     titulo: cv.titulo,
     descripcion: cv.descripcion,
     video_url: cv.url,
     fecha_partido: cv.fecha || cv.created_at,
+    drive_file_id: cv.drive_file_id,
+    tamano_bytes: cv.tamano_bytes,
+    tipo_origen: cv.tipo_origen,
     created_at: cv.created_at,
   });
 
@@ -137,8 +140,17 @@ export function VideosTab({ club, season }: VideosTabProps) {
       </div>
 
       {loading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[1, 2, 3].map(i => <div key={i} className="h-48 bg-slate-800 animate-pulse rounded-2xl" />)}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="flex flex-col bg-slate-900/40 rounded-2xl border border-slate-800/80 overflow-hidden animate-pulse">
+              <div className="w-full aspect-video bg-slate-800/60" />
+              <div className="p-4 space-y-3">
+                <div className="h-4 bg-slate-800 rounded w-1/3" />
+                <div className="h-5 bg-slate-800 rounded w-4/5" />
+                <div className="h-3 bg-slate-800 rounded w-full" />
+              </div>
+            </div>
+          ))}
         </div>
       ) : videos.length === 0 ? (
         <div className="text-center py-20 bg-slate-900/30 rounded-3xl border border-slate-800/50">
@@ -152,11 +164,14 @@ export function VideosTab({ club, season }: VideosTabProps) {
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredVideos.map(video => (
             <VideoCard 
               key={video.id} 
-              video={mapToMatchVideo(video)} 
+              video={mapToMatchVideo(video)}
+              category={video.categoria}
+              videoType={video.tipo}
+              layout="grid"
               onPlay={handlePlayAdapter} 
               onEdit={handleEditAdapter} 
               onDelete={handleDeleteAdapter} 

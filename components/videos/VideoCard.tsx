@@ -9,17 +9,32 @@ import { useEditMode } from '@/context/EditModeContext';
 
 interface VideoCardProps {
   video: MatchVideo;
+  category?: string | null;
+  videoType?: string | null;
+  layout?: 'row' | 'grid';
   onPlay: (video: MatchVideo) => void;
   onEdit: (video: MatchVideo) => void;
   onDelete: (id: string) => void;
 }
 
-export function VideoCard({ video, onPlay, onEdit, onDelete }: VideoCardProps) {
+export function VideoCard({
+  video,
+  category,
+  videoType,
+  layout = 'row',
+  onPlay,
+  onEdit,
+  onDelete,
+}: VideoCardProps) {
   const { isEditMode } = useEditMode();
   const [isExpanded, setIsExpanded] = useState(false);
   const { type, thumbnailUrl } = parseVideoUrl(video.video_url);
 
-  const isDriveVideo = !!video.drive_file_id || video.tipo_origen === 'Archivo';
+  const isDriveVideo =
+    !!video.drive_file_id ||
+    video.tipo_origen === 'Archivo' ||
+    video.video_url.includes('/api/google-drive') ||
+    video.video_url.includes('drive.google.com');
 
   // Formatear tamaño de archivo (bytes -> MB / GB)
   const formatFileSize = (bytes?: number | null) => {
@@ -62,7 +77,7 @@ export function VideoCard({ video, onPlay, onEdit, onDelete }: VideoCardProps) {
           alt={video.titulo}
           fill
           className="object-cover transition-transform duration-500 group-hover:scale-105"
-          sizes="(max-width: 768px) 100vw, 256px"
+          sizes="(max-width: 768px) 100vw, 400px"
         />
       );
     }
@@ -84,6 +99,114 @@ export function VideoCard({ video, onPlay, onEdit, onDelete }: VideoCardProps) {
   };
 
   const sizeFormatted = formatFileSize(video.tamano_bytes);
+
+  // VISTA EN CUADRÍCULA (GRID RESPONSIVE PARA RIVALES / CATÁLOGOS)
+  if (layout === 'grid') {
+    return (
+      <Card className="relative overflow-hidden group border border-slate-800/80 bg-slate-900/40 backdrop-blur-sm transition-all duration-300 hover:border-[#CC0E21]/50 hover:shadow-lg hover:shadow-[#CC0E21]/5 flex flex-col h-full rounded-2xl">
+        {/* Contenedor de Miniatura 16:9 Proporcionada */}
+        <div 
+          onClick={() => onPlay(video)}
+          className="relative w-full aspect-video overflow-hidden cursor-pointer bg-slate-950 border-b border-slate-800/80 flex-shrink-0 group/thumb"
+        >
+          {renderThumbnail()}
+          <div className="absolute inset-0 bg-black/40 group-hover/thumb:bg-black/20 transition-colors duration-300 flex items-center justify-center">
+            <div className="h-12 w-12 rounded-full bg-[#CC0E21] text-white flex items-center justify-center shadow-lg transform scale-90 opacity-90 group-hover/thumb:scale-100 group-hover/thumb:opacity-100 transition-all duration-300">
+              <Play className="h-5 w-5 fill-current ml-0.5" />
+            </div>
+          </div>
+        </div>
+
+        {/* Metadatos y Detalles Distribuidos Debajo */}
+        <div className="p-4 flex-1 flex flex-col justify-between min-w-0">
+          <div>
+            {/* Categoría / Tipo / Fecha */}
+            <div className="flex items-center gap-2 text-xs mb-2 flex-wrap">
+              {category && (
+                <span className="px-2 py-0.5 rounded-md bg-[#CC0E21]/15 text-[#CC0E21] border border-[#CC0E21]/30 text-[10px] font-bold uppercase tracking-wider">
+                  {category}
+                </span>
+              )}
+              {videoType && (
+                <span className="px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 border border-slate-700/80 text-[10px] font-semibold">
+                  {videoType}
+                </span>
+              )}
+              <span className="flex items-center gap-1 text-[11px] text-slate-400 font-medium ml-auto">
+                <Calendar className="h-3 w-3 text-slate-500" />
+                {formatDate(video.fecha_partido)}
+              </span>
+            </div>
+
+            {/* Metadatos de Origen y Tamaño */}
+            <div className="flex items-center gap-2 text-[10px] text-slate-400 mb-2 font-medium">
+              <span className="flex items-center gap-1 text-slate-300">
+                {isDriveVideo && <HardDrive className="h-3 w-3 text-[#CC0E21]" />}
+                {isDriveVideo ? 'Google Drive 5 TB' : type === 'veo' ? 'Veo' : type}
+              </span>
+              {sizeFormatted && (
+                <>
+                  <span className="w-1 h-1 rounded-full bg-slate-700" />
+                  <span className="font-mono text-slate-400">{sizeFormatted}</span>
+                </>
+              )}
+            </div>
+
+            {/* Título de vídeo legible sin cortes */}
+            <h3 
+              onClick={() => onPlay(video)}
+              className="text-sm sm:text-base font-bold text-slate-100 hover:text-[#CC0E21] cursor-pointer transition-colors duration-200 leading-snug line-clamp-2 mb-1.5"
+              title={video.titulo}
+            >
+              {video.titulo}
+            </h3>
+
+            {/* Descripción */}
+            {desc ? (
+              <p className="text-xs text-slate-400 leading-relaxed line-clamp-2 mb-2 break-words">
+                {desc}
+              </p>
+            ) : (
+              <p className="text-xs text-slate-600 italic mb-2">Sin descripción para este vídeo.</p>
+            )}
+          </div>
+
+          {/* Barra de Acciones Inferior */}
+          <div className="flex items-center justify-between pt-3 border-t border-slate-800/60 mt-2">
+            <Button
+              onClick={() => onPlay(video)}
+              variant="primary"
+              className="flex items-center gap-1.5 font-bold py-1.5 px-3 text-xs bg-[#CC0E21] hover:bg-[#b00c1c]"
+            >
+              <Play className="h-3 w-3 fill-current" />
+              Reproducir
+            </Button>
+
+            {isEditMode && (
+              <div className="flex items-center gap-1.5">
+                <Button
+                  onClick={() => onEdit(video)}
+                  variant="ghost"
+                  className="h-7 w-7 p-0 text-slate-400 hover:text-[#CC0E21] hover:bg-[#CC0E21]/10 rounded-lg"
+                  title="Editar vídeo"
+                >
+                  <Edit className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  onClick={() => onDelete(video.id)}
+                  variant="ghost"
+                  className="h-7 w-7 p-0 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg"
+                  title="Eliminar vídeo"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+      </Card>
+    );
+  }
 
   return (
     <Card className="relative overflow-hidden group border border-slate-800/80 bg-slate-900/30 backdrop-blur-sm transition-all duration-300 hover:border-[#CC0E21]/40">
