@@ -79,6 +79,7 @@ interface RenderCtx {
   reportDate: string;
   reportType: string;
   currentBlockTitle?: string | null; // Título del bloque o fase activa para encabezado de continuación
+  isBlockActive?: boolean; // Solo true tras haberse renderizado la cabecera del bloque en la página actual
 }
 
 // ─── Helpers de Limpieza y Formato ─────────────────────────────────────────────
@@ -133,7 +134,7 @@ async function loadBase64Image(url?: string | null): Promise<string | null> {
 /**
  * Comprueba si quedan al menos `needed` mm disponibles en la página.
  * Si no caben, añade página nueva e inicializa la cabecera/cursor.
- * Si hay un bloque o fase activa, añade un encabezado discreto de continuación.
+ * Si un bloque ya ha comenzado previamente, añade un encabezado discreto de continuación.
  */
 function ensureSpace(ctx: RenderCtx, needed: number): void {
   if (ctx.y + needed > PAGE_H - MARGIN) {
@@ -141,8 +142,8 @@ function ensureSpace(ctx: RenderCtx, needed: number): void {
     ctx.y = MARGIN + 4;
     drawTopBar(ctx.doc);
 
-    // Encabezado discreto de continuación cuando un bloque/fase se divide entre páginas
-    if (ctx.currentBlockTitle) {
+    // Encabezado discreto de continuación ÚNICAMENTE cuando el bloque ya comenzó en una página anterior
+    if (ctx.isBlockActive && ctx.currentBlockTitle) {
       const { doc } = ctx;
       doc.setFont('helvetica', 'italic');
       doc.setFontSize(SZ_TINY + 1);
@@ -169,7 +170,10 @@ function drawTopBar(doc: jsPDF): void {
  * Cabecera de Bloque Principal (Bloques 1 a 5)
  */
 function renderBlockHeader(ctx: RenderCtx, num: number, title: string): void {
-  ctx.currentBlockTitle = `${num}. ${title}`;
+  // Desactivar flag antes de pintar la cabecera para que si salta de página no imprima continuación falsa
+  ctx.isBlockActive = false;
+  ctx.currentBlockTitle = null;
+
   // Evitar encabezados huérfanos: asegurar espacio para el encabezado + al menos 18 mm de contenido posterior
   ensureSpace(ctx, 24);
   const { doc } = ctx;
@@ -187,6 +191,10 @@ function renderBlockHeader(ctx: RenderCtx, num: number, title: string): void {
   doc.setLineWidth(0.3);
   doc.line(MARGIN, ctx.y, PAGE_W - MARGIN, ctx.y);
   ctx.y += 4;
+
+  // Cabecera ya dibujada en la página: activar seguimiento de continuación para contenidos internos
+  ctx.currentBlockTitle = `${num}. ${title}`;
+  ctx.isBlockActive = true;
 }
 
 /**
@@ -436,8 +444,15 @@ function renderTacticalPhase(
   fallbackText?: string | null,
   sistemaIndautxu?: string
 ): void {
-  ctx.currentBlockTitle = title;
+  // Desactivar flag antes de pintar la cabecera de la fase
+  ctx.isBlockActive = false;
+  ctx.currentBlockTitle = null;
+
   renderPhaseHeader(ctx, title, badgeText);
+
+  // La cabecera de la fase ya está dibujada en la página; activar flag para si se divide más adelante
+  ctx.currentBlockTitle = title;
+  ctx.isBlockActive = true;
 
   if (block) {
     renderCapaA(ctx, block.capaA_evidencias);
@@ -454,6 +469,9 @@ function renderTacticalPhase(
   ctx.doc.setLineWidth(0.2);
   ctx.doc.line(MARGIN, ctx.y, PAGE_W - MARGIN, ctx.y);
   ctx.y += 4;
+
+  // Fase finalizada: desactivar flag
+  ctx.isBlockActive = false;
   ctx.currentBlockTitle = null;
 }
 
@@ -740,7 +758,10 @@ export async function exportScoutingToPdf(config: ScoutingPdfConfig): Promise<vo
   } else {
     amenazas.forEach((threat, idx) => {
       const playerName = threat.jugador || `Jugador Rival #${idx + 1}`;
-      ctx.currentBlockTitle = `Amenaza: ${playerName}`;
+
+      // Desactivar flag antes de comenzar la ficha para que un salto de página inicial empiece limpio
+      ctx.isBlockActive = false;
+      ctx.currentBlockTitle = null;
 
       // Cabecera de la ficha del jugador (asegurar espacio para encabezado + evidencia inicial)
       ensureSpace(ctx, 22);
@@ -784,6 +805,10 @@ export async function exportScoutingToPdf(config: ScoutingPdfConfig): Promise<vo
       } else {
         ctx.y += 2;
       }
+
+      // La cabecera de la amenaza ya está dibujada en la página actual; activar seguimiento de continuación
+      ctx.currentBlockTitle = `Amenaza: ${playerName}`;
+      ctx.isBlockActive = true;
 
       // Evidencia del jugador
       if (threat.capaA_evidencia) {
@@ -842,6 +867,9 @@ export async function exportScoutingToPdf(config: ScoutingPdfConfig): Promise<vo
       doc.setLineWidth(0.2);
       doc.line(MARGIN + 4, ctx.y, PAGE_W - MARGIN - 4, ctx.y);
       ctx.y += 5;
+
+      // Finalizada la ficha: desactivar flag
+      ctx.isBlockActive = false;
       ctx.currentBlockTitle = null;
     });
   }
@@ -853,7 +881,19 @@ export async function exportScoutingToPdf(config: ScoutingPdfConfig): Promise<vo
   renderBlockHeader(ctx, 4, 'Vulnerabilidades del Rival y Consignas por Líneas');
 
   // 4.1 Vulnerabilidades a explotar
+  ctx.isBlockActive = false;
+  ctx.currentBlockTitle = null;
+  ensureSpace(ctx, 16);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(SZ_SUBTITLE);
+  doc.setTextColor(DARK_SLATE);
+  doc.text('4.1 VULNERABILIDADES Y DEBILIDADES A EXPLOTAR', MARGIN, ctx.y);
+  ctx.y += 5;
+
   ctx.currentBlockTitle = '4.1 Vulnerabilidades y Debilidades a Explotar';
+  ctx.isBlockActive = true;
+
   const debilidades: WeaknessItem[] = parsedPlan?.debilidadesExplotar || [];
 
   doc.setFont('helvetica', 'bold');
@@ -918,8 +958,8 @@ export async function exportScoutingToPdf(config: ScoutingPdfConfig): Promise<vo
   ctx.currentBlockTitle = null;
 
   // 4.2 Consignas Específicas por Líneas
-  ctx.currentBlockTitle = `4.2 Consignas por Líneas (SD Indautxu ${sistemaIndautxu})`;
-  const lineas: LineInstructions | undefined = parsedPlan?.consignasPorLineas;
+  ctx.isBlockActive = false;
+  ctx.currentBlockTitle = null;
 
   ensureSpace(ctx, 20);
   doc.setFont('helvetica', 'bold');
@@ -927,6 +967,10 @@ export async function exportScoutingToPdf(config: ScoutingPdfConfig): Promise<vo
   doc.setTextColor(DARK_SLATE);
   doc.text(`4.2 CONSIGNAS POR LÍNEAS (SD INDAUTXU ${sistemaIndautxu})`, MARGIN, ctx.y);
   ctx.y += 5.5;
+
+  ctx.currentBlockTitle = `4.2 Consignas por Líneas (SD Indautxu ${sistemaIndautxu})`;
+  ctx.isBlockActive = true;
+  const lineas: LineInstructions | undefined = parsedPlan?.consignasPorLineas;
 
   const renderLineaCard = (nombreLinea: string, contenido?: string | null, acentoColor = DARK_SLATE) => {
     if (!hasContent(contenido)) return;
@@ -970,7 +1014,6 @@ export async function exportScoutingToPdf(config: ScoutingPdfConfig): Promise<vo
   // ═════════════════════════════════════════════════════════════════════════════
 
   renderBlockHeader(ctx, 5, 'Riesgos Asumidos y Puntos Críticos del Plan');
-  ctx.currentBlockTitle = '5. Riesgos Asumidos y Puntos Críticos del Plan';
 
   const riesgos: string[] = parsedPlan?.riesgosDelPlan || (report.riesgos ? [report.riesgos] : []);
 
@@ -1013,6 +1056,7 @@ export async function exportScoutingToPdf(config: ScoutingPdfConfig): Promise<vo
     });
   }
 
+  ctx.isBlockActive = false;
   ctx.currentBlockTitle = null;
 
   // ═════════════════════════════════════════════════════════════════════════════
