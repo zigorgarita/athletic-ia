@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { createSignedCoachSessionToken, COACH_SESSION_COOKIE_NAME } from '@/lib/auth/staff-session';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -35,9 +36,22 @@ export async function POST(req: Request) {
       );
     }
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
     });
+
+    const sessionToken = createSignedCoachSessionToken();
+    response.cookies.set({
+      name: COACH_SESSION_COOKIE_NAME,
+      value: sessionToken,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 7 * 24 * 60 * 60, // 7 días
+    });
+
+    return response;
   } catch {
     return NextResponse.json(
       { success: false, error: 'Error interno en el servidor de autenticación' },
