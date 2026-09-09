@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Activity, Target, RefreshCw, Loader2 } from 'lucide-react';
+import { getStaffPasskey } from '@/lib/passkey';
 import { DieLigenTimelineEvent, DieLigenTimelineResult } from '@/lib/die-ligen/client';
 
 interface DieLigenTimelineProps {
@@ -37,12 +38,10 @@ export function DieLigenTimeline({ jornada, isOfficialMatch = true }: DieLigenTi
           Accept: 'application/json',
         };
 
-        // Enviar credenciales de staff/editor si están en sessionStorage/localStorage
-        const staffUser = sessionStorage.getItem('editor_user') || localStorage.getItem('editor_user');
-        const staffPass = sessionStorage.getItem('editor_pass') || localStorage.getItem('editor_pass');
-        if (staffPass) {
-          headers['x-editor-user'] = staffUser || 'aitor';
-          headers['x-editor-pass'] = staffPass;
+        // Enviar clave de staff del cuerpo técnico según el estándar de la app
+        const staffPasskey = getStaffPasskey() || process.env.NEXT_PUBLIC_COACH_PASSKEY || '';
+        if (staffPasskey) {
+          headers['x-staff-passkey'] = staffPasskey;
         }
 
         const res = await fetch(`/api/die-ligen/timeline?jornada=${jornada}`, {

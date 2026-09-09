@@ -6,13 +6,23 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(req: Request) {
   try {
-    // 1. Verificación de autorización de servidor
-    const authCheck = await verifyServerAuthorization(req);
-    if (!authCheck.authorized) {
+    // 1. Verificación de autorización de staff (patrón existente de la app)
+    const staffPasskey = req.headers.get('x-staff-passkey')?.trim() || req.headers.get('x-coach-staff-passkey')?.trim();
+    const expectedPasskey = (process.env.COACH_STAFF_PASSKEY || process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026').trim();
+
+    let isAuthorized = Boolean(staffPasskey && staffPasskey === expectedPasskey);
+
+    // Si no coincide la passkey directa de staff, permitir también verificación de sesión/editor si estuviera disponible
+    if (!isAuthorized) {
+      const authCheck = await verifyServerAuthorization(req);
+      isAuthorized = authCheck.authorized;
+    }
+
+    if (!isAuthorized) {
       return NextResponse.json(
         {
           success: false,
-          error: authCheck.error || 'Acceso no autorizado en la aplicación.',
+          error: 'Acceso no autorizado en la aplicación. Clave de staff no válida.',
         },
         { status: 401 }
       );
