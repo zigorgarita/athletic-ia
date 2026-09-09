@@ -834,10 +834,10 @@ export function PlayerDetail({ player, onBack, initialTab }: PlayerDetailProps) 
       </div>
 
       {/* Tabs */}
-      <div className="flex overflow-x-auto border-b border-slate-800 scrollbar-none whitespace-nowrap">
+      <div className="flex overflow-x-auto border-b border-slate-800 whitespace-nowrap">
         <button
           onClick={() => setActiveTab('personal')}
-          className={`flex items-center gap-2 px-5 py-3.5 border-b-2 text-sm font-semibold transition-all duration-200 ${
+          className={`flex items-center gap-1.5 px-3.5 py-3 border-b-2 text-sm font-semibold transition-all duration-200 ${
             activeTab === 'personal'
               ? 'border-[#CC0E21] text-[#CC0E21] bg-[#CC0E21]/5'
               : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -848,7 +848,7 @@ export function PlayerDetail({ player, onBack, initialTab }: PlayerDetailProps) 
         </button>
         <button
           onClick={() => setActiveTab('resumen')}
-          className={`flex items-center gap-2 px-5 py-3.5 border-b-2 text-sm font-semibold transition-all duration-200 ${
+          className={`flex items-center gap-1.5 px-3.5 py-3 border-b-2 text-sm font-semibold transition-all duration-200 ${
             activeTab === 'resumen'
               ? 'border-[#CC0E21] text-[#CC0E21] bg-[#CC0E21]/5'
               : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -859,7 +859,7 @@ export function PlayerDetail({ player, onBack, initialTab }: PlayerDetailProps) 
         </button>
         <button
           onClick={() => setActiveTab('rendimiento')}
-          className={`flex items-center gap-2 px-5 py-3.5 border-b-2 text-sm font-semibold transition-all duration-200 ${
+          className={`flex items-center gap-1.5 px-3.5 py-3 border-b-2 text-sm font-semibold transition-all duration-200 ${
             activeTab === 'rendimiento'
               ? 'border-[#CC0E21] text-[#CC0E21] bg-[#CC0E21]/5'
               : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -870,7 +870,7 @@ export function PlayerDetail({ player, onBack, initialTab }: PlayerDetailProps) 
         </button>
         <button
           onClick={() => setActiveTab('tactica')}
-          className={`flex items-center gap-2 px-5 py-3.5 border-b-2 text-sm font-semibold transition-all duration-200 ${
+          className={`flex items-center gap-1.5 px-3.5 py-3 border-b-2 text-sm font-semibold transition-all duration-200 ${
             activeTab === 'tactica'
               ? 'border-[#CC0E21] text-[#CC0E21] bg-[#CC0E21]/5'
               : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -881,7 +881,7 @@ export function PlayerDetail({ player, onBack, initialTab }: PlayerDetailProps) 
         </button>
         <button
           onClick={() => setActiveTab('fisico')}
-          className={`flex items-center gap-2 px-5 py-3.5 border-b-2 text-sm font-semibold transition-all duration-200 ${
+          className={`flex items-center gap-1.5 px-3.5 py-3 border-b-2 text-sm font-semibold transition-all duration-200 ${
             activeTab === 'fisico'
               ? 'border-[#CC0E21] text-[#CC0E21] bg-[#CC0E21]/5'
               : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -898,7 +898,7 @@ export function PlayerDetail({ player, onBack, initialTab }: PlayerDetailProps) 
         {isEditMode && (
           <button
             onClick={() => setActiveTab('datos_pf')}
-            className={`flex items-center gap-2 px-5 py-3.5 border-b-2 text-sm font-semibold transition-all duration-200 ${
+            className={`flex items-center gap-1.5 px-3.5 py-3 border-b-2 text-sm font-semibold transition-all duration-200 ${
               activeTab === 'datos_pf'
                 ? 'border-[#CC0E21] text-[#CC0E21] bg-[#CC0E21]/5'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -910,7 +910,7 @@ export function PlayerDetail({ player, onBack, initialTab }: PlayerDetailProps) 
         )}
         <button
           onClick={() => setActiveTab('multimedia')}
-          className={`flex items-center gap-2 px-5 py-3.5 border-b-2 text-sm font-semibold transition-all duration-200 ${
+          className={`flex items-center gap-1.5 px-3.5 py-3 border-b-2 text-sm font-semibold transition-all duration-200 ${
             activeTab === 'multimedia'
               ? 'border-[#CC0E21] text-[#CC0E21] bg-[#CC0E21]/5'
               : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -921,9 +921,9 @@ export function PlayerDetail({ player, onBack, initialTab }: PlayerDetailProps) 
         </button>
         <button
           onClick={() => setActiveTab('reuniones')}
-          className={`flex items-center gap-2 px-5 py-3.5 border-b-2 text-sm font-semibold transition-all duration-200 ${
+          className={`flex items-center gap-1.5 px-3.5 py-3 border-b-2 text-sm font-semibold transition-all duration-200 ${
             activeTab === 'reuniones'
-              ? 'border-[#CC0E21]' + ' text-[#CC0E21] bg-[#CC0E21]/5'
+              ? 'border-[#CC0E21] text-[#CC0E21] bg-[#CC0E21]/5'
               : 'border-transparent text-slate-400 hover:text-slate-200'
           }`}
         >
@@ -932,9 +932,9 @@ export function PlayerDetail({ player, onBack, initialTab }: PlayerDetailProps) 
         </button>
         <button
           onClick={() => setActiveTab('multas')}
-          className={`flex items-center gap-2 px-5 py-3.5 border-b-2 text-sm font-semibold transition-all duration-200 ${
+          className={`flex items-center gap-1.5 px-3.5 py-3 border-b-2 text-sm font-semibold transition-all duration-200 ${
             activeTab === 'multas'
-              ? 'border-[#CC0E21]' + ' text-[#CC0E21] bg-[#CC0E21]/5'
+              ? 'border-[#CC0E21] text-[#CC0E21] bg-[#CC0E21]/5'
               : 'border-transparent text-slate-400 hover:text-slate-200'
           }`}
         >
@@ -943,9 +943,9 @@ export function PlayerDetail({ player, onBack, initialTab }: PlayerDetailProps) 
         </button>
         <button
           onClick={() => setActiveTab('ia')}
-          className={`flex items-center gap-2 px-5 py-3.5 border-b-2 text-sm font-semibold transition-all duration-200 ${
+          className={`flex items-center gap-1.5 px-3.5 py-3 border-b-2 text-sm font-semibold transition-all duration-200 ${
             activeTab === 'ia'
-              ? 'border-[#CC0E21]' + ' text-[#CC0E21] bg-[#CC0E21]/5'
+              ? 'border-[#CC0E21] text-[#CC0E21] bg-[#CC0E21]/5'
               : 'border-transparent text-slate-400 hover:text-slate-200'
           }`}
         >
