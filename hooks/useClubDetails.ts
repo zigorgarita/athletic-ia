@@ -115,14 +115,17 @@ export function useClubDetails(clubId: string, temporada: string = '2026-27') {
   const updateClub = async (data: Partial<Club>): Promise<boolean> => {
     try {
       verifyWritePermission();
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
-      const { error: rpcErr } = await supabase.rpc('exec_secure_upsert', {
-        target_table: 'clubs',
-        payload: { ...data, id: clubId },
-        conflict_columns: '{id}',
-        staff_passkey: passkey,
+      const res = await fetch('/api/clubs', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ target: 'clubs', id: clubId, data }),
       });
-      if (rpcErr) throw rpcErr;
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Error al actualizar club (${res.status})`);
+      }
+
       await loadData();
       return true;
     } catch (err: unknown) {
@@ -136,14 +139,17 @@ export function useClubDetails(clubId: string, temporada: string = '2026-27') {
     try {
       if (!season?.id) return false;
       verifyWritePermission();
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
-      const { error: rpcErr } = await supabase.rpc('exec_secure_upsert', {
-        target_table: 'club_seasons',
-        payload: { ...data, id: season.id },
-        conflict_columns: '{id}',
-        staff_passkey: passkey,
+      const res = await fetch('/api/clubs', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ target: 'club_seasons', id: season.id, data }),
       });
-      if (rpcErr) throw rpcErr;
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Error al actualizar season (${res.status})`);
+      }
+
       await loadData();
       return true;
     } catch (err: unknown) {

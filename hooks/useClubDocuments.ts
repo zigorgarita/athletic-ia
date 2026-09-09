@@ -115,14 +115,15 @@ export function useClubDocuments(clubId: string | undefined, seasonId: string | 
   const deleteDocument = async (id: string): Promise<boolean> => {
     try {
       verifyWritePermission();
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
-      const { error: rpcErr } = await supabase.rpc('exec_secure_delete', {
-        target_table: 'club_documents',
-        record_id: id,
-        staff_passkey: passkey,
+      const res = await fetch(`/api/clubs/documents?id=${encodeURIComponent(id)}`, {
+        method: 'DELETE',
       });
 
-      if (rpcErr) throw rpcErr;
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Error al borrar documento (${res.status})`);
+      }
+
       setDocuments(prev => prev.filter(d => d.id !== id));
       return true;
     } catch (err: unknown) {

@@ -66,28 +66,31 @@ export function useClubPlayModel(seasonId: string | undefined) {
     try {
       if (!seasonId) throw new Error('No season ID');
       verifyWritePermission();
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
-      
+
       const isNew = createNewVersion || !playModel?.id;
-      const payload = { 
+      const payload: Record<string, unknown> = { 
         ...data, 
         club_season_id: seasonId,
         version: isNew ? (playModel ? playModel.version + 1 : 1) : (playModel?.version || 1),
-        fecha: new Date().toISOString().split('T')[0]
+        fecha: new Date().toISOString().split('T')[0],
+        createNewVersion
       };
 
       if (createNewVersion) {
         delete payload.id;
       }
-      
-      const { error: rpcErr } = await supabase.rpc('exec_secure_upsert', {
-        target_table: 'club_play_models',
-        payload: payload,
-        conflict_columns: isNew ? null : '{id}',
-        staff_passkey: passkey,
+
+      const res = await fetch('/api/clubs/play-models', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
       });
 
-      if (rpcErr) throw rpcErr;
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Error al guardar modelo de juego (${res.status})`);
+      }
+
       await loadModel();
       return true;
     } catch (err: unknown) {

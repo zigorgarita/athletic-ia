@@ -162,19 +162,19 @@ export function useClubAIReports(seasonId: string | undefined) {
     try {
       if (!seasonId) throw new Error('No season ID');
       verifyWritePermission();
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
 
-      const isNew = !data.id;
       const payload = { ...data, club_season_id: seasonId };
-
-      const { error: rpcErr } = await supabase.rpc('exec_secure_upsert', {
-        target_table: 'club_ai_reports',
-        payload: payload,
-        conflict_columns: isNew ? null : '{id}',
-        staff_passkey: passkey,
+      const res = await fetch('/api/clubs/ai-reports', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
       });
 
-      if (rpcErr) throw rpcErr;
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Error al guardar informe de IA (${res.status})`);
+      }
+
       await loadReports();
       return true;
     } catch (err: unknown) {
@@ -186,14 +186,15 @@ export function useClubAIReports(seasonId: string | undefined) {
   const deleteReport = async (id: string): Promise<boolean> => {
     try {
       verifyWritePermission();
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
-      const { error: rpcErr } = await supabase.rpc('exec_secure_delete', {
-        target_table: 'club_ai_reports',
-        record_id: id,
-        staff_passkey: passkey,
+      const res = await fetch(`/api/clubs/ai-reports?id=${encodeURIComponent(id)}`, {
+        method: 'DELETE',
       });
 
-      if (rpcErr) throw rpcErr;
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Error al borrar informe de IA (${res.status})`);
+      }
+
       setReports(prev => prev.filter(r => r.id !== id));
       return true;
     } catch (err: unknown) {

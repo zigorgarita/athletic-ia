@@ -311,12 +311,7 @@ export function useClubPlayers(seasonId: string | undefined, clubId?: string, te
     try {
       if (!seasonId) throw new Error('No season ID');
       verifyWritePermission();
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
 
-      const isNew = !data.id;
-
-      // Lista explícita y blindada de campos reales y persistentes de la tabla club_players
-      // Se excluyen rigurosamente todas las propiedades calculadas o visuales de participación
       const payload: Record<string, unknown> = {
         club_season_id: seasonId,
         nombre: data.nombre ? data.nombre.trim() : '',
@@ -335,18 +330,21 @@ export function useClubPlayers(seasonId: string | undefined, clubId?: string, te
         origen: data.origen || 'manual',
       };
 
-      if (!isNew && data.id) {
+      if (data.id) {
         payload.id = data.id;
       }
-      
-      const { error: rpcErr } = await supabase.rpc('exec_secure_upsert', {
-        target_table: 'club_players',
-        payload: payload,
-        conflict_columns: isNew ? null : '{id}',
-        staff_passkey: passkey,
+
+      const res = await fetch('/api/clubs/players', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
       });
 
-      if (rpcErr) throw rpcErr;
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Error al guardar jugador (${res.status})`);
+      }
+
       await loadPlayers();
       return true;
     } catch (err: unknown) {
@@ -360,25 +358,22 @@ export function useClubPlayers(seasonId: string | undefined, clubId?: string, te
       if (!seasonId) throw new Error('No season ID');
       if (newPlayers.length === 0) return true;
       verifyWritePermission();
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
 
-      const payloads = newPlayers.map(p => ({
-        club_season_id: seasonId,
-        nombre: p.nombre.trim(),
-        dorsal: p.dorsal ?? null,
-        posicion: p.posicion ?? null,
-        origen: p.origen || 'documento',
-        minutos_jugados: 0,
-      }));
-
-      const { error: rpcErr } = await supabase.rpc('exec_secure_bulk_upsert', {
-        target_table: 'club_players',
-        payloads: payloads,
-        conflict_columns: null, // Solo inserción limpia de nuevos jugadores
-        staff_passkey: passkey,
+      const res = await fetch('/api/clubs/players', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bulk: true,
+          club_season_id: seasonId,
+          players: newPlayers,
+        }),
       });
 
-      if (rpcErr) throw rpcErr;
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Error al importar jugadores (${res.status})`);
+      }
+
       await loadPlayers();
       return true;
     } catch (err: unknown) {
@@ -390,14 +385,15 @@ export function useClubPlayers(seasonId: string | undefined, clubId?: string, te
   const deletePlayer = async (id: string): Promise<boolean> => {
     try {
       verifyWritePermission();
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
-      const { error: rpcErr } = await supabase.rpc('exec_secure_delete', {
-        target_table: 'club_players',
-        record_id: id,
-        staff_passkey: passkey,
+      const res = await fetch(`/api/clubs/players?id=${encodeURIComponent(id)}`, {
+        method: 'DELETE',
       });
 
-      if (rpcErr) throw rpcErr;
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Error al borrar jugador (${res.status})`);
+      }
+
       setPlayers(prev => prev.filter(p => p.id !== id));
       return true;
     } catch (err: unknown) {

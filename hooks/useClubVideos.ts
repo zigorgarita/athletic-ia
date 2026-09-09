@@ -62,23 +62,24 @@ export function useClubVideos(clubId: string | undefined, seasonId: string | und
     try {
       if (!clubId) throw new Error('No se ha especificado el club destino.');
       verifyWritePermission();
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
-      
-      const isNew = !data.id;
+
       const payload = { 
         ...data, 
         club_id: clubId,
         club_season_id: data.club_season_id || seasonId || null 
       };
-      
-      const { error: rpcErr } = await supabase.rpc('exec_secure_upsert', {
-        target_table: 'club_videos',
-        payload: payload,
-        conflict_columns: isNew ? null : ['id'],
-        staff_passkey: passkey,
+
+      const res = await fetch('/api/clubs/videos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
       });
 
-      if (rpcErr) throw rpcErr;
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Error al guardar vídeo (${res.status})`);
+      }
+
       await loadVideos();
       setError(null);
       return { success: true };
@@ -92,14 +93,15 @@ export function useClubVideos(clubId: string | undefined, seasonId: string | und
   const deleteVideo = async (id: string): Promise<boolean> => {
     try {
       verifyWritePermission();
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
-      const { error: rpcErr } = await supabase.rpc('exec_secure_delete', {
-        target_table: 'club_videos',
-        record_id: id,
-        staff_passkey: passkey,
+      const res = await fetch(`/api/clubs/videos?id=${encodeURIComponent(id)}`, {
+        method: 'DELETE',
       });
 
-      if (rpcErr) throw rpcErr;
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Error al borrar vídeo (${res.status})`);
+      }
+
       setVideos(prev => prev.filter(v => v.id !== id));
       return true;
     } catch (err: unknown) {
