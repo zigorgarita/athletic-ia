@@ -7,6 +7,8 @@ export interface OfficialMatchClub {
   id: string;
   nombre: string;
   escudo_url: string | null;
+  tipo?: string | null;
+  rfef_club_id?: number | null;
 }
 
 export interface OfficialMatch {
@@ -120,7 +122,7 @@ export function useOfficialMatches(clubId?: string) {
 
   const loadMatchDetail = useCallback(async (matchId: string) => {
     try {
-      const [matchRes, statsRes] = await Promise.all([
+      const [matchRes, statsRes, ownMatchRes] = await Promise.all([
         supabase
           .from('official_matches')
           .select(`
@@ -141,8 +143,8 @@ export function useOfficialMatches(clubId?: string) {
             asistentes,
             oficiales,
             source,
-            local_club:clubs!local_club_id(id, nombre, escudo_url),
-            visitor_club:clubs!visitor_club_id(id, nombre, escudo_url)
+            local_club:clubs!local_club_id(id, nombre, escudo_url, tipo, rfef_club_id),
+            visitor_club:clubs!visitor_club_id(id, nombre, escudo_url, tipo, rfef_club_id)
           `)
           .eq('id', matchId)
           .single(),
@@ -168,15 +170,90 @@ export function useOfficialMatches(clubId?: string) {
           `)
           .eq('official_match_id', matchId)
           .order('titular', { ascending: false })
-          .order('dorsal_partido', { ascending: true })
+          .order('dorsal_partido', { ascending: true }),
+        supabase
+          .from('matches')
+          .select('id')
+          .eq('official_match_id', matchId)
+          .maybeSingle()
       ]);
 
       if (matchRes.error) throw matchRes.error;
       if (statsRes.error) throw statsRes.error;
 
+      const matchData = matchRes.data as unknown as OfficialMatch;
+      let stats = (statsRes.data as unknown as OfficialPlayerStat[]) || [];
+
+      // Si el acta involucra al SD Indautxu y tenemos el partido interno vinculado,
+      // incorporamos dinámicamente las estadísticas de match_player_stats + players
+      const indautxuClub = [matchData.local_club, matchData.visitor_club].find(
+        c => c?.tipo === 'PROPIO' || c?.rfef_club_id === 33836524
+      );
+
+      if (indautxuClub && ownMatchRes?.data?.id) {
+        const [statsOwnRes, playersRes] = await Promise.all([
+          supabase
+            .from('match_player_stats')
+            .select('*')
+            .eq('match_id', ownMatchRes.data.id),
+          supabase
+            .from('players')
+            .select('id, nombre, apellidos, demarcacion, foto_url')
+        ]);
+
+        if (statsOwnRes.data && statsOwnRes.data.length > 0) {
+          const playerMap = new Map((playersRes.data || []).map(p => [p.id, p]));
+
+          const indautxuStats: OfficialPlayerStat[] = statsOwnRes.data.map(mps => {
+            const p = playerMap.get(mps.player_id);
+            const minEntrada = mps.titular
+              ? null
+              : (mps.minuto_entrada && mps.minuto_entrada > 0 ? mps.minuto_entrada : null);
+            const minSalida = (mps.minuto_salida !== null && mps.minuto_salida < 90)
+              ? mps.minuto_salida
+              : null;
+
+            return {
+              id: mps.id,
+              official_match_id: matchId,
+              club_player_id: mps.player_id,
+              club_id: indautxuClub.id,
+              dorsal_partido: mps.dorsal_partido ?? null,
+              convocado: mps.convocado ?? true,
+              titular: Boolean(mps.titular),
+              minuto_entrada: minEntrada,
+              minuto_salida: minSalida,
+              minutos: mps.minutos ?? 0,
+              goles: mps.goles ?? 0,
+              amarillas: mps.tarjeta_amarilla ? 1 : 0,
+              doble_amarilla: Boolean(mps.doble_amarilla),
+              roja: Boolean(mps.tarjeta_roja || mps.roja_directa),
+              motivo_sancion: null, // match_player_stats no almacena motivo textual de sanción
+              player: p
+                ? {
+                    id: p.id,
+                    nombre: p.apellidos ? `${p.nombre} ${p.apellidos}` : p.nombre,
+                    posicion: p.demarcacion || null,
+                    foto_url: p.foto_url || null,
+                  }
+                : null,
+            };
+          });
+
+          indautxuStats.sort((a, b) => {
+            if (a.titular !== b.titular) return a.titular ? -1 : 1;
+            return (a.dorsal_partido ?? 99) - (b.dorsal_partido ?? 99);
+          });
+
+          // Filtrar por si ya hubiera stats de Indautxu para evitar duplicidad
+          const existingNonIndautxu = stats.filter(s => s.club_id !== indautxuClub.id);
+          stats = [...existingNonIndautxu, ...indautxuStats];
+        }
+      }
+
       return {
-        match: matchRes.data as unknown as OfficialMatch,
-        stats: (statsRes.data as unknown as OfficialPlayerStat[]) || []
+        match: matchData,
+        stats
       };
     } catch (err: unknown) {
       console.error('Error al cargar detalle del acta oficial:', err);
