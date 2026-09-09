@@ -38,9 +38,7 @@ export async function POST(req: Request) {
       estado,
       fecha_prevista_recuperacion,
       fecha_real_recuperacion,
-      observaciones,
-      zona_afectada,
-      tratamiento
+      observaciones
     } = body;
 
     if (!player_id || typeof player_id !== 'string' || player_id.trim().length === 0) {
@@ -78,8 +76,6 @@ export async function POST(req: Request) {
       fecha_prevista_recuperacion: typeof fecha_prevista_recuperacion === 'string' && fecha_prevista_recuperacion.trim().length > 0 ? fecha_prevista_recuperacion.trim() : null,
       fecha_real_recuperacion: typeof fecha_real_recuperacion === 'string' && fecha_real_recuperacion.trim().length > 0 ? fecha_real_recuperacion.trim() : null,
       observaciones: typeof observaciones === 'string' && observaciones.trim().length > 0 ? observaciones.trim() : null,
-      zona_afectada: typeof zona_afectada === 'string' && zona_afectada.trim().length > 0 ? zona_afectada.trim() : null,
-      tratamiento: typeof tratamiento === 'string' && tratamiento.trim().length > 0 ? tratamiento.trim() : null,
     };
 
     const supabaseServer = getSupabaseServerClient();
@@ -151,12 +147,6 @@ export async function PATCH(req: Request) {
     }
     if ('observaciones' in updatesObj) {
       allowedUpdates.observaciones = typeof updatesObj.observaciones === 'string' && updatesObj.observaciones.trim().length > 0 ? updatesObj.observaciones.trim() : null;
-    }
-    if ('zona_afectada' in updatesObj) {
-      allowedUpdates.zona_afectada = typeof updatesObj.zona_afectada === 'string' && updatesObj.zona_afectada.trim().length > 0 ? updatesObj.zona_afectada.trim() : null;
-    }
-    if ('tratamiento' in updatesObj) {
-      allowedUpdates.tratamiento = typeof updatesObj.tratamiento === 'string' && updatesObj.tratamiento.trim().length > 0 ? updatesObj.tratamiento.trim() : null;
     }
 
     if (Object.keys(allowedUpdates).length === 0) {
