@@ -33,23 +33,25 @@ export function useObservaciones(playerId: string | null) {
     setError(null);
     try {
       verifyWritePermission();
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
-      const { data, error: supabaseError } = await supabase
-        .rpc('exec_secure_upsert', {
-          target_table: 'observaciones',
-          payload: obs,
-          conflict_columns: null,
-          staff_passkey: passkey
-        });
+      const res = await fetch('/api/players/observaciones', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(obs),
+      });
 
-      if (supabaseError) throw supabaseError;
-      setObservaciones((prev) => [data, ...prev]);
-      return data;
+      const result = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(result?.error || 'Error al crear la observación');
+      }
+
+      const created = result?.data as Observacion;
+      setObservaciones((prev) => [created, ...prev]);
+      return created;
     } catch (err: any) {
       setError(err.message || 'Error al crear la observación');
       return null;
     }
-  }, []);
+  }, [verifyWritePermission]);
 
   useEffect(() => {
     if (playerId) {

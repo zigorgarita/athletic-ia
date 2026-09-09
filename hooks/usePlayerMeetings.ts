@@ -51,18 +51,20 @@ export function usePlayerMeetings(playerId: string | null) {
     setError(null);
     try {
       verifyWritePermission();
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
-      const { data, error: supabaseError } = await supabase
-        .rpc('exec_secure_upsert', {
-          target_table: 'player_meetings',
-          payload: meeting,
-          conflict_columns: null,
-          staff_passkey: passkey
-        });
+      const res = await fetch('/api/players/meetings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(meeting),
+      });
 
-      if (supabaseError) throw supabaseError;
-      setMeetings((prev) => [data as PlayerMeeting, ...prev]);
-      return data as PlayerMeeting;
+      const result = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(result?.error || 'Error al crear la reunión');
+      }
+
+      const created = result?.data as PlayerMeeting;
+      setMeetings((prev) => [created, ...prev]);
+      return created;
     } catch (err: any) {
       setError(err.message || 'Error al crear la reunión');
       return null;
@@ -73,16 +75,17 @@ export function usePlayerMeetings(playerId: string | null) {
     setError(null);
     try {
       verifyWritePermission();
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
-      const { error: supabaseError } = await supabase
-        .rpc('exec_secure_upsert', {
-          target_table: 'player_meetings',
-          payload: { ...updates, id: meetingId },
-          conflict_columns: ['id'],
-          staff_passkey: passkey
-        });
+      const res = await fetch('/api/players/meetings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: meetingId, updates }),
+      });
 
-      if (supabaseError) throw supabaseError;
+      const result = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(result?.error || 'Error al actualizar la reunión');
+      }
+
       await fetchMeetings();
       return true;
     } catch (err: any) {
@@ -95,15 +98,15 @@ export function usePlayerMeetings(playerId: string | null) {
     setError(null);
     try {
       verifyWritePermission();
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
-      const { error: supabaseError } = await supabase
-        .rpc('exec_secure_delete', {
-          target_table: 'player_meetings',
-          record_id: meetingId,
-          staff_passkey: passkey
-        });
+      const res = await fetch(`/api/players/meetings?id=${encodeURIComponent(meetingId)}`, {
+        method: 'DELETE',
+      });
 
-      if (supabaseError) throw supabaseError;
+      const result = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(result?.error || 'Error al eliminar la reunión');
+      }
+
       setMeetings((prev) => prev.filter((m) => m.id !== meetingId));
       return true;
     } catch (err: any) {
