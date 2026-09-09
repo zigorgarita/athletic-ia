@@ -622,28 +622,17 @@ export function TacticaClient() {
         analisis_modelo_juego: analisisModeloJuego && Object.keys(analisisModeloJuego).length > 0 ? analisisModeloJuego : null
       };
 
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
-      let error;
+      const lineupPayload = currentLineupId ? { ...payload, id: currentLineupId } : payload;
+      const res = await fetch('/api/tactica/lineups', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(lineupPayload)
+      });
 
-      if (currentLineupId) {
-        const res = await supabase.rpc('exec_secure_upsert', {
-          target_table: 'tactical_lineups',
-          payload: { ...payload, id: currentLineupId },
-          conflict_columns: ['id'],
-          staff_passkey: passkey
-        });
-        error = res.error;
-      } else {
-        const res = await supabase.rpc('exec_secure_upsert', {
-          target_table: 'tactical_lineups',
-          payload: payload,
-          conflict_columns: null,
-          staff_passkey: passkey
-        });
-        error = res.error;
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || `Error ${res.status} al guardar la pizarra.`);
       }
-
-      if (error) throw error;
 
       // Save Plan táctico of the Match if connected
       if (selectedMatchId) {
@@ -960,13 +949,13 @@ export function TacticaClient() {
     e.stopPropagation();
     if (!confirm('¿Seguro que deseas eliminar esta pizarra táctica?')) return;
     try {
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
-      const { error } = await supabase.rpc('exec_secure_delete', {
-        target_table: 'tactical_lineups',
-        record_id: id,
-        staff_passkey: passkey
+      const res = await fetch(`/api/tactica/lineups?id=${encodeURIComponent(id)}`, {
+        method: 'DELETE'
       });
-      if (error) throw error;
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || `Error ${res.status} al eliminar la pizarra.`);
+      }
       if (currentLineupId === id) {
         setCurrentLineupId(null);
         setLineupName('');

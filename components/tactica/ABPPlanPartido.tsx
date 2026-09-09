@@ -163,35 +163,20 @@ export function ABPPlanPartido({ players, matches, onExit }: ABPPlanPartidoProps
     if (!selectedMatchId) return;
     try {
       setLoading(true);
-      // 1. Get play roles to create empty assignments
-      const { data: roles } = await supabase.from('abp_player_roles').select('*').eq('abp_play_id', playId);
-      const normalizedRoles = (roles || []).map(r => ({
-        ...r,
-        rol_asignado: normalizeRoleName(r.rol_asignado)
-      }));
-      
-      // 2. Create Plan
-      const newOrder = matchAbpPlans.length + 1;
-      const { data: plan, error: planError } = await supabase
-        .from('match_abp_plans')
-        .insert([{
-           match_id: isDraft ? null : selectedMatchId,
-           abp_play_id: playId,
-           orden: newOrder
-        }])
-        .select()
-        .single();
-        
-      if (planError) throw planError;
-      
-      // 3. Create Empty Assignments
-      if (normalizedRoles && normalizedRoles.length > 0) {
-        const assignments = normalizedRoles.map(r => ({
-          match_abp_plan_id: plan.id,
-          abp_player_role_id: r.id,
-          player_id: null
-        }));
-        await supabase.from('match_abp_player_assignments').insert(assignments);
+      // 1. Create Plan via API (auto-initializes player assignments server-side)
+      const res = await fetch('/api/abp/match-plans', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          match_id: isDraft ? null : selectedMatchId,
+          abp_play_id: playId,
+          orden: matchAbpPlans.length + 1
+        })
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Error ${res.status} al añadir la jugada.`);
       }
       
       setSuccessMsg('Jugada añadida al plan correctamente.');
@@ -210,20 +195,32 @@ export function ABPPlanPartido({ players, matches, onExit }: ABPPlanPartidoProps
         r => r.match_abp_plan_id === planId && r.player_id === playerId
       );
 
+      const updates: Array<{ match_abp_plan_id: string; abp_player_role_id: string; player_id: string | null }> = [];
       if (existingAssignment && existingAssignment.abp_player_role_id !== roleId) {
         // Clear their old position
-        await supabase
-          .from('match_abp_player_assignments')
-          .update({ player_id: null })
-          .match({ match_abp_plan_id: planId, abp_player_role_id: existingAssignment.abp_player_role_id });
+        updates.push({
+          match_abp_plan_id: planId,
+          abp_player_role_id: existingAssignment.abp_player_role_id,
+          player_id: null
+        });
       }
 
-      const { error } = await supabase
-        .from('match_abp_player_assignments')
-        .update({ player_id: playerId })
-        .match({ match_abp_plan_id: planId, abp_player_role_id: roleId });
-      
-      if (error) throw error;
+      updates.push({
+        match_abp_plan_id: planId,
+        abp_player_role_id: roleId,
+        player_id: playerId
+      });
+
+      const assignRes = await fetch('/api/abp/match-assignments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ updates })
+      });
+
+      if (!assignRes.ok) {
+        const errData = await assignRes.json().catch(() => ({}));
+        throw new Error(errData.error || `Error ${assignRes.status} al asignar jugador.`);
+      }
       
       setMatchAbpRoles(prev => prev.map(r => {
         if (r.match_abp_plan_id === planId) {
@@ -243,12 +240,22 @@ export function ABPPlanPartido({ players, matches, onExit }: ABPPlanPartidoProps
 
   const handleRemovePlayer = async (planId: string, roleId: string) => {
     try {
-      const { error } = await supabase
-        .from('match_abp_player_assignments')
-        .update({ player_id: null })
-        .match({ match_abp_plan_id: planId, abp_player_role_id: roleId });
-      
-      if (error) throw error;
+      const remRes = await fetch('/api/abp/match-assignments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          updates: [{
+            match_abp_plan_id: planId,
+            abp_player_role_id: roleId,
+            player_id: null
+          }]
+        })
+      });
+
+      if (!remRes.ok) {
+        const errData = await remRes.json().catch(() => ({}));
+        throw new Error(errData.error || `Error ${remRes.status} al quitar jugador.`);
+      }
       
       setMatchAbpRoles(prev => prev.map(r => 
         (r.match_abp_plan_id === planId && r.abp_player_role_id === roleId) 
@@ -266,10 +273,21 @@ export function ABPPlanPartido({ players, matches, onExit }: ABPPlanPartidoProps
    */
   const handleUpdateLabelPosition = async (roleId: string, position: 'top' | 'bottom' | 'left' | 'right') => {
     try {
-      await supabase
-        .from('abp_player_roles')
-        .update({ label_position: position })
-        .eq('id', roleId);
+      const roleRes = await fetch('/api/abp/roles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          roles: [{
+            id: roleId,
+            label_position: position
+          }]
+        })
+      });
+
+      if (!roleRes.ok) {
+        const errData = await roleRes.json().catch(() => ({}));
+        throw new Error(errData.error || `Error ${roleRes.status} al actualizar posición de etiqueta.`);
+      }
 
       // Actualiza el estado local para reflejar el cambio inmediatamente
       setMatchAbpRoles(prev => prev.map(r =>
@@ -319,12 +337,17 @@ export function ABPPlanPartido({ players, matches, onExit }: ABPPlanPartidoProps
         }
       }
       
-      // Execute all updates sequentially or via bulk
-      for (const update of updates) {
-        await supabase
-          .from('match_abp_player_assignments')
-          .update({ player_id: update.player_id })
-          .match({ match_abp_plan_id: update.match_abp_plan_id, abp_player_role_id: update.abp_player_role_id });
+      // Execute all updates via secure server-side endpoint
+      if (updates.length > 0) {
+        const autoRes = await fetch('/api/abp/match-assignments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ updates })
+        });
+        if (!autoRes.ok) {
+          const errData = await autoRes.json().catch(() => ({}));
+          throw new Error(errData.error || `Error ${autoRes.status} al autoasignar jugadores.`);
+        }
       }
       
       setMatchAbpRoles(newRolesState);
@@ -352,8 +375,21 @@ export function ABPPlanPartido({ players, matches, onExit }: ABPPlanPartidoProps
     
     try {
       setLoading(true);
-      await supabase.from('match_abp_plans').update({ orden: targetOrder }).eq('id', currentPlan.id);
-      await supabase.from('match_abp_plans').update({ orden: currentOrder }).eq('id', targetPlan.id);
+      const reorderRes = await fetch('/api/abp/match-plans', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          reorder: [
+            { id: currentPlan.id, orden: targetOrder },
+            { id: targetPlan.id, orden: currentOrder }
+          ]
+        })
+      });
+
+      if (!reorderRes.ok) {
+        const errData = await reorderRes.json().catch(() => ({}));
+        throw new Error(errData.error || `Error ${reorderRes.status} al reordenar.`);
+      }
       
       await loadMatchPlans();
     } catch(e: unknown) {
@@ -366,7 +402,15 @@ export function ABPPlanPartido({ players, matches, onExit }: ABPPlanPartidoProps
     if (!confirm('¿Seguro que quieres quitar esta jugada del plan?')) return;
     try {
       setLoading(true);
-      await supabase.from('match_abp_plans').delete().eq('id', planId);
+      const delPlanRes = await fetch(`/api/abp/match-plans?id=${encodeURIComponent(planId)}`, {
+        method: 'DELETE'
+      });
+
+      if (!delPlanRes.ok) {
+        const errData = await delPlanRes.json().catch(() => ({}));
+        throw new Error(errData.error || `Error ${delPlanRes.status} al borrar el plan.`);
+      }
+
       await loadMatchPlans();
     } catch(e: unknown) {
       setErrorMsg('Error al borrar plan: ' + (e as Error).message);
@@ -383,55 +427,29 @@ export function ABPPlanPartido({ players, matches, onExit }: ABPPlanPartidoProps
       const { data: originalPlay, error: pErr } = await supabase.from('abp_plays').select('*').eq('id', playId).single();
       if (pErr) throw pErr;
       
-      // 2. Clone play
+      // 2. Clone play data
       const newPlayData = { ...originalPlay };
       delete newPlayData.id;
       delete newPlayData.created_at;
       newPlayData.titulo = `${originalPlay.titulo} (Copia Jornada)`;
       
-      const { data: newPlay, error: newPlayErr } = await supabase.from('abp_plays').insert([newPlayData]).select().single();
-      if (newPlayErr) throw newPlayErr;
-      
-      // 3. Clone original roles mapping to new play
+      // 3. Get original roles to copy
       const { data: originalRoles } = await supabase.from('abp_player_roles').select('*').eq('abp_play_id', playId);
-      
-      let newRoles = [];
-      if (originalRoles && originalRoles.length > 0) {
-         const rolesToInsert = originalRoles.map(r => {
-           const nr = { ...r };
-           delete nr.id;
-           delete nr.created_at;
-           nr.abp_play_id = newPlay.id;
-           nr.rol_asignado = normalizeRoleName(nr.rol_asignado);
-           return nr;
-         });
-         const { data: insertedRoles, error: rolesErr } = await supabase.from('abp_player_roles').insert(rolesToInsert).select();
-         if (rolesErr) throw rolesErr;
-         newRoles = insertedRoles;
-      }
-      
-      // 4. Get current assignments for this plan
-      const currentAssignments = matchAbpRoles.filter(r => r.match_abp_plan_id === planId);
-      
-      // 5. Delete old assignments
-      await supabase.from('match_abp_player_assignments').delete().eq('match_abp_plan_id', planId);
-      
-      // 6. Update plan to point to new play_id
-      await supabase.from('match_abp_plans').update({ abp_play_id: newPlay.id }).eq('id', planId);
-      
-      // 7. Create new assignments pointing to the new roles, preserving player_id
-      if (newRoles.length > 0) {
-         const newAssignments = newRoles.map(nr => {
-            // Find which player was assigned to the old role with the same orden/etiqueta
-            const oldRole = originalRoles?.find(or => or.orden === nr.orden && or.rol_asignado === nr.rol_asignado);
-            const oldAssignment = oldRole ? currentAssignments.find(ca => ca.abp_player_role_id === oldRole.id) : null;
-            return {
-               match_abp_plan_id: planId,
-               abp_player_role_id: nr.id,
-               player_id: oldAssignment ? oldAssignment.player_id : null
-            };
-         });
-         await supabase.from('match_abp_player_assignments').insert(newAssignments);
+
+      const cloneRes = await fetch('/api/abp/match-plans', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'customize_for_match',
+          plan_id: planId,
+          new_play_data: newPlayData,
+          roles_to_copy: originalRoles || []
+        })
+      });
+
+      if (!cloneRes.ok) {
+        const errData = await cloneRes.json().catch(() => ({}));
+        throw new Error(errData.error || `Error ${cloneRes.status} al convertir la jugada.`);
       }
       
       setSuccessMsg('Jugada convertida en independiente correctamente.');

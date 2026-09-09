@@ -1,8 +1,6 @@
 import { useState, useCallback } from 'react';
 import { AIMessage, TacticalAIContext, TacticalRoleCard, KnowledgeEntry } from '@/types';
 import { useEditMode } from '@/context/EditModeContext';
-import { supabase } from '@/lib/supabase';
-import { getStaffPasskey } from '@/lib/passkey';
 
 export function useTacticalAI() {
   const [messages, setMessages] = useState<AIMessage[]>([]);
@@ -196,18 +194,20 @@ export function useTacticalAI() {
         ...entry,
         activo: true,
         creado_por: 'Asistente IA',
-        temporada: '2026-27',
-        updated_at: new Date().toISOString()
+        temporada: '2026-27'
       };
 
-      const { error: saveErr } = await supabase.rpc('exec_secure_upsert', {
-        target_table: 'knowledge_entries',
-        payload,
-        conflict_columns: ['id'],
-        staff_passkey: getStaffPasskey()
+      const response = await fetch('/api/knowledge/entries', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
       });
 
-      if (saveErr) throw saveErr;
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Error ${response.status} al guardar en la biblioteca.`);
+      }
+
       return true;
     } catch (err: any) {
       console.error('Error al guardar respuesta IA en la biblioteca:', err);
@@ -222,64 +222,23 @@ export function useTacticalAI() {
   const applyToRoleCards = useCallback(async (cards: Partial<TacticalRoleCard>[]): Promise<{ success: boolean; error?: any }> => {
     setLoading(true);
     setError(null);
-    console.log("=== APPLY TO ROLE CARDS: START ===");
-    console.log("Payload/Cards received:", JSON.stringify(cards, null, 2));
-    
     try {
       verifyWritePermission();
-      
-      const promises = cards.map(async (card, idx) => {
-        const cardToSave = { ...card };
-        let conflictCols: string[];
-        
-        if (cardToSave.match_plan_id) {
-          conflictCols = ['match_plan_id', 'posicion_label'];
-          cardToSave.matchup_id = null;
-        } else {
-          conflictCols = ['matchup_id', 'posicion_label'];
-          cardToSave.match_plan_id = null;
-        }
-          
-        console.log(`[Card ${idx}] Saving:`, {
-          posicion_label: cardToSave.posicion_label,
-          matchup_id: cardToSave.matchup_id,
-          match_plan_id: cardToSave.match_plan_id,
-          conflictCols
-        });
 
-        const rpcRes = await supabase.rpc('exec_secure_upsert', {
-          target_table: 'tactical_role_cards',
-          payload: cardToSave,
-          conflict_columns: conflictCols,
-          staff_passkey: getStaffPasskey()
-        });
-
-        console.log(`[Card ${idx}] RPC Raw Response:`, JSON.stringify(rpcRes, null, 2));
-        
-        if (rpcRes.error) {
-          console.error(`[Card ${idx}] RPC Error details:`, {
-            code: rpcRes.error.code,
-            message: rpcRes.error.message,
-            details: rpcRes.error.details,
-            hint: rpcRes.error.hint
-          });
-          throw rpcRes.error;
-        }
-        
-        return rpcRes;
+      const response = await fetch('/api/tactica/role-cards', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cards })
       });
 
-      await Promise.all(promises);
-      console.log("=== APPLY TO ROLE CARDS: SUCCESS ===");
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Error ${response.status} al guardar fichas de rol.`);
+      }
+
       return { success: true };
     } catch (err: any) {
-      console.error('=== APPLY TO ROLE CARDS: EXCEPTION ===');
-      console.error('Error object:', err);
-      console.error('Error code:', err.code);
-      console.error('Error message:', err.message);
-      console.error('Error details:', err.details);
-      console.error('Error hint:', err.hint);
-      
+      console.error('Error al guardar fichas de rol sugeridas:', err);
       setError(err.message || 'Error al guardar fichas de rol sugeridas.');
       return { success: false, error: err };
     } finally {

@@ -1,6 +1,5 @@
 import { useState, useCallback } from 'react';
 import { useEditMode } from '@/context/EditModeContext';
-import { getStaffPasskey } from '@/lib/passkey';
 
 export interface TacticalAnalystPlayer {
   id: string;
@@ -41,7 +40,6 @@ export function useTacticalAnalyst() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { verifyWritePermission } = useEditMode();
-  const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
 
   const analyzeMatch = useCallback(async (payload: TacticalAnalystPayload): Promise<TacticalAnalystReport | null> => {
     setIsAnalyzing(true);
@@ -50,13 +48,10 @@ export function useTacticalAnalyst() {
     try {
       verifyWritePermission();
 
-      const passkey = getStaffPasskey() || process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
       const response = await fetch('/api/tactical-analyst', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'x-coach-staff-passkey': passkey,
-          'x-staff-passkey': passkey
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify(payload)
       });
@@ -77,7 +72,7 @@ export function useTacticalAnalyst() {
     } finally {
       setIsAnalyzing(false);
     }
-  }, [verifyWritePermission, passkey]);
+  }, [verifyWritePermission]);
 
   return {
     analyzeMatch,

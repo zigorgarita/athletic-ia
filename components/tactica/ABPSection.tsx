@@ -881,30 +881,11 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
       }
 
       const isThrowIn = playType === 'Saque de banda ofensivo' || playType === 'Saque de banda defensivo';
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
-      const { data: playRes, error: insertError } = await supabase
-        .rpc('exec_secure_upsert', {
-          target_table: 'abp_plays',
-          payload: {
-            tipo: playType,
-            titulo: playTitle,
-            descripcion: isRealPositionPlayType(playType)
-              ? serializePlayDescripcion('1-4-3-3', playDesc)
-              : (playDesc || null),
-            video_url: videoUrl,
-            zona: isThrowIn ? playZone : null
-          },
-          conflict_columns: null,
-          staff_passkey: passkey
-        });
-
-      if (insertError) throw insertError;
 
       // Insert default roles & positions for the chosen ABPType
       let rolesPayload;
       if (isRealPositionPlayType(playType)) {
         rolesPayload = SISTEMAS_TACTICOS['1-4-3-3'].map((sp, index) => ({
-          abp_play_id: playRes.id,
           player_id: null,
           rol_asignado: sp.role,
           posicion_x: sp.x,
@@ -916,7 +897,6 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
       } else {
         const defaultRoles = getPositionsForPlay(playType, isThrowIn ? playZone : null);
         rolesPayload = defaultRoles.map((dr, index) => ({
-          abp_play_id: playRes.id,
           player_id: null,
           rol_asignado: dr.role,
           posicion_x: dr.x,
@@ -926,16 +906,26 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
         }));
       }
 
-      if (rolesPayload.length > 0 && playRes) {
-        const { error: rolesError } = await supabase
-          .rpc('exec_secure_bulk_upsert', {
-            target_table: 'abp_player_roles',
-            payloads: rolesPayload,
-            conflict_columns: null,
-            staff_passkey: passkey
-          });
+      const res = await fetch('/api/abp/plays', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          play: {
+            tipo: playType,
+            titulo: playTitle,
+            descripcion: isRealPositionPlayType(playType)
+              ? serializePlayDescripcion('1-4-3-3', playDesc)
+              : (playDesc || null),
+            video_url: videoUrl,
+            zona: isThrowIn ? playZone : null
+          },
+          roles: rolesPayload
+        })
+      });
 
-        if (rolesError) console.error('Error creating default roles:', rolesError);
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Error ${res.status} al crear la jugada.`);
       }
 
       setIsPlayModalOpen(false);
@@ -978,23 +968,23 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
         ? serializePlayDescripcion(selectedTacticalSystem, playDesc)
         : (playDesc || null);
 
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
-      const { error: updateError } = await supabase
-        .rpc('exec_secure_upsert', {
-          target_table: 'abp_plays',
-          payload: {
-            id: selectedPlay.id,
-            titulo: playTitle,
-            tipo: playType,
-            descripcion: nextDesc,
-            video_url: videoUrl,
-            zona: isThrowIn ? playZone : null
-          },
-          conflict_columns: ['id'],
-          staff_passkey: passkey
-        });
+      const updateRes = await fetch('/api/abp/plays', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: selectedPlay.id,
+          titulo: playTitle,
+          tipo: playType,
+          descripcion: nextDesc,
+          video_url: videoUrl,
+          zona: isThrowIn ? playZone : null
+        })
+      });
 
-      if (updateError) throw updateError;
+      if (!updateRes.ok) {
+        const errData = await updateRes.json().catch(() => ({}));
+        throw new Error(errData.error || `Error ${updateRes.status} al actualizar la jugada.`);
+      }
 
       setIsEditModalOpen(false);
       setVideoFile(null);
@@ -1060,23 +1050,23 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
       );
 
       // 2. Asociar exclusivamente a la abp_play seleccionada
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
-      const { error: updateError } = await supabase
-        .rpc('exec_secure_upsert', {
-          target_table: 'abp_plays',
-          payload: {
-            id: targetPlay.id,
-            tipo: targetPlay.tipo,
-            titulo: targetPlay.titulo,
-            descripcion: targetPlay.descripcion,
-            video_url: publicUrl,
-            zona: targetPlay.zona
-          },
-          conflict_columns: ['id'],
-          staff_passkey: passkey
-        });
+      const updateRes = await fetch('/api/abp/plays', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: targetPlay.id,
+          tipo: targetPlay.tipo,
+          titulo: targetPlay.titulo,
+          descripcion: targetPlay.descripcion,
+          video_url: publicUrl,
+          zona: targetPlay.zona
+        })
+      });
 
-      if (updateError) throw updateError;
+      if (!updateRes.ok) {
+        const errData = await updateRes.json().catch(() => ({}));
+        throw new Error(errData.error || `Error ${updateRes.status} al asociar el vídeo.`);
+      }
 
       // 3. Actualizar estado local reactivamente para reproducción inmediata
       const updatedPlay = {
@@ -1115,49 +1105,37 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
   async function handleDuplicatePlay() {
     if (!selectedPlay) return;
     setIsDuplicating(true);
-    setErrorMsg(null);
-    setSuccessMsg(null);
-
     try {
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
-      const { data: newPlay, error: playError } = await supabase
-        .rpc('exec_secure_upsert', {
-          target_table: 'abp_plays',
-          payload: {
+      const rolesPayload = playRoles.map(r => ({
+        player_id: r.player_id,
+        rol_asignado: r.rol_asignado,
+        posicion_x: r.posicion_x,
+        posicion_y: r.posicion_y,
+        etiqueta: r.etiqueta,
+        comentario: r.comentario,
+        orden: r.orden
+      }));
+
+      const dupRes = await fetch('/api/abp/plays', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          play: {
             titulo: `${selectedPlay.titulo} (Copia)`,
             tipo: selectedPlay.tipo,
             descripcion: selectedPlay.descripcion,
             video_url: selectedPlay.video_url
           },
-          conflict_columns: null,
-          staff_passkey: passkey
-        });
+          roles: rolesPayload
+        })
+      });
 
-      if (playError) throw playError;
-
-      // 2. Clone all player roles / positions
-      if (playRoles.length > 0 && newPlay) {
-        const rolesPayload = playRoles.map(r => ({
-          abp_play_id: newPlay.id,
-          player_id: r.player_id,
-          rol_asignado: r.rol_asignado,
-          posicion_x: r.posicion_x,
-          posicion_y: r.posicion_y,
-          etiqueta: r.etiqueta,
-          comentario: r.comentario,
-          orden: r.orden
-        }));
-
-        const { error: rolesError } = await supabase
-          .rpc('exec_secure_bulk_upsert', {
-            target_table: 'abp_player_roles',
-            payloads: rolesPayload,
-            conflict_columns: null,
-            staff_passkey: passkey
-          });
-
-        if (rolesError) throw rolesError;
+      if (!dupRes.ok) {
+        const errData = await dupRes.json().catch(() => ({}));
+        throw new Error(errData.error || `Error ${dupRes.status} al duplicar la jugada.`);
       }
+
+      const { data: newPlay } = await dupRes.json();
 
       setSelectedPlay(newPlay);
       await loadPlays();
@@ -1233,16 +1211,13 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
     setErrorMsg(null);
 
     try {
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
-
-      // Ejecución atómica y transaccional (Todo o Nada)
-      const { error: rpcError } = await supabase.rpc('delete_abp_play_atomic', {
-        p_play_id: playToDelete.playId,
-        staff_passkey: passkey
+      const delRes = await fetch(`/api/abp/plays?id=${encodeURIComponent(playToDelete.playId)}`, {
+        method: 'DELETE'
       });
 
-      if (rpcError) {
-        throw new Error(rpcError.message || 'Fallo en la transacción de borrado');
+      if (!delRes.ok) {
+        const errData = await delRes.json().catch(() => ({}));
+        throw new Error(errData.error || `Error ${delRes.status} al eliminar la jugada.`);
       }
 
       // Limpiar selección si correspondía a la jugada borrada
@@ -1274,7 +1249,6 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
     setSuccessMsg(null);
 
     try {
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
       const rolesPayload = playRoles.map((role) => ({
         id: role.id,
         abp_play_id: selectedPlay.id,
@@ -1288,13 +1262,16 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
         label_position: role.label_position ?? 'bottom'
       }));
 
-      const { error } = await supabase.rpc('exec_secure_bulk_upsert', {
-        target_table: 'abp_player_roles',
-        payloads: rolesPayload,
-        conflict_columns: ['id'],
-        staff_passkey: passkey
+      const rolesRes = await fetch('/api/abp/roles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roles: rolesPayload })
       });
-      if (error) throw error;
+
+      if (!rolesRes.ok) {
+        const errData = await rolesRes.json().catch(() => ({}));
+        throw new Error(errData.error || `Error ${rolesRes.status} al guardar roles.`);
+      }
 
       setSuccessMsg('Posiciones y roles guardados correctamente en Supabase.');
       loadPlayRoles(selectedPlay.id);
@@ -1313,27 +1290,29 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
     setErrorMsg(null);
 
     try {
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
-      const { data, error } = await supabase
-        .rpc('exec_secure_upsert', {
-          target_table: 'abp_player_roles',
-          payload: {
-            abp_play_id: selectedPlay.id,
-            player_id: null,
-            rol_asignado: 'Libre',
-            posicion_x: 45.0 + (Math.random() * 10), // Randomize slightly around center
-            posicion_y: 40.0 + (playRoles.length * 2), // Cascade downwards
-            etiqueta: 'LIB',
-            orden: playRoles.length + 1
-          },
-          conflict_columns: null,
-          staff_passkey: passkey
-        });
+      const res = await fetch('/api/abp/roles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          abp_play_id: selectedPlay.id,
+          player_id: null,
+          rol_asignado: 'Libre',
+          posicion_x: 45.0 + (Math.random() * 10),
+          posicion_y: 40.0 + (playRoles.length * 2),
+          etiqueta: 'LIB',
+          orden: playRoles.length + 1
+        })
+      });
 
-      if (error) throw error;
-      
-      if (data) {
-        setPlayRoles(prev => [...prev, { ...data, player: undefined }]);
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Error ${res.status} al añadir rol.`);
+      }
+
+      const json = await res.json();
+      const newRole = Array.isArray(json.data) ? json.data[0] : json.data;
+      if (newRole) {
+        setPlayRoles(prev => [...prev, { ...newRole, player: undefined }]);
       }
     } catch (err) {
       console.error('Error adding role node:', err);
@@ -1344,13 +1323,15 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
   // --- REMOVE ROLE NODE FROM THE BOARD ---
   async function handleRemoveRoleNode(roleId: string) {
     try {
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
-      const { error } = await supabase.rpc('exec_secure_delete', {
-        target_table: 'abp_player_roles',
-        record_id: roleId,
-        staff_passkey: passkey
+      const res = await fetch(`/api/abp/roles?id=${encodeURIComponent(roleId)}`, {
+        method: 'DELETE'
       });
-      if (error) throw error;
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Error ${res.status} al borrar el puesto.`);
+      }
+
       setPlayRoles(prev => prev.filter(r => r.id !== roleId));
       setSuccessMsg('Puesto eliminado del campo.');
     } catch (err) {
@@ -1370,17 +1351,14 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
     setSuccessMsg(null);
     
     try {
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
       // 1. Delete all existing roles for this play
-      const { error: deleteError } = await supabase
-        .rpc('exec_secure_delete_by_col', {
-          target_table: 'abp_player_roles',
-          col_name: 'abp_play_id',
-          col_value: selectedPlay.id,
-          staff_passkey: passkey
-        });
-        
-      if (deleteError) throw deleteError;
+      const delRolesRes = await fetch(`/api/abp/roles?abp_play_id=${encodeURIComponent(selectedPlay.id)}`, {
+        method: 'DELETE'
+      });
+      if (!delRolesRes.ok) {
+        const errData = await delRolesRes.json().catch(() => ({}));
+        throw new Error(errData.error || 'Error al eliminar roles existentes.');
+      }
 
       // 2. Insert new positions based on selected system
       const systemPositions = SISTEMAS_TACTICOS[systemKey];
@@ -1395,28 +1373,28 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
         orden: index + 1
       }));
 
-      const { error: insertError } = await supabase
-        .rpc('exec_secure_bulk_upsert', {
-          target_table: 'abp_player_roles',
-          payloads: rolesPayload,
-          conflict_columns: null,
-          staff_passkey: passkey
-        });
-
-      if (insertError) throw insertError;
+      const insRolesRes = await fetch('/api/abp/roles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roles: rolesPayload })
+      });
+      if (!insRolesRes.ok) {
+        const errData = await insRolesRes.json().catch(() => ({}));
+        throw new Error(errData.error || 'Error al insertar nuevos roles del sistema.');
+      }
 
       // Update play description in DB to store system
       const { descripcion_texto } = parsePlayDescripcion(selectedPlay.descripcion);
       const nextDesc = serializePlayDescripcion(systemKey, descripcion_texto);
-      const { error: playError } = await supabase
-        .rpc('exec_secure_upsert', {
-          target_table: 'abp_plays',
-          payload: { id: selectedPlay.id, descripcion: nextDesc },
-          conflict_columns: ['id'],
-          staff_passkey: passkey
-        });
-
-      if (playError) throw playError;
+      const updatePlayRes = await fetch('/api/abp/plays', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: selectedPlay.id, descripcion: nextDesc })
+      });
+      if (!updatePlayRes.ok) {
+        const errData = await updatePlayRes.json().catch(() => ({}));
+        throw new Error(errData.error || 'Error al actualizar descripción de la jugada.');
+      }
 
       // Update state
       setSelectedPlay(prev => prev ? { ...prev, descripcion: nextDesc } : null);
@@ -1444,12 +1422,13 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
     
     try {
       // 1. Delete all existing roles for this play
-      const { error: deleteError } = await supabase
-        .from('abp_player_roles')
-        .delete()
-        .eq('abp_play_id', selectedPlay.id);
-        
-      if (deleteError) throw deleteError;
+      const delRolesRes = await fetch(`/api/abp/roles?abp_play_id=${encodeURIComponent(selectedPlay.id)}`, {
+        method: 'DELETE'
+      });
+      if (!delRolesRes.ok) {
+        const errData = await delRolesRes.json().catch(() => ({}));
+        throw new Error(errData.error || 'Error al eliminar roles existentes.');
+      }
 
       // 2. Insert new default roles
       let rolesPayload;
@@ -1479,16 +1458,15 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
       }
 
       if (rolesPayload.length > 0) {
-        const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
-        const { error: insertError } = await supabase
-          .rpc('exec_secure_bulk_upsert', {
-            target_table: 'abp_player_roles',
-            payloads: rolesPayload,
-            conflict_columns: null,
-            staff_passkey: passkey
-          });
-
-        if (insertError) throw insertError;
+        const insRolesRes = await fetch('/api/abp/roles', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ roles: rolesPayload })
+        });
+        if (!insRolesRes.ok) {
+          const errData = await insRolesRes.json().catch(() => ({}));
+          throw new Error(errData.error || 'Error al restablecer roles.');
+        }
       }
 
       // 3. Reload roles

@@ -75,16 +75,18 @@ export function useTacticalSystems() {
     setError(null);
     try {
       verifyWritePermission();
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
 
-      const { data, error: upsertErr } = await supabase.rpc('exec_secure_upsert', {
-        target_table: 'tactical_match_plans',
-        payload: plan,
-        conflict_columns: ['match_id'],
-        staff_passkey: passkey
+      const response = await fetch('/api/tactica/match-plans', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(plan)
       });
 
-      if (upsertErr) throw upsertErr;
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Error ${response.status} al guardar el plan táctico.`);
+      }
+
       return true;
     } catch (err: any) {
       console.error('Error saving match plan:', err);

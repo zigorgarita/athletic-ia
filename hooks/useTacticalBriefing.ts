@@ -1,6 +1,5 @@
 import { useState, useCallback } from 'react';
 import { useEditMode } from '@/context/EditModeContext';
-import { getStaffPasskey } from '@/lib/passkey';
 import { Observation } from '@/types';
 
 export interface BriefingPlayerPayload {
@@ -69,13 +68,10 @@ export function useTacticalBriefing() {
     try {
       verifyWritePermission();
 
-      const passkey = getStaffPasskey() || process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
       const response = await fetch('/api/tactical-briefing', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'x-coach-staff-passkey': passkey,
-          'x-staff-passkey': passkey
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           ...payload,
@@ -106,13 +102,10 @@ export function useTacticalBriefing() {
     try {
       verifyWritePermission();
 
-      const passkey = getStaffPasskey() || process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
       const response = await fetch('/api/tactical-briefing', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'x-coach-staff-passkey': passkey,
-          'x-staff-passkey': passkey
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           ...payload,

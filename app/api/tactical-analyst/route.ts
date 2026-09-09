@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createProvider, AIMessage } from '@/lib/ai/provider';
+import { isCoachSessionAuthorized, isCoachSessionAuthorizedFromRequest } from '@/lib/auth/staff-session';
 
 // Simple in-memory rate limiting
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
@@ -33,13 +34,11 @@ export async function POST(request: Request) {
     );
   }
 
-  // 2. Validate passkey
-  const staffPasskey = request.headers.get('x-staff-passkey');
-  const expectedPasskey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
-  
-  if (staffPasskey !== expectedPasskey) {
+  // 2. Validate coach staff session
+  const authorized = (await isCoachSessionAuthorized()) || isCoachSessionAuthorizedFromRequest(request);
+  if (!authorized) {
     return NextResponse.json(
-      { error: 'No autorizado. Contraseña de staff incorrecta.' },
+      { error: 'No autorizado: Sesión de cuerpo técnico requerida.' },
       { status: 401 }
     );
   }

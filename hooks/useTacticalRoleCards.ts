@@ -57,21 +57,18 @@ export function useTacticalRoleCards() {
     setError(null);
     try {
       verifyWritePermission();
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
 
-      // Determine correct conflict constraint
-      const conflictCols = card.match_plan_id 
-        ? ['match_plan_id', 'posicion_label'] 
-        : ['matchup_id', 'posicion_label'];
-
-      const { error: upsertErr } = await supabase.rpc('exec_secure_upsert', {
-        target_table: 'tactical_role_cards',
-        payload: card,
-        conflict_columns: conflictCols,
-        staff_passkey: passkey
+      const response = await fetch('/api/tactica/role-cards', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(card)
       });
 
-      if (upsertErr) throw upsertErr;
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Error ${response.status} al guardar la ficha de rol.`);
+      }
+
       return true;
     } catch (err: any) {
       console.error('Error saving role card:', err);
