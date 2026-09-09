@@ -29,6 +29,7 @@ import { DriveUploadContext } from '@/lib/drive-folders';
 import { uploadToStorage } from '@/lib/storage';
 import { useOfficialMatches, OfficialMatch, OfficialPlayerStat } from '@/hooks/useOfficialMatches';
 import { OfficialMatchModal } from '@/components/rivales/modals/OfficialMatchModal';
+import { DieLigenTimeline } from './DieLigenTimeline';
 import {
   Trophy, MapPin, Users, Shield, Film,
   BookOpen, Plus, FolderOpen, Save, Trash2, FileText, ClipboardList,
@@ -2202,26 +2203,10 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
                 
                 {/* COLUMNA IZQUIERDA: LÍNEA TEMPORAL DE EVENTOS (7 cols) */}
                 <div className="lg:col-span-7 space-y-6">
-                  <div className="p-5 bg-slate-900/30 border border-slate-800 rounded-2xl space-y-5">
-                    <div className="flex items-center justify-between border-b border-slate-850 pb-2.5">
-                      <h4 className="text-xs font-black uppercase text-slate-200 tracking-widest">
-                        Línea Temporal de Eventos
-                      </h4>
-                      <span className="text-[9px] font-bold text-slate-400 bg-slate-950 px-2 py-0.5 rounded-full border border-slate-800 uppercase tracking-wider">
-                        DIE LIGEN · Pendiente conexión
-                      </span>
-                    </div>
-
-                    <div className="p-8 text-center text-slate-500 space-y-3 bg-slate-950/20 border border-dashed border-slate-800/80 rounded-xl">
-                      <Activity className="h-8 w-8 text-slate-700 mx-auto" />
-                      <div className="max-w-md mx-auto space-y-1">
-                        <h5 className="text-xs font-bold text-slate-300">Registro de Eventos en Tiempo Real</h5>
-                        <p className="text-[11px] text-slate-500 leading-relaxed">
-                          Espacio reservado para la sincronización automática de goles, tarjetas, sustituciones e incidencias cronológicas a través de Die Ligen.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
+                  <DieLigenTimeline
+                    jornada={match.jornada}
+                    isOfficialMatch={match.tipo_partido === 'LIGA'}
+                  />
                 </div>
 
                 {/* COLUMNA DERECHA: MARCADOR Y ESTADÍSTICAS (5 cols) */}

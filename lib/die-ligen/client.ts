@@ -272,3 +272,284 @@ export async function getDieLigenStatus(): Promise<DieLigenStatusResult> {
     };
   }
 }
+
+// ============================================================================
+// FASE 2B: LÍNEA TEMPORAL DINÁMICA DE EVENTOS (DIE LIGEN)
+// ============================================================================
+
+export const INDAUTXU_DIE_LIGEN_TEAM_ID = '3f859a44-bb09-46d9-acd5-de7de0ba8aca';
+export const DHJ2_CONTEST_ID = '75bfb443-8fe9-4bdc-ae28-d42b3e1d19cf';
+const DELIVERY_BASE_URL = 'https://coaches.ligen.football/api/delivery';
+
+/**
+ * Consulta endpoints internos de delivery de Die Ligen (coaching cockpit).
+ */
+export async function fetchDieLigenDelivery<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  const url = `${DELIVERY_BASE_URL}${cleanEndpoint}`;
+
+  let token = await getDieLigenToken(false);
+
+  let res = await fetch(url, {
+    ...options,
+    headers: {
+      ...options.headers,
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/json, text/plain, */*',
+    },
+    cache: 'no-store',
+  });
+
+  if (res.status === 401) {
+    token = await getDieLigenToken(true);
+    res = await fetch(url, {
+      ...options,
+      headers: {
+        ...options.headers,
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/json, text/plain, */*',
+      },
+      cache: 'no-store',
+    });
+
+    if (res.status === 401) {
+      throw new DieLigenError(
+        'La API de Die Ligen rechazó el token de acceso tras el reintento de autenticación (401).',
+        'DIE_LIGEN_UPSTREAM_UNAUTHORIZED'
+      );
+    }
+  }
+
+  if (!res.ok) {
+    throw new DieLigenError(
+      `Error en respuesta delivery de Die Ligen en ${cleanEndpoint} (HTTP ${res.status}).`,
+      'DIE_LIGEN_UPSTREAM_ERROR'
+    );
+  }
+
+  const contentType = res.headers.get('content-type') || '';
+  if (contentType.includes('application/json')) {
+    return (await res.json()) as T;
+  }
+
+  return (await res.text()) as unknown as T;
+}
+
+export interface DieLigenTimelineEvent {
+  id: string;
+  category: 'GOAL' | 'CARD' | 'SUBSTITUTION';
+  gameTime: number;
+  minuteString: string;
+  detailedTimeString?: string;
+  period: '1T' | '2T';
+  teamName: string;
+  isIndautxu: boolean;
+  scorerName?: string;
+  scorerDorsal?: number;
+  assistName?: string;
+  assistDorsal?: number;
+  scoreHome?: number;
+  scoreAway?: number;
+  goalDetail?: string;
+  cardType?: 'YELLOW' | 'RED';
+  offendingPlayerName?: string;
+  offendingPlayerDorsal?: number;
+  playerInName?: string;
+  playerInDorsal?: number;
+  playerOutName?: string;
+  playerOutDorsal?: number;
+}
+
+export interface DieLigenTimelineResult {
+  available: boolean;
+  gameId?: string;
+  jornada: number;
+  status?: string;
+  reason?: string;
+  scoreHome?: number | null;
+  scoreAway?: number | null;
+  homeTeamName?: string;
+  awayTeamName?: string;
+  eventsCount?: number;
+  events?: DieLigenTimelineEvent[];
+}
+
+/**
+ * Resuelve dinámicamente el partido del SD Indautxu en la jornada dada
+ * y devuelve los eventos nucleares (GOAL, CARD, SUBSTITUTION) ordenados cronológicamente.
+ */
+export async function getDieLigenTimelineForJornada(jornada: number): Promise<DieLigenTimelineResult> {
+  try {
+    // 1. Obtener calendario del torneo oficial
+    const contest = await fetchDieLigenDelivery<{
+      games?: Array<{
+        id: string;
+        round?: { roundOrderNumber?: number };
+        homeTeam?: { id?: string; name?: string };
+        awayTeam?: { id?: string; name?: string };
+        analysisStatus?: { i18NKey?: string };
+        scoreHome?: number | null;
+        scoreAway?: number | null;
+      }>;
+    }>(`/analysis/contest/${DHJ2_CONTEST_ID}`);
+
+    if (!contest?.games || !Array.isArray(contest.games)) {
+      return {
+        available: false,
+        jornada,
+        reason: 'No se pudo obtener el calendario del torneo en Die Ligen.',
+      };
+    }
+
+    // 2. Localizar el partido oficial donde participe SD Indautxu en esta jornada
+    const matchGame = contest.games.find((g) => {
+      const isIndautxu =
+        g.homeTeam?.id === INDAUTXU_DIE_LIGEN_TEAM_ID ||
+        g.awayTeam?.id === INDAUTXU_DIE_LIGEN_TEAM_ID;
+      return isIndautxu && g.round?.roundOrderNumber === jornada;
+    });
+
+    if (!matchGame) {
+      return {
+        available: false,
+        jornada,
+        reason: `No se encontró ningún partido oficial del SD Indautxu para la Jornada ${jornada} en Die Ligen.`,
+      };
+    }
+
+    const statusKey = matchGame.analysisStatus?.i18NKey || 'OPEN';
+    if (statusKey !== 'FINISHED') {
+      return {
+        available: false,
+        gameId: matchGame.id,
+        jornada,
+        status: statusKey,
+        reason: 'Partido pendiente de análisis en Die Ligen.',
+        homeTeamName: matchGame.homeTeam?.name,
+        awayTeamName: matchGame.awayTeam?.name,
+      };
+    }
+
+    // 3. Descargar análisis completo del partido
+    const gameData = await fetchDieLigenDelivery<{
+      gameInfo?: {
+        id: string;
+        scoreHome: number | null;
+        scoreAway: number | null;
+        homeTeam?: { id: string; name: string };
+        awayTeam?: { id: string; name: string };
+      };
+      events?: Array<{
+        id: string;
+        categoryName: string;
+        defensiveEvent: boolean;
+        gameTime: number;
+        eventTime: number;
+        gameTimeString: string;
+        gameTimeDetailedString?: string;
+        halftimeCode: string;
+        team?: { id: string; name: string };
+        teamType?: string;
+        teamScore?: number;
+        opponentScore?: number;
+        selectedPlayers?: Array<{
+          tag?: { i18NKey: string };
+          player?: { id: string; playerName: string; shirtNumber: number };
+        }>;
+        selectedLabels?: Array<{
+          tag?: { i18NKey: string };
+          i18NKey: string;
+        }>;
+      }>;
+    }>(`/analysis/game/${matchGame.id}`);
+
+    const rawEvents = gameData?.events || [];
+    if (rawEvents.length === 0) {
+      return {
+        available: false,
+        gameId: matchGame.id,
+        jornada,
+        status: 'NO_EVENTS',
+        reason: 'El partido no contiene eventos registrados en Die Ligen.',
+      };
+    }
+
+    // 4. Filtrar únicamente eventos nucleares válidos (defensiveEvent === false y GOAL, CARD, SUBSTITUTION)
+    const filtered = rawEvents
+      .filter(
+        (e) =>
+          !e.defensiveEvent &&
+          ['GOAL', 'CARD', 'SUBSTITUTION'].includes(e.categoryName)
+      )
+      .sort((a, b) => (a.gameTime ?? a.eventTime) - (b.gameTime ?? b.eventTime));
+
+    const events: DieLigenTimelineEvent[] = filtered.map((e) => {
+      const isIndautxu =
+        e.team?.id === INDAUTXU_DIE_LIGEN_TEAM_ID || e.teamType === 'AWAY';
+      const period: '1T' | '2T' =
+        e.halftimeCode === 'HALFTIME_ONE' ? '1T' : '2T';
+
+      const ev: DieLigenTimelineEvent = {
+        id: e.id,
+        category: e.categoryName as 'GOAL' | 'CARD' | 'SUBSTITUTION',
+        gameTime: e.gameTime ?? e.eventTime,
+        minuteString: e.gameTimeString || `${Math.floor((e.gameTime ?? e.eventTime) / 60)}'`,
+        detailedTimeString: e.gameTimeDetailedString,
+        period,
+        teamName: e.team?.name || (isIndautxu ? 'SD Indautxu' : 'Rival'),
+        isIndautxu,
+      };
+
+      if (e.categoryName === 'GOAL') {
+        const scorer = e.selectedPlayers?.find((p) => p.tag?.i18NKey === 'SCORER')?.player;
+        const assist = e.selectedPlayers?.find((p) => p.tag?.i18NKey === 'ASSIST_PROVIDER')?.player;
+        const situation = e.selectedLabels?.find((l) => l.tag?.i18NKey === 'SITUATION_LEADING_TO')?.i18NKey;
+        const location = e.selectedLabels?.find((l) => l.tag?.i18NKey === 'SHOT_LOCATION')?.i18NKey;
+
+        ev.scorerName = scorer?.playerName;
+        ev.scorerDorsal = scorer?.shirtNumber;
+        ev.assistName = assist?.playerName;
+        ev.assistDorsal = assist?.shirtNumber;
+        ev.scoreHome = gameData.gameInfo?.scoreHome ?? undefined;
+        ev.scoreAway = gameData.gameInfo?.scoreAway ?? undefined;
+        ev.goalDetail = situation || location || undefined;
+      } else if (e.categoryName === 'CARD') {
+        const offender = e.selectedPlayers?.find((p) => p.tag?.i18NKey === 'OFFENDING_PLAYER')?.player;
+        const cardType = e.selectedLabels?.find((l) => l.tag?.i18NKey === 'CARD_TYPE')?.i18NKey;
+
+        ev.offendingPlayerName = offender?.playerName;
+        ev.offendingPlayerDorsal = offender?.shirtNumber;
+        ev.cardType = cardType === 'RED' ? 'RED' : 'YELLOW';
+      } else if (e.categoryName === 'SUBSTITUTION') {
+        const pIn = e.selectedPlayers?.find((p) => p.tag?.i18NKey === 'PLAYER_IN')?.player;
+        const pOut = e.selectedPlayers?.find((p) => p.tag?.i18NKey === 'PLAYER_OUT')?.player;
+
+        ev.playerInName = pIn?.playerName;
+        ev.playerInDorsal = pIn?.shirtNumber;
+        ev.playerOutName = pOut?.playerName;
+        ev.playerOutDorsal = pOut?.shirtNumber;
+      }
+
+      return ev;
+    });
+
+    return {
+      available: true,
+      gameId: matchGame.id,
+      jornada,
+      scoreHome: gameData.gameInfo?.scoreHome,
+      scoreAway: gameData.gameInfo?.scoreAway,
+      homeTeamName: gameData.gameInfo?.homeTeam?.name,
+      awayTeamName: gameData.gameInfo?.awayTeam?.name,
+      eventsCount: events.length,
+      events,
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Error al consultar Die Ligen';
+    return {
+      available: false,
+      jornada,
+      reason: msg,
+    };
+  }
+}
