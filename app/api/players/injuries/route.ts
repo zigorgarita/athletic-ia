@@ -137,10 +137,10 @@ export async function PATCH(req: Request) {
     if (typeof updatesObj.diagnostico === 'string' && updatesObj.diagnostico.trim().length > 0) {
       allowedUpdates.diagnostico = updatesObj.diagnostico.trim();
     }
-    if (typeof updatesObj.informado_por === 'string' && (VALID_INFORMADO_POR as readonly string[]).includes(updatesObj.informado_por as any)) {
+    if (typeof updatesObj.informado_por === 'string' && (VALID_INFORMADO_POR as readonly string[]).includes(updatesObj.informado_por)) {
       allowedUpdates.informado_por = updatesObj.informado_por;
     }
-    if (typeof updatesObj.estado === 'string' && (VALID_ESTADOS as readonly string[]).includes(updatesObj.estado as any)) {
+    if (typeof updatesObj.estado === 'string' && (VALID_ESTADOS as readonly string[]).includes(updatesObj.estado)) {
       allowedUpdates.estado = updatesObj.estado;
     }
     if ('fecha_prevista_recuperacion' in updatesObj) {
