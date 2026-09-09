@@ -27,6 +27,8 @@ import { useTacticalAI } from '@/hooks/useTacticalAI';
 import { DriveResumableUploader } from '@/lib/drive-resumable';
 import { DriveUploadContext } from '@/lib/drive-folders';
 import { uploadToStorage } from '@/lib/storage';
+import { useOfficialMatches, OfficialMatch, OfficialPlayerStat } from '@/hooks/useOfficialMatches';
+import { OfficialMatchModal } from '@/components/rivales/modals/OfficialMatchModal';
 import {
   Trophy, MapPin, Users, Shield, Film,
   BookOpen, Plus, FolderOpen, Save, Trash2, FileText, ClipboardList,
@@ -177,6 +179,34 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
   // GPS Session & Data states
   const [gpsSession, setGpsSession] = useState<GPSSession | null>(null);
   const [gpsData, setGpsData] = useState<(GPSData & { player?: Player })[]>([]);
+
+  // Tab 5: Acta Oficial RFEF
+  const { loadMatchDetail } = useOfficialMatches();
+  const [officialMatch, setOfficialMatch] = useState<OfficialMatch | null>(null);
+  const [officialStats, setOfficialStats] = useState<OfficialPlayerStat[]>([]);
+  const [isOfficialModalOpen, setIsOfficialModalOpen] = useState(false);
+  const [loadingOfficialDetail, setLoadingOfficialDetail] = useState(false);
+
+  const handleOpenOfficialMatch = async () => {
+    if (!match?.official_match_id) return;
+    if (officialMatch && officialMatch.id === match.official_match_id) {
+      setIsOfficialModalOpen(true);
+      return;
+    }
+    try {
+      setLoadingOfficialDetail(true);
+      const detail = await loadMatchDetail(match.official_match_id);
+      if (detail && detail.match) {
+        setOfficialMatch(detail.match);
+        setOfficialStats(detail.stats);
+        setIsOfficialModalOpen(true);
+      }
+    } catch (err) {
+      console.error('Error al abrir acta oficial:', err);
+    } finally {
+      setLoadingOfficialDetail(false);
+    }
+  };
 
   const openAnalysisDocModal = (type: string, origin: 'Archivo' | 'Enlace') => {
     setDocType(type);
@@ -2142,9 +2172,28 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Estado:</span>
-                  <span className={`text-[10px] px-2.5 py-0.5 rounded font-extrabold border ${stateColor}`}>{matchState}</span>
+                <div className="flex items-center gap-3">
+                  {match?.official_match_id && (
+                    <button
+                      type="button"
+                      onClick={handleOpenOfficialMatch}
+                      disabled={loadingOfficialDetail}
+                      className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-950/80 hover:bg-slate-850 text-slate-200 hover:text-white border border-slate-750 hover:border-slate-650 transition-all shadow-sm text-xs font-semibold cursor-pointer disabled:opacity-50"
+                      title="Ver acta oficial de la RFEF"
+                    >
+                      {loadingOfficialDetail ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin text-[#CC0E21]" />
+                      ) : (
+                        <Award className="h-3.5 w-3.5 text-[#CC0E21]" />
+                      )}
+                      <span>Acta Oficial RFEF</span>
+                    </button>
+                  )}
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Estado:</span>
+                    <span className={`text-[10px] px-2.5 py-0.5 rounded font-extrabold border ${stateColor}`}>{matchState}</span>
+                  </div>
                 </div>
               </div>
 
@@ -4013,6 +4062,15 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
         title={activeVideoTitle}
         videoUrl={activeVideoUrl}
         tipoOrigen={activeVideoType}
+      />
+
+      {/* Modal del Acta Oficial RFEF */}
+      <OfficialMatchModal
+        isOpen={isOfficialModalOpen}
+        onClose={() => setIsOfficialModalOpen(false)}
+        match={officialMatch}
+        stats={officialStats}
+        loading={loadingOfficialDetail}
       />
     </div>
   );
