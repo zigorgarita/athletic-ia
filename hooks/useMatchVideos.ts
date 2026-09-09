@@ -32,16 +32,18 @@ export function useMatchVideos() {
     setCreating(true);
     setError(null);
     try {
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
-      const { data, error: supabaseError } = await supabase
-        .rpc('exec_secure_upsert', {
-          target_table: 'match_videos',
-          payload: video,
-          conflict_columns: null,
-          staff_passkey: passkey
-        });
+      const res = await fetch('/api/videos/matches', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(video)
+      });
 
-      if (supabaseError) throw supabaseError;
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || 'Error al registrar el video del partido');
+      }
+
+      const data = await res.json();
       setVideos((prev) => [data, ...prev]);
       return data;
     } catch (err: any) {

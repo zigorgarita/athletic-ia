@@ -171,16 +171,17 @@ export function usePlayerStats(playerId: string | null) {
     setError(null);
     try {
       verifyWritePermission();
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
-      const { error: supabaseError } = await supabase
-        .rpc('exec_secure_upsert', {
-          target_table: 'match_player_stats',
-          payload: { ...updates, id: statId },
-          conflict_columns: ['id'],
-          staff_passkey: passkey
-        });
+      const res = await fetch('/api/players/stats', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ statId, updates })
+      });
 
-      if (supabaseError) throw supabaseError;
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || 'Error al actualizar las estadísticas');
+      }
+
       await fetchStats();
       return true;
     } catch (err: any) {

@@ -24,7 +24,6 @@ export function useKnowledgeLibrary() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { verifyWritePermission } = useEditMode();
-  const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
 
   // Obtener todas las entradas con filtros
   const fetchEntries = useCallback(async (filters?: KnowledgeFilters): Promise<KnowledgeEntry[]> => {
@@ -233,17 +232,18 @@ export function useKnowledgeLibrary() {
         updated_at: new Date().toISOString()
       };
 
-      const { data, error: saveErr } = await supabase.rpc('exec_secure_upsert', {
-        target_table: 'knowledge_entries',
-        payload,
-        conflict_columns: ['id'],
-        staff_passkey: passkey
+      const res = await fetch('/api/knowledge/entries', {
+        method: entry.id ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
       });
 
-      if (saveErr) throw saveErr;
-      
-      // La rpc devuelve el registro insertado/modificado como JSONB
-      const saved = data as any;
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || 'Error al guardar conocimiento.');
+      }
+
+      const saved = await res.json();
       return saved?.id || entry.id || null;
     } catch (err: any) {
       console.error('Error al guardar entrada de conocimiento:', err);
@@ -261,14 +261,17 @@ export function useKnowledgeLibrary() {
     try {
       verifyWritePermission();
       
-      const { error: saveErr } = await supabase.rpc('exec_secure_upsert', {
-        target_table: 'knowledge_entries',
-        payload: { id, activo: false, updated_at: new Date().toISOString() },
-        conflict_columns: ['id'],
-        staff_passkey: passkey
+      const res = await fetch('/api/knowledge/entries', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, activo: false })
       });
 
-      if (saveErr) throw saveErr;
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || 'Error al archivar conocimiento.');
+      }
+
       return true;
     } catch (err: any) {
       console.error('Error al archivar entrada de conocimiento:', err);
@@ -286,14 +289,16 @@ export function useKnowledgeLibrary() {
     try {
       verifyWritePermission();
       
-      const { data, error: delErr } = await supabase.rpc('exec_secure_delete', {
-        target_table: 'knowledge_entries',
-        record_id: id,
-        staff_passkey: passkey
+      const res = await fetch(`/api/knowledge/entries?id=${encodeURIComponent(id)}`, {
+        method: 'DELETE'
       });
 
-      if (delErr) throw delErr;
-      return !!data;
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || 'Error al eliminar conocimiento.');
+      }
+
+      return true;
     } catch (err: any) {
       console.error('Error al eliminar entrada permanentemente:', err);
       setError(err.message || 'Error al eliminar conocimiento.');
@@ -310,14 +315,17 @@ export function useKnowledgeLibrary() {
     try {
       verifyWritePermission();
 
-      const { error: saveErr } = await supabase.rpc('exec_secure_upsert', {
-        target_table: 'knowledge_media',
-        payload: media,
-        conflict_columns: ['id'],
-        staff_passkey: passkey
+      const res = await fetch('/api/knowledge/media', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(media)
       });
 
-      if (saveErr) throw saveErr;
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || 'Error al añadir multimedia.');
+      }
+
       return true;
     } catch (err: any) {
       console.error('Error al añadir recurso multimedia:', err);
@@ -335,14 +343,16 @@ export function useKnowledgeLibrary() {
     try {
       verifyWritePermission();
 
-      const { data, error: delErr } = await supabase.rpc('exec_secure_delete', {
-        target_table: 'knowledge_media',
-        record_id: mediaId,
-        staff_passkey: passkey
+      const res = await fetch(`/api/knowledge/media?id=${encodeURIComponent(mediaId)}`, {
+        method: 'DELETE'
       });
 
-      if (delErr) throw delErr;
-      return !!data;
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || 'Error al eliminar multimedia.');
+      }
+
+      return true;
     } catch (err: any) {
       console.error('Error al eliminar recurso multimedia:', err);
       setError(err.message || 'Error al eliminar multimedia.');
@@ -414,14 +424,17 @@ export function useKnowledgeLibrary() {
       const cleanTag = tag.trim();
       if (!cleanTag) return false;
 
-      const { error: saveErr } = await supabase.rpc('exec_secure_upsert', {
-        target_table: 'knowledge_tags',
-        payload: { knowledge_entry_id: entryId, tag: cleanTag },
-        conflict_columns: ['knowledge_entry_id', 'tag'],
-        staff_passkey: passkey
+      const res = await fetch('/api/knowledge/tags', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ knowledge_entry_id: entryId, tag: cleanTag })
       });
 
-      if (saveErr) throw saveErr;
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || 'Error al añadir etiqueta.');
+      }
+
       return true;
     } catch (err: any) {
       console.error('Error al añadir etiqueta:', err);
@@ -439,14 +452,16 @@ export function useKnowledgeLibrary() {
     try {
       verifyWritePermission();
 
-      const { data, error: delErr } = await supabase.rpc('exec_secure_delete', {
-        target_table: 'knowledge_tags',
-        record_id: tagId,
-        staff_passkey: passkey
+      const res = await fetch(`/api/knowledge/tags?id=${encodeURIComponent(tagId)}`, {
+        method: 'DELETE'
       });
 
-      if (delErr) throw delErr;
-      return !!data;
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || 'Error al eliminar etiqueta.');
+      }
+
+      return true;
     } catch (err: any) {
       console.error('Error al eliminar etiqueta:', err);
       setError(err.message || 'Error al eliminar etiqueta.');

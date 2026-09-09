@@ -1,5 +1,4 @@
 import { useState, useCallback } from 'react';
-import { supabase } from '@/lib/supabase';
 import { Player } from '@/types';
 import { useEditMode } from '@/context/EditModeContext';
 
@@ -15,29 +14,18 @@ export function useUpdatePlayer() {
     setError(null);
     try {
       verifyWritePermission();
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
+      const res = await fetch('/api/players', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...player, id })
+      });
 
-      // Fetch the current player record to merge fields, preventing database NOT NULL constraint violations on INSERT
-      const { data: current, error: getError } = await supabase
-        .from('players')
-        .select('*')
-        .eq('id', id)
-        .single();
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || 'Error al actualizar el jugador');
+      }
 
-      if (getError) throw getError;
-
-      const { created_at, updated_at, ...mergeableCurrent } = current;
-      const fullPayload = { ...mergeableCurrent, ...player };
-
-      const { data, error: supabaseError } = await supabase
-        .rpc('exec_secure_upsert', {
-          target_table: 'players',
-          payload: { ...fullPayload, id },
-          conflict_columns: ['id'],
-          staff_passkey: passkey
-        });
-
-      if (supabaseError) throw supabaseError;
+      const data = await res.json();
       return data;
     } catch (err: any) {
       setError(err.message || 'Error al actualizar el jugador');

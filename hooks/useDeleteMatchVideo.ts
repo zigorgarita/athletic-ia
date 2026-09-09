@@ -1,5 +1,4 @@
 import { useState, useCallback } from 'react';
-import { supabase } from '@/lib/supabase';
 import { useEditMode } from '@/context/EditModeContext';
 
 export function useDeleteMatchVideo() {
@@ -12,15 +11,15 @@ export function useDeleteMatchVideo() {
     setError(null);
     try {
       verifyWritePermission();
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
-      const { error: supabaseError } = await supabase
-        .rpc('exec_secure_delete', {
-          target_table: 'match_videos',
-          record_id: id,
-          staff_passkey: passkey
-        });
+      const res = await fetch(`/api/videos/matches?id=${encodeURIComponent(id)}`, {
+        method: 'DELETE'
+      });
 
-      if (supabaseError) throw supabaseError;
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || 'Error al eliminar el video del partido');
+      }
+
       return true;
     } catch (err: any) {
       setError(err.message || 'Error al eliminar el video del partido');

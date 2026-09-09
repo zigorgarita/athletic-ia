@@ -7,7 +7,6 @@ export function useKnowledgeLinks() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { verifyWritePermission } = useEditMode();
-  const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
 
   // Obtener todos los vínculos para una entrada de conocimiento concreta
   const fetchLinksForEntry = useCallback(async (entryId: string): Promise<KnowledgeLink[]> => {
@@ -98,14 +97,17 @@ export function useKnowledgeLinks() {
         notas: notas || null
       };
 
-      const { error: saveErr } = await supabase.rpc('exec_secure_upsert', {
-        target_table: 'knowledge_links',
-        payload,
-        conflict_columns: ['knowledge_entry_id', 'linked_entity_type', 'linked_entity_id'],
-        staff_passkey: passkey
+      const res = await fetch('/api/knowledge/links', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
       });
 
-      if (saveErr) throw saveErr;
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || 'Error al vincular conocimiento.');
+      }
+
       return true;
     } catch (err: any) {
       console.error('Error al crear vinculación de conocimiento:', err);
@@ -123,14 +125,16 @@ export function useKnowledgeLinks() {
     try {
       verifyWritePermission();
 
-      const { data, error: delErr } = await supabase.rpc('exec_secure_delete', {
-        target_table: 'knowledge_links',
-        record_id: linkId,
-        staff_passkey: passkey
+      const res = await fetch(`/api/knowledge/links?id=${encodeURIComponent(linkId)}`, {
+        method: 'DELETE'
       });
 
-      if (delErr) throw delErr;
-      return !!data;
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || 'Error al desvincular conocimiento.');
+      }
+
+      return true;
     } catch (err: any) {
       console.error('Error al eliminar vinculación:', err);
       setError(err.message || 'Error al desvincular conocimiento.');

@@ -1,5 +1,4 @@
 import { useState, useCallback } from 'react';
-import { supabase } from '@/lib/supabase';
 import { MatchVideo } from '@/types';
 import { useEditMode } from '@/context/EditModeContext';
 
@@ -15,16 +14,18 @@ export function useUpdateMatchVideo() {
     setError(null);
     try {
       verifyWritePermission();
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
-      const { data, error: supabaseError } = await supabase
-        .rpc('exec_secure_upsert', {
-          target_table: 'match_videos',
-          payload: { ...video, id },
-          conflict_columns: ['id'],
-          staff_passkey: passkey
-        });
+      const res = await fetch('/api/videos/matches', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...video, id })
+      });
 
-      if (supabaseError) throw supabaseError;
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || 'Error al actualizar el video del partido');
+      }
+
+      const data = await res.json();
       return data;
     } catch (err: any) {
       setError(err.message || 'Error al actualizar el video del partido');
