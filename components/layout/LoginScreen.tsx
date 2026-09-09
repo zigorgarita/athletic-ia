@@ -15,8 +15,7 @@ export function LoginScreen({ children }: LoginScreenProps) {
   const [error, setError] = useState<string | null>(null);
   const [isShaking, setIsShaking] = useState(false);
 
-  // Obtener la clave de acceso de las variables de entorno o usar la por defecto
-  const correctPasskey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     // Comprobar si ya estaba autorizado previamente
@@ -28,19 +27,36 @@ export function LoginScreen({ children }: LoginScreenProps) {
     }
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
     setError(null);
+    setLoading(true);
 
-    if (password === correctPasskey) {
-      localStorage.setItem('coach_authorized', 'true');
-      setStaffPasskey(password);
-      setIsAuthorized(true);
-    }
- else {
+    try {
+      const res = await fetch('/api/auth/verify-staff', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ passkey: password.trim() }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (res.ok && data.success) {
+        localStorage.setItem('coach_authorized', 'true');
+        setStaffPasskey(password.trim());
+        setIsAuthorized(true);
+      } else {
+        setIsShaking(true);
+        setError(data.error || 'Contraseña de acceso incorrecta');
+        setTimeout(() => setIsShaking(false), 500);
+      }
+    } catch {
       setIsShaking(true);
-      setError('Contraseña de acceso incorrecta');
+      setError('Error de conexión al verificar la clave');
       setTimeout(() => setIsShaking(false), 500);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -104,20 +120,22 @@ export function LoginScreen({ children }: LoginScreenProps) {
               onChange={(e) => setPassword(e.target.value)}
               className="w-full pl-4 pr-11 py-3 text-sm rounded-xl bg-slate-950/70 border border-slate-800/80 text-slate-100 placeholder-slate-500 outline-none transition-all duration-200 focus:border-[#CC0E21] focus:ring-1 focus:ring-[#CC0E21]"
               autoFocus
+              disabled={loading}
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
               className="absolute right-3.5 top-1/2 transform -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors duration-150 outline-none"
+              disabled={loading}
             >
               {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
           </div>
 
           {/* Botón Ingresar */}
-          <Button type="submit" className="w-full flex items-center gap-2 font-bold py-3">
+          <Button type="submit" className="w-full flex items-center justify-center gap-2 font-bold py-3" disabled={loading}>
             <ShieldCheck className="h-4 w-4" />
-            Verificar Acceso
+            {loading ? 'Verificando...' : 'Verificar Acceso'}
           </Button>
         </form>
 
