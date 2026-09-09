@@ -34,21 +34,21 @@ export function usePlayerFines(playerId: string | null) {
     setError(null);
     try {
       verifyWritePermission();
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
-      const { data, error: supabaseError } = await supabase
-        .rpc('exec_secure_upsert', {
-          target_table: 'player_fines',
-          payload: fine,
-          conflict_columns: null,
-          staff_passkey: passkey
-        });
+      const res = await fetch('/api/players/fines', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(fine),
+      });
 
-      if (supabaseError) throw supabaseError;
-      
+      const result = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(result?.error || 'Error al registrar la multa');
+      }
+
       await fetchFines();
-      return data;
-    } catch (err: any) {
-      setError(err.message || 'Error al registrar la multa');
+      return result?.data || null;
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Error al registrar la multa');
       return null;
     } finally {
       setLoading(false);
@@ -60,34 +60,21 @@ export function usePlayerFines(playerId: string | null) {
     setError(null);
     try {
       verifyWritePermission();
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
+      const res = await fetch('/api/players/fines', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, updates }),
+      });
 
-      // Fetch current fine to prevent partial upsert overrides
-      const { data: current, error: getError } = await supabase
-        .from('player_fines')
-        .select('*')
-        .eq('id', id)
-        .single();
+      const result = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(result?.error || 'Error al actualizar la multa');
+      }
 
-      if (getError) throw getError;
-
-      const { created_at, updated_at, ...mergeableCurrent } = current;
-      const fullPayload = { ...mergeableCurrent, ...updates };
-
-      const { data, error: supabaseError } = await supabase
-        .rpc('exec_secure_upsert', {
-          target_table: 'player_fines',
-          payload: { ...fullPayload, id },
-          conflict_columns: ['id'],
-          staff_passkey: passkey
-        });
-
-      if (supabaseError) throw supabaseError;
-      
       await fetchFines();
-      return data;
-    } catch (err: any) {
-      setError(err.message || 'Error al actualizar la multa');
+      return result?.data || null;
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Error al actualizar la multa');
       return null;
     } finally {
       setLoading(false);
@@ -99,20 +86,19 @@ export function usePlayerFines(playerId: string | null) {
     setError(null);
     try {
       verifyWritePermission();
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
-      const { error: supabaseError } = await supabase
-        .rpc('exec_secure_delete', {
-          target_table: 'player_fines',
-          record_id: id,
-          staff_passkey: passkey
-        });
+      const res = await fetch(`/api/players/fines?id=${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      });
 
-      if (supabaseError) throw supabaseError;
-      
+      const result = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(result?.error || 'Error al eliminar la multa');
+      }
+
       setFines(prev => prev.filter(item => item.id !== id));
       return true;
-    } catch (err: any) {
-      setError(err.message || 'Error al eliminar la multa');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Error al eliminar la multa');
       return false;
     } finally {
       setLoading(false);
