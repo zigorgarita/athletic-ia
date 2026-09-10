@@ -3,6 +3,7 @@ import { Search, BookOpen, Clock, Users, Maximize, Target, Check, Trash2, X } fr
 import { supabase } from '@/lib/supabase';
 import { PlanningTaskLibrary } from '@/types';
 import { Button } from '@/components/ui/Button';
+import { getStaffPasskey } from '@/lib/passkey';
 
 interface BibliotecaTareasModalProps {
   isOpen: boolean;
@@ -58,14 +59,22 @@ export function BibliotecaTareasModal({ isOpen, onClose, onSelectTask }: Bibliot
     e.stopPropagation();
     if (!confirm('¿Estás seguro de que deseas eliminar esta tarea de la biblioteca táctica permanente?')) return;
     try {
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
-      const { error } = await supabase
-        .rpc('exec_secure_delete', {
-          target_table: 'planning_task_library',
-          record_id: taskId,
-          staff_passkey: passkey
-        });
-      if (error) throw error;
+      const headers: Record<string, string> = {};
+      const staffPasskey = getStaffPasskey();
+      if (staffPasskey) {
+        headers['x-staff-passkey'] = staffPasskey;
+      }
+
+      const response = await fetch(`/api/planificacion/library?id=${encodeURIComponent(taskId)}`, {
+        method: 'DELETE',
+        headers
+      });
+
+      const resJson = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(resJson?.error || `Error ${response.status} al eliminar la tarea`);
+      }
       
       setTasks(prev => prev.filter(t => t.id !== taskId));
       if (previewTask?.id === taskId) {
@@ -74,7 +83,7 @@ export function BibliotecaTareasModal({ isOpen, onClose, onSelectTask }: Bibliot
       alert('Tarea eliminada correctamente.');
     } catch (err) {
       console.error(err);
-      alert('Error al eliminar la tarea de la biblioteca.');
+      alert(err instanceof Error ? err.message : 'Error al eliminar la tarea de la biblioteca.');
     }
   };
 

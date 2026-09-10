@@ -6,7 +6,7 @@ import { useTacticalAI } from '@/hooks/useTacticalAI';
 import { useEditMode } from '@/context/EditModeContext';
 import { Button } from '@/components/ui/Button';
 import { Check, Copy, Save, Calendar, CheckSquare, RefreshCw } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { getStaffPasskey } from '@/lib/passkey';
 
 interface AIActionButtonProps {
   action: AIAction;
@@ -18,7 +18,6 @@ export function AIActionButton({ action, onApplied }: AIActionButtonProps) {
   const { verifyWritePermission } = useEditMode();
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-  const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
 
   // Validación de posiciones para aplicar fichas de rol
   if (action.type === 'apply_to_role_card') {
@@ -78,7 +77,7 @@ export function AIActionButton({ action, onApplied }: AIActionButtonProps) {
       }
 
       else if (action.type === 'create_session') {
-        // 1. Crear sesión de planificación
+        // Preparar sesión de planificación
         const sessionPayload = {
           fecha: new Date().toISOString().split('T')[0],
           tipo_sesion: 'Entrenamiento',
@@ -88,42 +87,47 @@ export function AIActionButton({ action, onApplied }: AIActionButtonProps) {
           num_porteros_previstos: 2
         };
 
-        const { data: savedSession, error: sErr } = await supabase.rpc('exec_secure_upsert', {
-          target_table: 'planning_sessions',
-          payload: sessionPayload,
-          conflict_columns: ['id'],
-          staff_passkey: passkey
+        // Preparar tareas
+        const rawTareas = (action.data.tareas as {
+          nombre_tarea: string;
+          tipo_tarea: string;
+          minutos?: number;
+          descripcion: string;
+          orden?: number;
+        }[]) || [];
+
+        const taskPayloads = rawTareas.map((task, idx) => ({
+          nombre_tarea: task.nombre_tarea,
+          tipo_tarea: task.tipo_tarea,
+          minutos: task.minutos || 15,
+          descripcion: task.descripcion,
+          orden: task.orden !== undefined ? task.orden : idx
+        }));
+
+        // Guardado atómico server-side
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json'
+        };
+        const staffPasskey = getStaffPasskey();
+        if (staffPasskey) {
+          headers['x-staff-passkey'] = staffPasskey;
+        }
+
+        const response = await fetch('/api/planificacion/sessions', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            session: sessionPayload,
+            tasks: taskPayloads,
+            players: [],
+            concepts: []
+          })
         });
 
-        if (sErr) throw sErr;
-        const sessionId = (savedSession as { id: string } | null)?.id;
+        const resJson = await response.json().catch(() => null);
 
-        if (sessionId && action.data.tareas && action.data.tareas.length > 0) {
-          // 2. Crear tareas asociadas
-          const taskPromises = (action.data.tareas as {
-            nombre_tarea: string;
-            tipo_tarea: string;
-            minutos?: number;
-            descripcion: string;
-            orden?: number;
-          }[]).map((task) => {
-            const taskPayload = {
-              planning_session_id: sessionId,
-              nombre_tarea: task.nombre_tarea,
-              tipo_tarea: task.tipo_tarea,
-              minutos: task.minutos || 15,
-              descripcion: task.descripcion,
-              orden: task.orden || 0
-            };
-            return supabase.rpc('exec_secure_upsert', {
-              target_table: 'planning_tasks',
-              payload: taskPayload,
-              conflict_columns: ['id'],
-              staff_passkey: passkey
-            });
-          });
-
-          await Promise.all(taskPromises);
+        if (!response.ok) {
+          throw new Error(resJson?.error || `Error ${response.status} al crear la sesión`);
         }
 
         setSuccess(true);

@@ -17,6 +17,7 @@ import { MatchBadge } from './MatchBadge';
 import { PlanningTaskLibrary, Match, TrainingAttendance, TrainingEvaluation } from '@/types';
 import { useTrainingAttendance } from '@/hooks/useTrainingAttendance';
 import { getEffectiveGlobalRating } from '@/components/asistencia/AsistenciaClient';
+import { getStaffPasskey } from '@/lib/passkey';
 
 // Mock material checklist interface
 interface MockChecklist {
@@ -680,132 +681,76 @@ export function PlanificacionClient() {
         sessionPayload.id = sessionForm.id;
       }
 
-      const { data: sessionResult, error: sErr } = await supabase.rpc('exec_secure_upsert', {
-        target_table: 'planning_sessions',
-        payload: sessionPayload,
-        conflict_columns: ['id'],
-        staff_passkey: 'indautxu2026'
-      });
-      if (sErr) throw sErr;
-
-      const savedSession = sessionResult as { id: string };
-      const sessionId = savedSession.id;
-
-      // Clean up deleted tasks from this session
-      if (!isNew) {
-        const { data: existingTasks } = await supabase
-          .from('planning_tasks')
-          .select('id')
-          .eq('planning_session_id', sessionId);
-        
-        if (existingTasks) {
-          for (const extTask of existingTasks) {
-            if (!sessionTasks.some(t => t.id === extTask.id)) {
-              await supabase.rpc('exec_secure_delete', {
-                target_table: 'planning_tasks',
-                record_id: extTask.id,
-                staff_passkey: 'indautxu2026'
-              });
-            }
-          }
+      // Preparar tareas para guardado atómico
+      const taskPayloads = sessionTasks.map((t, idx) => {
+        const payload: {
+          id?: string;
+          nombre_tarea: string;
+          tipo_tarea: string;
+          minutos: number;
+          jugadores?: number | null;
+          espacio?: string | null;
+          objetivo?: string | null;
+          descripcion?: string | null;
+          observaciones?: string | null;
+          orden: number;
+        } = {
+          nombre_tarea: t.nombre_tarea,
+          tipo_tarea: t.tipo_tarea,
+          minutos: Number(t.minutos) || 0,
+          jugadores: t.jugadores || null,
+          espacio: t.espacio || null,
+          objetivo: t.objetivo || null,
+          descripcion: t.descripcion || null,
+          observaciones: t.observaciones || null,
+          orden: idx
+        };
+        if (t.id && !t.id.startsWith('t') && !t.id.startsWith('temp-')) {
+          payload.id = t.id;
         }
-      }
+        return payload;
+      });
 
-      // Upsert current tasks
-      if (sessionTasks.length > 0) {
-        const taskPayloads = sessionTasks.map((t, idx) => {
-          const payload: {
-            id?: string;
-            planning_session_id: string;
-            nombre_tarea: string;
-            tipo_tarea: string;
-            minutos: number;
-            jugadores?: number | null;
-            espacio?: string | null;
-            objetivo?: string | null;
-            descripcion?: string | null;
-            observaciones?: string | null;
-            orden: number;
-          } = {
-            planning_session_id: sessionId,
-            nombre_tarea: t.nombre_tarea,
-            tipo_tarea: t.tipo_tarea,
-            minutos: Number(t.minutos) || 0,
-            jugadores: t.jugadores || null,
-            espacio: t.espacio || null,
-            objetivo: t.objetivo || null,
-            descripcion: t.descripcion || null,
-            observaciones: t.observaciones || null,
-            orden: idx
-          };
-          if (t.id && !t.id.startsWith('t') && !t.id.startsWith('temp-')) {
-            payload.id = t.id;
-          }
-          return payload;
-        });
-
-        const { error: tErr } = await supabase.rpc('exec_secure_bulk_upsert', {
-          target_table: 'planning_tasks',
-          payloads: taskPayloads,
-          conflict_columns: ['id'],
-          staff_passkey: 'indautxu2026'
-        });
-        if (tErr) throw tErr;
-      }
-
-      // Save summoned players
+      // Preparar jugadores convocados
       const playerPayloads = players.map(p => {
         const isSummoned = summonedPlayerIds.includes(p.id);
         return {
-          session_id: sessionId,
           player_id: p.id,
           convocado: isSummoned,
           estado_sesion: p.estado
         };
       });
 
-       const { error: pErr } = await supabase.rpc('exec_secure_bulk_upsert', {
-        target_table: 'planning_session_players',
-        payloads: playerPayloads,
-        conflict_columns: ['session_id', 'player_id'],
-        staff_passkey: 'indautxu2026'
-      });
-      if (pErr) throw pErr;
+      // Preparar conceptos trabajados
+      const conceptPayloads = sessionConcepts.map(c => ({
+        categoria: c.categoria,
+        concepto: c.concepto
+      }));
 
-      // Overwrite/Clean up worked concepts
-      if (!isNew) {
-        const { data: existingConcepts } = await supabase
-          .from('planning_concepts')
-          .select('id, categoria, concepto')
-          .eq('session_id', sessionId);
-        
-        if (existingConcepts && existingConcepts.length > 0) {
-          for (const extConcept of existingConcepts) {
-            if (!sessionConcepts.some(c => c.id === extConcept.id || (c.categoria === extConcept.categoria && c.concepto === extConcept.concepto))) {
-              await supabase.rpc('exec_secure_delete', {
-                target_table: 'planning_concepts',
-                record_id: extConcept.id,
-                staff_passkey: 'indautxu2026'
-              });
-            }
-          }
-        }
+      // Llamada atómica transaccional server-side
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      };
+      const staffPasskey = getStaffPasskey();
+      if (staffPasskey) {
+        headers['x-staff-passkey'] = staffPasskey;
       }
 
-      if (sessionConcepts.length > 0) {
-        const conceptPayloads = sessionConcepts.map(c => ({
-          session_id: sessionId,
-          categoria: c.categoria,
-          concepto: c.concepto
-        }));
+      const response = await fetch('/api/planificacion/sessions', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          session: sessionPayload,
+          tasks: taskPayloads,
+          players: playerPayloads,
+          concepts: conceptPayloads
+        })
+      });
 
-        const { error: cErr } = await supabase.rpc('exec_secure_bulk_upsert', {
-          target_table: 'planning_concepts',
-          payloads: conceptPayloads,
-          conflict_columns: ['session_id', 'categoria', 'concepto'],
-          staff_passkey: 'indautxu2026'
-        });
-        if (cErr) throw cErr;
+      const resJson = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(resJson?.error || `Error ${response.status} al guardar la sesión`);
       }
 
       triggerToast('¡Sesión guardada con éxito en Supabase!');
