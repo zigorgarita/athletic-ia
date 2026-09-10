@@ -7,6 +7,7 @@ import { usePlayers } from '@/hooks/usePlayers';
 import { useEditMode } from '@/context/EditModeContext';
 import { GPSSession, GPSData, Player, GPSPlayerMapping, TournamentMatch } from '@/types';
 import { Button } from '@/components/ui/Button';
+import { getStaffPasskey } from '@/lib/passkey';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -317,19 +318,28 @@ export function GPSClient() {
     if (!confirm(confirmMsg)) return;
 
     try {
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
-      const { error } = await supabase.rpc('exec_secure_delete', {
-        target_table: 'gps_sessions',
-        record_id: currentSession.id,
-        staff_passkey: passkey
+      const headers: Record<string, string> = {};
+      const staffPasskey = getStaffPasskey();
+      if (staffPasskey) {
+        headers['x-staff-passkey'] = staffPasskey;
+      }
+
+      const response = await fetch(`/api/gps/sessions?id=${encodeURIComponent(currentSession.id)}`, {
+        method: 'DELETE',
+        headers
       });
-      if (error) throw error;
+
+      const resJson = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(resJson?.error || `Error ${response.status} al borrar la sesión GPS`);
+      }
       
       setCurrentSession(null);
       setSessionData([]);
     } catch (err) {
       console.error('Error deleting session:', err);
-      alert('Error al borrar los datos GPS del partido.');
+      alert(err instanceof Error ? err.message : 'Error al borrar los datos GPS del partido.');
     }
   }
 
@@ -610,103 +620,74 @@ export function GPSClient() {
         throw new Error('El archivo no contiene registros de jugadores válidos para importar.');
       }
 
-      // --- ALL VALIDATIONS PASSED! INITIATE SAFE SUBSTITUTION ---
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
-
-      // 1. Persist player name mappings in Supabase `gps_player_mappings` table
-      for (const rawName of Object.keys(playerMappings)) {
-        const pId = playerMappings[rawName];
-        if (pId) {
-          const normName = normalizePlayerName(rawName);
-          await supabase.rpc('exec_secure_upsert', {
-            target_table: 'gps_player_mappings',
-            payload: {
-              source_name: rawName,
-              source_name_normalized: normName,
-              player_id: pId,
-              updated_at: new Date().toISOString()
-            },
-            conflict_columns: ['source_name_normalized'],
-            staff_passkey: passkey
-          });
-        }
-      }
-
-      // 2. Create / Update session in `gps_sessions`
+      // --- ALL VALIDATIONS PASSED! INITIATE ATOMIC SERVER-SIDE SUBSTITUTION ---
       const isTmMode = isTournamentMode && !!selectedTournamentMatchId;
       const tmMatch = tournamentMatches.find(tm => tm.id === selectedTournamentMatchId);
 
-      let targetSessionId: string;
+      let sessionPayload: {
+        id?: string;
+        fecha: string;
+        descripcion: string;
+        match_id?: string;
+        tournament_match_id?: string;
+      };
 
       if (isTmMode && tmMatch) {
         // TOURNAMENT branch: session linked via tournament_match_id (match_id stays null)
         const sessionDesc = `Torneo ${selectedMatch.rival}: vs ${tmMatch.rival}`;
-        const { data: sessionRes, error: sessionErr } = await supabase.rpc('exec_secure_upsert', {
-          target_table: 'gps_sessions',
-          payload: {
-            id: currentSession?.id || undefined,
-            tournament_match_id: selectedTournamentMatchId,
-            fecha: tmMatch.fecha,
-            descripcion: sessionDesc
-          },
-          conflict_columns: ['tournament_match_id'],
-          staff_passkey: passkey
-        });
-        if (sessionErr) throw sessionErr;
-        targetSessionId = sessionRes.id;
+        sessionPayload = {
+          id: currentSession?.id || undefined,
+          tournament_match_id: selectedTournamentMatchId,
+          fecha: tmMatch.fecha,
+          descripcion: sessionDesc
+        };
       } else {
         // NORMAL MATCH branch: existing behavior unchanged
         const matchTypeLabel = selectedMatch.tipo_partido || selectedMatch.competicion || 'PARTIDO';
         const sessionDesc = selectedMatch.jornada 
           ? `J${selectedMatch.jornada}: vs ${selectedMatch.rival} (${matchTypeLabel})`
           : `vs ${selectedMatch.rival} (${matchTypeLabel})`;
-        const { data: sessionRes, error: sessionErr } = await supabase.rpc('exec_secure_upsert', {
-          target_table: 'gps_sessions',
-          payload: {
-            id: currentSession?.id || undefined,
-            match_id: selectedMatch.id,
-            fecha: selectedMatch.fecha,
-            descripcion: sessionDesc
-          },
-          conflict_columns: ['match_id'],
-          staff_passkey: passkey
-        });
-        if (sessionErr) throw sessionErr;
-        targetSessionId = sessionRes.id;
+        sessionPayload = {
+          id: currentSession?.id || undefined,
+          match_id: selectedMatch.id,
+          fecha: selectedMatch.fecha,
+          descripcion: sessionDesc
+        };
       }
 
-      // 3. If reimporting, clear previous gps_data rows for this session
-      if (currentSession) {
-        const { data: oldRows } = await supabase
-          .from('gps_data')
-          .select('id')
-          .eq('session_id', targetSessionId);
+      // Preparar mappings para guardar en servidor
+      const mappingsPayload = Object.keys(playerMappings)
+        .filter(rawName => Boolean(playerMappings[rawName]))
+        .map(rawName => ({
+          source_name: rawName,
+          source_name_normalized: normalizePlayerName(rawName),
+          player_id: playerMappings[rawName]
+        }));
 
-        if (oldRows && oldRows.length > 0) {
-          for (const oldRow of oldRows) {
-            await supabase.rpc('exec_secure_delete', {
-              target_table: 'gps_data',
-              record_id: oldRow.id,
-              staff_passkey: passkey
-            });
-          }
-        }
+      // Llamada atómica transaccional server-side
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      };
+      const staffPasskey = getStaffPasskey();
+      if (staffPasskey) {
+        headers['x-staff-passkey'] = staffPasskey;
       }
 
-      // 4. Bulk insert new payloads with session_id
-      const finalPayloads = validPayloads.map(p => ({
-        ...p,
-        session_id: targetSessionId
-      }));
-
-      const { error: dataErr } = await supabase.rpc('exec_secure_bulk_upsert', {
-        target_table: 'gps_data',
-        payloads: finalPayloads,
-        conflict_columns: null,
-        staff_passkey: passkey
+      const response = await fetch('/api/gps/sessions', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          session: sessionPayload,
+          rows: validPayloads,
+          mappings: mappingsPayload
+        })
       });
 
-      if (dataErr) throw dataErr;
+      const resJson = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(resJson?.error || `Error ${response.status} al guardar los datos del GPS`);
+      }
 
       // 5. Complete & reload
       setIsModalOpen(false);
