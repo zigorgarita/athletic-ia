@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { TrainingAttendance, TrainingEvaluation } from '@/types';
 import { useEditMode } from '@/context/EditModeContext';
+import { getStaffPasskey } from '@/lib/passkey';
 
 export function useTrainingAttendance() {
   const [loading, setLoading] = useState(false);
@@ -50,31 +51,25 @@ export function useTrainingAttendance() {
     setError(null);
     try {
       verifyWritePermission();
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
-      // 1. Upsert attendance rows if any
-      if (attendance.length > 0) {
-        const { error: attError } = await supabase
-          .rpc('exec_secure_bulk_upsert', {
-            target_table: 'training_attendance',
-            payloads: attendance,
-            conflict_columns: ['session_id', 'player_id'],
-            staff_passkey: passkey
-          });
-        
-        if (attError) throw attError;
+
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+
+      const staffPasskey = getStaffPasskey();
+      if (staffPasskey) {
+        headers['x-staff-passkey'] = staffPasskey;
       }
 
-      // 2. Upsert evaluation rows if any
-      if (evaluations.length > 0) {
-        const { error: evalError } = await supabase
-          .rpc('exec_secure_bulk_upsert', {
-            target_table: 'training_evaluations',
-            payloads: evaluations,
-            conflict_columns: ['session_id', 'player_id'],
-            staff_passkey: passkey
-          });
+      const response = await fetch('/api/training/attendance', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ attendance, evaluations }),
+      });
 
-        if (evalError) throw evalError;
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || `Error ${response.status} al guardar la asistencia.`);
       }
 
       return true;
