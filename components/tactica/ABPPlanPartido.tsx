@@ -167,6 +167,7 @@ export function ABPPlanPartido({ players, matches, onExit }: ABPPlanPartidoProps
       const res = await fetch('/api/abp/match-plans', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           match_id: isDraft ? null : selectedMatchId,
           abp_play_id: playId,
@@ -214,6 +215,7 @@ export function ABPPlanPartido({ players, matches, onExit }: ABPPlanPartidoProps
       const assignRes = await fetch('/api/abp/match-assignments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ updates })
       });
 
@@ -243,6 +245,7 @@ export function ABPPlanPartido({ players, matches, onExit }: ABPPlanPartidoProps
       const remRes = await fetch('/api/abp/match-assignments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           updates: [{
             match_abp_plan_id: planId,
@@ -276,6 +279,7 @@ export function ABPPlanPartido({ players, matches, onExit }: ABPPlanPartidoProps
       const roleRes = await fetch('/api/abp/roles', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           roles: [{
             id: roleId,
@@ -342,6 +346,7 @@ export function ABPPlanPartido({ players, matches, onExit }: ABPPlanPartidoProps
         const autoRes = await fetch('/api/abp/match-assignments', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
           body: JSON.stringify({ updates })
         });
         if (!autoRes.ok) {
@@ -378,6 +383,7 @@ export function ABPPlanPartido({ players, matches, onExit }: ABPPlanPartidoProps
       const reorderRes = await fetch('/api/abp/match-plans', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           reorder: [
             { id: currentPlan.id, orden: targetOrder },
@@ -403,7 +409,8 @@ export function ABPPlanPartido({ players, matches, onExit }: ABPPlanPartidoProps
     try {
       setLoading(true);
       const delPlanRes = await fetch(`/api/abp/match-plans?id=${encodeURIComponent(planId)}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        credentials: 'include'
       });
 
       if (!delPlanRes.ok) {
@@ -439,6 +446,7 @@ export function ABPPlanPartido({ players, matches, onExit }: ABPPlanPartidoProps
       const cloneRes = await fetch('/api/abp/match-plans', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           action: 'customize_for_match',
           plan_id: planId,

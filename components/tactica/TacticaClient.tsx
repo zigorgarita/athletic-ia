@@ -626,6 +626,7 @@ export function TacticaClient() {
       const res = await fetch('/api/tactica/lineups', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(lineupPayload)
       });
 
@@ -950,7 +951,8 @@ export function TacticaClient() {
     if (!confirm('¿Seguro que deseas eliminar esta pizarra táctica?')) return;
     try {
       const res = await fetch(`/api/tactica/lineups?id=${encodeURIComponent(id)}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        credentials: 'include'
       });
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));

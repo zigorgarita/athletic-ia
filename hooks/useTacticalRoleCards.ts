@@ -61,6 +61,7 @@ export function useTacticalRoleCards() {
       const response = await fetch('/api/tactica/role-cards', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(card)
       });
 

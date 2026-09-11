@@ -116,6 +116,7 @@ export function AIActionButton({ action, onApplied }: AIActionButtonProps) {
         const response = await fetch('/api/planificacion/sessions', {
           method: 'POST',
           headers,
+          credentials: 'include',
           body: JSON.stringify({
             session: sessionPayload,
             tasks: taskPayloads,

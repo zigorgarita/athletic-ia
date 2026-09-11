@@ -909,6 +909,7 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
       const res = await fetch('/api/abp/plays', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           play: {
             tipo: playType,
@@ -971,6 +972,7 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
       const updateRes = await fetch('/api/abp/plays', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           id: selectedPlay.id,
           titulo: playTitle,
@@ -1053,6 +1055,7 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
       const updateRes = await fetch('/api/abp/plays', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           id: targetPlay.id,
           tipo: targetPlay.tipo,
@@ -1119,6 +1122,7 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
       const dupRes = await fetch('/api/abp/plays', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           play: {
             titulo: `${selectedPlay.titulo} (Copia)`,
@@ -1212,7 +1216,8 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
 
     try {
       const delRes = await fetch(`/api/abp/plays?id=${encodeURIComponent(playToDelete.playId)}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        credentials: 'include'
       });
 
       if (!delRes.ok) {
@@ -1265,6 +1270,7 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
       const rolesRes = await fetch('/api/abp/roles', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ roles: rolesPayload })
       });
 
@@ -1278,7 +1284,7 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
     } catch (err: unknown) {
       const error = err as Error;
       console.error('Error saving tactical board:', error);
-      setErrorMsg('Error al guardar la pizarra táctica.');
+      setErrorMsg(error.message || 'Error al guardar la pizarra táctica.');
     } finally {
       setIsSaving(false);
     }
@@ -1293,6 +1299,7 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
       const res = await fetch('/api/abp/roles', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           abp_play_id: selectedPlay.id,
           player_id: null,
@@ -1324,7 +1331,8 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
   async function handleRemoveRoleNode(roleId: string) {
     try {
       const res = await fetch(`/api/abp/roles?id=${encodeURIComponent(roleId)}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        credentials: 'include'
       });
 
       if (!res.ok) {
@@ -1353,7 +1361,8 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
     try {
       // 1. Delete all existing roles for this play
       const delRolesRes = await fetch(`/api/abp/roles?abp_play_id=${encodeURIComponent(selectedPlay.id)}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        credentials: 'include'
       });
       if (!delRolesRes.ok) {
         const errData = await delRolesRes.json().catch(() => ({}));
@@ -1376,6 +1385,7 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
       const insRolesRes = await fetch('/api/abp/roles', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ roles: rolesPayload })
       });
       if (!insRolesRes.ok) {
@@ -1389,6 +1399,7 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
       const updatePlayRes = await fetch('/api/abp/plays', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ id: selectedPlay.id, descripcion: nextDesc })
       });
       if (!updatePlayRes.ok) {
@@ -1423,7 +1434,8 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
     try {
       // 1. Delete all existing roles for this play
       const delRolesRes = await fetch(`/api/abp/roles?abp_play_id=${encodeURIComponent(selectedPlay.id)}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        credentials: 'include'
       });
       if (!delRolesRes.ok) {
         const errData = await delRolesRes.json().catch(() => ({}));
@@ -1461,6 +1473,7 @@ export function ABPSection({ players, matches }: ABPSectionProps) {
         const insRolesRes = await fetch('/api/abp/roles', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
           body: JSON.stringify({ roles: rolesPayload })
         });
         if (!insRolesRes.ok) {

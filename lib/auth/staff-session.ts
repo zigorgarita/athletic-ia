@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { cookies } from 'next/headers';
 import { NextRequest } from 'next/server';
+import { verifySessionToken, SESSION_COOKIE_NAME } from './session';
 
 export const COACH_SESSION_COOKIE_NAME = 'coach_staff_session';
 export const COACH_SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000; // 7 días
@@ -87,13 +88,28 @@ export function verifyCoachSessionToken(token: string | undefined | null): Coach
 
 /**
  * Helper para verificar la sesión desde cualquier ruta de API que reciba Request o NextRequest.
+ * Reconoce coach_staff_session válida o staff_session válida con rol editor/admin.
  */
 export function isCoachSessionAuthorizedFromRequest(req: Request | NextRequest): boolean {
   try {
     const cookieHeader = req.headers.get('cookie') || '';
-    const match = cookieHeader.match(new RegExp(`(?:^|;\\s*)${COACH_SESSION_COOKIE_NAME}=([^;]+)`));
-    const token = match ? match[1] : null;
-    return verifyCoachSessionToken(token) !== null;
+
+    // 1. Validar coach_staff_session si está presente
+    const matchCoach = cookieHeader.match(new RegExp(`(?:^|;\\s*)${COACH_SESSION_COOKIE_NAME}=([^;]+)`));
+    if (matchCoach && verifyCoachSessionToken(matchCoach[1]) !== null) {
+      return true;
+    }
+
+    // 2. Validar staff_session (editor/admin) si está presente
+    const matchEditor = cookieHeader.match(new RegExp(`(?:^|;\\s*)${SESSION_COOKIE_NAME}=([^;]+)`));
+    if (matchEditor) {
+      const editorSession = verifySessionToken(matchEditor[1]);
+      if (editorSession && (editorSession.role === 'editor' || editorSession.role === 'admin')) {
+        return true;
+      }
+    }
+
+    return false;
   } catch {
     return false;
   }
@@ -101,13 +117,28 @@ export function isCoachSessionAuthorizedFromRequest(req: Request | NextRequest):
 
 /**
  * Helper para verificar la sesión en Server Components o endpoints que usen cookies() de next/headers.
+ * Reconoce coach_staff_session válida o staff_session válida con rol editor/admin.
  */
 export async function isCoachSessionAuthorized(): Promise<boolean> {
   try {
     const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get(COACH_SESSION_COOKIE_NAME);
-    if (!sessionCookie?.value) return false;
-    return verifyCoachSessionToken(sessionCookie.value) !== null;
+
+    // 1. Validar coach_staff_session si existe
+    const coachCookie = cookieStore.get(COACH_SESSION_COOKIE_NAME);
+    if (coachCookie?.value && verifyCoachSessionToken(coachCookie.value) !== null) {
+      return true;
+    }
+
+    // 2. Validar staff_session (editor/admin) si existe
+    const editorCookie = cookieStore.get(SESSION_COOKIE_NAME);
+    if (editorCookie?.value) {
+      const editorSession = verifySessionToken(editorCookie.value);
+      if (editorSession && (editorSession.role === 'editor' || editorSession.role === 'admin')) {
+        return true;
+      }
+    }
+
+    return false;
   } catch {
     return false;
   }
