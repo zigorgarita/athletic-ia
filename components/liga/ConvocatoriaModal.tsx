@@ -247,6 +247,7 @@ export function ConvocatoriaModal({ match, onClose, onSave, initialStats }: Conv
                       value={stats.minutos ?? 0}
                       min="0"
                       max="120"
+                      onWheel={(e) => e.currentTarget.blur()}
                       onChange={(e) => updateStatField(p.id, 'minutos', Number(e.target.value))}
                       className="w-full px-2.5 py-1.5 text-xs rounded-lg bg-slate-950 border border-slate-800 text-slate-200 outline-none focus:border-[#CC0E21]"
                     />
@@ -259,6 +260,7 @@ export function ConvocatoriaModal({ match, onClose, onSave, initialStats }: Conv
                       type="number"
                       value={stats.goles ?? 0}
                       min="0"
+                      onWheel={(e) => e.currentTarget.blur()}
                       onChange={(e) => updateStatField(p.id, 'goles', Number(e.target.value))}
                       className="w-full px-2.5 py-1.5 text-xs rounded-lg bg-slate-950 border border-slate-800 text-slate-200 outline-none focus:border-[#CC0E21]"
                     />
@@ -271,6 +273,7 @@ export function ConvocatoriaModal({ match, onClose, onSave, initialStats }: Conv
                       type="number"
                       value={stats.asistencias ?? 0}
                       min="0"
+                      onWheel={(e) => e.currentTarget.blur()}
                       onChange={(e) => updateStatField(p.id, 'asistencias', Number(e.target.value))}
                       className="w-full px-2.5 py-1.5 text-xs rounded-lg bg-slate-950 border border-slate-800 text-slate-200 outline-none focus:border-[#CC0E21]"
                     />
@@ -305,6 +308,7 @@ export function ConvocatoriaModal({ match, onClose, onSave, initialStats }: Conv
                       type="number"
                       value={stats.recuperaciones ?? 0}
                       min="0"
+                      onWheel={(e) => e.currentTarget.blur()}
                       onChange={(e) => updateStatField(p.id, 'recuperaciones', Number(e.target.value))}
                       className="w-full px-2.5 py-1.5 text-xs rounded-lg bg-slate-950 border border-slate-800 text-slate-200 outline-none focus:border-[#CC0E21]"
                     />
@@ -317,6 +321,7 @@ export function ConvocatoriaModal({ match, onClose, onSave, initialStats }: Conv
                       type="number"
                       value={stats.intercepciones ?? 0}
                       min="0"
+                      onWheel={(e) => e.currentTarget.blur()}
                       onChange={(e) => updateStatField(p.id, 'intercepciones', Number(e.target.value))}
                       className="w-full px-2.5 py-1.5 text-xs rounded-lg bg-slate-950 border border-slate-800 text-slate-200 outline-none focus:border-[#CC0E21]"
                     />
@@ -329,6 +334,7 @@ export function ConvocatoriaModal({ match, onClose, onSave, initialStats }: Conv
                       type="number"
                       value={stats.pases_completados ?? 0}
                       min="0"
+                      onWheel={(e) => e.currentTarget.blur()}
                       onChange={(e) => updateStatField(p.id, 'pases_completados', Number(e.target.value))}
                       className="w-full px-2.5 py-1.5 text-xs rounded-lg bg-slate-950 border border-slate-800 text-slate-200 outline-none focus:border-[#CC0E21]"
                     />
@@ -341,6 +347,7 @@ export function ConvocatoriaModal({ match, onClose, onSave, initialStats }: Conv
                       type="number"
                       value={stats.pases_totales ?? 0}
                       min="0"
+                      onWheel={(e) => e.currentTarget.blur()}
                       onChange={(e) => updateStatField(p.id, 'pases_totales', Number(e.target.value))}
                       className="w-full px-2.5 py-1.5 text-xs rounded-lg bg-slate-950 border border-slate-800 text-slate-200 outline-none focus:border-[#CC0E21]"
                     />
