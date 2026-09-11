@@ -114,29 +114,25 @@ export function useMatches(matchType: 'LIGA' | 'AMISTOSO' | 'ALL' = 'LIGA') {
   ): Promise<boolean> => {
     try {
       verifyWritePermission();
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
-      // 1. Delete existing stats for this match securely
-      const { error: deleteError } = await supabase
-        .rpc('delete_match_player_stats_secure', {
-          target_match_id: matchId,
-          staff_passkey: passkey
-        });
 
-      if (deleteError) throw deleteError;
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
 
-      // 2. Insert new stats list if not empty securely
-      if (playerStatsList.length > 0) {
-        const { error: insertError } = await supabase
-          .rpc('exec_secure_bulk_upsert', {
-            target_table: 'match_player_stats',
-            payloads: playerStatsList,
-            conflict_columns: null,
-            staff_passkey: passkey
-          });
-        if (insertError) throw insertError;
+      const res = await fetch(`/api/matches/${encodeURIComponent(matchId)}/stats`, {
+        method: 'POST',
+        headers,
+        credentials: 'include',
+        body: JSON.stringify({ stats: playerStatsList }),
+      });
+
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || `HTTP ${res.status}`);
       }
 
-      return true;
+      const json = await res.json();
+      return Boolean(json.success);
     } catch (err) {
       console.error('Error saving match player stats:', err);
       return false;
