@@ -39,6 +39,7 @@ DECLARE
     v_total_after INT;
     v_rfef_preserved INT;
     v_existing_id UUID;
+    v_existing_origen VARCHAR(20);
 BEGIN
     -- 1. Validar que el partido exista
     IF p_match_id IS NULL THEN
@@ -97,7 +98,7 @@ BEGIN
             v_pases_totales := GREATEST(0, COALESCE((v_item->>'pases_totales')::INTEGER, 0));
 
             -- Comprobar si ya existe fila para (p_match_id, v_player_id)
-            SELECT id INTO v_existing_id
+            SELECT id, origen INTO v_existing_id, v_existing_origen
             FROM public.match_player_stats
             WHERE match_id = p_match_id AND player_id = v_player_id;
 
@@ -116,8 +117,10 @@ BEGIN
                     duelos_ganados = v_duelos_ganados,
                     pases_completados = v_pases_completados,
                     pases_totales = v_pases_totales,
-                    convocado = true,
-                    suplente = NOT v_titular
+                    -- En filas RFEF se preservan convocado y suplente oficiales intactos;
+                    -- en filas manuales se asigna convocado = true y suplente = NOT titular.
+                    convocado = CASE WHEN v_existing_origen = 'rfef' THEN convocado ELSE true END,
+                    suplente = CASE WHEN v_existing_origen = 'rfef' THEN suplente ELSE NOT v_titular END
                     -- PRESERVADOS ESTRICTAMENTE: id, created_at, origen, rfef_acta_id, dorsal_partido,
                     -- entro_banquillo, minuto_entrada, minuto_salida, goles_encajados, doble_amarilla, roja_directa
                 WHERE id = v_existing_id;
