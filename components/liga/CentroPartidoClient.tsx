@@ -653,12 +653,19 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
   // Official ABP Player Assignment Handlers
   const handleAssignOfficialABPPlayer = async (planId: string, roleId: string, playerId: string) => {
     try {
-      const { error } = await supabase
-        .from('match_abp_player_assignments')
-        .update({ player_id: playerId })
-        .match({ match_abp_plan_id: planId, abp_player_role_id: roleId });
+      const res = await fetch('/api/abp/match-assignments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          updates: [{ match_abp_plan_id: planId, abp_player_role_id: roleId, player_id: playerId }]
+        })
+      });
 
-      if (error) throw error;
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || `HTTP ${res.status}`);
+      }
 
       setOfficialAbpPlans(prev => prev.map(plan => {
         if (plan.id === planId) {
@@ -680,12 +687,19 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
 
   const handleRemoveOfficialABPPlayer = async (planId: string, roleId: string) => {
     try {
-      const { error } = await supabase
-        .from('match_abp_player_assignments')
-        .update({ player_id: null })
-        .match({ match_abp_plan_id: planId, abp_player_role_id: roleId });
+      const res = await fetch('/api/abp/match-assignments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          updates: [{ match_abp_plan_id: planId, abp_player_role_id: roleId, player_id: null }]
+        })
+      });
 
-      if (error) throw error;
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || `HTTP ${res.status}`);
+      }
 
       setOfficialAbpPlans(prev => prev.map(plan => {
         if (plan.id === planId) {
