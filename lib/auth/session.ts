@@ -86,4 +86,35 @@ export async function getStaffSession(): Promise<StaffSessionPayload | null> {
   }
 }
 
+/**
+ * Obtiene la sesión de editor a partir de la cabecera cookie de un Request
+ */
+export function getStaffSessionFromRequest(req: Request): StaffSessionPayload | null {
+  try {
+    const cookieHeader = req.headers.get('cookie') || '';
+    const match = cookieHeader.match(new RegExp(`(?:^|;\\s*)${SESSION_COOKIE_NAME}=([^;]+)`));
+    const token = match ? match[1] : null;
+    if (!token) return null;
+    return verifySessionToken(token);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Helper asíncrono para Server Components o Route Handlers que valida si el usuario es editor o admin
+ */
+export async function isEditorSessionAuthorized(): Promise<boolean> {
+  const session = await getStaffSession();
+  return Boolean(session && (session.role === 'editor' || session.role === 'admin'));
+}
+
+/**
+ * Helper síncrono para Route Handlers que valida si el usuario es editor o admin a partir del Request
+ */
+export function isEditorSessionAuthorizedFromRequest(req: Request): boolean {
+  const session = getStaffSessionFromRequest(req);
+  return Boolean(session && (session.role === 'editor' || session.role === 'admin'));
+}
+
 export { SESSION_COOKIE_NAME, SESSION_DURATION_MS };

@@ -67,7 +67,8 @@ export function BibliotecaTareasModal({ isOpen, onClose, onSelectTask }: Bibliot
 
       const response = await fetch(`/api/planificacion/library?id=${encodeURIComponent(taskId)}`, {
         method: 'DELETE',
-        headers
+        headers,
+        credentials: 'include'
       });
 
       const resJson = await response.json().catch(() => null);

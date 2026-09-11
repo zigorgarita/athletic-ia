@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { isCoachSessionAuthorized, isCoachSessionAuthorizedFromRequest } from '@/lib/auth/staff-session';
+import { isEditorSessionAuthorized, isEditorSessionAuthorizedFromRequest } from '@/lib/auth/session';
 import { getSupabaseServerClient } from '@/lib/supabase-server';
 
 export const dynamic = 'force-dynamic';
@@ -197,7 +198,12 @@ export async function POST(req: Request) {
     const passkeyHeader = req.headers.get('x-staff-passkey')?.trim() || req.headers.get('x-coach-staff-passkey')?.trim();
     const expectedPasskey = (process.env.COACH_STAFF_PASSKEY || process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026').trim();
     const isPasskeyValid = Boolean(expectedPasskey && passkeyHeader && passkeyHeader === expectedPasskey);
-    const authorized = (await isCoachSessionAuthorized()) || isCoachSessionAuthorizedFromRequest(req) || isPasskeyValid;
+    const authorized =
+      (await isCoachSessionAuthorized()) ||
+      isCoachSessionAuthorizedFromRequest(req) ||
+      (await isEditorSessionAuthorized()) ||
+      isEditorSessionAuthorizedFromRequest(req) ||
+      isPasskeyValid;
 
     if (!authorized) {
       return NextResponse.json({ error: 'No autorizado: Sesión de cuerpo técnico requerida.' }, { status: 401 });

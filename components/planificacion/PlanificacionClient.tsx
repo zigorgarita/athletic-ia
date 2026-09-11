@@ -531,6 +531,13 @@ export function PlanificacionClient() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    try {
+      verifyWritePermission();
+    } catch (err) {
+      triggerToast(err instanceof Error ? err.message : 'No autorizado para subir archivos');
+      return;
+    }
+
     setUploadingPdf(true);
     try {
       const fileExt = file.name.split('.').pop();
@@ -546,19 +553,116 @@ export function PlanificacionClient() {
       const { data } = supabase.storage.from('indautxu-assets').getPublicUrl(filePath);
       const publicUrl = data.publicUrl;
 
-      setSessionForm(prev => {
-        const baseObs = getNotesOnly(prev.evaluacion_observaciones);
-        return {
-          ...prev,
-          evaluacion_observaciones: baseObs ? `${baseObs}\nPDF: ${publicUrl}` : `PDF: ${publicUrl}`
+      const baseObs = getNotesOnly(sessionForm.evaluacion_observaciones);
+      const newEvaluacionObservaciones = baseObs ? `${baseObs}\nPDF: ${publicUrl}` : `PDF: ${publicUrl}`;
+
+      // Persistir inmediatamente la vinculación con la sesión
+      const sessionPayload: Record<string, unknown> = {
+        fecha: sessionForm.fecha || selectedDate,
+        tipo_sesion: sessionForm.tipo_sesion,
+        hora_inicio: sessionForm.hora_inicio || null,
+        hora_fin: sessionForm.hora_fin || null,
+        duracion_total: Number(sessionForm.duracion_total) || 0,
+        campo_instalacion: sessionForm.campo_instalacion || null,
+        objetivo_principal: sessionForm.objetivo_principal || null,
+        carga: sessionForm.carga || 'Media',
+        estado: sessionForm.estado || 'Planificada',
+        hora_convocatoria: sessionForm.hora_convocatoria || null,
+        observaciones_convocatoria: sessionForm.ropa_convocatoria || null,
+        checklist_material: (sessionForm.checklist_material as Record<string, unknown>) || {},
+        rival: sessionForm.rival || null,
+        evaluacion_completada: isEvaluationCompleted,
+        evaluacion_duracion_real: sessionForm.evaluacion_duracion_real ? Number(sessionForm.evaluacion_duracion_real) : null,
+        evaluacion_observaciones: newEvaluacionObservaciones,
+        valoracion_entrenador: sessionForm.rpe_medio ?? null
+      };
+
+      const isNew = !sessionForm.id || sessionForm.id.startsWith('temp-');
+      if (!isNew) {
+        sessionPayload.id = sessionForm.id;
+      }
+
+      const taskPayloads = sessionTasks.map((t, idx) => {
+        const payload: {
+          id?: string;
+          nombre_tarea: string;
+          tipo_tarea: string;
+          minutos: number;
+          jugadores?: number | null;
+          espacio?: string | null;
+          objetivo?: string | null;
+          descripcion?: string | null;
+          observaciones?: string | null;
+          orden: number;
+        } = {
+          nombre_tarea: t.nombre_tarea,
+          tipo_tarea: t.tipo_tarea,
+          minutos: Number(t.minutos) || 0,
+          jugadores: t.jugadores || null,
+          espacio: t.espacio || null,
+          objetivo: t.objetivo || null,
+          descripcion: t.descripcion || null,
+          observaciones: t.observaciones || null,
+          orden: idx
         };
+        if (t.id && !t.id.startsWith('t') && !t.id.startsWith('temp-')) {
+          payload.id = t.id;
+        }
+        return payload;
       });
-      triggerToast('¡Archivo PDF subido correctamente!');
-    } catch (err) {
-      console.error('Error uploading PDF:', err);
-      triggerToast('Error al subir el archivo PDF a Supabase Storage.');
+
+      const playerPayloads = players.map(p => ({
+        player_id: p.id,
+        convocado: summonedPlayerIds.includes(p.id),
+        estado_sesion: p.estado
+      }));
+
+      const conceptPayloads = sessionConcepts.map(c => ({
+        categoria: c.categoria,
+        concepto: c.concepto
+      }));
+
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      };
+      const staffPasskey = getStaffPasskey();
+      if (staffPasskey) {
+        headers['x-staff-passkey'] = staffPasskey;
+      }
+
+      const saveResponse = await fetch('/api/planificacion/sessions', {
+        method: 'POST',
+        headers,
+        credentials: 'include',
+        body: JSON.stringify({
+          session: sessionPayload,
+          tasks: taskPayloads,
+          players: playerPayloads,
+          concepts: conceptPayloads
+        })
+      });
+
+      const resJson = await saveResponse.json().catch(() => null);
+
+      if (!saveResponse.ok) {
+        throw new Error(resJson?.error || `Error ${saveResponse.status} al vincular el PDF a la sesión.`);
+      }
+
+      const savedSessionId = resJson?.data?.session_id || sessionForm.id;
+      setSessionForm(prev => ({
+        ...prev,
+        id: savedSessionId,
+        evaluacion_observaciones: newEvaluacionObservaciones
+      }));
+
+      await fetchWeekData(currentMonday, viewMode);
+      triggerToast('¡Archivo PDF subido y vinculado a la sesión con éxito!');
+    } catch (err: unknown) {
+      console.error('Error uploading/persisting PDF:', err);
+      triggerToast(err instanceof Error ? err.message : 'Error al subir y vincular el archivo PDF.');
     } finally {
       setUploadingPdf(false);
+      e.target.value = '';
     }
   };
 
@@ -739,6 +843,7 @@ export function PlanificacionClient() {
       const response = await fetch('/api/planificacion/sessions', {
         method: 'POST',
         headers,
+        credentials: 'include',
         body: JSON.stringify({
           session: sessionPayload,
           tasks: taskPayloads,

@@ -532,13 +532,13 @@ export function AsistenciaClient() {
       return;
     }
 
-    const success = await saveAttendanceAndEvaluations(attendancePayload, evaluationPayload);
-    if (success) {
+    const result = await saveAttendanceAndEvaluations(attendancePayload, evaluationPayload);
+    if (result.success) {
       setSaveSuccess(true);
       await loadHistory();
       setTimeout(() => setSaveSuccess(false), 4000);
     } else {
-      setShowError('Fallo al guardar en Supabase. Verifica la conexión o políticas.');
+      setShowError(result.error || 'Fallo al guardar en Supabase. Verifica la conexión o políticas.');
     }
   };
 

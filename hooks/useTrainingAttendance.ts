@@ -64,19 +64,23 @@ export function useTrainingAttendance() {
       const response = await fetch('/api/training/attendance', {
         method: 'POST',
         headers,
+        credentials: 'include',
         body: JSON.stringify({ attendance, evaluations }),
       });
 
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.error || `Error ${response.status} al guardar la asistencia.`);
+        const msg = errData.error || `Error ${response.status} al guardar la asistencia.`;
+        setError(msg);
+        return { success: false, error: msg };
       }
 
-      return true;
+      return { success: true };
     } catch (err: any) {
       console.error('Error saving training attendance/evaluations:', err);
-      setError(err.message || 'Error al guardar la asistencia y valoraciones');
-      return false;
+      const msg = err.message || 'Error al guardar la asistencia y valoraciones';
+      setError(msg);
+      return { success: false, error: msg };
     } finally {
       setLoading(false);
     }
