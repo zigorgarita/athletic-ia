@@ -679,6 +679,13 @@ export function TacticaClient() {
         ? `Jornada ${match.jornada} vs ${match.rival}`
         : 'Sin partido vinculado';
 
+      // Condición de exportación para la Página 2 (Rival):
+      // No generar página rival vacía. Se genera exclusivamente si existe
+      // al menos 1 jugador rival asignado (player_id) o con nombre/dorsal manual en nodesRival.
+      const hasRivalConfigured = nodesRival.some(
+        n => Boolean(n.player_id) || Boolean(n.customName && n.customName.trim())
+      );
+
       await exportToPDF({
         mode: 'tactica',
         fieldElementId: 'tactical-field-export-container',
@@ -688,6 +695,9 @@ export function TacticaClient() {
         sistemaPropio: selectedFormation,
         sistemaRival: rivalFormation,
         notas: lineupNotes,
+        rivalFieldElementId: 'tactical-rival-field-export-container',
+        rivalName: match?.rival || rivalClub?.nombre || undefined,
+        hasRivalBoard: hasRivalConfigured,
       });
     } catch (err) {
       console.error('[PDF Export] Error:', err);
@@ -1610,12 +1620,20 @@ export function TacticaClient() {
         </div>
       )}
 
-      {/* Hidden container for high-res PDF Export */}
+      {/* Hidden containers for high-res PDF Export */}
       <div className="fixed top-0 left-0 -z-50 opacity-0 pointer-events-none">
         <div id="tactical-field-export-container">
           <TacticalFieldExport
+            team="propio"
             nodes={nodesPropio}
             players={players}
+          />
+        </div>
+        <div id="tactical-rival-field-export-container">
+          <TacticalFieldExport
+            team="rival"
+            nodes={nodesRival}
+            rivalPlayers={rivalPlayers}
           />
         </div>
       </div>

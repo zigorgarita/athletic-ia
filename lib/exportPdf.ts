@@ -22,6 +22,9 @@ export interface TacticaExportConfig {
   sistemaPropio: string;
   sistemaRival: string;
   notas: string;
+  rivalFieldElementId?: string;
+  rivalName?: string;
+  hasRivalBoard?: boolean;
 }
 
 export interface ABPExportConfig {
@@ -190,6 +193,108 @@ export async function exportToPDF(config: ExportConfig): Promise<void> {
     const dateStr = new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
     doc.text(`Generado: ${dateStr}`, MARGIN, PAGE_H - 4);
     doc.text('Athletic Club Indautxu · Temporada 26/27', PAGE_W - MARGIN, PAGE_H - 4, { align: 'right' });
+
+    // ── Página 2: Probable XI Rival (Solo si hasRivalBoard es true y existe el contenedor) ──
+    if (config.hasRivalBoard && config.rivalFieldElementId) {
+      const rivalEl = document.getElementById(config.rivalFieldElementId);
+      if (rivalEl) {
+        const rivalNoExport = rivalEl.querySelectorAll<HTMLElement>('.no-export');
+        rivalNoExport.forEach(el => { el.style.visibility = 'hidden'; });
+
+        let rivalCanvas: HTMLCanvasElement | null = null;
+        try {
+          rivalCanvas = await html2canvas(rivalEl, {
+            scale: 3,
+            useCORS: true,
+            allowTaint: true,
+            backgroundColor: '#F0FDF4',
+            logging: false,
+          });
+        } catch (captureErr) {
+          console.error('[exportPdf] Error capturando pizarra rival:', captureErr);
+        } finally {
+          rivalNoExport.forEach(el => { el.style.visibility = ''; });
+        }
+
+        if (rivalCanvas && rivalCanvas.width > 0 && rivalCanvas.height > 0) {
+          const rivalImgData = rivalCanvas.toDataURL('image/jpeg', 0.95);
+
+          doc.addPage();
+
+          // ── Background (Clean White Page) ──
+          doc.setFillColor(PAGE_BG);
+          doc.rect(0, 0, PAGE_W, PAGE_H, 'F');
+
+          // ── Blue accent bar top para diferenciar la página rival ──
+          doc.setFillColor('#1E40AF');
+          doc.rect(0, 0, PAGE_W, 3, 'F');
+
+          let rivalCursorY = 8;
+
+          // ── Logo / Title ──
+          doc.setTextColor(TEXT_DARK);
+          doc.setFontSize(16);
+          doc.setFont('helvetica', 'bold');
+          doc.text('PROBABLE XI RIVAL', MARGIN, rivalCursorY);
+
+          doc.setFontSize(10);
+          doc.setTextColor('#1E40AF');
+          doc.text(config.rivalName ? config.rivalName.toUpperCase() : 'EQUIPO RIVAL', PAGE_W - MARGIN, rivalCursorY, { align: 'right' });
+
+          rivalCursorY += 5;
+          drawDivider(doc, rivalCursorY);
+          rivalCursorY += 5;
+
+          // ── Alineación / Rival name ──
+          doc.setFontSize(13);
+          doc.setTextColor(TEXT_DARK);
+          doc.setFont('helvetica', 'bold');
+          doc.text(config.rivalName ? `Probable Alineación vs ${config.rivalName}` : 'Probable Alineación Rival', MARGIN, rivalCursorY);
+          rivalCursorY += 6;
+
+          // ── Partido ──
+          doc.setFontSize(8);
+          doc.setFont('helvetica', 'normal');
+          doc.setTextColor(TEXT_MUTED);
+          doc.text('Partido:', MARGIN, rivalCursorY);
+          doc.setTextColor(TEXT_DARK);
+          doc.text(config.partido, MARGIN + 18, rivalCursorY);
+          rivalCursorY += 5;
+
+          // ── Sistema Rival ──
+          doc.setTextColor(TEXT_MUTED);
+          doc.text('Sistema / Disposición rival:', MARGIN, rivalCursorY);
+          doc.setTextColor(TEXT_DARK);
+          doc.text(config.sistemaRival, MARGIN + 42, rivalCursorY);
+          rivalCursorY += 5;
+
+          drawDivider(doc, rivalCursorY);
+          rivalCursorY += 4;
+
+          // ── Field image — centered in the page ──
+          const rivalAvailW = PAGE_W - 2 * MARGIN;
+          const rivalAvailH = PAGE_H - rivalCursorY - MARGIN;
+          const rAspect = rivalCanvas.width / rivalCanvas.height;
+
+          let rFieldW = rivalAvailW;
+          let rFieldH = rFieldW / rAspect;
+
+          if (rFieldH > rivalAvailH) {
+            rFieldH = rivalAvailH;
+            rFieldW = rFieldH * rAspect;
+          }
+
+          const rFieldX = (PAGE_W - rFieldW) / 2;
+          doc.addImage(rivalImgData, 'JPEG', rFieldX, rivalCursorY, rFieldW, rFieldH);
+
+          // ── Footer ──
+          doc.setFontSize(6);
+          doc.setTextColor(TEXT_MUTED);
+          doc.text(`Generado: ${dateStr}`, MARGIN, PAGE_H - 4);
+          doc.text('Athletic Club Indautxu · Temporada 26/27', PAGE_W - MARGIN, PAGE_H - 4, { align: 'right' });
+        }
+      }
+    }
 
   } else {
     // ── ABP Mode ──
