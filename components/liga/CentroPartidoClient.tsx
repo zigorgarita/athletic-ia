@@ -609,36 +609,22 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
   // Tab 1: General Info Save
   const handleSaveGeneralInfo = async () => {
     try {
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
+      const res = await fetch(`/api/matches/${encodeURIComponent(matchId)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          hora: matchHora || null,
+          campo: matchCampo || null,
+          clasificacion_nota: matchClasificacionNota || null,
+        }),
+      });
 
-      // Fetch fila actual para evitar violación NOT NULL al hacer upsert parcial
-      // Mismo patrón que useUpdatePlayer.ts y usePlayerInjuries.ts
-      const { data: currentMatch, error: fetchErr } = await supabase
-        .from('matches')
-        .select('*')
-        .eq('id', matchId)
-        .single();
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || `HTTP ${res.status}`);
+      }
 
-      if (fetchErr) throw fetchErr;
-
-      const { created_at, ...mergeableMatch } = currentMatch as Record<string, unknown>;
-      void created_at; // excluido intencionalmente
-
-      const { error } = await supabase
-        .rpc('exec_secure_upsert', {
-          target_table: 'matches',
-          payload: {
-            ...mergeableMatch,
-            id: matchId,
-            hora: matchHora || null,
-            campo: matchCampo || null,
-            clasificacion_nota: matchClasificacionNota || null
-          },
-          conflict_columns: ['id'],
-          staff_passkey: passkey
-        });
-
-      if (error) throw error;
       setIsEditingInfo(false);
       loadAllData();
       alert('Información general guardada correctamente.');
@@ -972,38 +958,24 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
   const handleSaveReport = async () => {
     setIsSavingReport(true);
     try {
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
+      const res = await fetch(`/api/matches/${encodeURIComponent(matchId)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          analisis_resumen: reportResumen || null,
+          analisis_positivos: reportPositivos || null,
+          analisis_mejorar: reportMejorar || null,
+          analisis_claves: reportClaves || null,
+          analisis_conclusiones: reportConclusiones || null,
+        }),
+      });
 
-      // Fetch fila actual para evitar violación NOT NULL al hacer upsert parcial
-      // Mismo patrón que useUpdatePlayer.ts y usePlayerInjuries.ts
-      const { data: currentMatch, error: fetchErr } = await supabase
-        .from('matches')
-        .select('*')
-        .eq('id', matchId)
-        .single();
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || `HTTP ${res.status}`);
+      }
 
-      if (fetchErr) throw fetchErr;
-
-      const { created_at, ...mergeableMatch } = currentMatch as Record<string, unknown>;
-      void created_at; // excluido intencionalmente
-
-      const { error } = await supabase
-        .rpc('exec_secure_upsert', {
-          target_table: 'matches',
-          payload: {
-            ...mergeableMatch,
-            id: matchId,
-            analisis_resumen: reportResumen || null,
-            analisis_positivos: reportPositivos || null,
-            analisis_mejorar: reportMejorar || null,
-            analisis_claves: reportClaves || null,
-            analisis_conclusiones: reportConclusiones || null
-          },
-          conflict_columns: ['id'],
-          staff_passkey: passkey
-        });
-
-      if (error) throw error;
       loadAllData();
       alert('Informe del analista guardado con éxito.');
     } catch (err: unknown) {

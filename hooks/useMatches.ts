@@ -32,38 +32,46 @@ export function useMatches(matchType: 'LIGA' | 'AMISTOSO' | 'ALL' = 'LIGA') {
     setError(null);
     try {
       verifyWritePermission();
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
-      const { data, error: supabaseError } = await supabase
-        .rpc('exec_secure_upsert', {
-          target_table: 'matches',
-          payload: { ...matchData, tipo_partido: matchType },
-          conflict_columns: null,
-          staff_passkey: passkey
-        });
+      const res = await fetch('/api/matches', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ ...matchData, tipo_partido: matchType }),
+      });
 
-      if (supabaseError) throw supabaseError;
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || `Error HTTP ${res.status}`);
+      }
+
+      const json = await res.json();
+      const data: Match = json.data;
       setMatches((prev) => [...prev, data].sort((a, b) => a.jornada - b.jornada));
       return data;
     } catch (err: any) {
       setError(err.message || 'Error al crear la jornada');
       return null;
     }
-  }, [verifyWritePermission]);
+  }, [verifyWritePermission, matchType]);
 
   const updateMatch = useCallback(async (id: string, matchData: Partial<Omit<Match, 'id' | 'created_at'>>): Promise<Match | null> => {
     setError(null);
     try {
       verifyWritePermission();
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
-      const { data, error: supabaseError } = await supabase
-        .rpc('exec_secure_upsert', {
-          target_table: 'matches',
-          payload: { ...matchData, id },
-          conflict_columns: ['id'],
-          staff_passkey: passkey
-        });
+      const res = await fetch(`/api/matches/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(matchData),
+      });
 
-      if (supabaseError) throw supabaseError;
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || `Error HTTP ${res.status}`);
+      }
+
+      const json = await res.json();
+      const data: Match = json.data;
       setMatches((prev) => prev.map((m) => (m.id === id ? data : m)));
       return data;
     } catch (err: any) {
