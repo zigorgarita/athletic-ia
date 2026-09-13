@@ -1,26 +1,26 @@
 import { NextResponse } from 'next/server';
+import { isCoachSessionAuthorized, isCoachSessionAuthorizedFromRequest } from '@/lib/auth/staff-session';
 import { getGoogleDriveAccessToken } from '@/lib/google-drive';
 import { getOrCreateDriveFolderPath, DriveUploadContext } from '@/lib/drive-folders';
 
 export async function POST(request: Request) {
   try {
+    // 1. Validar autenticación de staff del lado servidor mediante sesión central
+    const authorized = (await isCoachSessionAuthorized()) || isCoachSessionAuthorizedFromRequest(request);
+    if (!authorized) {
+      return NextResponse.json(
+        { error: 'No autorizado: Se requiere sesión de cuerpo técnico.' },
+        { status: 401 }
+      );
+    }
+
     const body = await request.json();
-    const { passkey, fileName, mimeType, fileSize, uploadContext } = body as {
-      passkey: string;
+    const { fileName, mimeType, fileSize, uploadContext } = body as {
       fileName: string;
       mimeType: string;
       fileSize: number;
       uploadContext?: DriveUploadContext;
     };
-
-    // 1. Validar autenticación de staff del lado servidor
-    const validPasskey = process.env.NEXT_PUBLIC_COACH_PASSKEY || process.env.COACH_STAFF_PASSKEY || 'indautxu2026';
-    if (!passkey || passkey !== validPasskey) {
-      return NextResponse.json(
-        { error: 'No autorizado. Clave de staff inválida.' },
-        { status: 401 }
-      );
-    }
 
     // 2. Validar parámetros de entrada
     if (!fileName || !mimeType || !fileSize) {

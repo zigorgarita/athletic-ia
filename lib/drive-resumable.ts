@@ -24,7 +24,7 @@ export interface UploadProgressInfo {
 
 export interface DriveResumableUploadOptions {
   file: File;
-  passkey: string;
+  passkey?: string;
   uploadContext?: DriveUploadContext;
   onProgress?: (info: UploadProgressInfo) => void;
   chunkSizeBytes?: number; // Por defecto 4 MiB (4,194,304 bytes)
@@ -32,7 +32,7 @@ export interface DriveResumableUploadOptions {
 
 export class DriveResumableUploader {
   private file: File;
-  private passkey: string;
+  private passkey?: string;
   private uploadContext?: DriveUploadContext;
   private onProgress?: (info: UploadProgressInfo) => void;
   private chunkSize: number;
@@ -72,9 +72,9 @@ export class DriveResumableUploader {
         
         const sessionRes = await fetch('/api/google-drive/create-resumable-session', {
           method: 'POST',
+          credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            passkey: this.passkey,
             fileName: this.file.name,
             mimeType: this.file.type || 'video/mp4',
             fileSize: this.file.size,
@@ -114,9 +114,9 @@ export class DriveResumableUploader {
 
         const response = await fetch('/api/google-drive/upload-chunk', {
           method: 'PUT',
+          credentials: 'include',
           headers: {
             'x-upload-url': this.uploadUrl!,
-            'x-staff-passkey': this.passkey,
             'Content-Range': `bytes ${startByte}-${endByte}/${total}`,
             'Content-Type': this.file.type || 'video/mp4',
           },
@@ -151,9 +151,9 @@ export class DriveResumableUploader {
           // 4. Finalizar subida y configurar acceso en el servidor
           const finalizeRes = await fetch('/api/google-drive/finalize-upload', {
             method: 'POST',
+            credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              passkey: this.passkey,
               driveFileId,
               fileName: this.file.name,
               mimeType: this.file.type || 'video/mp4',
@@ -193,9 +193,9 @@ export class DriveResumableUploader {
     try {
       const res = await fetch('/api/google-drive/upload-chunk', {
         method: 'PUT',
+        credentials: 'include',
         headers: {
           'x-upload-url': this.uploadUrl,
-          'x-staff-passkey': this.passkey,
           'Content-Range': `bytes */${this.file.size}`,
         },
       });

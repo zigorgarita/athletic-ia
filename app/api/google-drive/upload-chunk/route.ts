@@ -1,14 +1,13 @@
 import { NextResponse } from 'next/server';
+import { isCoachSessionAuthorized, isCoachSessionAuthorizedFromRequest } from '@/lib/auth/staff-session';
 
 export async function PUT(request: Request) {
   try {
-    // 1. Validar autenticación de staff
-    const headerPasskey = request.headers.get('x-staff-passkey');
-    const validPasskey = process.env.NEXT_PUBLIC_COACH_PASSKEY || process.env.COACH_STAFF_PASSKEY || 'indautxu2026';
-
-    if (!headerPasskey || headerPasskey !== validPasskey) {
+    // 1. Validar autenticación de staff mediante sesión central
+    const authorized = (await isCoachSessionAuthorized()) || isCoachSessionAuthorizedFromRequest(request);
+    if (!authorized) {
       return NextResponse.json(
-        { error: 'No autorizado. Clave de staff inválida.' },
+        { error: 'No autorizado: Se requiere sesión de cuerpo técnico.' },
         { status: 401 }
       );
     }
