@@ -231,3 +231,206 @@ export async function PATCH(
     );
   }
 }
+
+export async function DELETE(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> | { id: string } }
+) {
+  try {
+    // 1. Autorización mediante sesión central de staff exclusivamente (sin passkeys de fallback)
+    const authorized = (await isCoachSessionAuthorized()) || isCoachSessionAuthorizedFromRequest(req);
+    if (!authorized) {
+      return NextResponse.json(
+        { success: false, error: 'No autorizado: Se requiere sesión de cuerpo técnico.' },
+        { status: 401 }
+      );
+    }
+
+    // 2. Resolver y validar matchId (UUID requerido)
+    const resolvedParams = await params;
+    const matchId = resolvedParams?.id?.trim();
+
+    if (!matchId || !UUID_REGEX.test(matchId)) {
+      return NextResponse.json(
+        { success: false, error: `ID de partido inválido (UUID requerido): '${matchId}'` },
+        { status: 400 }
+      );
+    }
+
+    // 3. Consultar existencia y datos del partido
+    const supabaseServer = getSupabaseServerClient();
+    const { data: match, error: fetchError } = await supabaseServer
+      .from('matches')
+      .select('*')
+      .eq('id', matchId)
+      .single();
+
+    if (fetchError || !match) {
+      if (fetchError?.code === 'PGRST116' || !match) {
+        return NextResponse.json(
+          { success: false, error: `No se encontró ningún partido con id '${matchId}'.` },
+          { status: 404 }
+        );
+      }
+      console.error('[API /api/matches/[id] DELETE] Error al consultar partido:', fetchError);
+      return NextResponse.json(
+        { success: false, error: 'Error interno al consultar el partido.' },
+        { status: 500 }
+      );
+    }
+
+    // 4. Bloqueo RFEF obligatorio
+    if (match.official_match_id !== null && match.official_match_id !== undefined) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Este partido está vinculado a un acta oficial RFEF y está protegido contra eliminación.',
+        },
+        { status: 409 }
+      );
+    }
+
+    // 5. Bloqueo por estado deportivo o resultado registrado
+    if (match.jugado === true) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Este partido contiene datos deportivos o técnicos y está protegido contra eliminación.',
+        },
+        { status: 409 }
+      );
+    }
+
+    if (match.goles_favor !== null && match.goles_favor !== undefined) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Este partido contiene datos deportivos o técnicos y está protegido contra eliminación.',
+        },
+        { status: 409 }
+      );
+    }
+
+    if (match.goles_contra !== null && match.goles_contra !== undefined) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Este partido contiene datos deportivos o técnicos y está protegido contra eliminación.',
+        },
+        { status: 409 }
+      );
+    }
+
+    // 6. Bloqueo por informes técnicos o análisis
+    const hasAnalisis = Boolean(
+      (typeof match.analisis_resumen === 'string' && match.analisis_resumen.trim().length > 0) ||
+      (typeof match.analisis_positivos === 'string' && match.analisis_positivos.trim().length > 0) ||
+      (typeof match.analisis_mejorar === 'string' && match.analisis_mejorar.trim().length > 0) ||
+      (typeof match.analisis_claves === 'string' && match.analisis_claves.trim().length > 0) ||
+      (typeof match.analisis_conclusiones === 'string' && match.analisis_conclusiones.trim().length > 0)
+    );
+
+    if (hasAnalisis) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Este partido contiene datos deportivos o técnicos y está protegido contra eliminación.',
+        },
+        { status: 409 }
+      );
+    }
+
+    // 7. Bloqueos obligatorios por dependencias relacionales hijas (Fail Closed)
+    const [
+      statsRes,
+      abpRes,
+      gpsRes,
+      lineupsRes,
+      ownAnalysisRes,
+      fullVideosRes,
+      clipsRes,
+      strategicRes,
+      customVideosRes,
+      documentsRes,
+      tournamentsRes,
+      clubMatchesRes
+    ] = await Promise.all([
+      supabaseServer.from('match_player_stats').select('*', { count: 'exact', head: true }).eq('match_id', matchId),
+      supabaseServer.from('match_abp_plans').select('*', { count: 'exact', head: true }).eq('match_id', matchId),
+      supabaseServer.from('gps_sessions').select('*', { count: 'exact', head: true }).eq('match_id', matchId),
+      supabaseServer.from('tactical_lineups').select('*', { count: 'exact', head: true }).eq('match_id', matchId),
+      supabaseServer.from('match_own_analysis_videos').select('*', { count: 'exact', head: true }).eq('match_id', matchId),
+      supabaseServer.from('match_full_videos').select('*', { count: 'exact', head: true }).eq('match_id', matchId),
+      supabaseServer.from('match_video_clips').select('*', { count: 'exact', head: true }).eq('match_id', matchId),
+      supabaseServer.from('match_strategic_actions').select('*', { count: 'exact', head: true }).eq('match_id', matchId),
+      supabaseServer.from('match_custom_videos').select('*', { count: 'exact', head: true }).eq('match_id', matchId),
+      supabaseServer.from('match_documents').select('*', { count: 'exact', head: true }).eq('match_id', matchId),
+      supabaseServer.from('tournament_matches').select('*', { count: 'exact', head: true }).eq('match_id', matchId),
+      supabaseServer.from('club_matches').select('*', { count: 'exact', head: true }).eq('our_match_id', matchId),
+    ]);
+
+    const dependencyChecks = [
+      { table: 'match_player_stats', res: statsRes },
+      { table: 'match_abp_plans', res: abpRes },
+      { table: 'gps_sessions', res: gpsRes },
+      { table: 'tactical_lineups', res: lineupsRes },
+      { table: 'match_own_analysis_videos', res: ownAnalysisRes },
+      { table: 'match_full_videos', res: fullVideosRes },
+      { table: 'match_video_clips', res: clipsRes },
+      { table: 'match_strategic_actions', res: strategicRes },
+      { table: 'match_custom_videos', res: customVideosRes },
+      { table: 'match_documents', res: documentsRes },
+      { table: 'tournament_matches', res: tournamentsRes },
+      { table: 'club_matches', res: clubMatchesRes },
+    ];
+
+    for (const check of dependencyChecks) {
+      if (check.res.error) {
+        console.error(`[API /api/matches/[id] DELETE] Error al verificar dependencias en ${check.table}:`, check.res.error);
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'No se pudo verificar la integridad de las dependencias del partido. Operación abortada por seguridad.',
+          },
+          { status: 500 }
+        );
+      }
+
+      if ((check.res.count ?? 0) > 0) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Este partido contiene datos deportivos o técnicos y está protegido contra eliminación.',
+          },
+          { status: 409 }
+        );
+      }
+    }
+
+    // 8. Eliminación atómica segura exclusivamente para partidos totalmente vacíos
+    const { error: deleteError } = await supabaseServer
+      .from('matches')
+      .delete()
+      .eq('id', matchId);
+
+    if (deleteError) {
+      console.error('[API /api/matches/[id] DELETE] Error en delete:', deleteError);
+      return NextResponse.json(
+        { success: false, error: deleteError.message || 'Error al eliminar el partido.' },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json(
+      { success: true, message: 'Partido eliminado correctamente.', deletedId: matchId },
+      { status: 200 }
+    );
+  } catch (err) {
+    console.error('[API /api/matches/[id] DELETE] Excepción interna:', err);
+    return NextResponse.json(
+      { success: false, error: err instanceof Error ? err.message : 'Error interno del servidor.' },
+      { status: 500 }
+    );
+  }
+}
+

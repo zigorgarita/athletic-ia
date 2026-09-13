@@ -92,6 +92,13 @@ export function MatchCard({
   // Custom type casting since Match interface doesn't explicitly declare hora in TS
   const matchTime = matchWithFields.hora || null;
 
+  const isMatchProtected = Boolean(
+    match.official_match_id ||
+    match.jugado ||
+    match.goles_favor !== null ||
+    match.goles_contra !== null
+  );
+
   return (
     <div className="relative bg-slate-900/40 border border-slate-800 hover:border-red-500/20 rounded-3xl p-5 flex flex-col justify-between transition-all duration-300 group shadow-lg hover:shadow-red-500/5 select-none overflow-hidden h-[330px]">
       
@@ -118,9 +125,17 @@ export function MatchCard({
             )}
             {onDelete && (
               <button
-                onClick={(e) => { e.stopPropagation(); onDelete(match.id); }}
-                className="p-1.5 hover:bg-slate-800/80 rounded-lg text-slate-400 hover:text-red-400 transition-colors"
-                title="Eliminar jornada"
+                disabled={isMatchProtected}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (!isMatchProtected) onDelete(match.id);
+                }}
+                className={`p-1.5 rounded-lg transition-colors ${
+                  isMatchProtected
+                    ? 'text-slate-600 opacity-40 cursor-not-allowed'
+                    : 'text-slate-400 hover:bg-slate-800/80 hover:text-red-400'
+                }`}
+                title={isMatchProtected ? 'Partido protegido contra eliminación' : 'Eliminar jornada'}
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>

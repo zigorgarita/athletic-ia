@@ -84,15 +84,16 @@ export function useMatches(matchType: 'LIGA' | 'AMISTOSO' | 'ALL' = 'LIGA') {
     setError(null);
     try {
       verifyWritePermission();
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
-      const { error: supabaseError } = await supabase
-        .rpc('exec_secure_delete', {
-          target_table: 'matches',
-          record_id: id,
-          staff_passkey: passkey
-        });
+      const res = await fetch(`/api/matches/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
 
-      if (supabaseError) throw supabaseError;
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || `Error HTTP ${res.status}`);
+      }
+
       setMatches((prev) => prev.filter((m) => m.id !== id));
       return true;
     } catch (err: any) {

@@ -80,7 +80,7 @@ export function MatchCenterClient({ matchType }: MatchCenterClientProps) {
   };
 
   const handleDeleteMatch = async (id: string) => {
-    if (confirm(`¿Estás seguro de que deseas eliminar este partido de ${matchType.toLowerCase()}? Todos los datos asociados y estadísticas de jugadores se perderán.`)) {
+    if (confirm(`¿Estás seguro de que deseas eliminar este partido de ${matchType.toLowerCase()}? Solo se pueden eliminar partidos vacíos sin datos asociados.`)) {
       const success = await deleteMatch(id);
       if (success) {
         refetch();
