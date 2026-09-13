@@ -3772,26 +3772,61 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
                         <Shield className="h-4 w-4 text-[#CC0E21]" />
                         Acta Oficial RFEF
                       </h4>
-                      <span className="text-[8px] bg-amber-500/15 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded font-black tracking-widest uppercase">
-                        Pendiente
-                      </span>
+                      {match?.official_match_id ? (
+                        <span className="text-[8px] bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 rounded font-black tracking-widest uppercase">
+                          Disponible
+                        </span>
+                      ) : (
+                        <span className="text-[8px] bg-amber-500/15 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded font-black tracking-widest uppercase">
+                          Pendiente
+                        </span>
+                      )}
                     </div>
                     
                     <div className="p-4 bg-slate-950/40 border border-slate-850 rounded-xl space-y-3 text-center">
-                      <div className="h-10 w-10 rounded-full bg-slate-900 border border-slate-850 flex items-center justify-center mx-auto text-slate-600">
-                        <FileText className="h-5 w-5" />
+                      <div className={`h-10 w-10 rounded-full flex items-center justify-center mx-auto border ${
+                        match?.official_match_id 
+                          ? 'bg-emerald-500/10 border-emerald-500/20 text-[#CC0E21]' 
+                          : 'bg-slate-900 border-slate-850 text-slate-600'
+                      }`}>
+                        {match?.official_match_id ? (
+                          <Award className="h-5 w-5 text-[#CC0E21]" />
+                        ) : (
+                          <FileText className="h-5 w-5" />
+                        )}
                       </div>
                       <div className="space-y-1">
-                        <p className="text-xs font-bold text-slate-300">Sincronización de Acta Oficial</p>
+                        <p className="text-xs font-bold text-slate-300">
+                          {match?.official_match_id ? 'Acta Oficial Vinculada' : 'Sincronización de Acta Oficial'}
+                        </p>
                         <p className="text-[9px] text-slate-500 leading-relaxed">
-                          Permite enlazar directamente el acta oficial RFEF una vez cerrado y subido por el equipo arbitral en su portal.
+                          {match?.official_match_id
+                            ? 'El acta arbitral oficial de la RFEF está disponible y vinculada a este partido.'
+                            : 'Permite enlazar directamente el acta oficial RFEF una vez cerrado y subido por el equipo arbitral en su portal.'}
                         </p>
                       </div>
                       <div className="pt-1.5">
-                        <Button disabled className="w-full flex items-center justify-center gap-1.5 text-[10px] py-1.5 bg-slate-900 border border-slate-850 text-slate-500 select-none">
-                          <RefreshCw className="h-3 w-3 animate-pulse" />
-                          Sincronizar con RFEF
-                        </Button>
+                        {match?.official_match_id ? (
+                          <button
+                            type="button"
+                            onClick={handleOpenOfficialMatch}
+                            disabled={loadingOfficialDetail}
+                            className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-slate-950/80 hover:bg-slate-850 text-slate-200 hover:text-white border border-slate-750 hover:border-slate-650 transition-all shadow-sm text-xs font-semibold cursor-pointer disabled:opacity-50"
+                            title="Ver acta oficial de la RFEF"
+                          >
+                            {loadingOfficialDetail ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin text-[#CC0E21]" />
+                            ) : (
+                              <Award className="h-3.5 w-3.5 text-[#CC0E21]" />
+                            )}
+                            <span>Ver Acta Oficial RFEF</span>
+                          </button>
+                        ) : (
+                          <Button disabled className="w-full flex items-center justify-center gap-1.5 text-[10px] py-1.5 bg-slate-900 border border-slate-850 text-slate-500 select-none">
+                            <Clock className="h-3 w-3" />
+                            Pendiente de Publicación RFEF
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </div>
