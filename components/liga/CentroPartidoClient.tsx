@@ -1002,23 +1002,23 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
 
       if (!finalUrl) throw new Error('Es necesario un archivo o enlace para el documento');
 
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
-      const { error } = await supabase
-        .rpc('exec_secure_upsert', {
-          target_table: 'match_documents',
-          payload: {
-            match_id: matchId,
-            nombre_documento: docName,
-            tipo_documento: docType,
-            tipo_origen: docOrigin,
-            url_storage: finalUrl,
-            comentario: docComment || null
-          },
-          conflict_columns: null,
-          staff_passkey: passkey
-        });
+      const res = await fetch(`/api/matches/${matchId}/documents`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nombre_documento: docName.trim(),
+          tipo_documento: docType.trim(),
+          tipo_origen: docOrigin,
+          url_storage: finalUrl,
+          comentario: docComment?.trim() || null,
+        }),
+      });
 
-      if (error) throw error;
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || 'Error al guardar el documento.');
+      }
 
       setDocName('');
       setDocUrl('');
@@ -1037,13 +1037,14 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
   const handleDeleteDoc = async (id: string) => {
     if (!confirm('¿Deseas eliminar este documento?')) return;
     try {
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
-      const { error } = await supabase.rpc('exec_secure_delete', {
-        target_table: 'match_documents',
-        record_id: id,
-        staff_passkey: passkey
+      const res = await fetch(`/api/matches/${matchId}/documents/${id}`, {
+        method: 'DELETE',
+        credentials: 'include',
       });
-      if (error) throw error;
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || 'Error al eliminar el documento.');
+      }
       loadAllData();
     } catch (err: unknown) {
       alert(`Error: ${err instanceof Error ? err.message : String(err)}`);

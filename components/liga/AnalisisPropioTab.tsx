@@ -271,21 +271,23 @@ export function AnalisisPropioTab({ match }: AnalisisPropioTabProps) {
         throw new Error('No se pudo obtener la URL del archivo subido.');
       }
 
-      const { error: rpcError } = await supabase.rpc('exec_secure_upsert', {
-        target_table: 'match_documents',
-        payload: {
-          match_id: match.id,
+      const res = await fetch(`/api/matches/${match.id}/documents`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           nombre_documento: selectedPdfFile.name,
           tipo_documento: 'Informe Aitor',
           tipo_origen: 'Archivo',
           url_storage: finalUrl,
-          comentario: null
-        },
-        conflict_columns: null,
-        staff_passkey: passkey
+          comentario: null,
+        }),
       });
 
-      if (rpcError) throw rpcError;
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || 'Error al registrar el informe en el partido.');
+      }
 
       setSelectedPdfFile(null);
       await fetchPdfDocs();
