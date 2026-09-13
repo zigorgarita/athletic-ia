@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { isCoachSessionAuthorized, isCoachSessionAuthorizedFromRequest } from '@/lib/auth/staff-session';
 import { getGoogleDriveAccessToken } from '@/lib/google-drive';
 
 export async function POST(request: Request) {
@@ -7,15 +8,12 @@ export async function POST(request: Request) {
   let testFileDeleted = false;
 
   try {
-    const body = await request.json().catch(() => ({}));
-    const { passkey } = body;
-
-    const validPasskey = process.env.NEXT_PUBLIC_COACH_PASSKEY || process.env.COACH_STAFF_PASSKEY || 'indautxu2026';
-    if (!passkey || passkey !== validPasskey) {
-      return NextResponse.json({ error: 'No autorizado. Clave de staff inválida.' }, { status: 401 });
+    const authorized = (await isCoachSessionAuthorized()) || isCoachSessionAuthorizedFromRequest(request);
+    if (!authorized) {
+      return NextResponse.json({ error: 'No autorizado: Se requiere sesión de cuerpo técnico.' }, { status: 401 });
     }
 
-    logSteps.push('1. Autenticación de staff verificada correctamente del lado servidor.');
+    logSteps.push('1. Autenticación de staff verificada correctamente del lado servidor mediante sesión central.');
 
     // 1. Obtener Access Token
     const accessToken = await getGoogleDriveAccessToken();

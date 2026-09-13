@@ -1,18 +1,33 @@
 import { getSupabaseServerClient } from './supabase-server';
+import { isCoachSessionAuthorized, isCoachSessionAuthorizedFromRequest } from './auth/staff-session';
 
 export interface AuthVerificationResult {
   authorized: boolean;
   user?: string;
-  authMethod: 'supabase_token' | 'editor_credentials' | 'unauthorized';
+  authMethod: 'supabase_token' | 'editor_credentials' | 'staff_session' | 'unauthorized';
   error?: string;
 }
 
 /**
- * Módulo de verificación de autorización exclusivo del servidor para rutas de Rivales.
- * NUNCA utiliza valores por defecto escritos en código ni autoriza mediante passkeys antiguas.
+ * Módulo de verificación de autorización exclusivo del servidor para rutas de Rivales y Táctica.
+ * NUNCA asume identidades por defecto si faltan credenciales ni utiliza passkeys antiguas.
+ * Autoriza exclusivamente mediante:
+ * 1. Sesión central de staff (cookie firmada HMAC-SHA256).
+ * 2. Token JWT verificado de Supabase Auth.
+ * 3. Credenciales privadas de editor (x-editor-user y x-editor-pass).
  */
 export async function verifyServerAuthorization(req: Request): Promise<AuthVerificationResult> {
-  // 1. Verificación por Token JWT de Supabase Auth
+  // 1. Verificación mediante sesión central de staff (cookie coach_staff_session o staff_session editor/admin)
+  const isStaffAuthorized = (await isCoachSessionAuthorized()) || isCoachSessionAuthorizedFromRequest(req);
+  if (isStaffAuthorized) {
+    return {
+      authorized: true,
+      user: 'coach_staff',
+      authMethod: 'staff_session',
+    };
+  }
+
+  // 2. Verificación por Token JWT de Supabase Auth
   const authHeader = req.headers.get('authorization');
   if (authHeader && authHeader.startsWith('Bearer ')) {
     const token = authHeader.substring(7).trim();
@@ -34,7 +49,6 @@ export async function verifyServerAuthorization(req: Request): Promise<AuthVerif
           const isAuthorized = allowedEmails.length > 0 ? allowedEmails.includes(userEmail) : Boolean(userEmail);
 
           if (isAuthorized) {
-            console.log(`[AUTH] Resultado: AUTORIZADO (metodo: supabase_token, usuario_id: ${user.id})`);
             return {
               authorized: true,
               user: userEmail,
@@ -48,9 +62,9 @@ export async function verifyServerAuthorization(req: Request): Promise<AuthVerif
     }
   }
 
-  // 2. Verificación por credenciales de usuario editor mediante variables de servidor privadas
-  let editorUser = req.headers.get('x-editor-user')?.trim().toLowerCase();
-  let editorPass = req.headers.get('x-editor-pass')?.trim();
+  // 3. Verificación por credenciales explícitas de usuario editor mediante variables de servidor privadas
+  const editorUser = req.headers.get('x-editor-user')?.trim().toLowerCase();
+  const editorPass = req.headers.get('x-editor-pass')?.trim();
 
   const serverPasswords: Record<string, string | undefined> = {
     zigor: process.env.EDIT_PASSWORD_ZIGOR,
@@ -59,32 +73,22 @@ export async function verifyServerAuthorization(req: Request): Promise<AuthVerif
     julen: process.env.EDIT_PASSWORD_JULEN,
   };
 
-  // Si no se proporcionaron credenciales o vienen vacías, permitir acceso con perfil de staff por defecto ('aitor')
-  if (!editorUser && !editorPass) {
-    editorUser = 'aitor';
-    editorPass = serverPasswords.aitor;
-  }
-
   if (editorUser && editorPass && serverPasswords[editorUser]) {
     const validServerPass = serverPasswords[editorUser]?.trim();
     if (validServerPass && editorPass === validServerPass) {
-      console.log(`[AUTH] Intento de autorización: editor_credentials | Resultado: AUTORIZADO (usuario: ${editorUser})`);
       return {
         authorized: true,
         user: editorUser,
         authMethod: 'editor_credentials',
       };
     } else {
-      console.warn(`[AUTH] Intento de autorización: editor_credentials | Resultado: DENEGADO (usuario: ${editorUser}, clave recibida: ${editorPass ? 'presente pero no coincide' : 'vacía'})`);
+      console.warn(`[AUTH] Intento de autorización: editor_credentials | DENEGADO (usuario: ${editorUser})`);
     }
-  } else {
-    console.warn(`[AUTH] Intento de autorización: editor_credentials | Resultado: DENEGADO (x-editor-user: '${editorUser || ''}', x-editor-pass: '${editorPass ? 'SÍ' : 'NO'}')`);
   }
 
-  console.log('[AUTH] Resultado final: DENEGADO (metodo: unauthorized)');
   return {
     authorized: false,
     authMethod: 'unauthorized',
-    error: 'Acceso no autorizado en servidor: Credenciales o token de usuario no válidos.',
+    error: 'Acceso no autorizado en servidor: Se requiere sesión de cuerpo técnico o credenciales de editor válidas.',
   };
 }

@@ -1,8 +1,17 @@
 import { NextResponse } from 'next/server';
+import { isCoachSessionAuthorized, isCoachSessionAuthorizedFromRequest } from '@/lib/auth/staff-session';
 import { uploadVideoBufferToDrive } from '@/lib/google-drive';
 
 export async function POST(request: Request) {
   try {
+    const authorized = (await isCoachSessionAuthorized()) || isCoachSessionAuthorizedFromRequest(request);
+    if (!authorized) {
+      return NextResponse.json(
+        { error: 'No autorizado: Se requiere sesión de cuerpo técnico.' },
+        { status: 401 }
+      );
+    }
+
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
 
