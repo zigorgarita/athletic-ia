@@ -137,21 +137,14 @@ export function usePlayerMultimedia(playerId: string | null) {
       const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
       
       if (videoType === 'PARTIDO') {
-        // Delete from match_own_analysis_video_players
-        const { data: rows } = await supabase
-          .from('match_own_analysis_video_players')
-          .select('id')
-          .eq('video_id', videoId)
-          .eq('player_id', playerId);
-
-        if (rows && rows.length > 0) {
-          for (const row of rows) {
-            await supabase.rpc('exec_secure_delete', {
-              target_table: 'match_own_analysis_video_players',
-              record_id: row.id,
-              staff_passkey: passkey
-            });
-          }
+        // Desvincular de match_own_analysis_video_players mediante endpoint server-side securizado
+        const res = await fetch(`/api/videos/own-analysis/${videoId}/players/${playerId}`, {
+          method: 'DELETE',
+          credentials: 'include',
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok || !json.success) {
+          throw new Error(json.error || 'Error al desvincular el vídeo de análisis propio');
         }
       } else {
         // Delete from player_video_targets

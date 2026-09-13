@@ -435,41 +435,16 @@ export function AnalisisPropioTab({ match }: AnalisisPropioTabProps) {
     if (!assignModalVideo) return;
     setSavingAssigned(true);
     try {
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
-      
-      // Players to add
-      const toAdd = assignedPlayerIds.filter(id => !initialAssignedPlayerIds.includes(id));
-      // Players to remove
-      const toRemove = initialAssignedPlayerIds.filter(id => !assignedPlayerIds.includes(id));
+      const res = await fetch(`/api/videos/own-analysis/${assignModalVideo.id}/players`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ player_ids: assignedPlayerIds }),
+      });
 
-      for (const pId of toAdd) {
-        await supabase.rpc('exec_secure_upsert', {
-          target_table: 'match_own_analysis_video_players',
-          payload: {
-            video_id: assignModalVideo.id,
-            player_id: pId
-          },
-          conflict_columns: ['video_id', 'player_id'],
-          staff_passkey: passkey
-        });
-      }
-
-      for (const pId of toRemove) {
-        const { data: rows } = await supabase
-          .from('match_own_analysis_video_players')
-          .select('id')
-          .eq('video_id', assignModalVideo.id)
-          .eq('player_id', pId);
-
-        if (rows && rows.length > 0) {
-          for (const row of rows) {
-            await supabase.rpc('exec_secure_delete', {
-              target_table: 'match_own_analysis_video_players',
-              record_id: row.id,
-              staff_passkey: passkey
-            });
-          }
-        }
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || 'Error al guardar asignación de jugadores.');
       }
 
       setAssignModalVideo(null);

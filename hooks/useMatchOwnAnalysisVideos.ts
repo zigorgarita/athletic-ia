@@ -31,22 +31,24 @@ export function useMatchOwnAnalysisVideos(matchId?: string) {
     }
   }, [matchId]);
 
-  // Alta segura usando exec_secure_upsert
+  // Alta mediante endpoint server-side securizado con sesión staff central
   const addVideo = useCallback(async (video: NewOwnAnalysisVideo): Promise<MatchOwnAnalysisVideo | null> => {
     setCreating(true);
     setError(null);
     try {
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
-      const { data, error: supabaseError } = await supabase
-        .rpc('exec_secure_upsert', {
-          target_table: 'match_own_analysis_videos',
-          payload: video,
-          conflict_columns: null,
-          staff_passkey: passkey
-        });
+      const res = await fetch('/api/videos/own-analysis', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(video),
+      });
 
-      if (supabaseError) throw supabaseError;
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || 'Error al añadir vídeo de análisis propio');
+      }
 
+      const data = json.data as MatchOwnAnalysisVideo;
       setVideos((prev) => [...prev, data]);
       return data;
     } catch (err: any) {
@@ -57,20 +59,20 @@ export function useMatchOwnAnalysisVideos(matchId?: string) {
     }
   }, []);
 
-  // Borrado seguro usando exec_secure_delete
+  // Borrado mediante endpoint server-side securizado con sesión staff central
   const deleteVideo = useCallback(async (id: string): Promise<boolean> => {
     setDeleting(id);
     setError(null);
     try {
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
-      const { error: supabaseError } = await supabase
-        .rpc('exec_secure_delete', {
-          target_table: 'match_own_analysis_videos',
-          record_id: id,
-          staff_passkey: passkey
-        });
+      const res = await fetch(`/api/videos/own-analysis/${id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
 
-      if (supabaseError) throw supabaseError;
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || 'Error al eliminar el vídeo de análisis propio');
+      }
 
       setVideos((prev) => prev.filter((v) => v.id !== id));
       return true;
