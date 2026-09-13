@@ -52,8 +52,9 @@ export function useMatchOwnAnalysisVideos(matchId?: string) {
       setVideos((prev) => [...prev, data]);
       return data;
     } catch (err: any) {
-      setError(err.message || 'Error al añadir vídeo de análisis propio');
-      return null;
+      const msg = err.message || 'Error al añadir vídeo de análisis propio';
+      setError(msg);
+      throw err;
     } finally {
       setCreating(false);
     }

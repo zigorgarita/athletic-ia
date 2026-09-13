@@ -337,17 +337,25 @@ export function AnalisisPropioTab({ match }: AnalisisPropioTabProps) {
     const form = getFormState(category.id);
     if (!form.url.trim()) return;
 
-    await addVideo({
-      match_id: match.id,
-      categoria: category.id,
-      titulo: form.title.trim() || category.label,
-      video_url: form.url.trim(),
-      drive_file_id: null,
-      tipo_origen: 'Enlace',
-      tamano_bytes: null
-    });
+    try {
+      const created = await addVideo({
+        match_id: match.id,
+        categoria: category.id,
+        titulo: form.title.trim() || category.label,
+        video_url: form.url.trim(),
+        drive_file_id: null,
+        tipo_origen: 'Enlace',
+        tamano_bytes: null
+      });
 
-    updateFormState(category.id, { url: '', title: '' });
+      if (!created) {
+        throw new Error('No se pudo registrar el vídeo en la base de datos.');
+      }
+
+      updateFormState(category.id, { url: '', title: '' });
+    } catch (err: unknown) {
+      alert(`Error al guardar enlace de vídeo: ${err instanceof Error ? err.message : String(err)}`);
+    }
   };
 
   // Submit File Upload to Drive
@@ -381,7 +389,7 @@ export function AnalisisPropioTab({ match }: AnalisisPropioTabProps) {
 
       if (info.driveFileId) {
         const form = getFormState(category.id);
-        await addVideo({
+        const created = await addVideo({
           match_id: match.id,
           categoria: category.id,
           titulo: form.title.trim() || file.name,
@@ -390,6 +398,10 @@ export function AnalisisPropioTab({ match }: AnalisisPropioTabProps) {
           tipo_origen: 'Archivo',
           tamano_bytes: file.size
         });
+
+        if (!created) {
+          throw new Error('No se pudo registrar el vídeo en la base de datos.');
+        }
 
         setActiveFiles((prev) => ({ ...prev, [category.id]: null }));
         updateFormState(category.id, { title: '' });

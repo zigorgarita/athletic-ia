@@ -31,7 +31,6 @@ export async function POST(request: Request) {
       match_id,
       categoria,
       titulo,
-      descripcion,
       video_url,
       drive_file_id,
       tipo_origen,
@@ -76,7 +75,7 @@ export async function POST(request: Request) {
       .eq('id', match_id)
       .maybeSingle();
 
-    if (matchErr || !matchData) {
+    if (!matchErr && !matchData) {
       return NextResponse.json(
         { error: `Partido con id '${match_id}' no encontrado.` },
         { status: 404 }
@@ -84,13 +83,13 @@ export async function POST(request: Request) {
     }
 
     // 5. Whitelist e inserción estricta en match_own_analysis_videos
+    // Columnas exactas en base de datos: match_id, categoria, titulo, video_url, drive_file_id, tipo_origen, tamano_bytes
     const payload = {
       match_id,
       categoria: categoria.trim(),
       titulo: titulo.trim(),
-      descripcion: typeof descripcion === 'string' ? descripcion.trim() : null,
-      video_url: typeof video_url === 'string' ? video_url.trim() : null,
-      drive_file_id: typeof drive_file_id === 'string' ? drive_file_id.trim() : null,
+      video_url: typeof video_url === 'string' && video_url.trim() ? video_url.trim() : null,
+      drive_file_id: typeof drive_file_id === 'string' && drive_file_id.trim() ? drive_file_id.trim() : null,
       tipo_origen: tipo_origen === 'Archivo' ? 'Archivo' : 'Enlace',
       tamano_bytes: typeof tamano_bytes === 'number' ? tamano_bytes : null,
     };
