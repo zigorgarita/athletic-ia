@@ -85,54 +85,25 @@ export function PlayerMultimediaTab({ player }: PlayerMultimediaTabProps) {
 
     setIsUploading(true);
     try {
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
-      const videoId = crypto.randomUUID();
-
-      // 1. Create player_videos record
-      const { error: vidErr } = await supabase.rpc('exec_secure_upsert', {
-        target_table: 'player_videos',
-        payload: {
-          id: videoId,
+      const res = await fetch(`/api/players/${player.id}/videos`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           titulo: title.trim() || `Vídeo Individual - ${player.nombre}`,
           categoria: category.trim() || 'Seguimiento Individual',
           comentario_tecnico: comment.trim() || null,
           video_url: url.trim(),
           drive_file_id: null,
           tipo_origen: 'Enlace',
-          tamano_bytes: null
-        },
-        conflict_columns: ['id'],
-        staff_passkey: passkey
+          tamano_bytes: null,
+          secondary_player_ids: secondaryPlayerIds,
+        }),
       });
 
-      if (vidErr) throw vidErr;
-
-      // 2. Target primary player
-      const { error: targetErr } = await supabase.rpc('exec_secure_upsert', {
-        target_table: 'player_video_targets',
-        payload: {
-          video_id: videoId,
-          player_id: player.id,
-          is_primary: true
-        },
-        conflict_columns: ['video_id', 'player_id'],
-        staff_passkey: passkey
-      });
-
-      if (targetErr) throw targetErr;
-
-      // 3. Target secondary players
-      for (const sId of secondaryPlayerIds) {
-        await supabase.rpc('exec_secure_upsert', {
-          target_table: 'player_video_targets',
-          payload: {
-            video_id: videoId,
-            player_id: sId,
-            is_primary: false
-          },
-          conflict_columns: ['video_id', 'player_id'],
-          staff_passkey: passkey
-        });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || 'Error al guardar el vídeo individual');
       }
 
       setIsUploadModalOpen(false);
@@ -174,53 +145,25 @@ export function PlayerMultimediaTab({ player }: PlayerMultimediaTabProps) {
       const info = await uploader.start();
 
       if (info.driveFileId) {
-        const videoId = crypto.randomUUID();
-
-        // 1. Create player_videos record
-        const { error: vidErr } = await supabase.rpc('exec_secure_upsert', {
-          target_table: 'player_videos',
-          payload: {
-            id: videoId,
+        const res = await fetch(`/api/players/${player.id}/videos`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
             titulo: title.trim() || selectedFile.name,
             categoria: category.trim() || 'Seguimiento Individual',
             comentario_tecnico: comment.trim() || null,
             video_url: null,
             drive_file_id: info.driveFileId,
             tipo_origen: 'Archivo',
-            tamano_bytes: selectedFile.size
-          },
-          conflict_columns: ['id'],
-          staff_passkey: passkey
+            tamano_bytes: selectedFile.size,
+            secondary_player_ids: secondaryPlayerIds,
+          }),
         });
 
-        if (vidErr) throw vidErr;
-
-        // 2. Target primary player
-        const { error: targetErr } = await supabase.rpc('exec_secure_upsert', {
-          target_table: 'player_video_targets',
-          payload: {
-            video_id: videoId,
-            player_id: player.id,
-            is_primary: true
-          },
-          conflict_columns: ['video_id', 'player_id'],
-          staff_passkey: passkey
-        });
-
-        if (targetErr) throw targetErr;
-
-        // 3. Target secondary players
-        for (const sId of secondaryPlayerIds) {
-          await supabase.rpc('exec_secure_upsert', {
-            target_table: 'player_video_targets',
-            payload: {
-              video_id: videoId,
-              player_id: sId,
-              is_primary: false
-            },
-            conflict_columns: ['video_id', 'player_id'],
-            staff_passkey: passkey
-          });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok || !json.success) {
+          throw new Error(json.error || 'Error al registrar el vídeo subido');
         }
 
         setIsUploadModalOpen(false);
