@@ -116,10 +116,7 @@ function sanitizeGPSMappings(mappings: unknown[]): Record<string, unknown>[] {
 
 export async function POST(req: Request) {
   try {
-    const passkeyHeader = req.headers.get('x-staff-passkey')?.trim() || req.headers.get('x-coach-staff-passkey')?.trim();
-    const expectedPasskey = (process.env.COACH_STAFF_PASSKEY || process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026').trim();
-    const isPasskeyValid = Boolean(expectedPasskey && passkeyHeader && passkeyHeader === expectedPasskey);
-    const authorized = (await isCoachSessionAuthorized()) || isCoachSessionAuthorizedFromRequest(req) || isPasskeyValid;
+    const authorized = (await isCoachSessionAuthorized()) || isCoachSessionAuthorizedFromRequest(req);
 
     if (!authorized) {
       return NextResponse.json({ error: 'No autorizado: Sesión de cuerpo técnico requerida.' }, { status: 401 });
@@ -168,10 +165,7 @@ export async function POST(req: Request) {
 
 export async function DELETE(req: Request) {
   try {
-    const passkeyHeader = req.headers.get('x-staff-passkey')?.trim() || req.headers.get('x-coach-staff-passkey')?.trim();
-    const expectedPasskey = (process.env.COACH_STAFF_PASSKEY || process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026').trim();
-    const isPasskeyValid = Boolean(expectedPasskey && passkeyHeader && passkeyHeader === expectedPasskey);
-    const authorized = (await isCoachSessionAuthorized()) || isCoachSessionAuthorizedFromRequest(req) || isPasskeyValid;
+    const authorized = (await isCoachSessionAuthorized()) || isCoachSessionAuthorizedFromRequest(req);
 
     if (!authorized) {
       return NextResponse.json({ error: 'No autorizado: Sesión de cuerpo técnico requerida.' }, { status: 401 });

@@ -8,16 +8,8 @@ export const revalidate = 0;
 
 export async function POST(req: Request) {
   try {
-    // 1. Autorización mediante sesión central de staff
-    let authorized = (await isCoachSessionAuthorized()) || isCoachSessionAuthorizedFromRequest(req);
-    if (!authorized) {
-      const staffPasskey = req.headers.get('x-staff-passkey')?.trim() || req.headers.get('x-coach-staff-passkey')?.trim();
-      const expectedPasskey = (process.env.COACH_STAFF_PASSKEY || process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026').trim();
-      if (staffPasskey && staffPasskey === expectedPasskey) {
-        authorized = true;
-      }
-    }
-
+    // 1. Autorización mediante sesión central de staff exclusivamente
+    const authorized = (await isCoachSessionAuthorized()) || isCoachSessionAuthorizedFromRequest(req);
     if (!authorized) {
       return NextResponse.json(
         { success: false, error: 'No autorizado: Se requiere sesión de cuerpo técnico.' },

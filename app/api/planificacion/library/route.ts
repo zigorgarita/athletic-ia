@@ -8,15 +8,11 @@ export const revalidate = 0;
 
 export async function DELETE(req: Request) {
   try {
-    const passkeyHeader = req.headers.get('x-staff-passkey')?.trim() || req.headers.get('x-coach-staff-passkey')?.trim();
-    const expectedPasskey = (process.env.COACH_STAFF_PASSKEY || process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026').trim();
-    const isPasskeyValid = Boolean(expectedPasskey && passkeyHeader && passkeyHeader === expectedPasskey);
     const authorized =
       (await isCoachSessionAuthorized()) ||
       isCoachSessionAuthorizedFromRequest(req) ||
       (await isEditorSessionAuthorized()) ||
-      isEditorSessionAuthorizedFromRequest(req) ||
-      isPasskeyValid;
+      isEditorSessionAuthorizedFromRequest(req);
 
     if (!authorized) {
       return NextResponse.json({ error: 'No autorizado: Sesión de cuerpo técnico requerida.' }, { status: 401 });

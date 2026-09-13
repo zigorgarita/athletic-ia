@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
+import { isCoachSessionAuthorized, isCoachSessionAuthorizedFromRequest } from '@/lib/auth/staff-session';
 import { getSupabaseServerClient } from '@/lib/supabase-server';
 import { getOrCreateDriveFolderPath } from '@/lib/drive-folders';
 import { uploadGenericBufferToDrive, deleteDriveFile } from '@/lib/google-drive';
@@ -17,6 +18,11 @@ function normalizeString(str: string): string {
 }
 
 export async function POST(req: NextRequest) {
+  const authorized = (await isCoachSessionAuthorized()) || isCoachSessionAuthorizedFromRequest(req);
+  if (!authorized) {
+    return NextResponse.json({ error: 'No autorizado: Sesión de cuerpo técnico requerida.' }, { status: 401 });
+  }
+
   const supabase = getSupabaseServerClient();
   let importId: string | null = null;
   let createdSessionId: string | null = null;

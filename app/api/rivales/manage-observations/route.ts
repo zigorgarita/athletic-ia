@@ -56,9 +56,7 @@ export async function POST(req: Request) {
         return NextResponse.json({ success: true, count: rpcCount || rows.length });
       }
 
-      console.warn('RPC replace_document_observations devolvió error de permisos, ejecutando guardado resiliente vía exec_secure_upsert:', rpcErr);
-
-      const staffPasskey = process.env.COACH_STAFF_PASSKEY || process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
+      console.warn('RPC replace_document_observations devolvió error, ejecutando guardado server-side directo:', rpcErr);
 
       // 2. Obtener datos completos del documento si existen
       const { data: fullDoc } = await supabaseServer
@@ -67,7 +65,7 @@ export async function POST(req: Request) {
         .eq('id', targetDocId)
         .maybeSingle();
 
-      // 3. Guardar las observaciones aprobadas usando exec_secure_upsert (rol staff)
+      // 3. Guardar las observaciones aprobadas directamente server-side
       let savedCount = 0;
       for (const row of rows) {
         const obsPayload = {
@@ -95,32 +93,30 @@ export async function POST(req: Request) {
           approved_at: row.approved_at || new Date().toISOString()
         };
 
-        const { error: upsertErr } = await supabaseServer.rpc('exec_secure_upsert', {
-          target_table: 'club_report_observations',
-          payload: obsPayload,
-          conflict_columns: null,
-          staff_passkey: staffPasskey
-        });
+        const { error: insertErr } = await supabaseServer
+          .from('club_report_observations')
+          .insert(obsPayload);
 
-        if (!upsertErr) {
+        if (!insertErr) {
           savedCount++;
         } else {
-          console.error('Error guardando observación aprobada vía exec_secure_upsert:', upsertErr);
+          console.error('Error guardando observación aprobada:', insertErr);
         }
       }
 
       // 4. Actualizar estado del documento a analizado en club_documents
       if (fullDoc) {
-        await supabaseServer.rpc('exec_secure_upsert', {
-          target_table: 'club_documents',
-          payload: {
-            ...fullDoc,
+        const { error: updateDocErr } = await supabaseServer
+          .from('club_documents')
+          .update({
             estado_analisis: 'analizado',
             analyzed_at: new Date().toISOString()
-          },
-          conflict_columns: '{id}',
-          staff_passkey: staffPasskey
-        });
+          })
+          .eq('id', targetDocId);
+
+        if (updateDocErr) {
+          console.error('Error actualizando estado del documento:', updateDocErr);
+        }
       }
 
       return NextResponse.json({ success: true, count: savedCount || rows.length, verifiedInDb: savedCount > 0 });

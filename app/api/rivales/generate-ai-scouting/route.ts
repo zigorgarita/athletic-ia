@@ -248,9 +248,7 @@ export async function POST(req: Request) {
 
     const reportType = (prevReportsCount || 0) > 0 ? 'Actualización' : 'Informe inicial';
 
-    // 12. GUARDAR EN SUPABASE VÍA EXEC_SECURE_UPSERT (ROL STAFF)
-    const staffPasskey = process.env.COACH_STAFF_PASSKEY || process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
-
+    // 12. GUARDAR EN SUPABASE SERVER-SIDE
     const payload = {
       club_season_id: seasonId,
       tipo: reportType,
@@ -267,20 +265,19 @@ export async function POST(req: Request) {
       editado_por_mister: false,
     };
 
-    const { data: upsertData, error: upsertErr } = await supabaseServer.rpc('exec_secure_upsert', {
-      target_table: 'club_ai_reports',
-      payload,
-      conflict_columns: null, // Inserta un nuevo registro para conservar el historial de versiones
-      staff_passkey: staffPasskey,
-    });
+    const { data: insertedReport, error: insertErr } = await supabaseServer
+      .from('club_ai_reports')
+      .insert(payload)
+      .select('id')
+      .single();
 
-    if (upsertErr) {
-      console.error('[generate-ai-scouting] Error guardando informe en club_ai_reports:', upsertErr);
+    if (insertErr) {
+      console.error('[generate-ai-scouting] Error guardando informe en club_ai_reports:', insertErr);
       return NextResponse.json(
         {
           success: true,
           scouting: parsedScouting,
-          warning: `El análisis se generó pero no se pudo guardar en la base de datos: ${upsertErr.message}`,
+          warning: `El análisis se generó pero no se pudo guardar en la base de datos: ${insertErr.message}`,
         }
       );
     }
@@ -288,7 +285,7 @@ export async function POST(req: Request) {
     return NextResponse.json({
       success: true,
       scouting: parsedScouting,
-      reportId: (upsertData as Record<string, unknown>)?.id || null,
+      reportId: insertedReport?.id || null,
       tipo: reportType,
       totalObservacionesUsadas: approvedObservations.length,
       documentosFuentes: reportSourcesLabels,

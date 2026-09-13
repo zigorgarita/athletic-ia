@@ -1,8 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from 'next/server';
+import { isCoachSessionAuthorized, isCoachSessionAuthorizedFromRequest } from '@/lib/auth/staff-session';
 import { getSupabaseServerClient } from '@/lib/supabase-server';
 
 export async function POST(req: NextRequest) {
+  const authorized = (await isCoachSessionAuthorized()) || isCoachSessionAuthorizedFromRequest(req);
+  if (!authorized) {
+    return NextResponse.json({ error: 'No autorizado: Sesión de cuerpo técnico requerida.' }, { status: 401 });
+  }
+
   const supabase = getSupabaseServerClient();
 
   try {
