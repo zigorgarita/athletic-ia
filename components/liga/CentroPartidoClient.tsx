@@ -710,7 +710,6 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
   const handleSaveFullVideos = async () => {
     setIsSavingFullVideos(true);
     try {
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
       const videoTypes: { type: 'Completo' | 'Primera Parte' | 'Segunda Parte', url: string, origin: 'Enlace' | 'Archivo', file: File | null }[] = [
         { type: 'Completo', url: completoUrl, origin: completoOrigin, file: completoFile },
         { type: 'Primera Parte', url: p1Url, origin: p1Origin, file: p1File },
@@ -727,36 +726,45 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
 
         if (existing) {
           if (finalUrl) {
-            const { error } = await supabase
-              .rpc('exec_secure_upsert', {
-                target_table: 'match_full_videos',
-                payload: { id: existing.id, video_url: finalUrl, tipo_origen: vt.origin },
-                conflict_columns: ['id'],
-                staff_passkey: passkey
-              });
-            if (error) throw error;
+            const res = await fetch(`/api/matches/${matchId}/videos/full/${existing.id}`, {
+              method: 'PATCH',
+              credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                video_url: finalUrl,
+                tipo_origen: vt.origin,
+              }),
+            });
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok || !json.success) {
+              throw new Error(json.error || `Error al actualizar el vídeo de ${vt.type}`);
+            }
           } else {
             // Delete if cleared
-            await supabase.rpc('exec_secure_delete', {
-              target_table: 'match_full_videos',
-              record_id: existing.id,
-              staff_passkey: passkey
+            const res = await fetch(`/api/matches/${matchId}/videos/full/${existing.id}`, {
+              method: 'DELETE',
+              credentials: 'include',
             });
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok || !json.success) {
+              throw new Error(json.error || `Error al eliminar el vídeo de ${vt.type}`);
+            }
           }
         } else if (finalUrl) {
-          const { error } = await supabase
-            .rpc('exec_secure_upsert', {
-              target_table: 'match_full_videos',
-              payload: {
-                match_id: matchId,
-                tipo_video: vt.type,
-                tipo_origen: vt.origin,
-                video_url: finalUrl
-              },
-              conflict_columns: null,
-              staff_passkey: passkey
-            });
-          if (error) throw error;
+          const res = await fetch(`/api/matches/${matchId}/videos/full`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              tipo_video: vt.type,
+              tipo_origen: vt.origin,
+              video_url: finalUrl,
+            }),
+          });
+          const json = await res.json().catch(() => ({}));
+          if (!res.ok || !json.success) {
+            throw new Error(json.error || `Error al guardar el vídeo de ${vt.type}`);
+          }
         }
       }
 
@@ -785,24 +793,24 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
 
       if (!finalUrl) throw new Error('Es necesario un archivo o enlace para el clip');
 
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
-      const { error } = await supabase
-        .rpc('exec_secure_upsert', {
-          target_table: 'match_video_clips',
-          payload: {
-            match_id: matchId,
-            categoria: clipCategory,
-            subcategoria: clipSubcategory,
-            titulo: clipTitle,
-            tipo_origen: clipOrigin,
-            video_url: finalUrl,
-            comentario_tecnico: clipComment || null
-          },
-          conflict_columns: null,
-          staff_passkey: passkey
-        });
+      const res = await fetch(`/api/matches/${matchId}/videos/clips`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          categoria: clipCategory,
+          subcategoria: clipSubcategory,
+          titulo: clipTitle.trim(),
+          tipo_origen: clipOrigin,
+          video_url: finalUrl,
+          comentario_tecnico: clipComment?.trim() || null,
+        }),
+      });
 
-      if (error) throw error;
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || 'Error al guardar el corte de vídeo.');
+      }
 
       setClipTitle('');
       setClipUrl('');
@@ -821,13 +829,14 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
   const handleDeleteClip = async (id: string) => {
     if (!confirm('¿Deseas eliminar este corte de vídeo?')) return;
     try {
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
-      const { error } = await supabase.rpc('exec_secure_delete', {
-        target_table: 'match_video_clips',
-        record_id: id,
-        staff_passkey: passkey
+      const res = await fetch(`/api/matches/${matchId}/videos/clips/${id}`, {
+        method: 'DELETE',
+        credentials: 'include',
       });
-      if (error) throw error;
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || 'Error al eliminar el corte de vídeo.');
+      }
       loadAllData();
     } catch (err: unknown) {
       alert(`Error al eliminar: ${err instanceof Error ? err.message : String(err)}`);
@@ -847,23 +856,23 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
 
       if (!finalUrl) throw new Error('Es necesario un archivo o enlace para la acción');
 
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
-      const { error } = await supabase
-        .rpc('exec_secure_upsert', {
-          target_table: 'match_strategic_actions',
-          payload: {
-            match_id: matchId,
-            tipo: actionType,
-            aspecto: actionAspect,
-            descripcion: actionDesc || null,
-            tipo_origen: actionOrigin,
-            video_url: finalUrl
-          },
-          conflict_columns: null,
-          staff_passkey: passkey
-        });
+      const res = await fetch(`/api/matches/${matchId}/videos/strategic`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tipo: actionType,
+          aspecto: actionAspect.trim(),
+          descripcion: actionDesc?.trim() || null,
+          tipo_origen: actionOrigin,
+          video_url: finalUrl,
+        }),
+      });
 
-      if (error) throw error;
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || 'Error al guardar la acción estratégica.');
+      }
 
       setActionAspect('');
       setActionDesc('');
@@ -882,13 +891,14 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
   const handleDeleteAction = async (id: string) => {
     if (!confirm('¿Deseas eliminar esta acción táctica?')) return;
     try {
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
-      const { error } = await supabase.rpc('exec_secure_delete', {
-        target_table: 'match_strategic_actions',
-        record_id: id,
-        staff_passkey: passkey
+      const res = await fetch(`/api/matches/${matchId}/videos/strategic/${id}`, {
+        method: 'DELETE',
+        credentials: 'include',
       });
-      if (error) throw error;
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || 'Error al eliminar la acción táctica.');
+      }
       loadAllData();
     } catch (err: unknown) {
       alert(`Error: ${err instanceof Error ? err.message : String(err)}`);
@@ -908,22 +918,22 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
 
       if (!finalUrl) throw new Error('Es necesario un archivo o enlace para el vídeo');
 
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
-      const { error } = await supabase
-        .rpc('exec_secure_upsert', {
-          target_table: 'match_custom_videos',
-          payload: {
-            match_id: matchId,
-            etiqueta: customLabel,
-            titulo: customTitle,
-            tipo_origen: customOrigin,
-            video_url: finalUrl
-          },
-          conflict_columns: null,
-          staff_passkey: passkey
-        });
+      const res = await fetch(`/api/matches/${matchId}/videos/custom`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          etiqueta: customLabel,
+          titulo: customTitle.trim(),
+          tipo_origen: customOrigin,
+          video_url: finalUrl,
+        }),
+      });
 
-      if (error) throw error;
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || 'Error al guardar el vídeo del staff.');
+      }
 
       setCustomTitle('');
       setCustomUrl('');
@@ -941,13 +951,14 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
   const handleDeleteCustomVideo = async (id: string) => {
     if (!confirm('¿Deseas eliminar este vídeo?')) return;
     try {
-      const passkey = process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
-      const { error } = await supabase.rpc('exec_secure_delete', {
-        target_table: 'match_custom_videos',
-        record_id: id,
-        staff_passkey: passkey
+      const res = await fetch(`/api/matches/${matchId}/videos/custom/${id}`, {
+        method: 'DELETE',
+        credentials: 'include',
       });
-      if (error) throw error;
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || 'Error al eliminar el vídeo.');
+      }
       loadAllData();
     } catch (err: unknown) {
       alert(`Error: ${err instanceof Error ? err.message : String(err)}`);
