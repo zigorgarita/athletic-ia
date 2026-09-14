@@ -12,6 +12,7 @@ interface VideoCardProps {
   category?: string | null;
   videoType?: string | null;
   layout?: 'row' | 'grid';
+  isEditMode?: boolean;
   onPlay: (video: MatchVideo) => void;
   onEdit: (video: MatchVideo) => void;
   onDelete: (id: string) => void;
@@ -22,11 +23,13 @@ export function VideoCard({
   category,
   videoType,
   layout = 'row',
+  isEditMode: isEditModeProp,
   onPlay,
   onEdit,
   onDelete,
 }: VideoCardProps) {
-  const { isEditMode } = useEditMode();
+  const { isEditMode: isEditModeContext } = useEditMode();
+  const canEdit = isEditModeProp !== undefined ? isEditModeProp : isEditModeContext;
   const [isExpanded, setIsExpanded] = useState(false);
   const { type, thumbnailUrl } = parseVideoUrl(video.video_url);
 
@@ -182,7 +185,7 @@ export function VideoCard({
               Reproducir
             </Button>
 
-            {isEditMode && (
+            {canEdit && (
               <div className="flex items-center gap-1.5">
                 <Button
                   onClick={() => onEdit(video)}
@@ -293,7 +296,7 @@ export function VideoCard({
               Reproducir
             </Button>
 
-            {isEditMode && (
+            {canEdit && (
               <div className="flex items-center gap-2">
                 <Button
                   onClick={() => onEdit(video)}
