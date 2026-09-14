@@ -2,6 +2,7 @@
 import { execFileSync } from 'child_process';
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
 
 /**
  * ============================================================================
@@ -28,23 +29,29 @@ export const RFEF_CONSTANTS = {
 };
 
 function getCookiePath(): string {
-  const scratchDir = path.join(process.cwd(), 'scratch');
-  if (!fs.existsSync(scratchDir)) {
-    fs.mkdirSync(scratchDir, { recursive: true });
+  const baseDir = process.env.VERCEL ? os.tmpdir() : path.join(process.cwd(), 'scratch');
+  if (!fs.existsSync(baseDir)) {
+    try {
+      fs.mkdirSync(baseDir, { recursive: true });
+    } catch {
+      return path.join(os.tmpdir(), 'rfef_cookies.txt');
+    }
   }
-  return path.join(scratchDir, 'cookies.txt');
+  return path.join(baseDir, 'rfef_cookies.txt');
 }
 
 /**
- * Ejecuta una petición HTTP a la RFEF utilizando curl.exe con gestión automática
- * de cookie jar y seguimiento de redirecciones (-L), devolviendo el HTML decodificado en latin1.
+ * Ejecuta una petición HTTP a la RFEF utilizando el binario curl compatible con la plataforma
+ * (curl.exe en Windows, curl en Linux/Vercel) con gestión automática de cookie jar
+ * y seguimiento de redirecciones (-L), devolviendo el HTML decodificado en latin1.
  */
 export function fetchRFEFRaw(url: string, timeoutMs: number = 15000): string {
   const cookiePath = getCookiePath();
+  const curlBinary = process.platform === 'win32' ? 'curl.exe' : 'curl';
 
   try {
     const stdout = execFileSync(
-      'curl.exe',
+      curlBinary,
       [
         '-s',
         '-c',
