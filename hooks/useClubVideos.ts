@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useEditMode } from '@/context/EditModeContext';
-import { useClubDetails } from '@/hooks/useClubDetails';
 
 export interface ClubVideo {
   id: string;
@@ -27,7 +26,7 @@ export function useClubVideos(clubId: string | undefined, seasonId: string | und
   const [videos, setVideos] = useState<ClubVideo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { verifyWritePermission } = useEditMode();
+  const { verifyWritePermission, currentUser } = useEditMode();
 
   const loadVideos = useCallback(async () => {
     if (!clubId && !seasonId) return;
@@ -69,9 +68,14 @@ export function useClubVideos(clubId: string | undefined, seasonId: string | und
         club_season_id: data.club_season_id || seasonId || null 
       };
 
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (currentUser?.id) headers['x-editor-user'] = currentUser.id;
+      if (currentUser?.pass) headers['x-editor-pass'] = currentUser.pass;
+
       const res = await fetch('/api/clubs/videos', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
+        credentials: 'include',
         body: JSON.stringify(payload),
       });
 
@@ -93,8 +97,15 @@ export function useClubVideos(clubId: string | undefined, seasonId: string | und
   const deleteVideo = async (id: string): Promise<boolean> => {
     try {
       verifyWritePermission();
+
+      const headers: Record<string, string> = {};
+      if (currentUser?.id) headers['x-editor-user'] = currentUser.id;
+      if (currentUser?.pass) headers['x-editor-pass'] = currentUser.pass;
+
       const res = await fetch(`/api/clubs/videos?id=${encodeURIComponent(id)}`, {
         method: 'DELETE',
+        headers,
+        credentials: 'include',
       });
 
       if (!res.ok) {

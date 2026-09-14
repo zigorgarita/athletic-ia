@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { isCoachSessionAuthorized, isCoachSessionAuthorizedFromRequest } from '@/lib/auth/staff-session';
+import { verifyServerAuthorization } from '@/lib/auth-server';
 import { getSupabaseServerClient } from '@/lib/supabase-server';
 
 export const dynamic = 'force-dynamic';
@@ -7,13 +7,13 @@ export const revalidate = 0;
 
 /**
  * Endpoint server-side para club_videos.
- * Protegido por coach_staff_session.
+ * Protegido por sesión staff o credenciales de editor.
  */
 export async function POST(req: Request) {
   try {
-    const authorized = (await isCoachSessionAuthorized()) || isCoachSessionAuthorizedFromRequest(req);
-    if (!authorized) {
-      return NextResponse.json({ error: 'No autorizado: Sesión requerida.' }, { status: 401 });
+    const authCheck = await verifyServerAuthorization(req);
+    if (!authCheck.authorized) {
+      return NextResponse.json({ error: authCheck.error || 'No autorizado: Sesión requerida o credenciales de editor válidas.' }, { status: 401 });
     }
 
     const body = await req.json().catch(() => null);
@@ -104,9 +104,9 @@ export async function POST(req: Request) {
 
 export async function DELETE(req: Request) {
   try {
-    const authorized = (await isCoachSessionAuthorized()) || isCoachSessionAuthorizedFromRequest(req);
-    if (!authorized) {
-      return NextResponse.json({ error: 'No autorizado: Sesión requerida.' }, { status: 401 });
+    const authCheck = await verifyServerAuthorization(req);
+    if (!authCheck.authorized) {
+      return NextResponse.json({ error: authCheck.error || 'No autorizado: Sesión requerida o credenciales de editor válidas.' }, { status: 401 });
     }
 
     const url = new URL(req.url);

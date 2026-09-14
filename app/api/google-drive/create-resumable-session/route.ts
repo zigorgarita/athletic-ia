@@ -1,15 +1,15 @@
 import { NextResponse } from 'next/server';
-import { isCoachSessionAuthorized, isCoachSessionAuthorizedFromRequest } from '@/lib/auth/staff-session';
+import { verifyServerAuthorization } from '@/lib/auth-server';
 import { getGoogleDriveAccessToken } from '@/lib/google-drive';
 import { getOrCreateDriveFolderPath, DriveUploadContext } from '@/lib/drive-folders';
 
 export async function POST(request: Request) {
   try {
-    // 1. Validar autenticación de staff del lado servidor mediante sesión central
-    const authorized = (await isCoachSessionAuthorized()) || isCoachSessionAuthorizedFromRequest(request);
-    if (!authorized) {
+    // 1. Validar autenticación mediante sesión central o credenciales de editor
+    const authCheck = await verifyServerAuthorization(request);
+    if (!authCheck.authorized) {
       return NextResponse.json(
-        { error: 'No autorizado: Se requiere sesión de cuerpo técnico.' },
+        { error: authCheck.error || 'No autorizado: Se requiere sesión de cuerpo técnico o credenciales de editor válidas.' },
         { status: 401 }
       );
     }
