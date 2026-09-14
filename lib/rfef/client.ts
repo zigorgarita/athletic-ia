@@ -94,6 +94,7 @@ export function fetchRFEFRawWithDiagnostic(
       curlBinary,
       [
         '-s',
+        '--http1.1',
         '-c',
         cookiePath,
         '-b',
