@@ -28,16 +28,25 @@ export const RFEF_CONSTANTS = {
   COD_GRUPO: 33836118,
 };
 
-function getCookiePath(): string {
+function createUniqueCookieJarPath(): string {
   const baseDir = process.env.VERCEL ? os.tmpdir() : path.join(process.cwd(), 'scratch');
   if (!fs.existsSync(baseDir)) {
     try {
       fs.mkdirSync(baseDir, { recursive: true });
     } catch {
-      return path.join(os.tmpdir(), 'rfef_cookies.txt');
+      // Fallback a os.tmpdir() si falla la creación
     }
   }
-  return path.join(baseDir, 'rfef_cookies.txt');
+  const uniqueId = `${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  const jarPath = path.join(baseDir, `rfef_cookies_${uniqueId}.txt`);
+  if (fs.existsSync(jarPath)) {
+    try {
+      fs.unlinkSync(jarPath);
+    } catch {
+      // Silencioso
+    }
+  }
+  return jarPath;
 }
 
 export interface RFEFHttpDiagnostic {
@@ -62,15 +71,23 @@ export interface RawFetchOutput {
 /**
  * Ejecuta una petición HTTP a la RFEF utilizando el binario curl compatible con la plataforma
  * con instrumentación diagnóstica para auditar el handshake, estado HTTP y redirects.
+ * Utiliza un cookie jar efímero e independiente por flujo, asegurando un inicio limpio.
  */
-export function fetchRFEFRawWithDiagnostic(url: string, timeoutMs: number = 15000): RawFetchOutput {
-  const cookiePath = getCookiePath();
+export function fetchRFEFRawWithDiagnostic(
+  url: string,
+  timeoutMs: number = 15000,
+  sessionCookiePath?: string
+): RawFetchOutput {
+  const ownsCookiePath = !sessionCookiePath;
+  const cookiePath = sessionCookiePath || createUniqueCookieJarPath();
   const curlBinary = process.platform === 'win32' ? 'curl.exe' : 'curl';
   const writeOutFormat = '\n---CURL_DIAG---\n%{http_code}|%{num_redirects}|%{size_download}|%{url_effective}|%{exitcode}|%{errormsg}';
 
   let rawOutput = '';
   let curlExitCode = 0;
   let curlError: string | null = null;
+  let hasJSessionId = false;
+  let cookieFileExists = false;
 
   try {
     const stdout = execFileSync(
@@ -107,23 +124,31 @@ export function fetchRFEFRawWithDiagnostic(url: string, timeoutMs: number = 1500
     if (err.stdout) {
       rawOutput = err.stdout.toString('latin1');
     }
+  } finally {
+    // Comprobar presencia de JSESSIONID (solo booleano, NUNCA registrar valores de cookies)
+    cookieFileExists = fs.existsSync(cookiePath);
+    if (cookieFileExists) {
+      try {
+        const cookieContent = fs.readFileSync(cookiePath, 'utf8');
+        hasJSessionId = cookieContent.includes('JSESSIONID');
+      } catch {
+        hasJSessionId = false;
+      }
+    }
+    // Si este fetch es dueño de su cookie jar efímero, eliminarlo al finalizar
+    if (ownsCookiePath && fs.existsSync(cookiePath)) {
+      try {
+        fs.unlinkSync(cookiePath);
+      } catch {
+        // Ignorar error de limpieza
+      }
+    }
   }
 
   const parts = rawOutput.split('\n---CURL_DIAG---\n');
   const html = parts[0] || '';
   const diagRaw = parts[1] || '';
   const [httpCodeStr, redirectsStr, _sizeStr, urlEffStr, exitCodeStr, errorMsg] = diagRaw.trim().split('|');
-
-  const cookieFileExists = fs.existsSync(cookiePath);
-  let hasJSessionId = false;
-  if (cookieFileExists) {
-    try {
-      const cookieContent = fs.readFileSync(cookiePath, 'utf8');
-      hasJSessionId = cookieContent.includes('JSESSIONID');
-    } catch {
-      hasJSessionId = false;
-    }
-  }
 
   const effectiveUrl = urlEffStr || url;
   let finalPath = '';
@@ -156,11 +181,11 @@ export function fetchRFEFRawWithDiagnostic(url: string, timeoutMs: number = 1500
 
 /**
  * Ejecuta una petición HTTP a la RFEF utilizando el binario curl compatible con la plataforma
- * (curl.exe en Windows, curl en Linux/Vercel) con gestión automática de cookie jar
+ * (curl.exe en Windows, curl en Linux/Vercel) con gestión de cookie jar efímero
  * y seguimiento de redirecciones (-L), devolviendo el HTML decodificado en latin1.
  */
-export function fetchRFEFRaw(url: string, timeoutMs: number = 15000): string {
-  return fetchRFEFRawWithDiagnostic(url, timeoutMs).html;
+export function fetchRFEFRaw(url: string, timeoutMs: number = 15000, sessionCookiePath?: string): string {
+  return fetchRFEFRawWithDiagnostic(url, timeoutMs, sessionCookiePath).html;
 }
 
 export type RFEFDataSource = 'live' | 'snapshot' | 'none';
