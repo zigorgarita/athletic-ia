@@ -78,7 +78,7 @@ const TABS = [
 */
 
 export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
-  const { isEditMode } = useEditMode();
+  const { isEditMode, currentUser } = useEditMode();
   const { getLogo } = useClubLogos();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('analisis');
@@ -1013,10 +1013,14 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
 
       if (!finalUrl) throw new Error('Es necesario un archivo o enlace para el documento');
 
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (currentUser?.id) headers['x-editor-user'] = currentUser.id;
+      if (currentUser?.pass) headers['x-editor-pass'] = currentUser.pass;
+
       const res = await fetch(`/api/matches/${matchId}/documents`, {
         method: 'POST',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           nombre_documento: docName.trim(),
           tipo_documento: docType.trim(),
@@ -1048,9 +1052,14 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
   const handleDeleteDoc = async (id: string) => {
     if (!confirm('¿Deseas eliminar este documento?')) return;
     try {
+      const headers: Record<string, string> = {};
+      if (currentUser?.id) headers['x-editor-user'] = currentUser.id;
+      if (currentUser?.pass) headers['x-editor-pass'] = currentUser.pass;
+
       const res = await fetch(`/api/matches/${matchId}/documents/${id}`, {
         method: 'DELETE',
         credentials: 'include',
+        headers,
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok || !json.success) {
