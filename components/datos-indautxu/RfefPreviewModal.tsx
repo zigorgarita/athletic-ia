@@ -19,6 +19,7 @@ import {
   ChevronRight,
   Info,
   Lock,
+  Activity,
 } from 'lucide-react';
 
 import { getStaffPasskey } from '@/lib/passkey';
@@ -188,6 +189,12 @@ export function RfefPreviewModal({
             {data?.sources?.calendar?.bytes > 0 && (
               <span className="text-slate-500 font-mono text-[11px] hidden md:inline">
                 ({data.sources.calendar.bytes.toLocaleString()} bytes)
+              </span>
+            )}
+
+            {data?.rfefHttpDiagnostic && !isLive && !isSnapshot && (
+              <span className="text-slate-400 font-mono text-[11px] hidden sm:inline bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
+                HTTP {data.rfefHttpDiagnostic.httpCode} · {data.rfefHttpDiagnostic.bytesReceived}B · {data.rfefHttpDiagnostic.finalPath}
               </span>
             )}
           </div>
@@ -672,6 +679,83 @@ export function RfefPreviewModal({
               {/* TAB 4: AUDITORÍA DE SEGURIDAD Y AVISOS */}
               {activeTab === 'auditoria' && (
                 <div className="space-y-4">
+                  {/* Evidencia e Instrumentación Diagnóstica HTTP RFEF */}
+                  {(data.rfefHttpDiagnostic || data.sources?.calendar?.httpDiagnostic) && (() => {
+                    const diag = data.rfefHttpDiagnostic || data.sources?.calendar?.httpDiagnostic;
+                    return (
+                      <div className="bg-slate-950/80 border border-indigo-900/50 rounded-xl p-4 space-y-3 text-xs">
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                          <div className="font-bold text-indigo-300 flex items-center gap-2">
+                            <Activity className="w-4 h-4 text-indigo-400" />
+                            Evidencia HTTP RFEF (Instrumentación Diagnóstica)
+                          </div>
+                          <span className={`font-mono font-bold text-[11px] px-2.5 py-0.5 rounded border ${
+                            diag.httpCode === 200 ? 'bg-emerald-950/80 text-emerald-300 border-emerald-800' : 'bg-rose-950/80 text-rose-300 border-rose-800'
+                          }`}>
+                            HTTP {diag.httpCode || 'N/D'}
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 font-mono text-[11px]">
+                          <div className="bg-slate-900/90 p-2.5 rounded-lg border border-slate-800">
+                            <span className="text-slate-400 block text-[10px] uppercase">Código HTTP Final</span>
+                            <span className="text-white font-bold text-sm">
+                              {diag.httpCode ?? 'N/D'}
+                            </span>
+                          </div>
+                          <div className="bg-slate-900/90 p-2.5 rounded-lg border border-slate-800">
+                            <span className="text-slate-400 block text-[10px] uppercase">Redirects</span>
+                            <span className="text-white font-bold text-sm">
+                              {diag.numRedirects ?? 0}
+                            </span>
+                          </div>
+                          <div className="bg-slate-900/90 p-2.5 rounded-lg border border-slate-800">
+                            <span className="text-slate-400 block text-[10px] uppercase">Bytes Recibidos</span>
+                            <span className="text-white font-bold text-sm">
+                              {diag.bytesReceived ?? 0}
+                            </span>
+                          </div>
+                          <div className="bg-slate-900/90 p-2.5 rounded-lg border border-slate-800">
+                            <span className="text-slate-400 block text-[10px] uppercase">Cookie JSESSIONID</span>
+                            <span className={`font-bold text-sm ${diag.hasJSessionId ? 'text-emerald-400' : 'text-rose-400'}`}>
+                              {diag.hasJSessionId ? 'SÍ (PRESENTE)' : 'NO'}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="space-y-1.5 pt-1 text-[11px] font-mono border-t border-slate-800/80">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-slate-400">Path final:</span>
+                            <span className="text-amber-300 font-bold">{diag.finalPath || 'N/D'}</span>
+                            {diag.endsInLogin && (
+                              <span className="px-1.5 py-0.5 rounded bg-rose-950 text-rose-300 text-[10px] border border-rose-800">
+                                Termina en NLogin
+                              </span>
+                            )}
+                            {diag.endsInExpectedPath && (
+                              <span className="px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-300 text-[10px] border border-emerald-800">
+                                Termina en NFG_CmpJornada
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 flex-wrap text-slate-400 truncate">
+                            <span className="text-slate-500">URL sanitizada:</span>
+                            <span className="truncate">{diag.sanitizedUrl || 'N/D'}</span>
+                          </div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-slate-400">Exit code curl:</span>
+                            <span className={diag.curlExitCode === 0 ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
+                              {diag.curlExitCode ?? 'N/D'}
+                            </span>
+                            {diag.curlError && (
+                              <span className="text-rose-400 text-[10px]">({diag.curlError})</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
                   {/* Blockers Críticos */}
                   {data.blockers?.length > 0 && (
                     <div className="p-4 rounded-xl bg-rose-950/30 border border-rose-900/60 space-y-2">

@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 import { execFileSync } from 'child_process';
 import path from 'path';
 import fs from 'fs';
@@ -40,14 +40,37 @@ function getCookiePath(): string {
   return path.join(baseDir, 'rfef_cookies.txt');
 }
 
+export interface RFEFHttpDiagnostic {
+  httpCode: number;
+  numRedirects: number;
+  bytesReceived: number;
+  finalPath: string;
+  sanitizedUrl: string;
+  hasJSessionId: boolean;
+  cookieFileExists: boolean;
+  endsInExpectedPath: boolean;
+  endsInLogin: boolean;
+  curlExitCode: number;
+  curlError: string | null;
+}
+
+export interface RawFetchOutput {
+  html: string;
+  diagnostic: RFEFHttpDiagnostic;
+}
+
 /**
  * Ejecuta una petición HTTP a la RFEF utilizando el binario curl compatible con la plataforma
- * (curl.exe en Windows, curl en Linux/Vercel) con gestión automática de cookie jar
- * y seguimiento de redirecciones (-L), devolviendo el HTML decodificado en latin1.
+ * con instrumentación diagnóstica para auditar el handshake, estado HTTP y redirects.
  */
-export function fetchRFEFRaw(url: string, timeoutMs: number = 15000): string {
+export function fetchRFEFRawWithDiagnostic(url: string, timeoutMs: number = 15000): RawFetchOutput {
   const cookiePath = getCookiePath();
   const curlBinary = process.platform === 'win32' ? 'curl.exe' : 'curl';
+  const writeOutFormat = '\n---CURL_DIAG---\n%{http_code}|%{num_redirects}|%{size_download}|%{url_effective}|%{exitcode}|%{errormsg}';
+
+  let rawOutput = '';
+  let curlExitCode = 0;
+  let curlError: string | null = null;
 
   try {
     const stdout = execFileSync(
@@ -61,6 +84,8 @@ export function fetchRFEFRaw(url: string, timeoutMs: number = 15000): string {
         '-L',
         '--max-time',
         String(Math.round(timeoutMs / 1000)),
+        '-w',
+        writeOutFormat,
         url,
       ],
       {
@@ -69,10 +94,67 @@ export function fetchRFEFRaw(url: string, timeoutMs: number = 15000): string {
       }
     );
 
-    return stdout.toString('latin1');
+    rawOutput = stdout.toString('latin1');
   } catch (err: any) {
-    throw new Error(`Error al consultar RFEF en ${url}: ${err.message || err}`);
+    curlExitCode = err.status || 1;
+    curlError = err.message || String(err);
+    if (err.stdout) {
+      rawOutput = err.stdout.toString('latin1');
+    }
   }
+
+  const parts = rawOutput.split('\n---CURL_DIAG---\n');
+  const html = parts[0] || '';
+  const diagRaw = parts[1] || '';
+  const [httpCodeStr, redirectsStr, _sizeStr, urlEffStr, exitCodeStr, errorMsg] = diagRaw.trim().split('|');
+
+  const cookieFileExists = fs.existsSync(cookiePath);
+  let hasJSessionId = false;
+  if (cookieFileExists) {
+    try {
+      const cookieContent = fs.readFileSync(cookiePath, 'utf8');
+      hasJSessionId = cookieContent.includes('JSESSIONID');
+    } catch {
+      hasJSessionId = false;
+    }
+  }
+
+  const effectiveUrl = urlEffStr || url;
+  let finalPath = '';
+  let sanitizedUrl = '';
+  try {
+    const parsed = new URL(effectiveUrl);
+    finalPath = parsed.pathname;
+    sanitizedUrl = `${parsed.origin}${parsed.pathname}`;
+  } catch {
+    finalPath = effectiveUrl;
+    sanitizedUrl = effectiveUrl;
+  }
+
+  const diagnostic: RFEFHttpDiagnostic = {
+    httpCode: parseInt(httpCodeStr, 10) || 0,
+    numRedirects: parseInt(redirectsStr, 10) || 0,
+    bytesReceived: html.length,
+    finalPath,
+    sanitizedUrl,
+    hasJSessionId,
+    cookieFileExists,
+    endsInExpectedPath: finalPath.includes('NFG_CmpJornada'),
+    endsInLogin: finalPath.includes('NLogin'),
+    curlExitCode: parseInt(exitCodeStr, 10) || curlExitCode,
+    curlError: curlError || (errorMsg && errorMsg.trim() ? errorMsg.trim() : null),
+  };
+
+  return { html, diagnostic };
+}
+
+/**
+ * Ejecuta una petición HTTP a la RFEF utilizando el binario curl compatible con la plataforma
+ * (curl.exe en Windows, curl en Linux/Vercel) con gestión automática de cookie jar
+ * y seguimiento de redirecciones (-L), devolviendo el HTML decodificado en latin1.
+ */
+export function fetchRFEFRaw(url: string, timeoutMs: number = 15000): string {
+  return fetchRFEFRawWithDiagnostic(url, timeoutMs).html;
 }
 
 export type RFEFDataSource = 'live' | 'snapshot' | 'none';
@@ -84,6 +166,7 @@ export interface RFEFFetchResult {
   url: string;
   snapshotPath?: string;
   liveError?: string;
+  diagnostic?: RFEFHttpDiagnostic;
 }
 
 /**
@@ -93,9 +176,15 @@ export function fetchRFEFCalendarPageDetailed(jornada: number): RFEFFetchResult 
   const url = `${RFEF_CONSTANTS.BASE_URL}/NFG_CmpJornada?cod_primaria=${RFEF_CONSTANTS.COD_PRIMARIA}&CodCompeticion=${RFEF_CONSTANTS.COD_COMPETICION}&CodGrupo=${RFEF_CONSTANTS.COD_GRUPO}&CodTemporada=${RFEF_CONSTANTS.COD_TEMPORADA}&CodJornada=${jornada}`;
   let liveHtml = '';
   let liveError: string | undefined;
+  let diagnostic: RFEFHttpDiagnostic | undefined;
 
   try {
-    liveHtml = fetchRFEFRaw(url);
+    const rawRes = fetchRFEFRawWithDiagnostic(url);
+    liveHtml = rawRes.html;
+    diagnostic = rawRes.diagnostic;
+    if (diagnostic.curlError) {
+      liveError = diagnostic.curlError;
+    }
   } catch (err: any) {
     liveError = err.message || String(err);
   }
@@ -106,6 +195,7 @@ export function fetchRFEFCalendarPageDetailed(jornada: number): RFEFFetchResult 
       source: 'live',
       bytes: liveHtml.length,
       url,
+      diagnostic,
     };
   }
 
@@ -128,6 +218,7 @@ export function fetchRFEFCalendarPageDetailed(jornada: number): RFEFFetchResult 
         url,
         snapshotPath: path.basename(p),
         liveError: liveError || 'RFEF devolvió respuesta vacía (0 bytes / cookie-gate)',
+        diagnostic,
       };
     }
   }
@@ -138,6 +229,7 @@ export function fetchRFEFCalendarPageDetailed(jornada: number): RFEFFetchResult 
     bytes: (liveHtml || '').length,
     url,
     liveError: liveError || 'RFEF devolvió respuesta vacía y no existe snapshot local',
+    diagnostic,
   };
 }
 

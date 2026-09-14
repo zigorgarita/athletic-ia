@@ -404,12 +404,14 @@ export async function POST(req: NextRequest) {
       source: primarySource,
       syncBlocked,
       syncBlockedReason,
+      rfefHttpDiagnostic: calResult.diagnostic || null,
       sources: {
         global: primarySource,
         calendar: {
           source: calResult.source,
           bytes: calResult.bytes,
           snapshotFile: calResult.snapshotPath || null,
+          httpDiagnostic: calResult.diagnostic || null,
         },
         standings: {
           source: clasifResult.source,
