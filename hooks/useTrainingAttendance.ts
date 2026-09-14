@@ -7,7 +7,7 @@ import { getStaffPasskey } from '@/lib/passkey';
 export function useTrainingAttendance() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { verifyWritePermission } = useEditMode();
+  const { verifyWritePermission, currentUser } = useEditMode();
 
   const fetchSessionAttendance = useCallback(async (sessionId: string) => {
     if (!sessionId) return { attendance: [], evaluations: [] };
@@ -34,9 +34,10 @@ export function useTrainingAttendance() {
         attendance: (attendanceData || []) as TrainingAttendance[],
         evaluations: (evalData || []) as TrainingEvaluation[]
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error fetching training attendance/evaluations:', err);
-      setError(err.message || 'Error al obtener la asistencia del entrenamiento');
+      const msg = err instanceof Error ? err.message : 'Error al obtener la asistencia del entrenamiento';
+      setError(msg);
       return { attendance: [], evaluations: [] };
     } finally {
       setLoading(false);
@@ -55,6 +56,13 @@ export function useTrainingAttendance() {
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
       };
+
+      if (currentUser?.id) {
+        headers['x-editor-user'] = currentUser.id;
+      }
+      if (currentUser?.pass) {
+        headers['x-editor-pass'] = currentUser.pass;
+      }
 
       const staffPasskey = getStaffPasskey();
       if (staffPasskey) {
@@ -76,15 +84,15 @@ export function useTrainingAttendance() {
       }
 
       return { success: true };
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error saving training attendance/evaluations:', err);
-      const msg = err.message || 'Error al guardar la asistencia y valoraciones';
+      const msg = err instanceof Error ? err.message : 'Error al guardar la asistencia y valoraciones';
       setError(msg);
       return { success: false, error: msg };
     } finally {
       setLoading(false);
     }
-  }, [verifyWritePermission]);
+  }, [verifyWritePermission, currentUser]);
 
   return {
     fetchSessionAttendance,
