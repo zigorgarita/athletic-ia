@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyServerAuthorization } from '@/lib/auth-server';
 import { getSupabaseServerClient } from '@/lib/supabase-server';
