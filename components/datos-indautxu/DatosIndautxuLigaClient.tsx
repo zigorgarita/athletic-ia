@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Users, Trophy, Calendar, ShieldCheck, Sparkles } from 'lucide-react';
+import { Users, Trophy, Calendar, ShieldCheck, Sparkles, RefreshCw } from 'lucide-react';
 import { JugadoresTab } from './tabs/JugadoresTab';
 import { ClasificacionTab } from './tabs/ClasificacionTab';
 import { CalendarioTab } from './tabs/CalendarioTab';
+import { RfefPreviewModal } from './RfefPreviewModal';
 
 export type DatosLigaSubTab = 'jugadores' | 'clasificacion' | 'calendario';
 
@@ -42,6 +43,7 @@ const TABS: TabItem[] = [
 
 export function DatosIndautxuLigaClient() {
   const [activeTab, setActiveTab] = useState<DatosLigaSubTab>('jugadores');
+  const [isRfefModalOpen, setIsRfefModalOpen] = useState<boolean>(false);
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-20">
@@ -93,8 +95,8 @@ export function DatosIndautxuLigaClient() {
           </div>
         </div>
 
-        {/* 2. Barra de Navegación por Subpestañas */}
-        <div className="mt-8 pt-4 border-t border-slate-800/80">
+        {/* 2. Barra de Navegación por Subpestañas + Botón Actualizar RFEF */}
+        <div className="mt-8 pt-4 border-t border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
             {TABS.map((tab) => {
               const Icon = tab.icon;
@@ -127,6 +129,15 @@ export function DatosIndautxuLigaClient() {
               );
             })}
           </div>
+
+          <button
+            onClick={() => setIsRfefModalOpen(true)}
+            className="px-4 py-2.5 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white rounded-xl text-xs sm:text-sm font-extrabold flex items-center gap-2 transition-all shadow-lg shadow-red-950/60 border border-red-500/30 shrink-0 cursor-pointer self-start sm:self-auto"
+            title="Previsualizar sincronización oficial desde RFEF (Solo Lectura)"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Actualizar desde RFEF
+          </button>
         </div>
       </div>
 
@@ -136,6 +147,13 @@ export function DatosIndautxuLigaClient() {
         {activeTab === 'clasificacion' && <ClasificacionTab />}
         {activeTab === 'calendario' && <CalendarioTab />}
       </div>
+
+      {/* 4. Modal de Previsualización Oficial RFEF (Solo Lectura) */}
+      <RfefPreviewModal
+        isOpen={isRfefModalOpen}
+        onClose={() => setIsRfefModalOpen(false)}
+        initialJornada={3}
+      />
     </div>
   );
 }

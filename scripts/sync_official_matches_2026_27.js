@@ -48,8 +48,8 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 const OFFICIAL_SCHEDULE = [
   { id: '0b77432e-aa46-446a-bc03-14924d37e662', jornada: 1,  fecha: '2026-09-06', rival: 'Real Sociedad de Fútbol', es_local: false },
   { id: '527f4e02-6c17-4500-bd85-4aa72264f41a', jornada: 2,  fecha: '2026-09-13', rival: 'Santutxu F.C.',           es_local: true },
-  { id: 'c8a513f3-0829-4c20-8a92-32a6c8b0f64d', jornada: 3,  fecha: '2026-09-20', rival: 'SD Leioa',                es_local: true },
-  { id: 'a04dd36b-44d0-4fe6-9d95-d1bfdcdd09d5', jornada: 4,  fecha: '2026-10-04', rival: 'Deportivo Alavés',        es_local: false },
+  { id: 'c8a513f3-0829-4c20-8a92-32a6c8b0f64d', jornada: 3,  fecha: '2026-09-20', rival: 'SD Leioa',                es_local: false }, // FIX J3: Leioa LOCAL, Indautxu VISITANTE (RFEF oficial)
+  { id: 'a04dd36b-44d0-4fe6-9d95-d1bfdcdd09d5', jornada: 4,  fecha: '2026-10-04', rival: 'Deportivo Alavés',        es_local: true },  // FIX RFEF: Indautxu LOCAL, Alavés VISITANTE
   { id: '8683c454-05fb-43a3-9dbf-4a47dcdc5efa', jornada: 5,  fecha: '2026-10-11', rival: 'Arratia, C.D.',           es_local: false },
   { id: 'd5c53692-a044-4a3c-b3f4-8b553afaaa78', jornada: 6,  fecha: '2026-10-18', rival: 'Cultural Leonesa S.A.D.', es_local: true },
   { id: '179bc2b4-3cc3-4ab9-8cc3-c291c33b81c0', jornada: 7,  fecha: '2026-10-25', rival: 'Danok Bat Club',          es_local: false },
@@ -58,13 +58,13 @@ const OFFICIAL_SCHEDULE = [
   { id: '72978247-53b1-4678-abd4-88ab754793e9', jornada: 10, fecha: '2026-11-22', rival: 'SD Eibar',                es_local: false },
   { id: '8e18ac6c-70ca-41c2-94cb-b98c7305b283', jornada: 11, fecha: '2026-11-29', rival: 'Unión Deportiva Logroñés', es_local: true },
   { id: '6330759c-9e69-4637-9722-88f111a8439b', jornada: 12, fecha: '2026-12-06', rival: 'Antiguoko Kirol Elkartea', es_local: false },
-  { id: '4ed948d4-e63f-40e8-8466-53ba9ea696b2', jornada: 13, fecha: '2026-12-13', rival: 'Athletic Club',           es_local: false },
-  { id: '911f86af-ebbb-4621-8718-d52f4bf7bf6f', jornada: 14, fecha: '2026-12-16', rival: 'CD Betoño',               es_local: true },
+  { id: '4ed948d4-e63f-40e8-8466-53ba9ea696b2', jornada: 13, fecha: '2026-12-13', rival: 'Athletic Club',           es_local: true },  // FIX RFEF: Indautxu LOCAL, Athletic VISITANTE
+  { id: '911f86af-ebbb-4621-8718-d52f4bf7bf6f', jornada: 14, fecha: '2026-12-16', rival: 'CD Betoño',               es_local: false }, // FIX RFEF: Betoño LOCAL, Indautxu VISITANTE
   { id: 'da39e5ee-e056-4e89-935d-44473e34d06b', jornada: 15, fecha: '2026-12-20', rival: 'EF Mareo',                es_local: true },
   { id: '2cbe6d8a-bfd8-4304-a76b-833678443d42', jornada: 16, fecha: '2027-01-10', rival: 'Real Sociedad de Fútbol', es_local: true },
   { id: '0c0556b0-f8c3-42a5-b168-a489c9b82ad2', jornada: 17, fecha: '2027-01-24', rival: 'Santutxu F.C.',           es_local: false },
-  { id: '70559ec3-a6c3-4160-9b9d-2073a13c62d1', jornada: 18, fecha: '2027-01-31', rival: 'SD Leioa',                es_local: false },
-  { id: 'ed7c4d70-77ce-4676-8f90-573536741f84', jornada: 19, fecha: '2027-02-07', rival: 'Deportivo Alavés',        es_local: true },
+  { id: '70559ec3-a6c3-4160-9b9d-2073a13c62d1', jornada: 18, fecha: '2027-01-31', rival: 'SD Leioa',                es_local: true },  // FIX J18: Indautxu LOCAL, Leioa VISITANTE (RFEF oficial - vuelta)
+  { id: 'ed7c4d70-77ce-4676-8f90-573536741f84', jornada: 19, fecha: '2027-02-07', rival: 'Deportivo Alavés',        es_local: false }, // FIX RFEF: Alavés LOCAL, Indautxu VISITANTE
   { id: '40405e94-6bf5-49db-aa6d-9be568deee99', jornada: 20, fecha: '2027-02-14', rival: 'Arratia, C.D.',           es_local: true },
   { id: '0b245a5e-cb14-4bbf-9324-0c57c5cedc3a', jornada: 21, fecha: '2027-02-21', rival: 'Cultural Leonesa S.A.D.', es_local: false },
   { id: 'bb38457b-d244-410f-9d10-e23bb6818625', jornada: 22, fecha: '2027-02-28', rival: 'Danok Bat Club',          es_local: true },
@@ -73,8 +73,8 @@ const OFFICIAL_SCHEDULE = [
   { id: 'da642a93-983e-4c30-9d41-3c37cb1ec34a', jornada: 25, fecha: '2027-03-21', rival: 'SD Eibar',                es_local: true },
   { id: 'eeef58b0-9086-4db1-a7c2-81c65fcb8a3a', jornada: 26, fecha: '2027-04-04', rival: 'Unión Deportiva Logroñés', es_local: false },
   { id: '19e2b21b-ec01-44ab-927f-869e41fecbad', jornada: 27, fecha: '2027-04-11', rival: 'Antiguoko Kirol Elkartea', es_local: true },
-  { id: 'bb3e2f09-7d6b-4181-816f-7c669e798a1e', jornada: 28, fecha: '2027-04-18', rival: 'Athletic Club',           es_local: true },
-  { id: 'a09e585c-bc94-4341-8de0-f1390ca2e54c', jornada: 29, fecha: '2027-04-25', rival: 'CD Betoño',               es_local: false },
+  { id: 'bb3e2f09-7d6b-4181-816f-7c669e798a1e', jornada: 28, fecha: '2027-04-18', rival: 'Athletic Club',           es_local: false }, // FIX RFEF: Athletic LOCAL, Indautxu VISITANTE
+  { id: 'a09e585c-bc94-4341-8de0-f1390ca2e54c', jornada: 29, fecha: '2027-04-25', rival: 'CD Betoño',               es_local: true },  // FIX RFEF: Indautxu LOCAL, Betoño VISITANTE
   { id: 'd0054e95-9e59-401c-bb31-455fe709280a', jornada: 30, fecha: '2027-05-02', rival: 'EF Mareo',                es_local: false }
 ];
 

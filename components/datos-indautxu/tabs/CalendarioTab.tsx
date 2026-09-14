@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { useIndautxuLeagueCalendar } from '@/hooks/useIndautxuLeagueCalendar';
+import { RfefPreviewModal } from '../RfefPreviewModal';
 import {
   Calendar as CalendarIcon,
   CheckCircle2,
@@ -34,6 +35,8 @@ export function CalendarioTab() {
 
   const [filterEstado, setFilterEstado] = useState<FilterEstado>('todos');
   const [filterSede, setFilterSede] = useState<FilterSede>('todos');
+  const [isRfefModalOpen, setIsRfefModalOpen] = useState<boolean>(false);
+  const [rfefModalJornada, setRfefModalJornada] = useState<number>(3);
 
   // Filtrado de partidos
   const filteredMatches = useMemo(() => {
@@ -83,18 +86,38 @@ export function CalendarioTab() {
 
   if (error) {
     return (
-      <div className="rounded-xl bg-red-950/30 border border-red-900/50 p-6 flex items-start gap-4 text-red-200">
-        <AlertCircle className="w-6 h-6 text-red-400 shrink-0 mt-0.5" />
-        <div className="space-y-2 flex-1">
-          <h3 className="font-semibold text-lg text-red-300">Error al sincronizar el calendario</h3>
-          <p className="text-sm text-red-300/80">{error}</p>
-          <button
-            onClick={refetch}
-            className="inline-flex items-center gap-2 px-4 py-2 mt-2 bg-red-600/80 hover:bg-red-600 text-white rounded-lg text-sm font-medium transition-colors"
-          >
-            <RefreshCw className="w-4 h-4" /> Reintentar
-          </button>
+      <div className="space-y-6">
+        <div className="rounded-xl bg-red-950/30 border border-red-900/50 p-6 flex items-start gap-4 text-red-200">
+          <AlertCircle className="w-6 h-6 text-red-400 shrink-0 mt-0.5" />
+          <div className="space-y-2 flex-1">
+            <h3 className="font-semibold text-lg text-red-300">Aviso de sincronización del calendario local</h3>
+            <p className="text-sm text-red-300/80">{error}</p>
+            <div className="flex items-center gap-3 mt-3 flex-wrap">
+              <button
+                onClick={refetch}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold transition-colors border border-slate-700 cursor-pointer"
+              >
+                <RefreshCw className="w-3.5 h-3.5" /> Reintentar conexión local
+              </button>
+              <button
+                onClick={() => {
+                  setRfefModalJornada(3);
+                  setIsRfefModalOpen(true);
+                }}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white rounded-lg text-xs font-bold transition-all shadow-md shadow-red-950/40 border border-red-500/30 cursor-pointer"
+              >
+                <RefreshCw className="w-3.5 h-3.5" /> Actualizar desde RFEF (Previsualizar)
+              </button>
+            </div>
+          </div>
         </div>
+
+        {/* Modal de Previsualización RFEF (Solo Lectura) */}
+        <RfefPreviewModal
+          isOpen={isRfefModalOpen}
+          onClose={() => setIsRfefModalOpen(false)}
+          initialJornada={rfefModalJornada}
+        />
       </div>
     );
   }
@@ -231,38 +254,52 @@ export function CalendarioTab() {
           </button>
         </div>
 
-        {/* Filtros de Sede */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-400 font-medium mr-1">Sede:</span>
+        {/* Filtros de Sede y Botón Actualizar RFEF */}
+        <div className="flex items-center gap-3 flex-wrap w-full sm:w-auto justify-between sm:justify-end border-t sm:border-t-0 pt-3 sm:pt-0 border-slate-800/60">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-400 font-medium mr-1">Sede:</span>
+            <button
+              onClick={() => setFilterSede('todos')}
+              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                filterSede === 'todos'
+                  ? 'bg-slate-700 text-white font-semibold'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Todos
+            </button>
+            <button
+              onClick={() => setFilterSede('casa')}
+              className={`px-2.5 py-1 rounded-md text-xs font-medium flex items-center gap-1 transition-colors ${
+                filterSede === 'casa'
+                  ? 'bg-slate-700 text-white font-semibold'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Home className="w-3 h-3 text-red-400" /> Casa
+            </button>
+            <button
+              onClick={() => setFilterSede('fuera')}
+              className={`px-2.5 py-1 rounded-md text-xs font-medium flex items-center gap-1 transition-colors ${
+                filterSede === 'fuera'
+                  ? 'bg-slate-700 text-white font-semibold'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <PlaneTakeoff className="w-3 h-3 text-blue-400" /> Fuera
+            </button>
+          </div>
+
           <button
-            onClick={() => setFilterSede('todos')}
-            className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
-              filterSede === 'todos'
-                ? 'bg-slate-700 text-white font-semibold'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
+            onClick={() => {
+              setRfefModalJornada(nextMatch?.jornada || 3);
+              setIsRfefModalOpen(true);
+            }}
+            className="px-3.5 py-1.5 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white rounded-lg text-xs font-bold flex items-center gap-2 transition-all shadow-md shadow-red-950/40 border border-red-500/30 shrink-0 cursor-pointer"
+            title="Previsualizar datos oficiales en directo de la RFEF"
           >
-            Todos
-          </button>
-          <button
-            onClick={() => setFilterSede('casa')}
-            className={`px-2.5 py-1 rounded-md text-xs font-medium flex items-center gap-1 transition-colors ${
-              filterSede === 'casa'
-                ? 'bg-slate-700 text-white font-semibold'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <Home className="w-3 h-3 text-red-400" /> Casa
-          </button>
-          <button
-            onClick={() => setFilterSede('fuera')}
-            className={`px-2.5 py-1 rounded-md text-xs font-medium flex items-center gap-1 transition-colors ${
-              filterSede === 'fuera'
-                ? 'bg-slate-700 text-white font-semibold'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <PlaneTakeoff className="w-3 h-3 text-blue-400" /> Fuera
+            <RefreshCw className="w-3.5 h-3.5" />
+            Actualizar desde RFEF
           </button>
         </div>
       </div>
@@ -465,6 +502,18 @@ export function CalendarioTab() {
                       <span>Acta #{m.officialCodActa}</span>
                     </div>
                   )}
+
+                  <button
+                    onClick={() => {
+                      setRfefModalJornada(m.jornada);
+                      setIsRfefModalOpen(true);
+                    }}
+                    title={`Consultar Jornada ${m.jornada} en RFEF`}
+                    className="mt-1 px-2.5 py-1 rounded text-[11px] font-bold bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/60 transition-colors flex items-center gap-1.5 cursor-pointer shadow-sm"
+                  >
+                    <RefreshCw className="w-2.5 h-2.5 text-red-400" />
+                    RFEF J{m.jornada}
+                  </button>
                 </div>
               </div>
             </div>
@@ -497,6 +546,13 @@ export function CalendarioTab() {
           Resultados oficiales sincronizados con RFEF
         </div>
       </div>
+
+      {/* 5. Modal de Previsualización RFEF (Solo Lectura) */}
+      <RfefPreviewModal
+        isOpen={isRfefModalOpen}
+        onClose={() => setIsRfefModalOpen(false)}
+        initialJornada={rfefModalJornada}
+      />
     </div>
   );
 }
