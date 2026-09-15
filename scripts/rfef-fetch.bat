@@ -40,8 +40,7 @@ if not exist "scratch" (
     mkdir "scratch" >nul 2>&1
 )
 
-set "UNIQUE_ID=%RANDOM%_%TIME::=%"
-set "UNIQUE_ID=%UNIQUE_ID: =%"
+set "UNIQUE_ID=%RANDOM%_%RANDOM%"
 set "COOKIE_JAR=scratch\rfef_cookie_%UNIQUE_ID%.txt"
 set "TEMP_HTML=scratch\rfef_temp_%UNIQUE_ID%.html"
 set "FINAL_HTML=scratch\rfef_jornada_%JORNADA%.html"
@@ -53,7 +52,8 @@ set "URL=%BASE_URL%?cod_primaria=1000120&codtemporada=22&codcompeticion=33836116
 echo [INFO] Consultando RFEF oficial para Jornada %JORNADA% via Schannel...
 
 REM 4. Petición oficial con curl.exe nativo de Windows (Schannel)
-C:\Windows\System32\curl.exe -s -L --cookie-jar "%COOKIE_JAR%" --output "%TEMP_HTML%" "%URL%"
+type nul > "%COOKIE_JAR%"
+C:\Windows\System32\curl.exe -s -L --cookie-jar "%COOKIE_JAR%" --cookie "%COOKIE_JAR%" --output "%TEMP_HTML%" "%URL%"
 set "CURL_STATUS=%ERRORLEVEL%"
 
 REM 5. Limpieza obligatoria del cookie jar efímero
@@ -75,8 +75,8 @@ if not exist "%TEMP_HTML%" (
 
 REM Comprobar tamaño del archivo (> 10000 bytes)
 for %%F in ("%TEMP_HTML%") do set "HTML_SIZE=%%~zF"
-if %HTML_SIZE% LSS 10000 (
-    echo [ERROR] Respuesta de la RFEF insuficiente (%HTML_SIZE% bytes). La RFEF no devolvio el calendario completo.
+if !HTML_SIZE! LSS 10000 (
+    echo [ERROR] Respuesta de la RFEF insuficiente: !HTML_SIZE! bytes.
     if exist "%TEMP_HTML%" del /f /q "%TEMP_HTML%" >nul 2>&1
     exit /b 1
 )
@@ -90,14 +90,15 @@ if %ERRORLEVEL% neq 0 (
 )
 
 REM Comprobar correspondencia de jornada en el HTML
-findstr /i "codjornada=%JORNADA%" "%TEMP_HTML%" >nul 2>&1
-if %ERRORLEVEL% neq 0 (
-    findstr /i "Jornada %JORNADA%" "%TEMP_HTML%" >nul 2>&1
-    if %ERRORLEVEL% neq 0 (
-        echo [ERROR] El contenido recibido no parece corresponder a la Jornada %JORNADA%.
-        if exist "%TEMP_HTML%" del /f /q "%TEMP_HTML%" >nul 2>&1
-        exit /b 1
-    )
+set "FOUND_JORNADA=0"
+findstr /i "codjornada=%JORNADA%" "%TEMP_HTML%" >nul 2>&1 && set "FOUND_JORNADA=1"
+if "!FOUND_JORNADA!"=="0" (
+    findstr /i "Jornada %JORNADA%" "%TEMP_HTML%" >nul 2>&1 && set "FOUND_JORNADA=1"
+)
+if "!FOUND_JORNADA!"=="0" (
+    echo [ERROR] El contenido recibido no parece corresponder a la Jornada %JORNADA%.
+    if exist "%TEMP_HTML%" del /f /q "%TEMP_HTML%" >nul 2>&1
+    exit /b 1
 )
 
 REM 7. Preservar captura válida y copiar al portapapeles de Windows
@@ -108,7 +109,7 @@ type "%FINAL_HTML%" | C:\Windows\System32\clip.exe
 
 echo ============================================================================
 echo [OK] Jornada %JORNADA% obtenida con exito desde la RFEF.
-echo - Tamano: %HTML_SIZE% bytes
+echo - Tamano: !HTML_SIZE! bytes
 echo - Archivo local: %FINAL_HTML%
 echo - Estado: HTML oficial copiado al portapapeles de Windows.
 echo ============================================================================
