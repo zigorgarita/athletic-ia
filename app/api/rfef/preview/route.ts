@@ -76,9 +76,57 @@ export async function POST(req: NextRequest) {
     const blockers: string[] = [];
     const warnings: string[] = [];
 
-    // 3. Consultar calendario oficial RFEF de la jornada
-    const calResult = fetchRFEFCalendarPageDetailed(jornadaNum);
+    // 2.1 Soporte opcional de ingesta manual de HTML oficial (P1)
+    const rawCalendarHtml = typeof body.calendarHtml === 'string' ? body.calendarHtml : null;
+    let calResult: any;
+    let isManualCalendarIngest = false;
+
+    if (rawCalendarHtml !== null) {
+      const trimmedHtml = rawCalendarHtml.trim();
+      if (trimmedHtml.length < 500) {
+        return NextResponse.json(
+          { error: 'El contenido "calendarHtml" es insuficiente o inválido para un calendario oficial de la RFEF.' },
+          { status: 400 }
+        );
+      }
+      if (trimmedHtml.length > 5_000_000) {
+        return NextResponse.json(
+          { error: 'El contenido "calendarHtml" excede el tamaño máximo permitido (5 MB).' },
+          { status: 400 }
+        );
+      }
+
+      isManualCalendarIngest = true;
+      calResult = {
+        html: trimmedHtml,
+        source: 'live' as RFEFDataSource,
+        bytes: Buffer.byteLength(trimmedHtml, 'utf8'),
+        url: 'manual_ingest://calendarHtml',
+        diagnostic: {
+          httpStatus: 200,
+          redirectCount: 0,
+          bytes: Buffer.byteLength(trimmedHtml, 'utf8'),
+          hasJSessionId: true,
+          curlExitCode: 0,
+          curlError: null,
+        },
+      };
+    } else {
+      // 3. Consultar calendario oficial RFEF de la jornada (comportamiento previo intacto)
+      calResult = fetchRFEFCalendarPageDetailed(jornadaNum);
+    }
+
     const parsedCal = parseCalendarPage(calResult.html);
+
+    // Validación estricta de coherencia de jornada si el HTML fue proporcionado manualmente
+    if (isManualCalendarIngest && parsedCal.jornada !== null && parsedCal.jornada !== jornadaNum) {
+      return NextResponse.json(
+        {
+          error: `DISCREPANCIA DE JORNADA: El HTML proporcionado corresponde oficialmente a la Jornada ${parsedCal.jornada}, pero se solicitó previsualizar la Jornada ${jornadaNum}.`,
+        },
+        { status: 400 }
+      );
+    }
 
     if (!parsedCal.calendarAvailable || parsedCal.totalMatches === 0) {
       blockers.push(`RFEF no devolvió partidos oficiales para la jornada ${jornadaNum}.`);
