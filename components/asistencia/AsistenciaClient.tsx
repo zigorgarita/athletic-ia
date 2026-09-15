@@ -47,6 +47,41 @@ export function getEffectiveGlobalRating(ev: Partial<TrainingEvaluation> | undef
   return undefined;
 }
 
+async function fetchAllTableRows<T>(tableName: string): Promise<T[]> {
+  const PAGE_SIZE = 1000;
+  const MAX_PAGES = 100; // Guardia de seguridad para evitar bucles infinitos
+  const allRows: T[] = [];
+  let page = 0;
+
+  while (page < MAX_PAGES) {
+    const from = page * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
+
+    const { data, error } = await supabase
+      .from(tableName)
+      .select('*')
+      .range(from, to);
+
+    if (error) {
+      throw error;
+    }
+
+    if (!data || data.length === 0) {
+      break;
+    }
+
+    allRows.push(...(data as T[]));
+
+    if (data.length < PAGE_SIZE) {
+      break;
+    }
+
+    page++;
+  }
+
+  return allRows;
+}
+
 export function AsistenciaClient() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -85,18 +120,11 @@ export function AsistenciaClient() {
   const loadHistory = React.useCallback(async () => {
     try {
       setLoadingHistory(true);
-      const { data: attData, error: attErr } = await supabase
-        .from('training_attendance')
-        .select('*');
-      if (attErr) throw attErr;
+      const attData = await fetchAllTableRows<TrainingAttendance>('training_attendance');
+      const evalData = await fetchAllTableRows<TrainingEvaluation>('training_evaluations');
 
-      const { data: evalData, error: evalErr } = await supabase
-        .from('training_evaluations')
-        .select('*');
-      if (evalErr) throw evalErr;
-
-      setAllAttendance(attData || []);
-      setAllEvaluations(evalData || []);
+      setAllAttendance(attData);
+      setAllEvaluations(evalData);
     } catch (err: any) {
       console.error('Error loading historical attendance/evaluations:', err);
     } finally {
