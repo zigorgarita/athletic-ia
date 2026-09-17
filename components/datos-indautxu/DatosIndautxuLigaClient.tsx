@@ -6,6 +6,7 @@ import { JugadoresTab } from './tabs/JugadoresTab';
 import { ClasificacionTab } from './tabs/ClasificacionTab';
 import { CalendarioTab } from './tabs/CalendarioTab';
 import { RfefPreviewModal } from './RfefPreviewModal';
+import { useEditMode } from '@/context/EditModeContext';
 
 export type DatosLigaSubTab = 'jugadores' | 'clasificacion' | 'calendario';
 
@@ -44,6 +45,7 @@ const TABS: TabItem[] = [
 export function DatosIndautxuLigaClient() {
   const [activeTab, setActiveTab] = useState<DatosLigaSubTab>('jugadores');
   const [isRfefModalOpen, setIsRfefModalOpen] = useState<boolean>(false);
+  const { isEditMode } = useEditMode();
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-20">
@@ -132,11 +134,15 @@ export function DatosIndautxuLigaClient() {
 
           <button
             onClick={() => setIsRfefModalOpen(true)}
-            className="px-4 py-2.5 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white rounded-xl text-xs sm:text-sm font-extrabold flex items-center gap-2 transition-all shadow-lg shadow-red-950/60 border border-red-500/30 shrink-0 cursor-pointer self-start sm:self-auto"
-            title="Previsualizar sincronización oficial desde RFEF (Solo Lectura)"
+            className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-extrabold flex items-center gap-2 transition-all shrink-0 cursor-pointer self-start sm:self-auto ${
+              isEditMode
+                ? 'bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white shadow-lg shadow-red-950/60 border border-red-500/30'
+                : 'bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700'
+            }`}
+            title={isEditMode ? 'Actualizar/Previsualizar sincronización oficial desde RFEF' : 'Previsualizar RFEF (Modo Solo Lectura)'}
           >
             <RefreshCw className="w-4 h-4" />
-            Actualizar desde RFEF
+            {isEditMode ? 'Actualizar desde RFEF' : 'Previsualizar RFEF'}
           </button>
         </div>
       </div>

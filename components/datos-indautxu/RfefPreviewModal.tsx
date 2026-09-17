@@ -20,6 +20,8 @@ import {
   Info,
   Lock,
   Activity,
+  Clipboard,
+  FileCode,
 } from 'lucide-react';
 
 import { getStaffPasskey } from '@/lib/passkey';
@@ -41,18 +43,26 @@ export function RfefPreviewModal({
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<any | null>(null);
   const [activeTab, setActiveTab] = useState<'indautxu' | 'partidos' | 'jugadores' | 'auditoria'>('indautxu');
-  const { currentUser } = useEditMode();
+  const { currentUser, isEditMode } = useEditMode();
+  const [pasting, setPasting] = useState<boolean>(false);
+  const [pasteError, setPasteError] = useState<string | null>(null);
+  const [showManualPaste, setShowManualPaste] = useState<boolean>(false);
+  const [manualHtml, setManualHtml] = useState<string>('');
 
   useEffect(() => {
     if (isOpen) {
       setJornada(initialJornada);
+      setPasteError(null);
+      setManualHtml('');
+      setShowManualPaste(false);
       fetchPreview(initialJornada);
     }
   }, [isOpen, initialJornada]);
 
-  const fetchPreview = async (j: number) => {
+  const fetchPreview = async (j: number, customCalendarHtml?: string) => {
     setLoading(true);
     setError(null);
+    setPasteError(null);
     try {
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
@@ -66,22 +76,108 @@ export function RfefPreviewModal({
         headers['x-editor-pass'] = currentUser.pass;
       }
 
+      const bodyPayload: any = { jornada: j };
+      if (customCalendarHtml) {
+        bodyPayload.calendarHtml = customCalendarHtml;
+      }
+
       const res = await fetch('/api/rfef/preview', {
         method: 'POST',
         headers,
-        body: JSON.stringify({ jornada: j }),
+        body: JSON.stringify(bodyPayload),
       });
       const json = await res.json();
       if (!res.ok) {
         throw new Error(json.error || `Error ${res.status} al consultar la RFEF.`);
       }
       setData(json);
+      setManualHtml('');
+      setShowManualPaste(false);
     } catch (err: any) {
       setError(err.message || 'Error de conexión con el servidor.');
       setData(null);
     } finally {
       setLoading(false);
+      setPasting(false);
     }
+  };
+
+  const handlePasteFromClipboard = async () => {
+    if (!isEditMode) {
+      setPasteError('La ingesta de HTML oficial requiere tener el Modo Edición activado.');
+      return;
+    }
+    setPasteError(null);
+    setPasting(true);
+
+    try {
+      let text = '';
+      if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.readText) {
+        text = await navigator.clipboard.readText();
+      } else {
+        setShowManualPaste(true);
+        setPasting(false);
+        return;
+      }
+
+      const trimmed = (text || '').trim();
+      if (!trimmed) {
+        setPasteError(`El portapapeles está vacío. Ejecuta primero en tu consola: .\\scripts\\rfef-fetch.bat ${jornada}`);
+        setPasting(false);
+        return;
+      }
+
+      if (trimmed.length < 500) {
+        setPasteError('El contenido del portapapeles es insuficiente para un calendario oficial de la RFEF.');
+        setPasting(false);
+        return;
+      }
+
+      const hasRfefMarker =
+        trimmed.includes('NFG_') ||
+        trimmed.includes('rfef') ||
+        trimmed.includes('novanet') ||
+        trimmed.includes('Resultados') ||
+        trimmed.includes('Competicion');
+
+      if (!hasRfefMarker) {
+        setPasteError('El contenido del portapapeles no parece ser el HTML oficial generado por rfef-fetch.bat.');
+        setPasting(false);
+        return;
+      }
+
+      await fetchPreview(jornada, trimmed);
+    } catch (err: any) {
+      console.warn('Clipboard read error:', err);
+      setShowManualPaste(true);
+      setPasteError('El navegador no permitió leer el portapapeles directamente. Pégalo manualmente con Ctrl+V abajo.');
+      setPasting(false);
+    }
+  };
+
+  const handleManualPasteSubmit = () => {
+    const trimmed = manualHtml.trim();
+    if (!trimmed) {
+      setPasteError('Introduce o pega el contenido HTML oficial.');
+      return;
+    }
+    if (trimmed.length < 500) {
+      setPasteError('El contenido pegado es insuficiente para un calendario oficial de la RFEF.');
+      return;
+    }
+    const hasRfefMarker =
+      trimmed.includes('NFG_') ||
+      trimmed.includes('rfef') ||
+      trimmed.includes('novanet') ||
+      trimmed.includes('Resultados') ||
+      trimmed.includes('Competicion');
+
+    if (!hasRfefMarker) {
+      setPasteError('El contenido pegado no parece ser un HTML oficial de la RFEF.');
+      return;
+    }
+
+    fetchPreview(jornada, trimmed);
   };
 
   const handleJornadaChange = (newJ: number) => {
@@ -206,6 +302,88 @@ export function RfefPreviewModal({
             </span>
           </div>
         </div>
+
+        {/* Panel de Ingesta Schannel P2.1 / P3 (Exclusivo Modo Edición) */}
+        {isEditMode ? (
+          <div className="px-6 py-3 bg-slate-950/90 border-b border-slate-800 flex flex-col gap-2.5 shrink-0">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 text-xs font-bold text-red-400 bg-red-950/50 border border-red-800/60 px-2 py-0.5 rounded-md">
+                  <FileCode className="w-3.5 h-3.5" />
+                  Schannel P2.1 Helper
+                </span>
+                <span className="text-xs text-slate-300 font-medium">
+                  Cargar HTML oficial de <strong className="text-white">Jornada {jornada}</strong> desde portapapeles
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handlePasteFromClipboard}
+                  disabled={loading || pasting}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white rounded-lg text-xs font-bold transition-all shadow-md shadow-red-950/50 cursor-pointer disabled:opacity-50"
+                  title="Lee el portapapeles de Windows generado por rfef-fetch.bat"
+                >
+                  <Clipboard className={`w-3.5 h-3.5 ${pasting ? 'animate-pulse' : ''}`} />
+                  {pasting ? 'Leyendo...' : 'Pegar HTML desde Portapapeles'}
+                </button>
+                <button
+                  onClick={() => setShowManualPaste((v) => !v)}
+                  className="text-xs text-slate-400 hover:text-slate-200 underline underline-offset-2 px-1.5 py-1"
+                >
+                  {showManualPaste ? 'Cerrar pegado manual' : 'Pegar manual (Ctrl+V)'}
+                </button>
+              </div>
+            </div>
+
+            {showManualPaste && (
+              <div className="p-3 rounded-lg bg-slate-900 border border-slate-700/80 space-y-2 mt-1">
+                <div className="text-[11px] text-slate-300 flex items-center justify-between">
+                  <span>Pega aquí el HTML oficial copiado por <code className="text-red-300 font-mono">rfef-fetch.bat {jornada}</code>:</span>
+                  <span className="text-slate-500 text-[10px]">No se guardará en disco ni BD</span>
+                </div>
+                <textarea
+                  value={manualHtml}
+                  onChange={(e) => setManualHtml(e.target.value)}
+                  placeholder="Pega aquí el HTML oficial completo (Ctrl+V)..."
+                  rows={3}
+                  className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-red-500"
+                />
+                <div className="flex items-center justify-end gap-2">
+                  <button
+                    onClick={() => {
+                      setManualHtml('');
+                      setShowManualPaste(false);
+                    }}
+                    className="px-2.5 py-1 text-xs text-slate-400 hover:text-slate-200"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleManualPasteSubmit}
+                    disabled={loading || !manualHtml.trim()}
+                    className="px-3 py-1 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded cursor-pointer disabled:opacity-50"
+                  >
+                    Cargar HTML Pegado
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {pasteError && (
+              <div className="text-xs text-rose-300 bg-rose-950/50 border border-rose-900/60 rounded px-3 py-1.5 flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0 text-rose-400" />
+                <span>{pasteError}</span>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="px-6 py-2 bg-slate-950/60 border-b border-slate-800 flex items-center justify-between text-xs text-slate-400 shrink-0">
+            <div className="flex items-center gap-2">
+              <Lock className="w-3.5 h-3.5 text-amber-400" />
+              <span>Modo Solo Lectura: La ingesta de HTML oficial desde portapapeles está reservada al Modo Edición.</span>
+            </div>
+          </div>
+        )}
 
         {/* Pestañas internas de navegación */}
         <div className="flex items-center gap-1 px-6 pt-3 bg-slate-900 border-b border-slate-800 shrink-0 text-xs">

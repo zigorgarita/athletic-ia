@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { useIndautxuLeagueCalendar } from '@/hooks/useIndautxuLeagueCalendar';
+import { useEditMode } from '@/context/EditModeContext';
 import { RfefPreviewModal } from '../RfefPreviewModal';
 import {
   Calendar as CalendarIcon,
@@ -32,6 +33,8 @@ export function CalendarioTab() {
     error,
     refetch
   } = useIndautxuLeagueCalendar();
+
+  const { isEditMode } = useEditMode();
 
   const [filterEstado, setFilterEstado] = useState<FilterEstado>('todos');
   const [filterSede, setFilterSede] = useState<FilterSede>('todos');
@@ -104,9 +107,14 @@ export function CalendarioTab() {
                   setRfefModalJornada(3);
                   setIsRfefModalOpen(true);
                 }}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white rounded-lg text-xs font-bold transition-all shadow-md shadow-red-950/40 border border-red-500/30 cursor-pointer"
+                className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all border shrink-0 cursor-pointer ${
+                  isEditMode
+                    ? 'bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white shadow-md shadow-red-950/40 border-red-500/30'
+                    : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+                }`}
+                title={isEditMode ? 'Actualizar/Previsualizar datos oficiales RFEF' : 'Previsualizar RFEF (Modo Solo Lectura)'}
               >
-                <RefreshCw className="w-3.5 h-3.5" /> Actualizar desde RFEF (Previsualizar)
+                <RefreshCw className="w-3.5 h-3.5" /> {isEditMode ? 'Actualizar desde RFEF' : 'Previsualizar RFEF'}
               </button>
             </div>
           </div>
@@ -295,11 +303,15 @@ export function CalendarioTab() {
               setRfefModalJornada(nextMatch?.jornada || 3);
               setIsRfefModalOpen(true);
             }}
-            className="px-3.5 py-1.5 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white rounded-lg text-xs font-bold flex items-center gap-2 transition-all shadow-md shadow-red-950/40 border border-red-500/30 shrink-0 cursor-pointer"
-            title="Previsualizar datos oficiales en directo de la RFEF"
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2 transition-all shrink-0 cursor-pointer ${
+              isEditMode
+                ? 'bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white shadow-md shadow-red-950/40 border border-red-500/30'
+                : 'bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700'
+            }`}
+            title={isEditMode ? 'Actualizar/Previsualizar datos oficiales en directo de la RFEF' : 'Previsualizar RFEF (Modo Solo Lectura)'}
           >
             <RefreshCw className="w-3.5 h-3.5" />
-            Actualizar desde RFEF
+            {isEditMode ? 'Actualizar desde RFEF' : 'Previsualizar RFEF'}
           </button>
         </div>
       </div>

@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyServerAuthorization } from '@/lib/auth-server';
+import { isEditorSessionAuthorized, isEditorSessionAuthorizedFromRequest } from '@/lib/auth/session';
 import { getSupabaseServerClient } from '@/lib/supabase-server';
 import {
   fetchRFEFCalendarPageDetailed,
@@ -82,6 +83,23 @@ export async function POST(req: NextRequest) {
     let isManualCalendarIngest = false;
 
     if (rawCalendarHtml !== null) {
+      // REQUISITO CRÍTICO P3: La ingesta de HTML oficial exige EXCLUSIVAMENTE Modo Edición legítimo
+      const isEditorCookie = (await isEditorSessionAuthorized()) || isEditorSessionAuthorizedFromRequest(req);
+      let isEditorCredentials = false;
+      if (!isEditorCookie) {
+        const auth = await verifyServerAuthorization(req);
+        isEditorCredentials = auth.authorized && (auth.authMethod === 'editor_credentials' || auth.authMethod === 'supabase_token');
+      }
+
+      if (!isEditorCookie && !isEditorCredentials) {
+        return NextResponse.json(
+          {
+            error: 'Acceso denegado: La ingesta de HTML oficial desde el portapapeles requiere que Athletic IA esté en Modo Edición autorizado.',
+          },
+          { status: 403 }
+        );
+      }
+
       const trimmedHtml = rawCalendarHtml.trim();
       if (trimmedHtml.length < 500) {
         return NextResponse.json(
