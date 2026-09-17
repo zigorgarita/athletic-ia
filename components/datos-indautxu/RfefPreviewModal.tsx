@@ -58,7 +58,7 @@ export function RfefPreviewModal({
     try {
       let resBridge: Response;
       try {
-        resBridge = await fetch(`http://127.0.0.1:41189/rfef?jornada=${j}`, {
+        resBridge = await fetch(`http://127.0.0.1:41189/jornada-completa?jornada=${j}`, {
           method: 'GET',
         });
       } catch (networkErr: any) {
@@ -90,7 +90,8 @@ export function RfefPreviewModal({
         payload.ok !== true ||
         payload.jornada !== j ||
         typeof payload.calendarHtml !== 'string' ||
-        !payload.calendarHtml.trim()
+        !payload.calendarHtml.trim() ||
+        !Array.isArray(payload.actas)
       ) {
         setError('Respuesta inválida del puente local RFEF.');
         setData(null);
@@ -98,9 +99,9 @@ export function RfefPreviewModal({
         return;
       }
 
-      await fetchPreview(j, payload.calendarHtml);
+      await fetchPreview(j, payload.calendarHtml, payload.actas);
     } catch (err: any) {
-      setError(err.message || 'Error al procesar el calendario desde el puente local.');
+      setError(err.message || 'Error al procesar el calendario y actas desde el puente local.');
       setData(null);
       setLoading(false);
     }
@@ -124,7 +125,11 @@ export function RfefPreviewModal({
     }
   }, [isOpen, initialJornada]);
 
-  const fetchPreview = async (j: number, customCalendarHtml?: string) => {
+  const fetchPreview = async (
+    j: number,
+    customCalendarHtml?: string,
+    customActas?: Array<{ codActa: number; actaHtml: string; bytes?: number }>
+  ) => {
     setLoading(true);
     setError(null);
     setPasteError(null);
@@ -144,6 +149,9 @@ export function RfefPreviewModal({
       const bodyPayload: any = { jornada: j };
       if (customCalendarHtml) {
         bodyPayload.calendarHtml = customCalendarHtml;
+      }
+      if (customActas && Array.isArray(customActas)) {
+        bodyPayload.actas = customActas;
       }
 
       const res = await fetch('/api/rfef/preview', {

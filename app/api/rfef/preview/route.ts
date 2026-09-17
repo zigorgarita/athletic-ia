@@ -77,13 +77,14 @@ export async function POST(req: NextRequest) {
     const blockers: string[] = [];
     const warnings: string[] = [];
 
-    // 2.1 Soporte opcional de ingesta manual de HTML oficial (P1)
+    // 2.1 Soporte opcional de ingesta de HTML oficial y actas (P1 / P4.2)
     const rawCalendarHtml = typeof body.calendarHtml === 'string' ? body.calendarHtml : null;
+    const rawActas = Array.isArray(body.actas) ? body.actas : null;
     let calResult: any;
     let isManualCalendarIngest = false;
 
-    if (rawCalendarHtml !== null) {
-      // REQUISITO CRÍTICO P3: La ingesta de HTML oficial exige EXCLUSIVAMENTE Modo Edición legítimo
+    if (rawCalendarHtml !== null || rawActas !== null) {
+      // REQUISITO CRÍTICO P3 / P4.2: La ingesta de datos oficiales exige EXCLUSIVAMENTE Modo Edición legítimo
       const isEditorCookie = (await isEditorSessionAuthorized()) || isEditorSessionAuthorizedFromRequest(req);
       let isEditorCredentials = false;
       if (!isEditorCookie) {
@@ -94,12 +95,14 @@ export async function POST(req: NextRequest) {
       if (!isEditorCookie && !isEditorCredentials) {
         return NextResponse.json(
           {
-            error: 'Acceso denegado: La ingesta de HTML oficial desde el portapapeles requiere que Athletic IA esté en Modo Edición autorizado.',
+            error: 'Acceso denegado: La ingesta de datos oficiales de la RFEF requiere que Athletic IA esté en Modo Edición autorizado.',
           },
           { status: 403 }
         );
       }
+    }
 
+    if (rawCalendarHtml !== null) {
       const trimmedHtml = rawCalendarHtml.trim();
       if (trimmedHtml.length < 500) {
         return NextResponse.json(
@@ -132,6 +135,33 @@ export async function POST(req: NextRequest) {
     } else {
       // 3. Consultar calendario oficial RFEF de la jornada (comportamiento previo intacto)
       calResult = fetchRFEFCalendarPageDetailed(jornadaNum);
+    }
+
+    // Indexar actas proporcionadas para utilizarlas sin redescargar (P4.2)
+    const providedActasMap = new Map<string, string>();
+    if (rawActas !== null) {
+      for (const item of rawActas) {
+        if (!item || typeof item !== 'object') {
+          return NextResponse.json(
+            { error: 'Formato inválido en la lista de actas proporcionadas.' },
+            { status: 400 }
+          );
+        }
+        const cActa = parseInt(item.codActa, 10);
+        if (isNaN(cActa) || cActa <= 0) {
+          return NextResponse.json(
+            { error: 'Identificador "codActa" inválido en una de las actas proporcionadas.' },
+            { status: 400 }
+          );
+        }
+        if (typeof item.actaHtml !== 'string' || item.actaHtml.trim().length === 0) {
+          return NextResponse.json(
+            { error: `El contenido "actaHtml" para el acta ${cActa} está vacío o es inválido.` },
+            { status: 400 }
+          );
+        }
+        providedActasMap.set(String(cActa), item.actaHtml.trim());
+      }
     }
 
     const parsedCal = parseCalendarPage(calResult.html);
@@ -281,16 +311,28 @@ export async function POST(req: NextRequest) {
       for (const m of actasToFetch) {
         if (!m.codActa) continue;
         try {
-          const actaResult = fetchRFEFActaPageDetailed(m.codActa);
-          actaSourcesMap.set(String(m.codActa), actaResult.source);
+          let actaHtml: string | null = null;
+          let actaSource: RFEFDataSource = 'none';
 
-          if (actaResult.html && actaResult.html.length > 500) {
-            const parsed = parseActaPage(actaResult.html, m.codActa);
+          if (providedActasMap.has(m.codActa)) {
+            // El acta ya fue obtenida por el bridge local: NO volver a descargar desde RFEF
+            actaHtml = providedActasMap.get(m.codActa)!;
+            actaSource = 'live';
+          } else {
+            const actaResult = fetchRFEFActaPageDetailed(m.codActa);
+            actaHtml = actaResult.html;
+            actaSource = actaResult.source;
+          }
+
+          actaSourcesMap.set(String(m.codActa), actaSource);
+
+          if (actaHtml && actaHtml.length > 500) {
+            const parsed = parseActaPage(actaHtml, m.codActa);
             allActasParsed.push(parsed);
 
             if (m.isIndautxuMatch) {
               indautxuActaParsed = parsed;
-              indautxuActaSource = actaResult.source;
+              indautxuActaSource = actaSource;
             }
           }
         } catch (err: any) {
