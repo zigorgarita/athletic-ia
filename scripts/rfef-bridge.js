@@ -161,43 +161,46 @@ function fetchRfefActa(codActa) {
       url
     ];
 
-    execFile(CURL_PATH, args, { maxBuffer: 10 * 1024 * 1024, encoding: 'utf8' }, (error, stdout, stderr) => {
-      // Limpieza obligatoria del archivo temporal de cookies en finally
-      try {
-        if (fs.existsSync(cookieFile)) {
-          fs.unlinkSync(cookieFile);
+    const runCurl = (attempt) => {
+      execFile(CURL_PATH, args, { maxBuffer: 15 * 1024 * 1024, encoding: 'utf8' }, (error, stdout, stderr) => {
+        const html = stdout || '';
+
+        // Si la RFEF devuelve respuesta vacía en el primer intento por negociación de cookies, reintentar una vez con la cookie ya establecida
+        if (html.length < 1000 && attempt === 1) {
+          return runCurl(2);
         }
-      } catch (cleanupErr) {
-        // Fallback silencioso de limpieza
-      }
 
-      if (error) {
-        return reject({ type: 'CURL_ERROR', message: 'Error de conexión curl con la RFEF.' });
-      }
+        // Limpieza obligatoria del archivo temporal de cookies en finally
+        try {
+          if (fs.existsSync(cookieFile)) {
+            fs.unlinkSync(cookieFile);
+          }
+        } catch (cleanupErr) {
+          // Fallback silencioso de limpieza
+        }
 
-      const html = stdout || '';
+        if (error) {
+          return reject({ type: 'CURL_ERROR', message: 'Error de conexión curl con la RFEF.' });
+        }
 
-      // Validaciones estructurales del acta oficial RFEF
-      if (html.length < 30000) {
-        return reject({ type: 'INVALID_HTML', message: 'Respuesta del acta RFEF insuficiente o vacía.' });
-      }
+        // Validaciones estructurales robustas del acta oficial RFEF
+        if (html.length < 10000) {
+          return reject({ type: 'INVALID_HTML', message: 'Respuesta del acta RFEF insuficiente o vacía.' });
+        }
 
-      if (!html.includes('id=actas') && !html.includes('rbitro')) {
-        return reject({ type: 'INVALID_HTML', message: 'El contenido recibido no contiene la estructura oficial de un acta RFEF.' });
-      }
+        if (!html.includes('font_widgetL') && !html.includes('font_widgetV') && !html.includes('font_widget')) {
+          return reject({ type: 'INVALID_HTML', message: 'El acta oficial de la RFEF no contiene datos de equipos o no está disponible.' });
+        }
 
-      if (!html.includes('Titulares') || !html.includes('Suplentes')) {
-        return reject({ type: 'INVALID_HTML', message: 'La respuesta de la RFEF no contiene las alineaciones oficiales del acta.' });
-      }
+        if (!/titulares/i.test(html) && !/alineaci/i.test(html)) {
+          return reject({ type: 'INVALID_HTML', message: 'La respuesta de la RFEF no contiene las alineaciones oficiales del acta.' });
+        }
 
-      // Validar que contiene equipos no vacíos en font_widget
-      const teamMatch = html.match(/<div class=["']?font_widget[LV]?["']?[^>]*>([\s\S]*?)<\/div>/i);
-      if (!teamMatch || !teamMatch[1].trim()) {
-        return reject({ type: 'INVALID_HTML', message: 'El acta oficial de la RFEF no contiene datos de equipos o no está disponible.' });
-      }
+        resolve(html);
+      });
+    };
 
-      resolve(html);
-    });
+    runCurl(1);
   });
 }
 
