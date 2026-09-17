@@ -140,6 +140,67 @@ function fetchRfefJornada(jornada) {
   });
 }
 
+function fetchRfefActa(codActa) {
+  return new Promise((resolve, reject) => {
+    const uniqueId = `rfef_cookie_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.txt`;
+    const cookieFile = path.join(os.tmpdir(), uniqueId);
+
+    try {
+      fs.writeFileSync(cookieFile, '');
+    } catch (e) {
+      // Ignorar si falla la creación vacía inicial
+    }
+
+    const url = `https://resultados.rfef.es/pnfg/NPcd/NFG_CmpPartido?cod_primaria=1000120&CodActa=${codActa}&cod_acta=${codActa}`;
+
+    const args = [
+      '-s',
+      '-L',
+      '--cookie-jar', cookieFile,
+      '--cookie', cookieFile,
+      url
+    ];
+
+    execFile(CURL_PATH, args, { maxBuffer: 10 * 1024 * 1024, encoding: 'utf8' }, (error, stdout, stderr) => {
+      // Limpieza obligatoria del archivo temporal de cookies en finally
+      try {
+        if (fs.existsSync(cookieFile)) {
+          fs.unlinkSync(cookieFile);
+        }
+      } catch (cleanupErr) {
+        // Fallback silencioso de limpieza
+      }
+
+      if (error) {
+        return reject({ type: 'CURL_ERROR', message: 'Error de conexión curl con la RFEF.' });
+      }
+
+      const html = stdout || '';
+
+      // Validaciones estructurales del acta oficial RFEF
+      if (html.length < 30000) {
+        return reject({ type: 'INVALID_HTML', message: 'Respuesta del acta RFEF insuficiente o vacía.' });
+      }
+
+      if (!html.includes('id=actas') && !html.includes('rbitro')) {
+        return reject({ type: 'INVALID_HTML', message: 'El contenido recibido no contiene la estructura oficial de un acta RFEF.' });
+      }
+
+      if (!html.includes('Titulares') || !html.includes('Suplentes')) {
+        return reject({ type: 'INVALID_HTML', message: 'La respuesta de la RFEF no contiene las alineaciones oficiales del acta.' });
+      }
+
+      // Validar que contiene equipos no vacíos en font_widget
+      const teamMatch = html.match(/<div class=["']?font_widget[LV]?["']?[^>]*>([\s\S]*?)<\/div>/i);
+      if (!teamMatch || !teamMatch[1].trim()) {
+        return reject({ type: 'INVALID_HTML', message: 'El acta oficial de la RFEF no contiene datos de equipos o no está disponible.' });
+      }
+
+      resolve(html);
+    });
+  });
+}
+
 const server = http.createServer(async (req, res) => {
   const origin = req.headers.origin;
   const url = new URL(req.url, `http://${HOST}:${PORT}`);
@@ -153,7 +214,7 @@ const server = http.createServer(async (req, res) => {
 
   // Manejo de Preflight OPTIONS (CORS / PNA)
   if (req.method === 'OPTIONS') {
-    if (pathname !== '/rfef' && pathname !== '/health') {
+    if (pathname !== '/rfef' && pathname !== '/acta' && pathname !== '/health') {
       sendJsonResponse(res, 404, { ok: false, error: 'Ruta no encontrada' }, origin);
       return;
     }
@@ -216,6 +277,47 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // Endpoint oficial /acta (P4.0)
+  if (pathname === '/acta') {
+    const codActaParam = url.searchParams.get('codActa');
+
+    if (!codActaParam || !/^[0-9]+$/.test(codActaParam)) {
+      sendJsonResponse(res, 400, {
+        ok: false,
+        error: "Parámetro 'codActa' inválido. Debe ser un número entero positivo."
+      }, origin);
+      return;
+    }
+
+    const codActa = parseInt(codActaParam, 10);
+    if (codActa <= 0) {
+      sendJsonResponse(res, 400, {
+        ok: false,
+        error: "Parámetro 'codActa' inválido. Debe ser un número entero positivo."
+      }, origin);
+      return;
+    }
+
+    try {
+      const html = await fetchRfefActa(codActa);
+      const byteLength = Buffer.byteLength(html, 'utf8');
+
+      sendJsonResponse(res, 200, {
+        ok: true,
+        codActa,
+        bytes: byteLength,
+        actaHtml: html
+      }, origin);
+    } catch (err) {
+      if (err.type === 'INVALID_HTML') {
+        sendJsonResponse(res, 422, { ok: false, error: err.message }, origin);
+      } else {
+        sendJsonResponse(res, 502, { ok: false, error: err.message || 'Error de adquisición del acta RFEF.' }, origin);
+      }
+    }
+    return;
+  }
+
   // Cualquier otra ruta no autorizada
   sendJsonResponse(res, 404, { ok: false, error: 'Ruta no encontrada' }, origin);
 });
@@ -224,6 +326,7 @@ server.listen(PORT, HOST, () => {
   console.log(`[OK] athletic-ia-rfef-bridge escuchando en http://${HOST}:${PORT}`);
   console.log(`[INFO] Endpoints:`);
   console.log(`       GET http://${HOST}:${PORT}/rfef?jornada=3`);
+  console.log(`       GET http://${HOST}:${PORT}/acta?codActa=70692435`);
   console.log(`       GET http://${HOST}:${PORT}/health`);
   console.log(`[INFO] Presiona Ctrl+C para detener el servicio.`);
 });
