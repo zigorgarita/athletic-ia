@@ -139,7 +139,7 @@ REM 7. Preservar captura válida y copiar al portapapeles de Windows
 copy /y "%TEMP_HTML%" "%FINAL_HTML%" >nul 2>&1
 if exist "%TEMP_HTML%" del /f /q "%TEMP_HTML%" >nul 2>&1
 
-type "%FINAL_HTML%" | C:\Windows\System32\clip.exe
+powershell -NoProfile -Command "Get-Content -Raw '%FINAL_HTML%' | Set-Clipboard"
 
 echo ============================================================================
 echo [OK] Jornada %JORNADA% obtenida con exito desde la RFEF.
