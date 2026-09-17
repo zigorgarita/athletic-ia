@@ -204,6 +204,27 @@ function fetchRfefActa(codActa) {
   });
 }
 
+function extractCodActas(calendarHtml) {
+  if (!calendarHtml || typeof calendarHtml !== 'string') return [];
+  const codActas = new Set();
+
+  // Extraer enlaces a NFG_CmpPartido que contengan CodActa o cod_acta
+  const linkRegex = /NFG_CmpPartido[^"'>\s]+/gi;
+  let match;
+  while ((match = linkRegex.exec(calendarHtml)) !== null) {
+    const urlString = match[0];
+    const idMatch = urlString.match(/[?&](?:CodActa|cod_acta)=(\d+)/i);
+    if (idMatch && idMatch[1]) {
+      const val = parseInt(idMatch[1], 10);
+      if (val > 0) {
+        codActas.add(val);
+      }
+    }
+  }
+
+  return Array.from(codActas);
+}
+
 const server = http.createServer(async (req, res) => {
   const origin = req.headers.origin;
   const url = new URL(req.url, `http://${HOST}:${PORT}`);
@@ -217,7 +238,7 @@ const server = http.createServer(async (req, res) => {
 
   // Manejo de Preflight OPTIONS (CORS / PNA)
   if (req.method === 'OPTIONS') {
-    if (pathname !== '/rfef' && pathname !== '/acta' && pathname !== '/health') {
+    if (pathname !== '/rfef' && pathname !== '/acta' && pathname !== '/jornada-completa' && pathname !== '/health') {
       sendJsonResponse(res, 404, { ok: false, error: 'Ruta no encontrada' }, origin);
       return;
     }
@@ -321,6 +342,63 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // Endpoint oficial /jornada-completa (P4.1)
+  if (pathname === '/jornada-completa') {
+    const jornadaParam = url.searchParams.get('jornada');
+
+    if (!jornadaParam || !/^[0-9]+$/.test(jornadaParam)) {
+      sendJsonResponse(res, 400, {
+        ok: false,
+        error: "Parámetro 'jornada' inválido. Debe ser un número entero."
+      }, origin);
+      return;
+    }
+
+    const jornada = parseInt(jornadaParam, 10);
+
+    if (jornada < 3 || jornada > 30) {
+      sendJsonResponse(res, 400, {
+        ok: false,
+        error: `Jornada inválida: ${jornada}. Solo se admiten jornadas de 3 a 30.`
+      }, origin);
+      return;
+    }
+
+    try {
+      const calendarHtml = await fetchRfefJornada(jornada);
+      const calendarBytes = Buffer.byteLength(calendarHtml, 'utf8');
+      const codActas = extractCodActas(calendarHtml);
+      const actasEncontradas = codActas.length;
+
+      const actas = [];
+      for (const codActa of codActas) {
+        const actaHtml = await fetchRfefActa(codActa);
+        const actaBytes = Buffer.byteLength(actaHtml, 'utf8');
+        actas.push({
+          codActa,
+          bytes: actaBytes,
+          actaHtml
+        });
+      }
+
+      sendJsonResponse(res, 200, {
+        ok: true,
+        jornada,
+        bytes: calendarBytes,
+        calendarHtml,
+        actasEncontradas,
+        actas
+      }, origin);
+    } catch (err) {
+      if (err.type === 'INVALID_HTML') {
+        sendJsonResponse(res, 422, { ok: false, error: err.message }, origin);
+      } else {
+        sendJsonResponse(res, 502, { ok: false, error: err.message || 'Error de adquisición RFEF.' }, origin);
+      }
+    }
+    return;
+  }
+
   // Cualquier otra ruta no autorizada
   sendJsonResponse(res, 404, { ok: false, error: 'Ruta no encontrada' }, origin);
 });
@@ -330,6 +408,7 @@ server.listen(PORT, HOST, () => {
   console.log(`[INFO] Endpoints:`);
   console.log(`       GET http://${HOST}:${PORT}/rfef?jornada=3`);
   console.log(`       GET http://${HOST}:${PORT}/acta?codActa=70692435`);
+  console.log(`       GET http://${HOST}:${PORT}/jornada-completa?jornada=3`);
   console.log(`       GET http://${HOST}:${PORT}/health`);
   console.log(`[INFO] Presiona Ctrl+C para detener el servicio.`);
 });
