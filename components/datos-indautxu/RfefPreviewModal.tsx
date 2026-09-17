@@ -291,7 +291,7 @@ export function RfefPreviewModal({
                 </span>
               </div>
               <p className="text-xs text-slate-400">
-                División de Honor Juvenil · Grupo 2 (2026/27) · <span className="text-emerald-400 font-medium">Modo Solo Lectura</span>
+                División de Honor Juvenil · Grupo 2 (2026/27) · <span className={isEditMode ? 'text-red-400 font-medium' : 'text-emerald-400 font-medium'}>{isEditMode ? 'Modo Edición' : 'Modo Solo Lectura'}</span>
               </p>
             </div>
           </div>
@@ -368,12 +368,14 @@ export function RfefPreviewModal({
             )}
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1 text-[11px] font-mono px-2 py-0.5 rounded bg-slate-800/80 text-slate-400 border border-slate-700/50">
-              <Lock className="w-3 h-3 text-amber-400" />
-              Sincronización Bloqueada (Fase Solo Lectura)
-            </span>
-          </div>
+          {!isEditMode && (
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1 text-[11px] font-mono px-2 py-0.5 rounded bg-slate-800/80 text-slate-400 border border-slate-700/50">
+                <Lock className="w-3 h-3 text-amber-400" />
+                Sincronización Bloqueada (Fase Solo Lectura)
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Panel de Ingesta Schannel P2.1 / P3 (Exclusivo Modo Edición) */}
