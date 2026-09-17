@@ -49,13 +49,78 @@ export function RfefPreviewModal({
   const [showManualPaste, setShowManualPaste] = useState<boolean>(false);
   const [manualHtml, setManualHtml] = useState<string>('');
 
+  const fetchFromBridgeAndPreview = async (j: number) => {
+    if (loading) return;
+    setLoading(true);
+    setError(null);
+    setPasteError(null);
+
+    try {
+      let resBridge: Response;
+      try {
+        resBridge = await fetch(`http://127.0.0.1:41189/rfef?jornada=${j}`, {
+          method: 'GET',
+        });
+      } catch (networkErr: any) {
+        setError('Puente RFEF local no disponible.');
+        setData(null);
+        setLoading(false);
+        return;
+      }
+
+      if (!resBridge.ok) {
+        let errJson: any = null;
+        try {
+          errJson = await resBridge.json();
+        } catch (_) {}
+        const errorMsg = errJson?.error || `Error ${resBridge.status} en el puente local RFEF.`;
+        setError(errorMsg);
+        setData(null);
+        setLoading(false);
+        return;
+      }
+
+      let payload: any = null;
+      try {
+        payload = await resBridge.json();
+      } catch (_) {}
+
+      if (
+        !payload ||
+        payload.ok !== true ||
+        payload.jornada !== j ||
+        typeof payload.calendarHtml !== 'string' ||
+        !payload.calendarHtml.trim()
+      ) {
+        setError('Respuesta inválida del puente local RFEF.');
+        setData(null);
+        setLoading(false);
+        return;
+      }
+
+      await fetchPreview(j, payload.calendarHtml);
+    } catch (err: any) {
+      setError(err.message || 'Error al procesar el calendario desde el puente local.');
+      setData(null);
+      setLoading(false);
+    }
+  };
+
+  const loadData = (targetJornada: number) => {
+    if (isEditMode) {
+      fetchFromBridgeAndPreview(targetJornada);
+    } else {
+      fetchPreview(targetJornada);
+    }
+  };
+
   useEffect(() => {
     if (isOpen) {
       setJornada(initialJornada);
       setPasteError(null);
       setManualHtml('');
       setShowManualPaste(false);
-      fetchPreview(initialJornada);
+      loadData(initialJornada);
     }
   }, [isOpen, initialJornada]);
 
@@ -182,7 +247,7 @@ export function RfefPreviewModal({
 
   const handleJornadaChange = (newJ: number) => {
     setJornada(newJ);
-    fetchPreview(newJ);
+    loadData(newJ);
   };
 
   if (!isOpen) return null;
@@ -242,7 +307,7 @@ export function RfefPreviewModal({
             </div>
 
             <button
-              onClick={() => fetchPreview(jornada)}
+              onClick={() => loadData(jornada)}
               disabled={loading}
               title="Refrescar consulta RFEF"
               className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors disabled:opacity-50"
