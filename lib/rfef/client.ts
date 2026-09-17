@@ -199,7 +199,7 @@ export interface RFEFFetchResult {
  * Consulta la página de calendario/partidos de una jornada específica detallando el origen (live vs snapshot).
  */
 export function fetchRFEFCalendarPageDetailed(jornada: number): RFEFFetchResult {
-  const url = `${RFEF_CONSTANTS.BASE_URL}/NFG_CmpJornada?cod_primaria=${RFEF_CONSTANTS.COD_PRIMARIA}&codtemporada=${RFEF_CONSTANTS.COD_TEMPORADA}&codcompeticion=${RFEF_CONSTANTS.COD_COMPETICION}&codgrupo=${RFEF_CONSTANTS.COD_GRUPO}&codjornada=${jornada}`;
+  const url = `${RFEF_CONSTANTS.BASE_URL}/NFG_CmpJornada?cod_primaria=${RFEF_CONSTANTS.COD_PRIMARIA}&CodTemporada=${RFEF_CONSTANTS.COD_TEMPORADA}&CodCompeticion=${RFEF_CONSTANTS.COD_COMPETICION}&CodGrupo=${RFEF_CONSTANTS.COD_GRUPO}&CodJornada=${jornada}`;
   let liveHtml = '';
   let liveError: string | undefined;
   let diagnostic: RFEFHttpDiagnostic | undefined;
@@ -325,7 +325,7 @@ export function fetchRFEFActaPage(codActa: string | number): string {
  * Consulta la clasificación oficial de una jornada específica detallando el origen (live vs snapshot).
  */
 export function fetchRFEFStandingsPageDetailed(jornada: number): RFEFFetchResult {
-  const url = `${RFEF_CONSTANTS.BASE_URL}/NFG_VisClasificacion?cod_primaria=${RFEF_CONSTANTS.COD_PRIMARIA}&codtemporada=${RFEF_CONSTANTS.COD_TEMPORADA}&codcompeticion=${RFEF_CONSTANTS.COD_COMPETICION}&codgrupo=${RFEF_CONSTANTS.COD_GRUPO}&codjornada=${jornada}`;
+  const url = `${RFEF_CONSTANTS.BASE_URL}/NFG_VisClasificacion?cod_primaria=${RFEF_CONSTANTS.COD_PRIMARIA}&CodTemporada=${RFEF_CONSTANTS.COD_TEMPORADA}&CodCompeticion=${RFEF_CONSTANTS.COD_COMPETICION}&CodGrupo=${RFEF_CONSTANTS.COD_GRUPO}&CodJornada=${jornada}`;
   let liveHtml = '';
   let liveError: string | undefined;
 

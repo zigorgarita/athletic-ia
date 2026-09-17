@@ -47,7 +47,7 @@ set "FINAL_HTML=scratch\rfef_jornada_%JORNADA%.html"
 
 REM 3. Endpoint canónico oficial RFEF (DHJ Grupo 2)
 set "BASE_URL=https://resultados.rfef.es/pnfg/NPcd/NFG_CmpJornada"
-set "URL=%BASE_URL%?cod_primaria=1000120&codtemporada=22&codcompeticion=33836116&codgrupo=33836118&codjornada=%JORNADA%"
+set "URL=%BASE_URL%?cod_primaria=1000120&CodTemporada=22&CodCompeticion=33836116&CodGrupo=33836118&CodJornada=%JORNADA%"
 
 echo [INFO] Consultando RFEF oficial para Jornada %JORNADA% via Schannel...
 
@@ -89,11 +89,45 @@ if %ERRORLEVEL% neq 0 (
     exit /b 1
 )
 
-REM Comprobar correspondencia de jornada en el HTML
+REM Comprobar que la respuesta contiene la competicion oficial configurada (DHJ)
+findstr /i "CodCompeticion=33836116" "%TEMP_HTML%" >nul 2>&1
+if %ERRORLEVEL% neq 0 (
+    echo [ERROR] La respuesta de la RFEF no contiene la competicion oficial (CodCompeticion=33836116).
+    if exist "%TEMP_HTML%" del /f /q "%TEMP_HTML%" >nul 2>&1
+    exit /b 1
+)
+
+REM Comprobar que la respuesta contiene el grupo oficial configurado (Grupo 2)
+findstr /i "CodGrupo=33836118" "%TEMP_HTML%" >nul 2>&1
+if %ERRORLEVEL% neq 0 (
+    echo [ERROR] La respuesta de la RFEF no contiene el grupo oficial (CodGrupo=33836118).
+    if exist "%TEMP_HTML%" del /f /q "%TEMP_HTML%" >nul 2>&1
+    exit /b 1
+)
+
+REM Comprobar evidencia estructural de emparejamientos y equipos (font_widgetL / font_widgetV)
+findstr /i /c:"class=font_widgetL" "%TEMP_HTML%" >nul 2>&1
+if %ERRORLEVEL% neq 0 (
+    echo [ERROR] La pagina de la RFEF no contiene partidos oficiales (tabla de resultados vacia).
+    if exist "%TEMP_HTML%" del /f /q "%TEMP_HTML%" >nul 2>&1
+    exit /b 1
+)
+
+findstr /i /c:"class=font_widgetV" "%TEMP_HTML%" >nul 2>&1
+if %ERRORLEVEL% neq 0 (
+    echo [ERROR] La pagina de la RFEF no contiene partidos oficiales (falta font_widgetV).
+    if exist "%TEMP_HTML%" del /f /q "%TEMP_HTML%" >nul 2>&1
+    exit /b 1
+)
+
+REM Comprobar correspondencia exacta de jornada en el HTML
 set "FOUND_JORNADA=0"
-findstr /i "codjornada=%JORNADA%" "%TEMP_HTML%" >nul 2>&1 && set "FOUND_JORNADA=1"
+findstr /i /c:"<strong>Jornada</strong> %JORNADA%" "%TEMP_HTML%" >nul 2>&1 && set "FOUND_JORNADA=1"
 if "!FOUND_JORNADA!"=="0" (
-    findstr /i "Jornada %JORNADA%" "%TEMP_HTML%" >nul 2>&1 && set "FOUND_JORNADA=1"
+    findstr /i /c:"CodJornada=%JORNADA%&" "%TEMP_HTML%" >nul 2>&1 && set "FOUND_JORNADA=1"
+)
+if "!FOUND_JORNADA!"=="0" (
+    findstr /i /c:"CodJornada=%JORNADA%\"" "%TEMP_HTML%" >nul 2>&1 && set "FOUND_JORNADA=1"
 )
 if "!FOUND_JORNADA!"=="0" (
     echo [ERROR] El contenido recibido no parece corresponder a la Jornada %JORNADA%.
