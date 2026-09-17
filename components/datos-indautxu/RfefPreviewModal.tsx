@@ -926,6 +926,173 @@ export function RfefPreviewModal({
                       </p>
                     </div>
                   )}
+
+                  {/* ── GOLES DEL PARTIDO INDAUTXU ── */}
+                  {data.indautxuMatch?.goles?.length > 0 && (
+                    <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-4 space-y-2">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                        <span className="text-base leading-none">⚽</span>
+                        Goles ({data.indautxuMatch.goles.length})
+                      </h4>
+                      <div className="space-y-1">
+                        {data.indautxuMatch.goles.map((g: any, idx: number) => (
+                          <div key={idx} className="flex items-center gap-3 px-2 py-1.5 rounded bg-slate-900/60 border border-slate-800/50 text-xs">
+                            <span className="font-mono font-bold text-amber-300 w-8 shrink-0">{g.minutoDisplay || `${g.minuto}'`}</span>
+                            <span className="flex-1 font-medium text-slate-200 truncate">{g.autor}</span>
+                            <span className="text-slate-400 font-mono text-[11px] truncate max-w-[120px]">{g.scoringClub}</span>
+                            <div className="flex items-center gap-1 shrink-0">
+                              {g.isPenalti && (
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-950/80 text-blue-300 border border-blue-800">P</span>
+                              )}
+                              {g.isPropia && (
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-950/80 text-rose-300 border border-rose-800">PP</span>
+                              )}
+                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${
+                                g.esLocal
+                                  ? 'bg-red-950/60 text-red-300 border-red-800'
+                                  : 'bg-slate-800 text-slate-400 border-slate-700'
+                              }`}>
+                                {g.esLocal ? 'L' : 'V'}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ── TARJETAS DEL PARTIDO INDAUTXU ── */}
+                  {data.indautxuMatch?.tarjetas?.length > 0 && (
+                    <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-4 space-y-2">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                        <span className="inline-block w-3 h-4 bg-amber-400 rounded-sm shrink-0" />
+                        Tarjetas ({data.indautxuMatch.tarjetas.length})
+                      </h4>
+                      <div className="space-y-1">
+                        {data.indautxuMatch.tarjetas.map((t: any, idx: number) => (
+                          <div key={idx} className="flex items-center gap-3 px-2 py-1.5 rounded bg-slate-900/60 border border-slate-800/50 text-xs">
+                            <span className="font-mono font-bold text-amber-300 w-8 shrink-0">{t.minuto}&apos;</span>
+                            <span className="flex-1 font-medium text-slate-200 truncate">{t.nombre}</span>
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold border shrink-0 ${
+                              t.tipo === 'Roja Directa' || t.tipo === 'Doble Amarilla'
+                                ? 'bg-rose-950/80 text-rose-300 border-rose-800'
+                                : 'bg-amber-950/80 text-amber-300 border-amber-800'
+                            }`}>
+                              {t.tipo}
+                            </span>
+                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border shrink-0 ${
+                              t.esLocal
+                                ? 'bg-red-950/60 text-red-300 border-red-800'
+                                : 'bg-slate-800 text-slate-400 border-slate-700'
+                            }`}>
+                              {t.esLocal ? 'L' : 'V'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ── SUSTITUCIONES DEL PARTIDO INDAUTXU ── */}
+                  {data.indautxuMatch?.sustituciones?.length > 0 && (
+                    <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-4 space-y-2">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                        <RefreshCw className="w-3.5 h-3.5 text-slate-400" />
+                        Sustituciones ({data.indautxuMatch.sustituciones.length})
+                      </h4>
+                      <div className="space-y-1">
+                        {data.indautxuMatch.sustituciones.map((s: any, idx: number) => (
+                          <div key={idx} className="flex items-center gap-2 px-2 py-1.5 rounded bg-slate-900/60 border border-slate-800/50 text-xs">
+                            <span className="font-mono font-bold text-amber-300 w-8 shrink-0">{s.minuto}&apos;</span>
+                            <span className="text-emerald-400 font-mono text-[11px] shrink-0">▲</span>
+                            <span className="font-medium text-slate-200 truncate flex-1">
+                              #{s.entraDorsal} {s.entraNombre}
+                            </span>
+                            <span className="text-rose-400 font-mono text-[11px] shrink-0">▼</span>
+                            <span className="font-medium text-slate-400 truncate flex-1">
+                              #{s.saleDorsal} {s.saleNombre}
+                            </span>
+                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border shrink-0 ${
+                              s.esLocal
+                                ? 'bg-red-950/60 text-red-300 border-red-800'
+                                : 'bg-slate-800 text-slate-400 border-slate-700'
+                            }`}>
+                              {s.esLocal ? 'L' : 'V'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ── JUGADORES RIVALES NUEVOS (DETALLE) ── */}
+                  {data.playersAudit?.newRivalPlayers?.length > 0 && (
+                    <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-4 space-y-2">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                        <Users className="w-3.5 h-3.5 text-slate-400" />
+                        Jugadores Rivales — Nuevos en BD ({data.playersAudit.newRivalPlayers.length})
+                      </h4>
+                      <div className="text-[11px] text-slate-500 mb-1">
+                        Detectados en actas oficiales · No registrados en <code className="font-mono text-slate-400">club_players</code> · Sin escritura en P4.3
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs text-left">
+                          <thead>
+                            <tr className="border-b border-slate-800 text-slate-400 font-medium text-[11px]">
+                              <th className="py-2 px-2">#</th>
+                              <th className="py-2 px-2">Nombre</th>
+                              <th className="py-2 px-2">Club</th>
+                              <th className="py-2 px-2">Rol</th>
+                              <th className="py-2 px-2">ID RFEF</th>
+                              <th className="py-2 px-2">Foto RFEF</th>
+                              <th className="py-2 px-2 text-right">Estado BD</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-800/50">
+                            {data.playersAudit.newRivalPlayers.map((p: any, idx: number) => (
+                              <tr key={idx} className="hover:bg-slate-900/40 transition-colors">
+                                <td className="py-2 px-2 font-mono text-slate-400">
+                                  {p.dorsal != null ? `#${p.dorsal}` : '—'}
+                                </td>
+                                <td className="py-2 px-2 font-medium text-slate-200">{p.nombre}</td>
+                                <td className="py-2 px-2 text-slate-400 text-[11px]">{p.clubNombre}</td>
+                                <td className="py-2 px-2">
+                                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${
+                                    p.rol === 'Titular'
+                                      ? 'bg-indigo-950/60 text-indigo-300 border-indigo-800'
+                                      : 'bg-slate-800 text-slate-400 border-slate-700'
+                                  }`}>
+                                    {p.rol}
+                                  </span>
+                                </td>
+                                <td className="py-2 px-2 font-mono text-slate-500 text-[11px]">{p.rfefPlayerId}</td>
+                                <td className="py-2 px-2">
+                                  {p.photoType === 'base64_real' ? (
+                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-950/60 text-emerald-300 border border-emerald-800">
+                                      <ImageIcon className="w-2.5 h-2.5" /> Real
+                                    </span>
+                                  ) : p.photoType === 'silueta_placeholder' ? (
+                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-800 text-slate-500 border border-slate-700">
+                                      Sin foto
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-800 text-slate-600 border border-slate-700/50">
+                                      N/D
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="py-2 px-2 text-right">
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-orange-950/60 text-orange-300 border border-orange-800">
+                                    NUEVO
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
