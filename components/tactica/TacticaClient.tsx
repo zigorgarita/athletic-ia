@@ -824,8 +824,9 @@ export function TacticaClient() {
       return;
     }
 
-    // More than one pizarra → open selector modal
-    setMatchLineupsModal(linked);
+    // More than one pizarra → load the most recent automatically
+    // (savedLineups is already sorted by created_at DESC, so linked[0] is the latest)
+    await handleLoadLineup(linked[0]);
   };
 
   // --- Load Saved Lineup ---
