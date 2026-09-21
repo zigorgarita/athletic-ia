@@ -6,6 +6,8 @@ import { extraerDatosPartidoDieLigen, DieLigenMatchReportData } from '@/lib/die-
 import { exportMatchToPdf } from '@/lib/die-ligen/exportMatchPdf';
 import { DieLigenTeamMatchItem } from '@/lib/die-ligen/mapping';
 import { getStaffPasskey } from '@/lib/passkey';
+import { aggregateDieLigenMatches, DieLigenMultiMatchReportData } from '@/lib/die-ligen/aggregator';
+import { DieLigenMultiMatchViewer } from './DieLigenMultiMatchViewer';
 import {
   UploadCloud,
   FileDown,
@@ -19,6 +21,9 @@ import {
   Clock,
   PlayCircle,
   RotateCcw,
+  CheckSquare,
+  Square,
+  Layers,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 
@@ -40,6 +45,34 @@ export function DieLigenMatchReportViewer({ club, season }: DieLigenMatchReportV
   const [hasLoadedMatches, setHasLoadedMatches] = useState(false);
   const [matchesError, setMatchesError] = useState<string | null>(null);
   const [loadingGameId, setLoadingGameId] = useState<string | null>(null);
+
+  // Estados para informe acumulado (Fase 3)
+  const [selectedGameIds, setSelectedGameIds] = useState<Set<string>>(new Set());
+  const [multiData, setMultiData] = useState<DieLigenMultiMatchReportData | null>(null);
+  const [isGeneratingMulti, setIsGeneratingMulti] = useState(false);
+  const [multiProgress, setMultiProgress] = useState<string | null>(null);
+  const jsonCacheRef = useRef<Map<string, Record<string, unknown>>>(new Map());
+
+  const toggleMatchSelection = (gameId: string) => {
+    setSelectedGameIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(gameId)) {
+        next.delete(gameId);
+      } else {
+        next.add(gameId);
+      }
+      return next;
+    });
+  };
+
+  const handleSelectAllAnalyzed = () => {
+    const analyzedIds = matches.filter((m) => m.isAnalyzed).map((m) => m.gameId);
+    setSelectedGameIds(new Set(analyzedIds));
+  };
+
+  const handleClearSelection = () => {
+    setSelectedGameIds(new Set());
+  };
 
   const fetchAvailableMatches = async () => {
     if (!club?.nombre) {
@@ -90,6 +123,17 @@ export function DieLigenMatchReportViewer({ club, season }: DieLigenMatchReportV
     setError(null);
 
     try {
+      // 1. Usar caché en memoria si ya fue descargado
+      if (jsonCacheRef.current.has(matchItem.gameId)) {
+        const cachedJson = jsonCacheRef.current.get(matchItem.gameId);
+        const reportData = extraerDatosPartidoDieLigen(cachedJson);
+        setMultiData(null); // Cerrar acumulado si estaba abierto
+        setData(reportData);
+        setFileName(`Die Ligen: J-${matchItem.jornada} · ${matchItem.homeTeam.name} vs ${matchItem.awayTeam.name}`);
+        return;
+      }
+
+      // 2. Descargar si no está en caché
       const headers: Record<string, string> = { Accept: 'application/json' };
       const staffPasskey = getStaffPasskey() || process.env.NEXT_PUBLIC_COACH_PASSKEY || '';
       if (staffPasskey) {
@@ -106,7 +150,11 @@ export function DieLigenMatchReportViewer({ club, season }: DieLigenMatchReportV
         throw new Error(json.error || `Error al obtener el JSON del partido (HTTP ${res.status})`);
       }
 
+      // Guardar en caché para no volver a descargarlo
+      jsonCacheRef.current.set(matchItem.gameId, json.data);
+
       const reportData = extraerDatosPartidoDieLigen(json.data);
+      setMultiData(null); // Cerrar acumulado si estaba abierto
       setData(reportData);
       setFileName(`Die Ligen: J-${matchItem.jornada} · ${matchItem.homeTeam.name} vs ${matchItem.awayTeam.name}`);
     } catch (err: unknown) {
@@ -114,6 +162,94 @@ export function DieLigenMatchReportViewer({ club, season }: DieLigenMatchReportV
       setError(`Error al descargar el análisis: ${msg}`);
     } finally {
       setLoadingGameId(null);
+    }
+  };
+
+  const handleGenerateMultiReport = async () => {
+    if (selectedGameIds.size === 0) return;
+    if (!club?.nombre) return;
+
+    setIsGeneratingMulti(true);
+    setMultiProgress(null);
+    setError(null);
+
+    try {
+      const targetMatches = matches.filter((m) => selectedGameIds.has(m.gameId) && m.isAnalyzed);
+      if (targetMatches.length === 0) {
+        throw new Error('Ninguno de los partidos seleccionados cuenta con análisis listo.');
+      }
+
+      const headers: Record<string, string> = { Accept: 'application/json' };
+      const staffPasskey = getStaffPasskey() || process.env.NEXT_PUBLIC_COACH_PASSKEY || '';
+      if (staffPasskey) {
+        headers['x-staff-passkey'] = staffPasskey;
+      }
+
+      let completedCount = 0;
+      const totalToFetch = targetMatches.length;
+
+      // Descargador con límite estricto de concurrencia = 2
+      const fetchWorker = async (matchItem: DieLigenTeamMatchItem) => {
+        const gId = matchItem.gameId;
+
+        // Si ya está en caché, no descargamos de nuevo
+        if (jsonCacheRef.current.has(gId)) {
+          completedCount++;
+          setMultiProgress(`Cargando partidos (${completedCount}/${totalToFetch})...`);
+          return jsonCacheRef.current.get(gId);
+        }
+
+        setMultiProgress(`Descargando J-${matchItem.jornada} (${completedCount + 1}/${totalToFetch})...`);
+        const res = await fetch(`/api/die-ligen/game-json?gameId=${encodeURIComponent(gId)}`, {
+          headers,
+          cache: 'no-store',
+        });
+        const json = await res.json();
+
+        if (!res.ok || !json.success || !json.data) {
+          throw new Error(
+            json.error || `Error al descargar J-${matchItem.jornada} (${matchItem.homeTeam.name} vs ${matchItem.awayTeam.name})`
+          );
+        }
+
+        jsonCacheRef.current.set(gId, json.data);
+        completedCount++;
+        setMultiProgress(`Procesando partidos (${completedCount}/${totalToFetch})...`);
+        return json.data;
+      };
+
+      const concurrencyLimit = 2;
+      const rawJsons: Record<string, unknown>[] = new Array(targetMatches.length);
+      let currentIndex = 0;
+
+      const runWorker = async () => {
+        while (currentIndex < targetMatches.length) {
+          const idx = currentIndex++;
+          const raw = await fetchWorker(targetMatches[idx]);
+          rawJsons[idx] = raw;
+        }
+      };
+
+      const workers = Array.from(
+        { length: Math.min(concurrencyLimit, targetMatches.length) },
+        () => runWorker()
+      );
+      await Promise.all(workers);
+
+      // Parseo estricto con parser.ts (intacto)
+      const parsedReports = rawJsons.map((raw) => extraerDatosPartidoDieLigen(raw));
+
+      // Agregador estadístico puro (aggregator.ts)
+      const aggregated = aggregateDieLigenMatches(parsedReports, club.nombre);
+
+      setData(null); // Cerrar vista individual
+      setMultiData(aggregated);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error al generar el informe acumulado';
+      setError(msg);
+    } finally {
+      setIsGeneratingMulti(false);
+      setMultiProgress(null);
     }
   };
 
@@ -223,81 +359,151 @@ export function DieLigenMatchReportViewer({ club, season }: DieLigenMatchReportV
                 No se encontraron partidos para este rival en la competición oficial de Die Ligen. Puedes cargar el archivo JSON manualmente a continuación.
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-[340px] overflow-y-auto pr-1">
-                {matches.map((m) => {
-                  const isLoadingThis = loadingGameId === m.gameId;
-                  return (
-                    <div
-                      key={m.gameId}
-                      className={`p-3 rounded-xl border transition-all flex flex-col justify-between gap-2.5 ${
-                        m.isAnalyzed
-                          ? 'bg-slate-950/70 border-slate-800/90 hover:border-[#CC0E21]/60 hover:bg-slate-950'
-                          : 'bg-slate-950/30 border-slate-800/40 opacity-70'
-                      }`}
+              <>
+                {/* Barra de acción multi-partido */}
+                <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-slate-950/90 border border-slate-800 rounded-xl mb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-300 font-semibold">
+                      Selección para informe acumulado:
+                    </span>
+                    <span className="text-xs font-bold text-[#CC0E21] px-2 py-0.5 rounded bg-[#CC0E21]/15 border border-[#CC0E21]/30 font-mono">
+                      {selectedGameIds.size} de {matches.filter((m) => m.isAnalyzed).length} seleccionados
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleSelectAllAnalyzed}
+                      className="text-[11px] font-semibold text-slate-400 hover:text-white underline px-1 transition-colors"
                     >
-                      <div className="flex items-center justify-between gap-2 text-xs">
-                        <span className="font-bold px-2 py-0.5 rounded-md bg-slate-900 border border-slate-700/80 text-white font-mono text-[11px]">
-                          Jornada {m.jornada}
-                        </span>
-                        <span className="text-[11px] text-slate-400 font-medium">
-                          {m.isHome ? 'Local' : 'Visitante'}
-                        </span>
-                        {m.isAnalyzed ? (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-400 bg-emerald-950/50 border border-emerald-800/60 px-2 py-0.5 rounded-full">
-                            <CheckCircle2 className="w-2.5 h-2.5" />
-                            Análisis listo
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-400 bg-slate-900 border border-slate-800 px-2 py-0.5 rounded-full">
-                            <Clock className="w-2.5 h-2.5" />
-                            {m.analysisStatus}
-                          </span>
-                        )}
-                      </div>
+                      Seleccionar todos analizados
+                    </button>
+                    {selectedGameIds.size > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleClearSelection}
+                        className="text-[11px] font-semibold text-slate-400 hover:text-white underline px-1 transition-colors"
+                      >
+                        Limpiar
+                      </button>
+                    )}
+                    <Button
+                      type="button"
+                      onClick={handleGenerateMultiReport}
+                      disabled={selectedGameIds.size === 0 || isGeneratingMulti}
+                      className="text-xs font-bold py-1.5 px-3 bg-[#CC0E21] hover:bg-[#A60B1B] text-white flex items-center gap-1.5 shadow-sm transition-all"
+                    >
+                      <Layers className={`h-3.5 w-3.5 ${isGeneratingMulti ? 'animate-spin' : ''}`} />
+                      <span>
+                        {isGeneratingMulti
+                          ? multiProgress || 'Generando...'
+                          : `Generar informe acumulado (${selectedGameIds.size})`}
+                      </span>
+                    </Button>
+                  </div>
+                </div>
 
-                      <div className="text-xs">
-                        <div className="font-semibold text-slate-200 truncate">
-                          {m.homeTeam.name}
-                        </div>
-                        <div className="text-[11px] text-slate-400 flex items-center justify-between mt-0.5">
-                          <span className="truncate">{m.awayTeam.name}</span>
-                          <span className="font-bold text-white font-mono bg-slate-900 px-1.5 py-0.5 rounded text-[11px] ml-2">
-                            {m.scoreFormatted || 'vs'}
-                          </span>
-                        </div>
-                      </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-[340px] overflow-y-auto pr-1">
+                  {matches.map((m) => {
+                    const isLoadingThis = loadingGameId === m.gameId;
+                    const isSelected = selectedGameIds.has(m.gameId);
 
-                      <div>
-                        {m.isAnalyzed ? (
-                          <Button
-                            type="button"
-                            variant="secondary"
-                            onClick={() => handleSelectMatch(m)}
-                            disabled={isLoadingThis || Boolean(loadingGameId)}
-                            className="w-full text-xs font-bold py-1.5 px-3 border-slate-700 bg-slate-800 hover:bg-[#CC0E21] hover:border-[#CC0E21] hover:text-white text-slate-200 transition-colors flex items-center justify-center gap-1.5"
-                          >
-                            {isLoadingThis ? (
-                              <>
-                                <RefreshCw className="h-3 w-3 animate-spin text-white" />
-                                <span>Descargando JSON...</span>
-                              </>
-                            ) : (
-                              <>
-                                <PlayCircle className="h-3.5 w-3.5 text-amber-400" />
-                                <span>Cargar en visor</span>
-                              </>
-                            )}
-                          </Button>
-                        ) : (
-                          <div className="text-[10px] text-center text-slate-500 italic py-1">
-                            Análisis aún no publicado en Die Ligen
+                    return (
+                      <div
+                        key={m.gameId}
+                        className={`p-3 rounded-xl border transition-all flex flex-col justify-between gap-2.5 ${
+                          m.isAnalyzed
+                            ? isSelected
+                              ? 'bg-slate-950 border-[#CC0E21] ring-1 ring-[#CC0E21]/40'
+                              : 'bg-slate-950/70 border-slate-800/90 hover:border-slate-700 hover:bg-slate-950'
+                            : 'bg-slate-950/30 border-slate-800/40 opacity-70'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2 text-xs">
+                          {m.isAnalyzed ? (
+                            <button
+                              type="button"
+                              onClick={() => toggleMatchSelection(m.gameId)}
+                              className="flex items-center gap-1.5 text-left group"
+                              title={isSelected ? 'Deseleccionar del informe acumulado' : 'Seleccionar para informe acumulado'}
+                            >
+                              {isSelected ? (
+                                <CheckSquare className="w-4 h-4 text-[#CC0E21] shrink-0" />
+                              ) : (
+                                <Square className="w-4 h-4 text-slate-500 group-hover:text-slate-300 shrink-0" />
+                              )}
+                              <span className="font-bold px-1.5 py-0.5 rounded bg-slate-900 border border-slate-700 text-white font-mono text-[11px]">
+                                Jornada {m.jornada}
+                              </span>
+                            </button>
+                          ) : (
+                            <span className="font-bold px-2 py-0.5 rounded-md bg-slate-900 border border-slate-700/80 text-slate-400 font-mono text-[11px]">
+                              Jornada {m.jornada}
+                            </span>
+                          )}
+
+                          <span className="text-[11px] text-slate-400 font-medium">
+                            {m.isHome ? 'Local' : 'Visitante'}
+                          </span>
+
+                          {m.isAnalyzed ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-400 bg-emerald-950/50 border border-emerald-800/60 px-2 py-0.5 rounded-full">
+                              <CheckCircle2 className="w-2.5 h-2.5" />
+                              Análisis listo
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-400 bg-slate-900 border border-slate-800 px-2 py-0.5 rounded-full">
+                              <Clock className="w-2.5 h-2.5" />
+                              {m.analysisStatus}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="text-xs">
+                          <div className="font-semibold text-slate-200 truncate">
+                            {m.homeTeam.name}
                           </div>
-                        )}
+                          <div className="text-[11px] text-slate-400 flex items-center justify-between mt-0.5">
+                            <span className="truncate">{m.awayTeam.name}</span>
+                            <span className="font-bold text-white font-mono bg-slate-900 px-1.5 py-0.5 rounded text-[11px] ml-2">
+                              {m.scoreFormatted || 'vs'}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div>
+                          {m.isAnalyzed ? (
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              onClick={() => handleSelectMatch(m)}
+                              disabled={isLoadingThis || Boolean(loadingGameId) || isGeneratingMulti}
+                              className="w-full text-xs font-bold py-1.5 px-3 border-slate-700 bg-slate-800 hover:bg-[#CC0E21] hover:border-[#CC0E21] hover:text-white text-slate-200 transition-colors flex items-center justify-center gap-1.5"
+                            >
+                              {isLoadingThis ? (
+                                <>
+                                  <RefreshCw className="h-3 w-3 animate-spin text-white" />
+                                  <span>Cargando JSON...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <PlayCircle className="h-3.5 w-3.5 text-amber-400" />
+                                  <span>Cargar en visor individual</span>
+                                </>
+                              )}
+                            </Button>
+                          ) : (
+                            <div className="text-[10px] text-center text-slate-500 italic py-1">
+                              Análisis aún no publicado en Die Ligen
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              </>
             )}
           </div>
         )}
@@ -356,8 +562,16 @@ export function DieLigenMatchReportViewer({ club, season }: DieLigenMatchReportV
         )}
       </div>
 
+      {/* ─── VISTA DEL INFORME ACUMULADO MULTI-PARTIDO ────────────────────── */}
+      {multiData && (
+        <DieLigenMultiMatchViewer
+          data={multiData}
+          onBack={() => setMultiData(null)}
+        />
+      )}
+
       {/* Banner de Partido Cargado en Pantalla con botón Exportar PDF */}
-      {data && (
+      {data && !multiData && (
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-md">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-[#CC0E21]/20 border border-[#CC0E21]/40 flex items-center justify-center shrink-0">
@@ -414,8 +628,8 @@ export function DieLigenMatchReportViewer({ club, season }: DieLigenMatchReportV
         </div>
       )}
 
-      {/* ─── VISTA DEL INFORME COMPLETO ───────────────────────────────────── */}
-      {data && (
+      {/* ─── VISTA DEL INFORME INDIVIDUAL COMPLETO ────────────────────────── */}
+      {data && !multiData && (
         <div className="space-y-6">
           {/* CABECERA DEL PARTIDO */}
           <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 shadow-lg">
