@@ -436,22 +436,6 @@ export function extraerDatosPartidoDieLigen(json: any): DieLigenMatchReportData 
     } catch (err) {}
   }
 
-  var cabecera = {
-    tipo: 'DIRECTO',
-    local: { id: homeId, nombre: homeName },
-    visitante: { id: awayId, nombre: awayName },
-    golesLocal: gi.scoreHome !== undefined ? gi.scoreHome : (gi.goalsHomeTeam !== undefined ? gi.goalsHomeTeam : 0),
-    golesVisitante: gi.scoreAway !== undefined ? gi.scoreAway : (gi.goalsAwayTeam !== undefined ? gi.goalsAwayTeam : 0),
-    descansoLocal: gi.homeScoreHalftime !== undefined ? gi.homeScoreHalftime : (gi.firstHalfGoalsHomeTeam !== undefined ? gi.firstHalfGoalsHomeTeam : 0),
-    descansoVisitante: gi.awayScoreHalftime !== undefined ? gi.awayScoreHalftime : (gi.firstHalfGoalsAwayTeam !== undefined ? gi.firstHalfGoalsAwayTeam : 0),
-    jornada: roundLabel,
-    numeroJornada: roundOrder,
-    fecha: fechaFormateada,
-    campo: safeStr(gi.venue_name || gi.venueName, 'Campo Municipal'),
-    competicion: safeStr((gi.contest && gi.contest.name) || gi.contestName, 'Competición oficial'),
-    temporada: safeStr((gi.contest && gi.contest.seasonYear) || gi.seasonName, 'Temporada oficial')
-  };
-
   // Filtro obligatorio: descartar eventos defensivos para evitar duplicados
   var events = (json.events || []).filter(function(e: any) {
     return !e.defensiveEvent;
@@ -474,6 +458,51 @@ export function extraerDatosPartidoDieLigen(json: any): DieLigenMatchReportData 
     var tb = b.gameTime !== undefined ? b.gameTime : (b.minute || 0) * 60;
     return ta - tb;
   });
+
+  var rawGolesLocal = gi.scoreHome !== undefined ? gi.scoreHome : (gi.goalsHomeTeam !== undefined ? gi.goalsHomeTeam : 0);
+  var rawGolesVisitante = gi.scoreAway !== undefined ? gi.scoreAway : (gi.goalsAwayTeam !== undefined ? gi.goalsAwayTeam : 0);
+
+  // Salvaguarda: si ambos vienen 0-0 pero existen eventos de gol, reconstruir desde los eventos
+  var finalGolesLocal = rawGolesLocal;
+  var finalGolesVisitante = rawGolesVisitante;
+
+  if (rawGolesLocal === 0 && rawGolesVisitante === 0 && goalEvents.length > 0) {
+    var recLocal = 0;
+    var recVisitante = 0;
+    goalEvents.forEach(function(g: any) {
+      var isHome = isHomeEvent(g);
+      var lbls = getEventLabels(g);
+      var ownGoalPlayer = getPlayerFromEvent(g, 'SCORER_OWN_GOAL');
+      var isOwnGoal = Boolean(ownGoalPlayer) || lbls.indexOf('OWN_GOAL') !== -1;
+
+      if (!isOwnGoal) {
+        if (isHome) recLocal++;
+        else recVisitante++;
+      } else {
+        // Autogol: HOME suma para AWAY, AWAY suma para HOME
+        if (isHome) recVisitante++;
+        else recLocal++;
+      }
+    });
+    finalGolesLocal = recLocal;
+    finalGolesVisitante = recVisitante;
+  }
+
+  var cabecera = {
+    tipo: 'DIRECTO',
+    local: { id: homeId, nombre: homeName },
+    visitante: { id: awayId, nombre: awayName },
+    golesLocal: finalGolesLocal,
+    golesVisitante: finalGolesVisitante,
+    descansoLocal: gi.homeScoreHalftime !== undefined ? gi.homeScoreHalftime : (gi.firstHalfGoalsHomeTeam !== undefined ? gi.firstHalfGoalsHomeTeam : 0),
+    descansoVisitante: gi.awayScoreHalftime !== undefined ? gi.awayScoreHalftime : (gi.firstHalfGoalsAwayTeam !== undefined ? gi.firstHalfGoalsAwayTeam : 0),
+    jornada: roundLabel,
+    numeroJornada: roundOrder,
+    fecha: fechaFormateada,
+    campo: safeStr(gi.venue_name || gi.venueName, 'Campo Municipal'),
+    competicion: safeStr((gi.contest && gi.contest.name) || gi.contestName, 'Competición oficial'),
+    temporada: safeStr((gi.contest && gi.contest.seasonYear) || gi.seasonName, 'Temporada oficial')
+  };
 
   var goles: DieLigenGoalItem[] = goalEvents.map(function(g: any) {
     var isHome = isHomeEvent(g);
