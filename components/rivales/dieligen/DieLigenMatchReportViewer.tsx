@@ -4,6 +4,8 @@ import React, { useState, useRef } from 'react';
 import { Club, ClubSeason } from '@/hooks/useClubs';
 import { extraerDatosPartidoDieLigen, DieLigenMatchReportData } from '@/lib/die-ligen/parser';
 import { exportMatchToPdf } from '@/lib/die-ligen/exportMatchPdf';
+import { DieLigenTeamMatchItem } from '@/lib/die-ligen/mapping';
+import { getStaffPasskey } from '@/lib/passkey';
 import {
   UploadCloud,
   FileDown,
@@ -13,6 +15,10 @@ import {
   Calendar,
   MapPin,
   Trophy,
+  CheckCircle2,
+  Clock,
+  PlayCircle,
+  RotateCcw,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 
@@ -27,6 +33,89 @@ export function DieLigenMatchReportViewer({ club, season }: DieLigenMatchReportV
   const [error, setError] = useState<string | null>(null);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Estados para consulta de partidos de Die Ligen
+  const [matches, setMatches] = useState<DieLigenTeamMatchItem[]>([]);
+  const [isLoadingMatches, setIsLoadingMatches] = useState(false);
+  const [hasLoadedMatches, setHasLoadedMatches] = useState(false);
+  const [matchesError, setMatchesError] = useState<string | null>(null);
+  const [loadingGameId, setLoadingGameId] = useState<string | null>(null);
+
+  const fetchAvailableMatches = async () => {
+    if (!club?.nombre) {
+      setMatchesError('No se ha especificado el club para consultar Die Ligen.');
+      return;
+    }
+
+    setIsLoadingMatches(true);
+    setMatchesError(null);
+
+    try {
+      const headers: Record<string, string> = { Accept: 'application/json' };
+      const staffPasskey = getStaffPasskey() || process.env.NEXT_PUBLIC_COACH_PASSKEY || '';
+      if (staffPasskey) {
+        headers['x-staff-passkey'] = staffPasskey;
+      }
+
+      const params = new URLSearchParams();
+      params.set('clubName', club.nombre);
+      if (club.nombre_corto) {
+        params.set('shortName', club.nombre_corto);
+      }
+
+      const res = await fetch(`/api/die-ligen/matches?${params.toString()}`, {
+        headers,
+        cache: 'no-store',
+      });
+      const json = await res.json();
+
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || `Error del servidor (HTTP ${res.status})`);
+      }
+
+      setMatches(json.matches || []);
+      setHasLoadedMatches(true);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error al consultar partidos en Die Ligen';
+      setMatchesError(msg);
+    } finally {
+      setIsLoadingMatches(false);
+    }
+  };
+
+  const handleSelectMatch = async (matchItem: DieLigenTeamMatchItem) => {
+    if (!matchItem.isAnalyzed) return;
+
+    setLoadingGameId(matchItem.gameId);
+    setError(null);
+
+    try {
+      const headers: Record<string, string> = { Accept: 'application/json' };
+      const staffPasskey = getStaffPasskey() || process.env.NEXT_PUBLIC_COACH_PASSKEY || '';
+      if (staffPasskey) {
+        headers['x-staff-passkey'] = staffPasskey;
+      }
+
+      const res = await fetch(`/api/die-ligen/game-json?gameId=${encodeURIComponent(matchItem.gameId)}`, {
+        headers,
+        cache: 'no-store',
+      });
+      const json = await res.json();
+
+      if (!res.ok || !json.success || !json.data) {
+        throw new Error(json.error || `Error al obtener el JSON del partido (HTTP ${res.status})`);
+      }
+
+      const reportData = extraerDatosPartidoDieLigen(json.data);
+      setData(reportData);
+      setFileName(`Die Ligen: J-${matchItem.jornada} · ${matchItem.homeTeam.name} vs ${matchItem.awayTeam.name}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error al descargar el partido de Die Ligen';
+      setError(`Error al descargar el análisis: ${msg}`);
+    } finally {
+      setLoadingGameId(null);
+    }
+  };
 
   const handleFileUpload = (file: File) => {
     setError(null);
@@ -84,16 +173,146 @@ export function DieLigenMatchReportViewer({ club, season }: DieLigenMatchReportV
 
   return (
     <div className="space-y-6">
-      {/* ─── Zona de Selección / Carga de JSON Local ────────────────────── */}
+      {/* ─── PANEL 1: PARTIDOS DISPONIBLES EN DIE LIGEN ───────────────────── */}
+      <div className="bg-slate-900/60 border border-slate-800/90 rounded-2xl p-5 shadow-sm">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <Trophy className="h-4 w-4 text-amber-400" />
+              <h3 className="text-sm font-bold text-white">
+                Partidos en Die Ligen — {club?.nombre || 'Rival'}
+              </h3>
+              {hasLoadedMatches && (
+                <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-300">
+                  {matches.length} partidos ({matches.filter((m) => m.isAnalyzed).length} analizados)
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-slate-400 mt-1">
+              Consulta el calendario oficial del torneo y pulsa sobre un encuentro con análisis terminado para cargar su informe completo.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={fetchAvailableMatches}
+              disabled={isLoadingMatches}
+              className="text-xs font-bold py-2 px-3.5 border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 flex items-center gap-1.5"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${isLoadingMatches ? 'animate-spin text-amber-400' : 'text-slate-400'}`} />
+              <span>{isLoadingMatches ? 'Consultando...' : hasLoadedMatches ? 'Actualizar lista' : 'Consultar partidos en Die Ligen'}</span>
+            </Button>
+          </div>
+        </div>
+
+        {/* Mensaje de error al consultar partidos */}
+        {matchesError && (
+          <div className="mt-4 bg-amber-950/40 border border-amber-800/60 rounded-xl p-3 flex items-start gap-2.5 text-amber-300 text-xs">
+            <AlertCircle className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
+            <span>{matchesError}</span>
+          </div>
+        )}
+
+        {/* Listado de partidos cuando ya se han consultado */}
+        {hasLoadedMatches && (
+          <div className="mt-4">
+            {matches.length === 0 ? (
+              <div className="p-4 bg-slate-950/50 border border-slate-800/80 rounded-xl text-center text-xs text-slate-400">
+                No se encontraron partidos para este rival en la competición oficial de Die Ligen. Puedes cargar el archivo JSON manualmente a continuación.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-[340px] overflow-y-auto pr-1">
+                {matches.map((m) => {
+                  const isLoadingThis = loadingGameId === m.gameId;
+                  return (
+                    <div
+                      key={m.gameId}
+                      className={`p-3 rounded-xl border transition-all flex flex-col justify-between gap-2.5 ${
+                        m.isAnalyzed
+                          ? 'bg-slate-950/70 border-slate-800/90 hover:border-[#CC0E21]/60 hover:bg-slate-950'
+                          : 'bg-slate-950/30 border-slate-800/40 opacity-70'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2 text-xs">
+                        <span className="font-bold px-2 py-0.5 rounded-md bg-slate-900 border border-slate-700/80 text-white font-mono text-[11px]">
+                          Jornada {m.jornada}
+                        </span>
+                        <span className="text-[11px] text-slate-400 font-medium">
+                          {m.isHome ? 'Local' : 'Visitante'}
+                        </span>
+                        {m.isAnalyzed ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-400 bg-emerald-950/50 border border-emerald-800/60 px-2 py-0.5 rounded-full">
+                            <CheckCircle2 className="w-2.5 h-2.5" />
+                            Análisis listo
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-400 bg-slate-900 border border-slate-800 px-2 py-0.5 rounded-full">
+                            <Clock className="w-2.5 h-2.5" />
+                            {m.analysisStatus}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="text-xs">
+                        <div className="font-semibold text-slate-200 truncate">
+                          {m.homeTeam.name}
+                        </div>
+                        <div className="text-[11px] text-slate-400 flex items-center justify-between mt-0.5">
+                          <span className="truncate">{m.awayTeam.name}</span>
+                          <span className="font-bold text-white font-mono bg-slate-900 px-1.5 py-0.5 rounded text-[11px] ml-2">
+                            {m.scoreFormatted || 'vs'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div>
+                        {m.isAnalyzed ? (
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={() => handleSelectMatch(m)}
+                            disabled={isLoadingThis || Boolean(loadingGameId)}
+                            className="w-full text-xs font-bold py-1.5 px-3 border-slate-700 bg-slate-800 hover:bg-[#CC0E21] hover:border-[#CC0E21] hover:text-white text-slate-200 transition-colors flex items-center justify-center gap-1.5"
+                          >
+                            {isLoadingThis ? (
+                              <>
+                                <RefreshCw className="h-3 w-3 animate-spin text-white" />
+                                <span>Descargando JSON...</span>
+                              </>
+                            ) : (
+                              <>
+                                <PlayCircle className="h-3.5 w-3.5 text-amber-400" />
+                                <span>Cargar en visor</span>
+                              </>
+                            )}
+                          </Button>
+                        ) : (
+                          <div className="text-[10px] text-center text-slate-500 italic py-1">
+                            Análisis aún no publicado en Die Ligen
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ─── PANEL 2: CARGA MANUAL DE JSON LOCAL (RESPALDO / OFFLINE) ────── */}
       <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-5 shadow-sm">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <h3 className="text-sm font-bold text-white flex items-center gap-2">
-              <FileText className="h-4 w-4 text-[#CC0E21]" />
-              Informe de Partido Die Ligen (Modo Offline)
+              <FileText className="h-4 w-4 text-slate-400" />
+              Carga manual de JSON local (Respaldo / Modo Offline)
             </h3>
             <p className="text-xs text-slate-400 mt-1">
-              Carga un archivo JSON original de análisis (ej. J-2 o J-3){club?.nombre ? ` para ${club.nombre}` : ''}{season?.temporada ? ` (${season.temporada})` : ''} para visualizar el informe y exportarlo a PDF.
+              Si dispones del archivo JSON descargado en disco (ej. J-2 o J-3){club?.nombre ? ` para ${club.nombre}` : ''}{season?.temporada ? ` (${season.temporada})` : ''}, puedes cargarlo directamente aquí sin llamada a la API.
             </p>
           </div>
 
@@ -113,30 +332,8 @@ export function DieLigenMatchReportViewer({ club, season }: DieLigenMatchReportV
               className="text-xs font-bold py-2 px-3.5 border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200"
             >
               <UploadCloud className="h-4 w-4 mr-1.5 text-amber-400" />
-              {data ? 'Cargar otro JSON' : 'Cargar JSON de partido'}
+              {data ? 'Cargar otro JSON local' : 'Cargar JSON local'}
             </Button>
-
-            {data && (
-              <Button
-                type="button"
-                variant="primary"
-                onClick={handleExportPdf}
-                disabled={isExportingPdf}
-                className="bg-[#CC0E21] hover:bg-[#b00c1c] text-white font-bold py-2 px-3.5 text-xs flex items-center gap-2 shadow-md shadow-[#CC0E21]/20 border-none"
-              >
-                {isExportingPdf ? (
-                  <>
-                    <RefreshCw className="h-3.5 w-3.5 animate-spin text-white" />
-                    <span>Generando PDF...</span>
-                  </>
-                ) : (
-                  <>
-                    <FileDown className="h-4 w-4 text-white" />
-                    <span>Exportar PDF</span>
-                  </>
-                )}
-              </Button>
-            )}
           </div>
         </div>
 
@@ -146,36 +343,76 @@ export function DieLigenMatchReportViewer({ club, season }: DieLigenMatchReportV
             onDragOver={(e) => e.preventDefault()}
             onDrop={handleDrop}
             onClick={() => fileInputRef.current?.click()}
-            className="mt-4 border-2 border-dashed border-slate-700/80 hover:border-amber-400/60 bg-slate-950/40 hover:bg-amber-400/[0.02] rounded-xl p-8 text-center cursor-pointer transition-all"
+            className="mt-4 border-2 border-dashed border-slate-700/80 hover:border-amber-400/60 bg-slate-950/40 hover:bg-amber-400/[0.02] rounded-xl p-6 text-center cursor-pointer transition-all"
           >
-            <UploadCloud className="h-10 w-10 text-slate-500 mx-auto mb-2.5" />
-            <p className="text-sm font-semibold text-slate-300">
+            <UploadCloud className="h-8 w-8 text-slate-500 mx-auto mb-2" />
+            <p className="text-xs font-semibold text-slate-300">
               Arrastra aquí el archivo JSON o haz clic para seleccionarlo
             </p>
-            <p className="text-xs text-slate-500 mt-1">
+            <p className="text-[11px] text-slate-500 mt-0.5">
               Archivos compatibles: JSON original descargado de Die Ligen
             </p>
           </div>
         )}
-
-        {/* Mensaje de archivo cargado */}
-        {fileName && (
-          <div className="mt-3 flex items-center gap-2 text-xs text-slate-400">
-            <span className="font-semibold text-slate-300">Archivo en pantalla:</span>
-            <span className="bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800 text-amber-300 font-mono">
-              {fileName}
-            </span>
-          </div>
-        )}
-
-        {/* Error */}
-        {error && (
-          <div className="mt-4 bg-red-950/40 border border-red-800/60 rounded-xl p-3 flex items-start gap-2.5 text-red-300 text-xs">
-            <AlertCircle className="h-4 w-4 text-red-400 shrink-0 mt-0.5" />
-            <span>{error}</span>
-          </div>
-        )}
       </div>
+
+      {/* Banner de Partido Cargado en Pantalla con botón Exportar PDF */}
+      {data && (
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-md">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-[#CC0E21]/20 border border-[#CC0E21]/40 flex items-center justify-center shrink-0">
+              <FileText className="h-5 w-5 text-[#CC0E21]" />
+            </div>
+            <div>
+              <div className="text-xs text-slate-400 font-medium">Informe cargado en visor:</div>
+              <div className="text-sm font-bold text-white font-mono">{fileName || 'Análisis de partido'}</div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                setData(null);
+                setFileName(null);
+              }}
+              className="text-xs font-medium py-2 px-3 border-slate-800 bg-slate-950 hover:bg-slate-800 text-slate-300 flex items-center gap-1.5"
+            >
+              <RotateCcw className="h-3.5 w-3.5 text-slate-400" />
+              <span>Cerrar informe</span>
+            </Button>
+
+            <Button
+              type="button"
+              variant="primary"
+              onClick={handleExportPdf}
+              disabled={isExportingPdf}
+              className="bg-[#CC0E21] hover:bg-[#b00c1c] text-white font-bold py-2 px-3.5 text-xs flex items-center gap-2 shadow-md shadow-[#CC0E21]/20 border-none"
+            >
+              {isExportingPdf ? (
+                <>
+                  <RefreshCw className="h-3.5 w-3.5 animate-spin text-white" />
+                  <span>Generando PDF...</span>
+                </>
+              ) : (
+                <>
+                  <FileDown className="h-4 w-4 text-white" />
+                  <span>Exportar PDF</span>
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Error de lectura o descarga */}
+      {error && (
+        <div className="mt-4 bg-red-950/40 border border-red-800/60 rounded-xl p-3.5 flex items-start gap-2.5 text-red-300 text-xs">
+          <AlertCircle className="h-4 w-4 text-red-400 shrink-0 mt-0.5" />
+          <span>{error}</span>
+        </div>
+      )}
 
       {/* ─── VISTA DEL INFORME COMPLETO ───────────────────────────────────── */}
       {data && (
