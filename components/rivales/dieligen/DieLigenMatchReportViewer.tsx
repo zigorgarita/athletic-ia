@@ -106,7 +106,47 @@ export function DieLigenMatchReportViewer({ club, season }: DieLigenMatchReportV
         throw new Error(json.error || `Error del servidor (HTTP ${res.status})`);
       }
 
-      setMatches(json.matches || []);
+      const rawMatches: DieLigenTeamMatchItem[] = json.matches || [];
+
+      // Reconciliación automática desde el primer render:
+      // Solo para partidos FINISHED cuyo marcador de calendario bruto venga 0-0
+      const reconciledMatches = await Promise.all(
+        rawMatches.map(async (m) => {
+          if (m.isAnalyzed && m.scoreHome === 0 && m.scoreAway === 0) {
+            try {
+              let gameJson: Record<string, unknown> | null = null;
+              if (jsonCacheRef.current.has(m.gameId)) {
+                gameJson = jsonCacheRef.current.get(m.gameId)!;
+              } else {
+                const gameRes = await fetch(`/api/die-ligen/game-json?gameId=${encodeURIComponent(m.gameId)}`, {
+                  headers,
+                  cache: 'no-store',
+                });
+                const gameData = await gameRes.json();
+                if (gameData.success && gameData.data) {
+                  gameJson = gameData.data as Record<string, unknown>;
+                  jsonCacheRef.current.set(m.gameId, gameJson);
+                }
+              }
+
+              if (gameJson) {
+                const parsed = extraerDatosPartidoDieLigen(gameJson);
+                return {
+                  ...m,
+                  scoreHome: parsed.cabecera.golesLocal,
+                  scoreAway: parsed.cabecera.golesVisitante,
+                  scoreFormatted: `${parsed.cabecera.golesLocal} - ${parsed.cabecera.golesVisitante}`,
+                };
+              }
+            } catch (err) {
+              console.warn('[Die Ligen] Reconciliación preventiva no disponible para partido:', m.gameId, err);
+            }
+          }
+          return m;
+        })
+      );
+
+      setMatches(reconciledMatches);
       setHasLoadedMatches(true);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error al consultar partidos en Die Ligen';
