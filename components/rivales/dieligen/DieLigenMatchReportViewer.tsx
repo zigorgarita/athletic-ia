@@ -93,7 +93,7 @@ export function DieLigenMatchReportViewer({ club, season }: DieLigenMatchReportV
               Informe de Partido Die Ligen (Modo Offline)
             </h3>
             <p className="text-xs text-slate-400 mt-1">
-              Carga un archivo JSON original de análisis (ej. J-2 o J-3) para visualizar el informe y exportarlo a PDF.
+              Carga un archivo JSON original de análisis (ej. J-2 o J-3){club?.nombre ? ` para ${club.nombre}` : ''}{season?.temporada ? ` (${season.temporada})` : ''} para visualizar el informe y exportarlo a PDF.
             </p>
           </div>
 

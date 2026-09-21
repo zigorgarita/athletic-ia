@@ -32,7 +32,6 @@ const COL_W  = PAGE_W - MARGIN * 2; // 182 mm útiles
 // Tamaños de fuente
 const SZ_TITLE       = 15;
 const SZ_SECTION_HDR = 10.5;
-const SZ_SUBTITLE    = 8.5;
 const SZ_BODY        = 8;
 const SZ_SMALL       = 7.5;
 const SZ_TINY        = 6.5;

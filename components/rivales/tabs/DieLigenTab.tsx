@@ -1,17 +1,13 @@
 'use client';
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useEditMode } from '@/context/EditModeContext';
 import { getStaffPasskey, setStaffPasskey } from '@/lib/passkey';
 import { StaffPasskeyModal } from '@/components/common/StaffPasskeyModal';
 import {
-  CloudCheck,
-  CloudOff,
-  Loader2,
   RefreshCw,
   Trophy,
   Calendar,
   AlertCircle,
-  ShieldAlert,
   Key,
 } from 'lucide-react';
 
