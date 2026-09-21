@@ -29,11 +29,11 @@ export function normalizeClubName(name: string | null | undefined): string {
 export const DIE_LIGEN_CLUB_ALIASES: Record<string, string[]> = {
   'sd leioa': ['sd leioa', 'leioa sd', 'leioa', 's d leioa'],
   'arenas club': ['arenas club', 'arenas club de getxo', 'arenas', 'arenas club getxo'],
-  'antiguoko ke': ['antiguoko ke', 'antiguoko c f', 'antiguoko cf', 'antiguoko', 'k e antiguoko'],
+  'antiguoko ke': ['antiguoko ke', 'antiguoko c f', 'antiguoko cf', 'antiguoko', 'k e antiguoko', 'antiguoko kirol elkartea'],
   'sd indautxu': ['sd indautxu', 'indautxu sd', 'indautxu', 's d indautxu'],
   'athletic club': ['athletic club', 'athletic club a', 'athletic', 'athletic club juvenil a'],
   'real sociedad': ['real sociedad', 'real sociedad de futbol', 'real sociedad a'],
-  'deportivo alaves': ['deportivo alaves', 'alaves', 'd alaves', 'deportivo alaves a'],
+  'deportivo alaves': ['deportivo alaves', 'alaves', 'd alaves', 'deportivo alaves a', 'deportivo alaves sad'],
   'sd eibar': ['sd eibar', 'eibar sd', 'eibar', 's d eibar'],
   'ca osasuna': ['ca osasuna', 'osasuna ca', 'osasuna', 'c a osasuna'],
   'danok bat cf': ['danok bat cf', 'danok bat c f', 'danok bat', 'c f danok bat'],
