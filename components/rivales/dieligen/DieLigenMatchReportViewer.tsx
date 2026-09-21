@@ -130,6 +130,20 @@ export function DieLigenMatchReportViewer({ club, season }: DieLigenMatchReportV
         setMultiData(null); // Cerrar acumulado si estaba abierto
         setData(reportData);
         setFileName(`Die Ligen: J-${matchItem.jornada} · ${matchItem.homeTeam.name} vs ${matchItem.awayTeam.name}`);
+
+        // Reconciliar marcador en la tarjeta si aplica
+        setMatches((prev) =>
+          prev.map((item) =>
+            item.gameId === matchItem.gameId
+              ? {
+                  ...item,
+                  scoreHome: reportData.cabecera.golesLocal,
+                  scoreAway: reportData.cabecera.golesVisitante,
+                  scoreFormatted: `${reportData.cabecera.golesLocal} - ${reportData.cabecera.golesVisitante}`,
+                }
+              : item
+          )
+        );
         return;
       }
 
@@ -157,6 +171,20 @@ export function DieLigenMatchReportViewer({ club, season }: DieLigenMatchReportV
       setMultiData(null); // Cerrar acumulado si estaba abierto
       setData(reportData);
       setFileName(`Die Ligen: J-${matchItem.jornada} · ${matchItem.homeTeam.name} vs ${matchItem.awayTeam.name}`);
+
+      // Reconciliar marcador en la tarjeta si aplica
+      setMatches((prev) =>
+        prev.map((item) =>
+          item.gameId === matchItem.gameId
+            ? {
+                ...item,
+                scoreHome: reportData.cabecera.golesLocal,
+                scoreAway: reportData.cabecera.golesVisitante,
+                scoreFormatted: `${reportData.cabecera.golesLocal} - ${reportData.cabecera.golesVisitante}`,
+              }
+            : item
+        )
+      );
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error al descargar el partido de Die Ligen';
       setError(`Error al descargar el análisis: ${msg}`);
@@ -239,6 +267,23 @@ export function DieLigenMatchReportViewer({ club, season }: DieLigenMatchReportV
       // Parseo estricto con parser.ts (intacto)
       const parsedReports = rawJsons.map((raw) => extraerDatosPartidoDieLigen(raw));
 
+      // Actualizar marcadores de las tarjetas seleccionadas con el resultado reconciliado
+      setMatches((prev) =>
+        prev.map((item) => {
+          const tIdx = targetMatches.findIndex((tm) => tm.gameId === item.gameId);
+          if (tIdx !== -1 && parsedReports[tIdx]?.cabecera) {
+            const rep = parsedReports[tIdx];
+            return {
+              ...item,
+              scoreHome: rep.cabecera.golesLocal,
+              scoreAway: rep.cabecera.golesVisitante,
+              scoreFormatted: `${rep.cabecera.golesLocal} - ${rep.cabecera.golesVisitante}`,
+            };
+          }
+          return item;
+        })
+      );
+
       // Agregador estadístico puro (aggregator.ts)
       const aggregated = aggregateDieLigenMatches(parsedReports, club.nombre);
 
@@ -268,6 +313,22 @@ export function DieLigenMatchReportViewer({ club, season }: DieLigenMatchReportV
         const reportData = extraerDatosPartidoDieLigen(parsedJson);
         setData(reportData);
         setFileName(file.name);
+
+        if (reportData.cabecera) {
+          setMatches((prev) =>
+            prev.map((item) =>
+              item.jornada === reportData.cabecera.numeroJornada ||
+              item.jornada === Number(reportData.cabecera.numeroJornada)
+                ? {
+                    ...item,
+                    scoreHome: reportData.cabecera.golesLocal,
+                    scoreAway: reportData.cabecera.golesVisitante,
+                    scoreFormatted: `${reportData.cabecera.golesLocal} - ${reportData.cabecera.golesVisitante}`,
+                  }
+                : item
+            )
+          );
+        }
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : 'Error al procesar el archivo JSON.';
         setError(`No se pudo leer el archivo: ${msg}`);
@@ -305,6 +366,25 @@ export function DieLigenMatchReportViewer({ club, season }: DieLigenMatchReportV
     } finally {
       setIsExportingPdf(false);
     }
+  };
+
+  const getMatchScoreDisplay = (m: DieLigenTeamMatchItem) => {
+    // 1. Si este partido es el actualmente mostrado en el visor individual
+    if (data && (m.jornada === data.cabecera.numeroJornada || m.jornada === Number(data.cabecera.numeroJornada))) {
+      return `${data.cabecera.golesLocal} - ${data.cabecera.golesVisitante}`;
+    }
+    // 2. Si su JSON ya se encuentra en caché de memoria, reutilizar extraerDatosPartidoDieLigen
+    if (jsonCacheRef.current.has(m.gameId)) {
+      try {
+        const cached = jsonCacheRef.current.get(m.gameId);
+        const parsed = extraerDatosPartidoDieLigen(cached);
+        return `${parsed.cabecera.golesLocal} - ${parsed.cabecera.golesVisitante}`;
+      } catch {
+        // fallback
+      }
+    }
+    // 3. Marcador del objeto de calendario
+    return m.scoreFormatted || 'vs';
   };
 
   return (
@@ -467,7 +547,7 @@ export function DieLigenMatchReportViewer({ club, season }: DieLigenMatchReportV
                           <div className="text-[11px] text-slate-400 flex items-center justify-between mt-0.5">
                             <span className="truncate">{m.awayTeam.name}</span>
                             <span className="font-bold text-white font-mono bg-slate-900 px-1.5 py-0.5 rounded text-[11px] ml-2">
-                              {m.scoreFormatted || 'vs'}
+                              {getMatchScoreDisplay(m)}
                             </span>
                           </div>
                         </div>
