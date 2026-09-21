@@ -15,6 +15,9 @@ import {
   Key,
 } from 'lucide-react';
 
+import { Club, ClubSeason } from '@/hooks/useClubs';
+import { DieLigenMatchReportViewer } from '../dieligen/DieLigenMatchReportViewer';
+
 export type DieLigenErrorCode =
   | 'APP_AUTH_UNAUTHORIZED'
   | 'DIE_LIGEN_CONFIG_MISSING'
@@ -61,17 +64,21 @@ const ERROR_PHASE_CONFIG: Record<
   },
 };
 
+interface DieLigenTabProps {
+  club?: Club | null;
+  season?: ClubSeason | null;
+}
+
 /**
- * DieLigenTab — Fase 2A (Conexión Segura con Die Ligen)
+ * DieLigenTab — Fase 1 (Visor de Informes Offline + Conexión Segura con Die Ligen)
  *
- * Conecta exclusivamente a la ruta interna de servidor /api/die-ligen/status.
- * Utiliza exactamente el mismo patrón de autorización que los hooks existentes:
- * envía x-editor-user y x-editor-pass únicamente si hay contraseña disponible,
- * permitiendo que el fallback del servidor funcione si no hay credenciales activas.
+ * Mantiene intacta la infraestructura de conexión existente para comprobaciones manuales,
+ * pero no realiza llamadas automáticas en el montaje para permitir el trabajo offline fluido.
  */
-export function DieLigenTab() {
+export function DieLigenTab({ club, season }: DieLigenTabProps) {
   const { currentUser } = useEditMode();
-  const [loading, setLoading] = useState(true);
+  // Inicializado en false para no bloquear la vista con pantalla de carga al montar
+  const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<DieLigenStatusResponse | null>(null);
   const [isPasskeyModalOpen, setIsPasskeyModalOpen] = useState(false);
 
@@ -82,12 +89,9 @@ export function DieLigenTab() {
         Accept: 'application/json',
       };
 
-      // Mismo origen y formato de credenciales que hooks existentes (useClubDocuments, useClubAIReports)
       const staffPass = (explicitPass || currentUser?.pass || getStaffPasskey() || '').trim();
       const staffUser = (currentUser?.id || 'zigor').trim().toLowerCase();
 
-      // Enviar credenciales de staff ÚNICAMENTE si existe contraseña no vacía
-      // para evitar que una cabecera vacía anule el fallback del servidor
       if (staffPass) {
         headers['x-editor-user'] = staffUser;
         headers['x-editor-pass'] = staffPass;
@@ -115,33 +119,8 @@ export function DieLigenTab() {
     }
   }, [currentUser]);
 
-  useEffect(() => {
-    checkConnection();
-  }, [checkConnection]);
-
-  // ────────────────────────────────────────────────────────────
-  // ESTADO 1: Comprobando conexión
-  // ────────────────────────────────────────────────────────────
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 px-6 text-center animate-in fade-in duration-300">
-        <div className="relative mb-6">
-          <div className="h-16 w-16 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center">
-            <Loader2 className="h-8 w-8 text-[#CC0E21] animate-spin" />
-          </div>
-          <span className="absolute -top-2 -right-2 bg-slate-800 border border-slate-700 text-slate-300 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full whitespace-nowrap">
-            Comprobando conexión
-          </span>
-        </div>
-        <h3 className="text-base font-bold text-slate-200 mb-2">
-          Verificando enlace con Die Ligen
-        </h3>
-        <p className="text-sm text-slate-500 max-w-sm leading-relaxed">
-          Consultando estado de autenticación, temporada activa y competiciones suscritas...
-        </p>
-      </div>
-    );
-  }
+  // En esta fase offline NO se ejecuta checkConnection automáticamente al montar,
+  // preservando la función para activación manual con el botón "Comprobar estado".
 
   const isConnected = Boolean(status?.connected);
   const errorCode = status?.errorCode;
@@ -149,11 +128,16 @@ export function DieLigenTab() {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
-      {/* Barra superior de estado */}
+      {/* Barra superior de estado de conexión (conservada íntegramente) */}
       <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex flex-wrap items-center gap-3">
           {/* Badge de estado */}
-          {isConnected ? (
+          {status === null ? (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-slate-800/80 border border-slate-700/80 text-slate-300">
+              <span className="w-2 h-2 rounded-full bg-slate-400" />
+              Modo Offline (Sin llamada automática)
+            </span>
+          ) : isConnected ? (
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-950/60 border border-emerald-800/60 text-emerald-400">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
               Conectado
@@ -165,7 +149,7 @@ export function DieLigenTab() {
             </span>
           )}
 
-          {/* TEMPORADA: se muestra ÚNICAMENTE si está conectado y viene un valor real */}
+          {/* TEMPORADA */}
           {isConnected && status?.temporadaActual && (
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-semibold bg-slate-950 border border-slate-800 text-slate-300">
               <Calendar className="w-3.5 h-3.5 text-slate-500" />
@@ -173,7 +157,7 @@ export function DieLigenTab() {
             </span>
           )}
 
-          {/* COMPETICIONES: se muestran ÚNICAMENTE si está conectado y vienen en la respuesta */}
+          {/* COMPETICIONES */}
           {isConnected && status?.competiciones && status.competiciones.length > 0 && (
             status.competiciones.map((comp, idx) => (
               <span
@@ -196,95 +180,37 @@ export function DieLigenTab() {
           title="Reintentar comprobación"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-          <span>Comprobar estado</span>
+          <span>{loading ? 'Comprobando...' : 'Comprobar estado'}</span>
         </button>
       </div>
 
-      {/* ────────────────────────────────────────────────────────────
-          ESTADO 2: Conectado con éxito
-          ──────────────────────────────────────────────────────────── */}
-      {isConnected ? (
-        <div className="flex flex-col items-center justify-center py-20 px-6 text-center bg-slate-900/20 border border-slate-800/60 rounded-3xl">
-          <div className="h-16 w-16 rounded-2xl bg-emerald-950/40 border border-emerald-800/50 flex items-center justify-center mb-5">
-            <CloudCheck className="h-8 w-8 text-emerald-400" />
-          </div>
-
-          <h3 className="text-base font-bold text-slate-200 mb-2">
-            Conectado, todavía sin partidos
-          </h3>
-
-          <p className="text-sm text-slate-500 max-w-md leading-relaxed">
-            Cuando haya partidos sincronizados aparecerán aquí para analizarlos,
-            revisar sus conclusiones y aprobarlas.
-          </p>
-        </div>
-      ) : (
-        /* ────────────────────────────────────────────────────────────
-           ESTADO 3: Error de conexión detallado por fase
-           ──────────────────────────────────────────────────────────── */
-        <div className="flex flex-col items-center justify-center py-16 px-6 text-center bg-slate-900/20 border border-slate-800/60 rounded-3xl max-w-2xl mx-auto">
-          <div className="h-16 w-16 rounded-2xl bg-amber-950/30 border border-amber-800/40 flex items-center justify-center mb-5">
-            {errorCode === 'APP_AUTH_UNAUTHORIZED' ? (
-              <ShieldAlert className="h-8 w-8 text-amber-500" />
-            ) : (
-              <CloudOff className="h-8 w-8 text-amber-500" />
-            )}
-          </div>
-
-          {/* Código de fase del error */}
-          {errorCode && (
-            <span className="inline-block mb-2 font-mono text-[10px] font-bold uppercase tracking-wider text-amber-400/90 bg-amber-950/50 border border-amber-800/40 px-2 py-0.5 rounded">
-              Fase: {errorCode}
-            </span>
-          )}
-
-          <h3 className="text-base font-bold text-slate-200 mb-2">
-            {errorConfig?.title || 'Error de conexión con Die Ligen'}
-          </h3>
-
-          <p className="text-sm text-slate-400 max-w-md leading-relaxed mb-3">
-            {status?.error || 'No se pudo establecer comunicación con el servicio.'}
-          </p>
-
-          {errorConfig?.hint && (
-            <p className="text-xs text-slate-500 max-w-sm leading-relaxed mb-6">
-              {errorConfig.hint}
-            </p>
-          )}
-
-          {errorCode === 'APP_AUTH_UNAUTHORIZED' ? (
-            <div className="flex flex-wrap items-center justify-center gap-3">
-              <button
-                type="button"
-                onClick={() => setIsPasskeyModalOpen(true)}
-                className="px-4 py-2 text-xs font-bold text-white bg-[#CC0E21] hover:bg-red-700 rounded-xl transition-all flex items-center gap-2 shadow-lg shadow-red-900/20"
-              >
-                <Key className="w-3.5 h-3.5" />
-                Introducir clave de entrenador
-              </button>
-              <button
-                type="button"
-                onClick={() => checkConnection()}
-                className="px-4 py-2 text-xs font-bold text-slate-300 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl transition-all flex items-center gap-2"
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
-                Reintentar
-              </button>
+      {/* Aviso discreto si hubo error en comprobación manual */}
+      {status !== null && !isConnected && (
+        <div className="bg-amber-950/30 border border-amber-800/50 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-amber-300">
+          <div className="flex items-start gap-2.5">
+            <AlertCircle className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
+            <div>
+              <span className="font-bold">{errorConfig?.title || 'Aviso de conexión'}: </span>
+              <span className="text-amber-200/90">{status?.error}</span>
             </div>
-          ) : (
+          </div>
+          {errorCode === 'APP_AUTH_UNAUTHORIZED' && (
             <button
               type="button"
-              onClick={() => checkConnection()}
-              className="px-4 py-2 text-xs font-bold text-slate-200 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl transition-all flex items-center gap-2"
+              onClick={() => setIsPasskeyModalOpen(true)}
+              className="px-3 py-1 text-[11px] font-bold text-white bg-[#CC0E21] hover:bg-red-700 rounded-lg shrink-0 flex items-center gap-1.5"
             >
-              <RefreshCw className="w-3.5 h-3.5" />
-              Reintentar comprobación
+              <Key className="w-3 h-3" />
+              Introducir clave staff
             </button>
           )}
         </div>
       )}
 
-      {/* Modal de autorización con clave de staff cuando falte o sea requerida */}
+      {/* ─── VISOR DEL INFORME DE PARTIDO (PROTOTIPO 2) ─────────────────── */}
+      <DieLigenMatchReportViewer club={club} season={season} />
+
+      {/* Modal de autorización con clave de staff cuando sea requerida */}
       <StaffPasskeyModal
         isOpen={isPasskeyModalOpen}
         onClose={() => setIsPasskeyModalOpen(false)}
