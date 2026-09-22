@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Users, Shield, Trophy, BarChart3, Activity, Layout, ArrowRightLeft, Calendar, CheckSquare, HelpCircle, Unlock, LogOut, AlertTriangle, Zap } from 'lucide-react';
+import { Users, Shield, Trophy, BarChart3, Activity, Layout, ArrowRightLeft, Calendar, CheckSquare, HelpCircle, Unlock, LogOut, AlertTriangle, Zap, Film } from 'lucide-react';
 import { LoginScreen } from './LoginScreen';
 import { useEditMode } from '@/context/EditModeContext';
 import { EditModeModal } from './EditModeModal';
@@ -24,6 +24,7 @@ const navigation: NavItem[] = [
   { name: 'ABP', href: '/abp', icon: Shield },
   { name: 'Liga', href: '/liga', icon: Trophy },
   { name: 'DATOS INDAUTXU DE LIGA', href: '/datos-indautxu-liga', icon: Trophy },
+  { name: 'Datos Indautxu · Die Ligue', href: '/datos-indautxu-die-ligue', icon: Film },
   { name: 'Amistosos', href: '/amistosos', icon: Trophy },
   { name: 'Rivales', href: '/rivales', icon: Shield },
   { name: 'Dashboard Plantilla', href: '/dashboard', icon: BarChart3 },
