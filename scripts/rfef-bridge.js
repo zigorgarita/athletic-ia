@@ -1,9 +1,9 @@
 /**
  * scripts/rfef-bridge.js
  * 
- * ATHLETIC IA — PUENTE LOCAL RFEF (P3.5)
+ * ATHLETIC IA — PUENTE LOCAL RFEF (P3.5 / P4.4)
  * 
- * Micro-servicio local para la adquisición segura de calendarios oficiales RFEF
+ * Micro-servicio local para la adquisición segura de calendarios y actas oficiales RFEF
  * mediante la pila TLS nativa de Windows (curl.exe / Schannel).
  * 
  * RESTRICCIONES Y SEGURIDAD:
@@ -13,6 +13,10 @@
  * - Validación estricta de parámetro 'jornada' (entero 1 a 30).
  * - URL canónica PascalCase inmutable: CodTemporada=22, CodCompeticion=33836116, CodGrupo=33836118.
  * - Validación estructural del HTML en memoria (CodCompeticion, CodGrupo, font_widgetL/V, Jornada).
+ * - Presupuesto global duro de 12 segundos para toda la adquisición.
+ * - Retry escalonado de 4 intentos (inmediato, +1.5s, +2.5s con sesión nueva de recuperación, +3.5s).
+ * - Protección estricta de sesión válida entre calendario y actas.
+ * - Cancelación limpia ante cierre de conexión HTTP del cliente.
  * - Cero persistencia en disco de HTML ni portapapeles.
  * - Cookies efímeras en os.tmpdir() eliminadas en bloque finally.
  * - CORS / Private Network Access (PNA) con allowlist estricta para Athletic IA.
@@ -27,6 +31,7 @@ const os = require('os');
 const HOST = '127.0.0.1';
 const PORT = parseInt(process.env.PORT || '41189', 10);
 const CURL_PATH = 'C:\\Windows\\System32\\curl.exe';
+const MAX_GLOBAL_BUDGET_MS = 12000; // Presupuesto global duro de 12 segundos
 
 // Allowlist estricta de orígenes autorizados
 const ALLOWED_STATIC_ORIGINS = new Set([
@@ -68,10 +73,24 @@ function sendJsonResponse(res, statusCode, data, origin) {
   res.end(JSON.stringify(data));
 }
 
-function fetchRfefJornada(jornada, sessionCookiePath) {
+function calculateRemainingMs(startTime) {
+  const elapsed = Date.now() - startTime;
+  return Math.max(0, MAX_GLOBAL_BUDGET_MS - elapsed);
+}
+
+function calculateCurlTimeoutSec(remainingMs) {
+  return Math.max(1, Math.min(4, Math.floor(remainingMs / 1000)));
+}
+
+/**
+ * Adquisición de calendario oficial RFEF con gestión de sesión y retry escalonado.
+ * Respeta el presupuesto global duro de 12 segundos.
+ */
+function fetchRfefJornada(jornada, sessionCookiePath, globalStartTime, cancelToken) {
   return new Promise((resolve, reject) => {
+    const startTime = globalStartTime || Date.now();
     const ownsCookie = !sessionCookiePath;
-    const cookieFile = sessionCookiePath || path.join(os.tmpdir(), `rfef_cookie_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.txt`);
+    let cookieFile = sessionCookiePath || path.join(os.tmpdir(), `rfef_cookie_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.txt`);
 
     if (ownsCookie) {
       try {
@@ -81,62 +100,112 @@ function fetchRfefJornada(jornada, sessionCookiePath) {
       }
     }
 
-    const url = `https://resultados.rfef.es/pnfg/NPcd/NFG_CmpJornada?cod_primaria=1000120&CodTemporada=22&CodCompeticion=33836116&CodGrupo=33836118&CodJornada=${jornada}`;
+    const delays = [0, 1500, 2500, 3500]; // Retardos entre intentos: Intento 1 (0ms), Intento 2 (+1.5s), Intento 3 (+2.5s), Intento 4 (+3.5s)
+    let currentChild = null;
+    let activeTimer = null;
 
-    const args = [
-      '-s',
-      '--http1.1',
-      '-L',
-      '--cookie-jar', cookieFile,
-      '--cookie', cookieFile,
-      url
-    ];
+    if (cancelToken) {
+      cancelToken.onCancel(() => {
+        if (activeTimer) clearTimeout(activeTimer);
+        if (currentChild) {
+          try { currentChild.kill(); } catch (e) {}
+        }
+      });
+    }
 
-    const runCurl = (attempt) => {
-      execFile(CURL_PATH, args, { maxBuffer: 10 * 1024 * 1024, encoding: 'utf8' }, (error, stdout, stderr) => {
+    const cleanup = () => {
+      if (ownsCookie) {
+        try {
+          if (fs.existsSync(cookieFile)) fs.unlinkSync(cookieFile);
+        } catch (cleanupErr) {
+          // Fallback silencioso de limpieza
+        }
+      }
+    };
+
+    const runAttempt = (attempt) => {
+      if (cancelToken && cancelToken.isCancelled) {
+        cleanup();
+        return reject({ type: 'ABORTED', message: 'Petición cancelada por el cliente.' });
+      }
+
+      const remainingMs = calculateRemainingMs(startTime);
+      if (remainingMs < 500) {
+        cleanup();
+        return reject({
+          type: 'RFEF_TEMPORARILY_UNAVAILABLE',
+          message: 'La federación (RFEF) no ha devuelto datos tras agotar el tiempo máximo de espera. Por favor, inténtalo de nuevo en unos segundos pulsando "Actualizar desde RFEF".',
+          retriesExhausted: attempt - 1,
+          elapsedMs: Date.now() - startTime
+        });
+      }
+
+      // En el intento 3: Si la sesión existente continúa devolviendo cuerpo vacío, se abre una sesión nueva como estrategia de recuperación.
+      if (attempt === 3 && ownsCookie) {
+        console.log(`[RFEF] Intento ${attempt}: Si la sesión existente continúa devolviendo cuerpo vacío, se abre una sesión nueva como estrategia de recuperación.`);
+        try {
+          if (fs.existsSync(cookieFile)) fs.unlinkSync(cookieFile);
+        } catch (e) {}
+        cookieFile = path.join(os.tmpdir(), `rfef_cookie_recov_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.txt`);
+        try {
+          fs.writeFileSync(cookieFile, '');
+        } catch (e) {}
+      }
+
+      const curlTimeoutSec = calculateCurlTimeoutSec(remainingMs);
+      const url = `https://resultados.rfef.es/pnfg/NPcd/NFG_CmpJornada?cod_primaria=1000120&CodTemporada=22&CodCompeticion=33836116&CodGrupo=33836118&CodJornada=${jornada}`;
+
+      const args = [
+        '-s',
+        '--http1.1',
+        '-L',
+        '--max-time', String(curlTimeoutSec),
+        '--cookie-jar', cookieFile,
+        '--cookie', cookieFile,
+        url
+      ];
+
+      currentChild = execFile(CURL_PATH, args, { maxBuffer: 10 * 1024 * 1024, encoding: 'utf8' }, (error, stdout) => {
+        currentChild = null;
         const html = stdout || '';
 
-        // Si la RFEF devuelve respuesta vacía por negociación de cookies o silenciamiento, reintentar hasta 3 veces (P4.4)
-        if (html.length < 1000 && attempt < 3) {
-          console.log(`[RFEF] Intento ${attempt} vacío (${html.length} bytes) para Jornada ${jornada}. Reintentando con cookie establecida...`);
-          setTimeout(() => runCurl(attempt + 1), 500);
-          return;
-        }
+        // Si la respuesta es vacía o insuficiente (< 1000 bytes) y quedan intentos
+        if (html.length < 1000 && attempt < 4) {
+          const nextDelay = delays[attempt]; // attempt 1 -> delays[1] (1500ms), attempt 2 -> delays[2] (2500ms), attempt 3 -> delays[3] (3500ms)
+          const newRemainingMs = calculateRemainingMs(startTime);
 
-        // Limpieza obligatoria del archivo temporal de cookies en finally si es dueño
-        if (ownsCookie) {
-          try {
-            if (fs.existsSync(cookieFile)) {
-              fs.unlinkSync(cookieFile);
-            }
-          } catch (cleanupErr) {
-            // Fallback silencioso de limpieza
+          if (newRemainingMs > nextDelay + 500) {
+            console.log(`[RFEF] Intento ${attempt} vacío (${html.length} bytes) para Jornada ${jornada}. Reintentando en ${nextDelay} ms (quedan ${newRemainingMs} ms)...`);
+            activeTimer = setTimeout(() => {
+              activeTimer = null;
+              runAttempt(attempt + 1);
+            }, nextDelay);
+            return;
           }
         }
 
+        cleanup();
+
+        if (html.length < 1000) {
+          return reject({
+            type: 'RFEF_TEMPORARILY_UNAVAILABLE',
+            message: 'La federación (RFEF) no ha devuelto datos tras varios intentos de conexión. Por favor, inténtalo de nuevo en unos segundos pulsando "Actualizar desde RFEF".',
+            retriesExhausted: attempt,
+            elapsedMs: Date.now() - startTime
+          });
+        }
+
         if (error) {
-          return reject({ type: 'CURL_ERROR', message: 'Error de conexión curl con la RFEF.' });
+          return reject({ type: 'CURL_ERROR', message: 'Error de conexión curl con la RFEF.', elapsedMs: Date.now() - startTime });
         }
 
-        // Validaciones estructurales idénticas a rfef-fetch.bat
-        if (html.length < 10000) {
-          return reject({ type: 'INVALID_HTML', message: 'Respuesta de la RFEF insuficiente o vacía.' });
-        }
-
-        if (!html.includes('NFG_CmpJornada')) {
-          return reject({ type: 'INVALID_HTML', message: 'El contenido recibido no contiene la estructura oficial de la RFEF.' });
-        }
-
-        if (!html.includes('CodCompeticion=33836116')) {
-          return reject({ type: 'INVALID_HTML', message: 'La respuesta de la RFEF no contiene la competición oficial (CodCompeticion=33836116).' });
-        }
-
-        if (!html.includes('CodGrupo=33836118')) {
-          return reject({ type: 'INVALID_HTML', message: 'La respuesta de la RFEF no contiene el grupo oficial (CodGrupo=33836118).' });
+        // Validaciones estructurales oficiales
+        if (!html.includes('NFG_CmpJornada') || !html.includes('CodCompeticion=33836116') || !html.includes('CodGrupo=33836118')) {
+          return reject({ type: 'INVALID_HTML', message: 'El contenido recibido no contiene la estructura oficial de la RFEF.', elapsedMs: Date.now() - startTime });
         }
 
         if (!html.includes('class=font_widgetL') || !html.includes('class=font_widgetV')) {
-          return reject({ type: 'INVALID_HTML', message: 'La página de la RFEF no contiene partidos oficiales (tabla de resultados vacía).' });
+          return reject({ type: 'INVALID_HTML', message: 'La página de la RFEF no contiene partidos oficiales (tabla de resultados vacía).', elapsedMs: Date.now() - startTime });
         }
 
         const hasJornada =
@@ -145,85 +214,146 @@ function fetchRfefJornada(jornada, sessionCookiePath) {
           html.includes(`Jornada ${jornada}`);
 
         if (!hasJornada) {
-          return reject({ type: 'INVALID_HTML', message: `El contenido recibido no parece corresponder a la Jornada ${jornada}.` });
+          return reject({ type: 'INVALID_HTML', message: `El contenido recibido no parece corresponder a la Jornada ${jornada}.`, elapsedMs: Date.now() - startTime });
         }
 
-        resolve(html);
+        resolve({ html, sessionCookiePath: cookieFile, elapsedMs: Date.now() - startTime });
       });
     };
 
-    runCurl(1);
+    runAttempt(1);
   });
 }
 
-function fetchRfefActa(codActa, sessionCookiePath) {
+/**
+ * Adquisición de un acta oficial RFEF.
+ * Si recibe una sesión principal válida del calendario, la usa sin destruirla.
+ * Si un acta requiere sesión de recuperación, usa un jar secundario aislado.
+ */
+function fetchRfefActa(codActa, mainSessionCookiePath, globalStartTime, cancelToken) {
   return new Promise((resolve, reject) => {
-    const ownsCookie = !sessionCookiePath;
-    const cookieFile = sessionCookiePath || path.join(os.tmpdir(), `rfef_cookie_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.txt`);
+    const startTime = globalStartTime || Date.now();
+    const delays = [0, 1500, 2500, 3500];
+    let currentChild = null;
+    let activeTimer = null;
+    let isolatedRecoveryJar = null;
 
-    if (ownsCookie) {
-      try {
-        fs.writeFileSync(cookieFile, '');
-      } catch (e) {
-        // Ignorar si falla la creación vacía inicial
-      }
+    if (cancelToken) {
+      cancelToken.onCancel(() => {
+        if (activeTimer) clearTimeout(activeTimer);
+        if (currentChild) {
+          try { currentChild.kill(); } catch (e) {}
+        }
+      });
     }
 
-    const url = `https://resultados.rfef.es/pnfg/NPcd/NFG_CmpPartido?cod_primaria=1000120&CodActa=${codActa}&cod_acta=${codActa}`;
+    const cleanup = () => {
+      if (isolatedRecoveryJar) {
+        try {
+          if (fs.existsSync(isolatedRecoveryJar)) fs.unlinkSync(isolatedRecoveryJar);
+        } catch (e) {}
+      }
+    };
 
-    const args = [
-      '-s',
-      '--http1.1',
-      '-L',
-      '--cookie-jar', cookieFile,
-      '--cookie', cookieFile,
-      url
-    ];
+    const runAttempt = (attempt) => {
+      if (cancelToken && cancelToken.isCancelled) {
+        cleanup();
+        return reject({ type: 'ABORTED', message: 'Petición cancelada por el cliente.' });
+      }
 
-    const runCurl = (attempt) => {
-      execFile(CURL_PATH, args, { maxBuffer: 15 * 1024 * 1024, encoding: 'utf8' }, (error, stdout, stderr) => {
+      const remainingMs = calculateRemainingMs(startTime);
+      if (remainingMs < 500) {
+        cleanup();
+        return reject({
+          type: 'RFEF_TEMPORARILY_UNAVAILABLE',
+          message: `Tiempo límite agotado para el acta ${codActa}.`,
+          retriesExhausted: attempt - 1,
+          elapsedMs: Date.now() - startTime
+        });
+      }
+
+      // En intento 3 y 4: Si la sesión existente continúa devolviendo cuerpo vacío, se abre una sesión nueva aislada de recuperación para este acta
+      let activeCookieJar = mainSessionCookiePath;
+      if (attempt >= 3) {
+        if (!isolatedRecoveryJar) {
+          console.log(`[RFEF] Acta ${codActa} intento ${attempt}: Si la sesión existente continúa devolviendo cuerpo vacío, se abre una sesión nueva como estrategia de recuperación aislada.`);
+          isolatedRecoveryJar = path.join(os.tmpdir(), `rfef_acta_${codActa}_recov_${Date.now()}.txt`);
+          try { fs.writeFileSync(isolatedRecoveryJar, ''); } catch (e) {}
+        }
+        activeCookieJar = isolatedRecoveryJar;
+      } else if (!activeCookieJar) {
+        if (!isolatedRecoveryJar) {
+          isolatedRecoveryJar = path.join(os.tmpdir(), `rfef_acta_${codActa}_init_${Date.now()}.txt`);
+          try { fs.writeFileSync(isolatedRecoveryJar, ''); } catch (e) {}
+        }
+        activeCookieJar = isolatedRecoveryJar;
+      }
+
+      const curlTimeoutSec = calculateCurlTimeoutSec(remainingMs);
+      const url = `https://resultados.rfef.es/pnfg/NPcd/NFG_CmpPartido?cod_primaria=1000120&CodActa=${codActa}&cod_acta=${codActa}`;
+
+      const args = [
+        '-s',
+        '--http1.1',
+        '-L',
+        '--max-time', String(curlTimeoutSec),
+        '--cookie-jar', activeCookieJar,
+        '--cookie', activeCookieJar,
+        url
+      ];
+
+      currentChild = execFile(CURL_PATH, args, { maxBuffer: 15 * 1024 * 1024, encoding: 'utf8' }, (error, stdout) => {
+        currentChild = null;
         const html = stdout || '';
 
-        // Si la RFEF devuelve respuesta vacía por negociación de cookies o silenciamiento, reintentar hasta 3 veces
-        if (html.length < 1000 && attempt < 3) {
-          console.log(`[RFEF] Intento ${attempt} vacío (${html.length} bytes) para Acta ${codActa}. Reintentando con cookie establecida...`);
-          setTimeout(() => runCurl(attempt + 1), 500);
-          return;
-        }
+        // Si la respuesta del acta es vacía o insuficiente (< 1000 bytes) y quedan intentos
+        if (html.length < 1000 && attempt < 4) {
+          const nextDelay = delays[attempt];
+          const newRemainingMs = calculateRemainingMs(startTime);
 
-        // Limpieza obligatoria del archivo temporal de cookies en finally si es dueño
-        if (ownsCookie) {
-          try {
-            if (fs.existsSync(cookieFile)) {
-              fs.unlinkSync(cookieFile);
-            }
-          } catch (cleanupErr) {
-            // Fallback silencioso de limpieza
+          if (newRemainingMs > nextDelay + 500) {
+            console.log(`[RFEF] Intento ${attempt} vacío (${html.length} bytes) para Acta ${codActa}. Reintentando en ${nextDelay} ms...`);
+            activeTimer = setTimeout(() => {
+              activeTimer = null;
+              runAttempt(attempt + 1);
+            }, nextDelay);
+            return;
           }
         }
 
+        cleanup();
+
+        if (html.length < 1000) {
+          return reject({
+            type: 'RFEF_TEMPORARILY_UNAVAILABLE',
+            message: `Acta ${codActa} no disponible o no publicada aún tras ${attempt} intentos.`,
+            retriesExhausted: attempt,
+            elapsedMs: Date.now() - startTime
+          });
+        }
+
         if (error) {
-          return reject({ type: 'CURL_ERROR', message: 'Error de conexión curl con la RFEF.' });
+          return reject({ type: 'CURL_ERROR', message: `Error de conexión curl para el acta ${codActa}.` });
         }
 
         // Validaciones estructurales robustas del acta oficial RFEF
         if (html.length < 10000) {
-          return reject({ type: 'INVALID_HTML', message: 'Respuesta del acta RFEF insuficiente o vacía.' });
+          return reject({ type: 'INVALID_HTML', message: `Respuesta del acta ${codActa} insuficiente o vacía.` });
         }
 
         if (!html.includes('font_widgetL') && !html.includes('font_widgetV') && !html.includes('font_widget')) {
-          return reject({ type: 'INVALID_HTML', message: 'El acta oficial de la RFEF no contiene datos de equipos o no está disponible.' });
+          return reject({ type: 'INVALID_HTML', message: `El acta ${codActa} no contiene datos de equipos o no está disponible.` });
         }
 
         if (!/titulares/i.test(html) && !/alineaci/i.test(html)) {
-          return reject({ type: 'INVALID_HTML', message: 'La respuesta de la RFEF no contiene las alineaciones oficiales del acta.' });
+          return reject({ type: 'INVALID_HTML', message: `La respuesta no contiene las alineaciones oficiales del acta ${codActa}.` });
         }
 
         resolve(html);
       });
     };
 
-    runCurl(1);
+    runAttempt(1);
   });
 }
 
@@ -269,10 +399,26 @@ function extractPendingCodActas(calendarHtml) {
   return Array.from(pendingActas);
 }
 
+function createCancelToken(req) {
+  let isCancelled = false;
+  const listeners = [];
+  req.on('close', () => {
+    isCancelled = true;
+    for (const fn of listeners) {
+      try { fn(); } catch (e) {}
+    }
+  });
+  return {
+    get isCancelled() { return isCancelled; },
+    onCancel(fn) { listeners.push(fn); }
+  };
+}
+
 const server = http.createServer(async (req, res) => {
   const origin = req.headers.origin;
   const url = new URL(req.url, `http://${HOST}:${PORT}`);
   const pathname = url.pathname;
+  const cancelToken = createCancelToken(req);
 
   // Validación estricta de Origin si la petición viene desde navegador
   if (origin && !isAllowedOrigin(origin)) {
@@ -325,21 +471,42 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    const startTime = Date.now();
+
     try {
-      const html = await fetchRfefJornada(jornada);
+      const { html, elapsedMs } = await fetchRfefJornada(jornada, null, startTime, cancelToken);
       const byteLength = Buffer.byteLength(html, 'utf8');
 
       sendJsonResponse(res, 200, {
         ok: true,
         jornada,
         bytes: byteLength,
-        calendarHtml: html
+        calendarHtml: html,
+        elapsedMs
       }, origin);
     } catch (err) {
-      if (err.type === 'INVALID_HTML') {
-        sendJsonResponse(res, 422, { ok: false, error: err.message }, origin);
+      if (err.type === 'RFEF_TEMPORARILY_UNAVAILABLE') {
+        sendJsonResponse(res, 422, {
+          ok: false,
+          code: 'RFEF_TEMPORARILY_UNAVAILABLE',
+          error: err.message,
+          retriesExhausted: err.retriesExhausted || 4,
+          elapsedMs: err.elapsedMs || (Date.now() - startTime)
+        }, origin);
+      } else if (err.type === 'INVALID_HTML') {
+        sendJsonResponse(res, 422, {
+          ok: false,
+          code: 'INVALID_HTML',
+          error: err.message,
+          elapsedMs: Date.now() - startTime
+        }, origin);
       } else {
-        sendJsonResponse(res, 502, { ok: false, error: err.message || 'Error de adquisición RFEF.' }, origin);
+        sendJsonResponse(res, 502, {
+          ok: false,
+          code: 'FETCH_ERROR',
+          error: err.message || 'Error de adquisición RFEF.',
+          elapsedMs: Date.now() - startTime
+        }, origin);
       }
     }
     return;
@@ -366,27 +533,48 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    const startTime = Date.now();
+
     try {
-      const html = await fetchRfefActa(codActa);
+      const html = await fetchRfefActa(codActa, null, startTime, cancelToken);
       const byteLength = Buffer.byteLength(html, 'utf8');
 
       sendJsonResponse(res, 200, {
         ok: true,
         codActa,
         bytes: byteLength,
-        actaHtml: html
+        actaHtml: html,
+        elapsedMs: Date.now() - startTime
       }, origin);
     } catch (err) {
-      if (err.type === 'INVALID_HTML') {
-        sendJsonResponse(res, 422, { ok: false, error: err.message }, origin);
+      if (err.type === 'RFEF_TEMPORARILY_UNAVAILABLE') {
+        sendJsonResponse(res, 422, {
+          ok: false,
+          code: 'RFEF_TEMPORARILY_UNAVAILABLE',
+          error: err.message,
+          retriesExhausted: err.retriesExhausted || 4,
+          elapsedMs: err.elapsedMs || (Date.now() - startTime)
+        }, origin);
+      } else if (err.type === 'INVALID_HTML') {
+        sendJsonResponse(res, 422, {
+          ok: false,
+          code: 'INVALID_HTML',
+          error: err.message,
+          elapsedMs: Date.now() - startTime
+        }, origin);
       } else {
-        sendJsonResponse(res, 502, { ok: false, error: err.message || 'Error de adquisición del acta RFEF.' }, origin);
+        sendJsonResponse(res, 502, {
+          ok: false,
+          code: 'FETCH_ERROR',
+          error: err.message || 'Error de adquisición del acta RFEF.',
+          elapsedMs: Date.now() - startTime
+        }, origin);
       }
     }
     return;
   }
 
-  // Endpoint oficial /jornada-completa (P4.1 / P4.4 Jornada Parcial)
+  // Endpoint oficial /jornada-completa (P4.1 / P4.4 Jornada Parcial con Presupuesto Global Duro)
   if (pathname === '/jornada-completa') {
     const jornadaParam = url.searchParams.get('jornada');
 
@@ -408,16 +596,16 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    const startTime = Date.now();
     const uniqueSessionId = `rfef_session_j${jornada}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.txt`;
     const sessionCookiePath = path.join(os.tmpdir(), uniqueSessionId);
     try {
       fs.writeFileSync(sessionCookiePath, '');
-    } catch (e) {
-      // Ignorar si falla la creación vacía inicial
-    }
+    } catch (e) {}
 
     try {
-      const calendarHtml = await fetchRfefJornada(jornada, sessionCookiePath);
+      // 1. Adquirir calendario de la jornada compartiendo la sesión base
+      const { html: calendarHtml } = await fetchRfefJornada(jornada, sessionCookiePath, startTime, cancelToken);
       const calendarBytes = Buffer.byteLength(calendarHtml, 'utf8');
       const codActas = extractCodActas(calendarHtml);
       const codActasPendientes = extractPendingCodActas(calendarHtml);
@@ -426,10 +614,20 @@ const server = http.createServer(async (req, res) => {
       const actas = [];
       const actasNoDisponibles = [];
 
-      // Procesar cada acta oficial de forma estrictamente aislada reutilizando la sesión del calendario (P4.4)
+      // 2. Procesar cada acta oficial de forma estrictamente aislada reutilizando la sesión del calendario protegida (P4.4)
       for (const codActa of codActas) {
+        // Comprobar presupuesto antes de lanzar cada acta
+        if (calculateRemainingMs(startTime) < 500) {
+          actasNoDisponibles.push({
+            codActa,
+            error: 'Tiempo límite global agotado antes de procesar este acta.'
+          });
+          continue;
+        }
+
         try {
-          const actaHtml = await fetchRfefActa(codActa, sessionCookiePath);
+          // Se pasa la sesión válida principal; si necesita reintentos avanzados usará un jar aislado sin tocar la principal
+          const actaHtml = await fetchRfefActa(codActa, sessionCookiePath, startTime, cancelToken);
           const actaBytes = Buffer.byteLength(actaHtml, 'utf8');
           actas.push({
             codActa,
@@ -453,13 +651,32 @@ const server = http.createServer(async (req, res) => {
         actasDisponibles: actas.length,
         actas,
         actasNoDisponibles,
-        codActasPendientes
+        codActasPendientes,
+        elapsedMs: Date.now() - startTime
       }, origin);
     } catch (err) {
-      if (err.type === 'INVALID_HTML') {
-        sendJsonResponse(res, 422, { ok: false, error: err.message }, origin);
+      if (err.type === 'RFEF_TEMPORARILY_UNAVAILABLE') {
+        sendJsonResponse(res, 422, {
+          ok: false,
+          code: 'RFEF_TEMPORARILY_UNAVAILABLE',
+          error: err.message,
+          retriesExhausted: err.retriesExhausted || 4,
+          elapsedMs: err.elapsedMs || (Date.now() - startTime)
+        }, origin);
+      } else if (err.type === 'INVALID_HTML') {
+        sendJsonResponse(res, 422, {
+          ok: false,
+          code: 'INVALID_HTML',
+          error: err.message,
+          elapsedMs: Date.now() - startTime
+        }, origin);
       } else {
-        sendJsonResponse(res, 502, { ok: false, error: err.message || 'Error de adquisición RFEF.' }, origin);
+        sendJsonResponse(res, 502, {
+          ok: false,
+          code: 'FETCH_ERROR',
+          error: err.message || 'Error de adquisición RFEF.',
+          elapsedMs: Date.now() - startTime
+        }, origin);
       }
     } finally {
       try {
