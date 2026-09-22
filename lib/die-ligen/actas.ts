@@ -93,13 +93,26 @@ export interface DieLigueJornadaResponse {
 }
 
 function parseMinute(timeStr?: string, timeSec?: number): number {
-  if (timeStr) {
-    const clean = timeStr.replace(/[^0-9]/g, '');
-    const parsed = parseInt(clean, 10);
-    if (!isNaN(parsed)) return parsed;
+  if (timeStr && typeof timeStr === 'string') {
+    const trimmed = timeStr.trim();
+    if (trimmed.length > 0) {
+      if (trimmed.includes('+')) {
+        const parts = trimmed.split('+');
+        const base = parseInt(parts[0].replace(/[^0-9]/g, ''), 10);
+        if (!isNaN(base)) return Math.min(90, Math.max(0, base));
+      }
+      if (trimmed.includes(':')) {
+        const parts = trimmed.split(':');
+        const mins = parseInt(parts[0].replace(/[^0-9]/g, ''), 10);
+        if (!isNaN(mins)) return Math.min(90, Math.max(0, mins));
+      }
+      const clean = trimmed.replace(/[^0-9]/g, '');
+      const parsed = parseInt(clean, 10);
+      if (!isNaN(parsed)) return Math.min(90, Math.max(0, parsed));
+    }
   }
-  if (typeof timeSec === 'number') {
-    return Math.floor(timeSec / 60);
+  if (typeof timeSec === 'number' && !isNaN(timeSec) && timeSec >= 0) {
+    return Math.min(90, Math.max(0, Math.floor(timeSec / 60)));
   }
   return 0;
 }
@@ -296,7 +309,7 @@ export async function getDieLigueJornadaActas(jornada: number): Promise<DieLigue
         } else if (e.categoryName === 'CARD') {
           const offender = e.selectedPlayers?.find((p) => p.tag?.i18NKey === 'OFFENDING_PLAYER')?.player;
           const isRed = e.selectedLabels?.some((l) => l.i18NKey === 'RED');
-          const isDoubleYellow = e.selectedLabels?.some((l) => l.i18NKey === 'DOUBLE_YELLOW');
+          const isDoubleYellow = e.selectedLabels?.some((l) => l.i18NKey === 'DOUBLE_YELLOW' || l.i18NKey === 'YELLOW_RED');
 
           parsedEvents.push({
             id: e.id,
@@ -368,17 +381,6 @@ export async function getDieLigueJornadaActas(jornada: number): Promise<DieLigue
           const minSalida = subOutEvent ? subOutEvent.minuto : null;
           const minEntrada = isStarter ? 0 : subInEvent ? subInEvent.minuto : null;
 
-          let minutosJugados = 0;
-          let jugo = false;
-
-          if (isStarter) {
-            jugo = true;
-            minutosJugados = minSalida !== null ? Math.max(0, minSalida) : 90;
-          } else if (minEntrada !== null) {
-            jugo = true;
-            minutosJugados = minSalida !== null ? Math.max(0, minSalida - minEntrada) : Math.max(0, 90 - minEntrada);
-          }
-
           // Goles del jugador
           const golesEventos = parsedEvents.filter(
             (ev) => ev.tipo === 'GOL' && ev.jugadorPrincipal?.id === p.id && !ev.esAutogol
@@ -400,6 +402,29 @@ export async function getDieLigueJornadaActas(jornada: number): Promise<DieLigue
           const tieneRoja = tarjetasEventos.some(
             (t) => t.tipoTarjeta === 'ROJA' || t.tipoTarjeta === 'DOBLE_AMARILLA'
           );
+
+          // Expulsión en acta (roja directa o doble amarilla)
+          const tarjetaExpulsion = tarjetasEventos.find(
+            (t) => t.tipoTarjeta === 'ROJA' || t.tipoTarjeta === 'DOBLE_AMARILLA'
+          );
+          const minExpulsion = tarjetaExpulsion ? tarjetaExpulsion.minuto : null;
+
+          const effectiveExit = minSalida !== null && minExpulsion !== null
+            ? Math.min(minSalida, minExpulsion)
+            : (minSalida ?? minExpulsion);
+
+          let minutosJugados = 0;
+          let jugo = false;
+
+          if (isStarter) {
+            jugo = true;
+            minutosJugados = effectiveExit !== null ? effectiveExit : 90;
+          } else if (minEntrada !== null) {
+            jugo = true;
+            minutosJugados = effectiveExit !== null ? (effectiveExit - minEntrada) : (90 - minEntrada);
+          }
+
+          minutosJugados = Math.max(0, Math.min(90, minutosJugados));
 
           // Buscar posición táctica en la formación
           const formPos = formationData?.gameFormationPositions?.find((fp) => fp.player?.id === p.id)?.position;

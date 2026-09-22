@@ -144,13 +144,34 @@ function mapearDemarcacion(posKey?: string): string {
   return 'Centrocampista';
 }
 
-function parseMinute(timeStr?: string, timeSec?: number): number {
-  if (timeStr) {
-    const clean = timeStr.replace(/[^0-9]/g, '');
-    const p = parseInt(clean, 10);
-    if (!isNaN(p)) return p;
+export function parseMinute(timeStr?: string, timeSec?: number): number {
+  if (timeStr && typeof timeStr === 'string') {
+    const trimmed = timeStr.trim();
+    if (trimmed.length > 0) {
+      // 1. Caso descuento con '+' (ej: "90+2'", "45+3'") -> se toma el minuto base (90 o 45)
+      if (trimmed.includes('+')) {
+        const parts = trimmed.split('+');
+        const base = parseInt(parts[0].replace(/[^0-9]/g, ''), 10);
+        if (!isNaN(base)) return Math.min(90, Math.max(0, base));
+      }
+      // 2. Caso reloj/cronómetro con ':' (ej: "09:02", "15:30") -> se toman los minutos
+      if (trimmed.includes(':')) {
+        const parts = trimmed.split(':');
+        const mins = parseInt(parts[0].replace(/[^0-9]/g, ''), 10);
+        if (!isNaN(mins)) return Math.min(90, Math.max(0, mins));
+      }
+      // 3. Caso estándar (ej: "77'", "45")
+      const clean = trimmed.replace(/[^0-9]/g, '');
+      const parsed = parseInt(clean, 10);
+      if (!isNaN(parsed)) return Math.min(90, Math.max(0, parsed));
+    }
   }
-  if (typeof timeSec === 'number') return Math.floor(timeSec / 60);
+
+  // 4. Fallback por segundos solo cuando no exista un string interpretable
+  if (typeof timeSec === 'number' && !isNaN(timeSec) && timeSec >= 0) {
+    return Math.min(90, Math.max(0, Math.floor(timeSec / 60)));
+  }
+
   return 0;
 }
 
@@ -433,18 +454,35 @@ export async function getDieLigueDatosLiga(): Promise<DieLigueDatosLigaResponse>
       const minSalida = subOut ? parseMinute(subOut.gameTimeString, subOut.gameTime) : null;
       const minEntrada = isStarter ? 0 : subIn ? parseMinute(subIn.gameTimeString, subIn.gameTime) : null;
 
+      // Expulsión (tarjeta roja directa o doble amarilla / yellow_red)
+      const redCard = events.find((e) =>
+        e.categoryName === 'CARD' &&
+        e.selectedPlayers?.some((sp) => sp.tag?.i18NKey === 'OFFENDING_PLAYER' && sp.player?.id === p.id) &&
+        e.selectedLabels?.some((l) => l.i18NKey === 'RED' || l.i18NKey === 'YELLOW_RED' || l.i18NKey === 'DOUBLE_YELLOW')
+      );
+      const minExpulsion = redCard ? parseMinute(redCard.gameTimeString, redCard.gameTime) : null;
+
+      const effectiveExit = minSalida !== null && minExpulsion !== null
+        ? Math.min(minSalida, minExpulsion)
+        : (minSalida ?? minExpulsion);
+
+      let matchMin = 0;
       if (isStarter) {
         row.titularidades += 1;
         row.partidosJugados += 1;
-        row.minutosJugados += minSalida !== null ? minSalida : 90;
+        matchMin = effectiveExit !== null ? effectiveExit : 90;
       } else {
         row.suplencias += 1;
         if (minEntrada !== null) {
           row.entradasBanquillo += 1;
           row.partidosJugados += 1;
-          row.minutosJugados += minSalida !== null ? minSalida - minEntrada : 90 - minEntrada;
+          matchMin = effectiveExit !== null ? (effectiveExit - minEntrada) : (90 - minEntrada);
         }
       }
+
+      // Garantía estricta de límites por partido: nunca negativo, nunca > 90'
+      matchMin = Math.max(0, Math.min(90, matchMin));
+      row.minutosJugados += matchMin;
 
       // Goles del jugador
       const myGoals = events.filter((e) => {
@@ -471,7 +509,7 @@ export async function getDieLigueDatosLiga(): Promise<DieLigueDatosLigaResponse>
       });
       for (const c of myCards) {
         const isRed = c.selectedLabels?.some((l) => l.i18NKey === 'RED');
-        const isDY = c.selectedLabels?.some((l) => l.i18NKey === 'DOUBLE_YELLOW');
+        const isDY = c.selectedLabels?.some((l) => l.i18NKey === 'DOUBLE_YELLOW' || l.i18NKey === 'YELLOW_RED');
         if (isRed) row.tarjetasRojas += 1;
         else if (isDY) row.doblesAmarillas += 1;
         else row.tarjetasAmarillas += 1;
@@ -490,7 +528,9 @@ export async function getDieLigueDatosLiga(): Promise<DieLigueDatosLigaResponse>
   // Recalcular porcentajes de minutos
   const indautxuPlayersList = Array.from(playersMap.values()).map((p) => {
     p.minutosPosibles = totalMinutosPosiblesIndautxu;
-    p.porcentajeMinutos = totalMinutosPosiblesIndautxu > 0 ? Math.round((p.minutosJugados / totalMinutosPosiblesIndautxu) * 100) : 0;
+    p.porcentajeMinutos = totalMinutosPosiblesIndautxu > 0
+      ? Math.min(100, Math.max(0, Math.round((p.minutosJugados / totalMinutosPosiblesIndautxu) * 100)))
+      : 0;
     return p;
   });
 
@@ -882,18 +922,34 @@ export async function getDieLigueRivalData(rivalName: string): Promise<DieLigueR
         const minSalida = subOut ? parseMinute(subOut.gameTimeString, subOut.gameTime) : null;
         const minEntrada = isStarter ? 0 : subIn ? parseMinute(subIn.gameTimeString, subIn.gameTime) : null;
 
+        // Expulsión (tarjeta roja directa o doble amarilla / yellow_red)
+        const redCard = events.find((e) =>
+          e.categoryName === 'CARD' &&
+          e.selectedPlayers?.some((sp) => sp.tag?.i18NKey === 'OFFENDING_PLAYER' && sp.player?.id === p.id) &&
+          e.selectedLabels?.some((l) => l.i18NKey === 'RED' || l.i18NKey === 'YELLOW_RED' || l.i18NKey === 'DOUBLE_YELLOW')
+        );
+        const minExpulsion = redCard ? parseMinute(redCard.gameTimeString, redCard.gameTime) : null;
+
+        const effectiveExit = minSalida !== null && minExpulsion !== null
+          ? Math.min(minSalida, minExpulsion)
+          : (minSalida ?? minExpulsion);
+
+        let matchMin = 0;
         if (isStarter) {
           row.titularidades += 1;
           row.partidosJugados += 1;
-          row.minutosJugados += minSalida !== null ? minSalida : 90;
+          matchMin = effectiveExit !== null ? effectiveExit : 90;
         } else {
           row.suplencias += 1;
           if (minEntrada !== null) {
             row.entradasBanquillo += 1;
             row.partidosJugados += 1;
-            row.minutosJugados += minSalida !== null ? minSalida - minEntrada : 90 - minEntrada;
+            matchMin = effectiveExit !== null ? (effectiveExit - minEntrada) : (90 - minEntrada);
           }
         }
+
+        matchMin = Math.max(0, Math.min(90, matchMin));
+        row.minutosJugados += matchMin;
 
         // Goles
         const myGoals = events.filter((e) => !e.defensiveEvent && e.categoryName === 'GOAL' && e.selectedPlayers?.some((sp) => sp.tag?.i18NKey === 'SCORER' && sp.player?.id === p.id));
@@ -902,7 +958,7 @@ export async function getDieLigueRivalData(rivalName: string): Promise<DieLigueR
         // Tarjetas
         const myCards = events.filter((e) => e.categoryName === 'CARD' && e.selectedPlayers?.some((sp) => sp.tag?.i18NKey === 'OFFENDING_PLAYER' && sp.player?.id === p.id));
         for (const c of myCards) {
-          if (c.selectedLabels?.some((l) => l.i18NKey === 'RED' || l.i18NKey === 'DOUBLE_YELLOW')) {
+          if (c.selectedLabels?.some((l) => l.i18NKey === 'RED' || l.i18NKey === 'YELLOW_RED' || l.i18NKey === 'DOUBLE_YELLOW')) {
             row.tarjetasRojas += 1;
           } else {
             row.tarjetasAmarillas += 1;
@@ -916,7 +972,9 @@ export async function getDieLigueRivalData(rivalName: string): Promise<DieLigueR
 
   const players = Array.from(playerRowsMap.values()).map((p) => {
     p.minutosPosibles = totalMinutosPosibles;
-    p.porcentajeMinutos = totalMinutosPosibles > 0 ? Math.round((p.minutosJugados / totalMinutosPosibles) * 100) : 0;
+    p.porcentajeMinutos = totalMinutosPosibles > 0
+      ? Math.min(100, Math.max(0, Math.round((p.minutosJugados / totalMinutosPosibles) * 100)))
+      : 0;
     return p;
   }).sort((a, b) => b.minutosJugados - a.minutosJugados);
 
