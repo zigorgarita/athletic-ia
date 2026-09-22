@@ -253,8 +253,8 @@ export function DatosIndautxuDieLigueClient() {
       id: 'calendario',
       label: 'CALENDARIO',
       icon: CalendarIcon,
-      badge: '30',
-      description: 'Jornadas de Liga, marcadores y estado en la plataforma',
+      badge: data?.calendar ? String(data.calendar.length) : undefined,
+      description: 'Partidos disputados y programados en la competición oficial Die Ligue',
     },
     {
       id: 'rivales',
@@ -885,9 +885,30 @@ export function DatosIndautxuDieLigueClient() {
         </div>
       )}
 
-      {/* 5. Subpestaña: CALENDARIO (30 JORNADAS) */}
+      {/* 5. Subpestaña: CALENDARIO */}
       {!loading && !error && activeTab === 'calendario' && data && (
         <div className="space-y-6">
+          {/* Cabecera resumen de partidos Die Ligue */}
+          <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-2xl bg-slate-900/60 border border-slate-800">
+            <div>
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                <CalendarIcon className="w-4 h-4 text-blue-400" />
+                <span>Partidos en Die Ligue · SD Indautxu</span>
+                <span className="text-xs px-2.5 py-0.5 rounded-full bg-blue-950 text-blue-400 border border-blue-800 font-mono font-bold">
+                  {filteredCalendar.length} {filteredCalendar.length === 1 ? 'partido' : 'partidos'}
+                </span>
+                {data.summary.partidosDisputados > 0 && (
+                  <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800 font-mono font-bold">
+                    {data.summary.partidosDisputados} analizados
+                  </span>
+                )}
+              </h3>
+              <p className="text-xs text-slate-400 mt-1">
+                Competición oficial Die Ligue: Grupo 2 División de Honor Juvenil (2026/27)
+              </p>
+            </div>
+          </div>
+
           {/* Filtros de Calendario */}
           <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-2xl bg-slate-900/40 border border-slate-800 text-xs">
             <div className="flex items-center gap-2">
@@ -921,147 +942,168 @@ export function DatosIndautxuDieLigueClient() {
             </div>
           </div>
 
-          {/* Grid de 30 Jornadas */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {filteredCalendar.map((match) => {
-              const isFinished = match.status === 'FINISHED';
-              const isNotPublished = match.status === 'NOT_PUBLISHED';
+          {/* Grid de Partidos */}
+          {filteredCalendar.length === 0 ? (
+            <div className="p-8 text-center rounded-2xl bg-slate-900/30 border border-slate-800 text-slate-400 text-sm">
+              No se han encontrado partidos con los filtros seleccionados.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {filteredCalendar.map((match) => {
+                const isFinished = match.status === 'FINISHED';
+                const isNotPublished = match.status === 'NOT_PUBLISHED';
 
-              return (
-                <div
-                  key={match.jornada}
-                  className={`p-4 rounded-2xl border transition-all flex flex-col justify-between ${
-                    isFinished
-                      ? 'bg-slate-900/90 border-slate-800 hover:border-slate-700 shadow-md'
-                      : isNotPublished
-                      ? 'bg-slate-950/40 border-slate-900/80 opacity-70'
-                      : 'bg-slate-900/50 border-amber-900/30'
-                  }`}
-                >
-                  {/* Cabecera: Jornada, Local/Visitante y Estado Die Ligue */}
-                  <div>
-                    <div className="flex items-center justify-between border-b border-slate-800/80 pb-2.5 mb-3 text-xs gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono font-extrabold px-2.5 py-0.5 rounded-lg bg-slate-800 text-white text-xs border border-slate-700/60">
-                          JORNADA {match.jornada}
-                        </span>
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider ${
-                          match.esLocal
-                            ? 'bg-blue-950/60 text-blue-300 border border-blue-800/40'
-                            : 'bg-slate-800 text-slate-300 border border-slate-700/50'
+                return (
+                  <div
+                    key={match.jornada}
+                    className={`p-4 rounded-2xl border transition-all flex flex-col justify-between ${
+                      isFinished
+                        ? 'bg-slate-900/90 border-slate-800 hover:border-slate-700 shadow-md'
+                        : isNotPublished
+                        ? 'bg-slate-950/40 border-slate-900/80 opacity-70'
+                        : 'bg-slate-900/50 border-amber-900/30'
+                    }`}
+                  >
+                    {/* Cabecera: Jornada, Local/Visitante y Estado Die Ligue */}
+                    <div>
+                      <div className="flex items-center justify-between border-b border-slate-800/80 pb-2.5 mb-3 text-xs gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-extrabold px-2.5 py-0.5 rounded-lg bg-slate-800 text-white text-xs border border-slate-700/60">
+                            JORNADA {match.jornada}
+                          </span>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider ${
+                            match.esLocal
+                              ? 'bg-blue-950/60 text-blue-300 border border-blue-800/40'
+                              : 'bg-slate-800 text-slate-300 border border-slate-700/50'
+                          }`}>
+                            {match.esLocal ? 'Local' : 'Visitante'}
+                          </span>
+                        </div>
+
+                        {/* Estado Die Ligue */}
+                        <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full whitespace-nowrap ${
+                          isFinished
+                            ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-500/30'
+                            : isNotPublished
+                            ? 'bg-slate-900 text-slate-500 border border-slate-800'
+                            : 'bg-amber-950/80 text-amber-400 border border-amber-500/30'
                         }`}>
-                          {match.esLocal ? 'Local' : 'Visitante'}
+                          {match.statusLabel}
                         </span>
                       </div>
 
-                      {/* Estado Die Ligue */}
-                      <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full whitespace-nowrap ${
-                        isFinished
-                          ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-500/30'
-                          : isNotPublished
-                          ? 'bg-slate-900 text-slate-500 border border-slate-800'
-                          : 'bg-amber-950/80 text-amber-400 border border-amber-500/30'
-                      }`}>
-                        {match.statusLabel}
-                      </span>
-                    </div>
+                      {/* Rival, Metadatos y Resultado */}
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          {match.rivalLogo ? (
+                            <img src={match.rivalLogo} alt={match.rival} className="w-10 h-10 object-contain shrink-0" />
+                          ) : (
+                            <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center text-slate-500 shrink-0">
+                              <Shield className="w-5 h-5" />
+                            </div>
+                          )}
+                          <div className="min-w-0">
+                            <h4 className="text-sm font-bold text-white truncate max-w-[220px]">
+                              {match.rival}
+                            </h4>
 
-                    {/* Rival, Metadatos y Resultado */}
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-3 min-w-0">
-                        {match.rivalLogo ? (
-                          <img src={match.rivalLogo} alt={match.rival} className="w-10 h-10 object-contain shrink-0" />
-                        ) : (
-                          <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center text-slate-500 shrink-0">
-                            <Shield className="w-5 h-5" />
-                          </div>
-                        )}
-                        <div className="min-w-0">
-                          <h4 className="text-sm font-bold text-white truncate max-w-[220px]">
-                            {match.rival}
-                          </h4>
+                            {/* Fecha y Hora */}
+                            <div className="flex items-center gap-1.5 text-[11px] text-slate-400 mt-1">
+                              <CalendarIcon className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                              <span>
+                                {match.fecha
+                                  ? new Date(match.fecha).toLocaleDateString('es-ES', {
+                                      day: 'numeric',
+                                      month: 'short',
+                                      year: 'numeric',
+                                    })
+                                  : 'Fecha pendiente'}
+                                {match.hora ? ` • ${match.hora}` : ''}
+                              </span>
+                            </div>
 
-                          {/* Fecha y Hora */}
-                          <div className="flex items-center gap-1.5 text-[11px] text-slate-400 mt-1">
-                            <CalendarIcon className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                            <span>
-                              {match.fecha
-                                ? new Date(match.fecha).toLocaleDateString('es-ES', {
-                                    day: 'numeric',
-                                    month: 'short',
-                                    year: 'numeric',
-                                  })
-                                : 'Fecha pendiente'}
-                              {match.hora ? ` • ${match.hora}` : ''}
-                            </span>
-                          </div>
-
-                          {/* Campo */}
-                          <div className="flex items-center gap-1.5 text-[11px] text-slate-400 mt-0.5">
-                            <MapPin className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                            <span className="truncate max-w-[220px]">
-                              {match.campo || (match.esLocal ? 'Campo Municipal de Iparralde' : 'Campo por determinar')}
-                            </span>
+                            {/* Campo */}
+                            <div className="flex items-center gap-1.5 text-[11px] text-slate-400 mt-0.5">
+                              <MapPin className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                              <span className="truncate max-w-[220px]" title={match.campo || undefined}>
+                                {match.campo || (match.esLocal ? 'Campo Municipal de Iparralde' : 'Campo por determinar')}
+                              </span>
+                            </div>
                           </div>
                         </div>
-                      </div>
 
-                      {/* Resultado */}
-                      <div className="text-right shrink-0">
-                        {isFinished && match.scoreHome !== null && match.scoreAway !== null ? (
-                          <div className="text-base font-mono font-black text-white px-3 py-1 rounded-xl bg-slate-950 border border-slate-800 shadow-inner">
-                            {match.scoreHome} - {match.scoreAway}
-                          </div>
-                        ) : (
-                          <div className="text-xs font-mono text-slate-500 px-2 py-1 rounded-lg bg-slate-950/40 border border-slate-900">
-                            - vs -
-                          </div>
-                        )}
+                        {/* Resultado */}
+                        <div className="text-right shrink-0">
+                          {isFinished && match.scoreHome !== null && match.scoreAway !== null ? (
+                            <div className="text-base font-mono font-black text-white px-3 py-1 rounded-xl bg-slate-950 border border-slate-800 shadow-inner">
+                              {match.scoreHome} - {match.scoreAway}
+                            </div>
+                          ) : (
+                            <div className="text-xs font-mono text-slate-500 px-2 py-1 rounded-lg bg-slate-950/40 border border-slate-900">
+                              - vs -
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Pie de Ficha: Botón Ver Detalle Die Ligue o Aviso Pendiente */}
-                  <div className="mt-3 pt-2.5 border-t border-slate-800/60">
-                    {isFinished && match.gameId ? (
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-[11px] text-emerald-400/80 font-medium flex items-center gap-1">
-                          <Sparkles className="w-3 h-3" />
-                          Acta deportiva completa
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setModalMatchInfo({
-                              isOpen: true,
-                              gameId: match.gameId,
-                              jornada: match.jornada,
-                              homeTeamName: match.esLocal ? 'Indautxu' : match.rival,
-                              awayTeamName: match.esLocal ? match.rival : 'Indautxu',
-                            })
-                          }
-                          className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all shadow-md shadow-blue-900/20 flex items-center gap-1.5"
-                        >
-                          <Film className="w-3.5 h-3.5" />
-                          <span>Ver detalle Die Ligue</span>
-                          <ChevronRight className="w-3.5 h-3.5 opacity-80" />
-                        </button>
-                      </div>
-                    ) : isNotPublished ? (
-                      <div className="text-xs text-slate-500 italic">
-                        Pendiente de publicación en Die Ligue
-                      </div>
-                    ) : (
-                      <div className="text-xs text-slate-400 italic flex items-center gap-1.5">
-                        <Clock className="w-3.5 h-3.5 text-slate-500" />
-                        <span>Análisis aún no publicado en Die Ligue</span>
-                      </div>
-                    )}
+                    {/* Pie de Ficha: Botón Ver Detalle Die Ligue o Aviso Pendiente */}
+                    <div className="mt-3 pt-2.5 border-t border-slate-800/60">
+                      {isFinished && match.gameId ? (
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[11px] text-emerald-400/80 font-medium flex items-center gap-1">
+                            <Sparkles className="w-3 h-3" />
+                            Acta deportiva completa
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setModalMatchInfo({
+                                isOpen: true,
+                                gameId: match.gameId,
+                                jornada: match.jornada,
+                                homeTeamName: match.esLocal ? 'Indautxu' : match.rival,
+                                awayTeamName: match.esLocal ? match.rival : 'Indautxu',
+                              })
+                            }
+                            className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all shadow-md shadow-blue-900/20 flex items-center gap-1.5"
+                          >
+                            <Film className="w-3.5 h-3.5" />
+                            <span>Ver detalle Die Ligue</span>
+                            <ChevronRight className="w-3.5 h-3.5 opacity-80" />
+                          </button>
+                        </div>
+                      ) : isNotPublished ? (
+                        <div className="text-xs text-slate-500 italic">
+                          Pendiente de publicación en Die Ligue
+                        </div>
+                      ) : (
+                        <div className="text-xs text-slate-400 italic flex items-center gap-1.5">
+                          <Clock className="w-3.5 h-3.5 text-slate-500" />
+                          <span>Análisis aún no publicado en Die Ligue</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Aviso sobre jornadas pendientes de publicación oficial en Die Ligue */}
+          {data.calendar.length < 30 && (
+            <div className="p-3.5 rounded-xl bg-slate-900/40 border border-slate-800/80 text-xs text-slate-400 flex flex-wrap items-center justify-between gap-2">
+              <span className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-slate-500 shrink-0" />
+                <span>
+                  Mostrando los {data.calendar.length} partidos publicados por Die Ligue. Las siguientes jornadas se irán incorporando automáticamente conforme Die Ligue las active en la competición oficial.
+                </span>
+              </span>
+              <span className="text-[11px] text-slate-500 font-mono">
+                {30 - data.calendar.length} jornadas por publicar
+              </span>
+            </div>
+          )}
         </div>
       )}
 

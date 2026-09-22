@@ -1,5 +1,6 @@
 import 'server-only';
 import { fetchDieLigenDelivery, DHJ2_CONTEST_ID } from '@/lib/die-ligen/client';
+import { isMatchingDieLigenTeam } from '@/lib/die-ligen/mapping';
 
 export interface DieLiguePlayerStatRow {
   id: string; // player.id estable
@@ -153,6 +154,81 @@ function parseMinute(timeStr?: string, timeSec?: number): number {
   return 0;
 }
 
+/**
+ * Normaliza de forma unificada y canónica un partido de Die Ligue al formato DieLigueCalendarMatch.
+ * Reutilizada idénticamente para Indautxu y para todos los Rivales.
+ */
+export function mapDieLigueGameToCalendarMatch(
+  g: {
+    id: string;
+    round?: { roundOrderNumber?: number };
+    homeTeam?: { id?: string; name?: string; teamLogoUrl?: string };
+    awayTeam?: { id?: string; name?: string; teamLogoUrl?: string };
+    analysisStatus?: { i18NKey?: string };
+    scoreHome?: number | null;
+    scoreAway?: number | null;
+    gameDate?: string;
+    venue_name?: string;
+  },
+  targetTeamName: string,
+  targetShortName?: string,
+  venueOverride?: string | null
+): DieLigueCalendarMatch {
+  const isHome = isMatchingDieLigenTeam(g.homeTeam?.name, targetTeamName, targetShortName);
+  const opp = isHome ? g.awayTeam : g.homeTeam;
+  const statusKey = g.analysisStatus?.i18NKey || 'OPEN';
+
+  let statusLabel = 'Programado/Pendiente';
+  let statusEnum: DieLigueCalendarMatch['status'] = 'OPEN';
+  if (statusKey === 'FINISHED') {
+    statusLabel = 'Finalizado';
+    statusEnum = 'FINISHED';
+  } else if (statusKey === 'TIMINGS_PENDING') {
+    statusLabel = 'Pendiente de sincronización';
+    statusEnum = 'TIMINGS_PENDING';
+  } else if (statusKey === 'IN_PROGRESS') {
+    statusLabel = 'En proceso de análisis';
+    statusEnum = 'IN_PROGRESS';
+  }
+
+  let horaStr: string | null = null;
+  if (g.gameDate) {
+    try {
+      const d = new Date(g.gameDate);
+      horaStr = d.toLocaleTimeString('es-ES', {
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: 'Europe/Madrid',
+      });
+    } catch {
+      horaStr = null;
+    }
+  }
+
+  const campo =
+    venueOverride ||
+    g.venue_name ||
+    (isHome ? 'Campo Municipal de Iparralde' : null);
+
+  return {
+    jornada: g.round?.roundOrderNumber || 0,
+    gameId: g.id,
+    fecha: g.gameDate || null,
+    hora: horaStr,
+    rival: opp?.name || 'Rival',
+    rivalLogo: opp?.teamLogoUrl || null,
+    esLocal: isHome,
+    campo,
+    scoreHome: g.scoreHome ?? null,
+    scoreAway: g.scoreAway ?? null,
+    scoreHalftimeHome: null,
+    scoreHalftimeAway: null,
+    status: statusEnum,
+    statusLabel,
+    disponible: true,
+  };
+}
+
 export async function getDieLigueDatosLiga(): Promise<DieLigueDatosLigaResponse> {
   // 1. Obtener calendario del torneo DHJ2
   const contest = await fetchDieLigenDelivery<{
@@ -171,13 +247,13 @@ export async function getDieLigueDatosLiga(): Promise<DieLigueDatosLigaResponse>
 
   const allGames = contest?.games || [];
 
-  // 2. Partidos del SD Indautxu
+  // 2. Partidos del SD Indautxu (usando resolución canónica unificada)
   const indautxuGames = allGames.filter((g) => {
     return (
       g.homeTeam?.id === INDAUTXU_TEAM_ID ||
       g.awayTeam?.id === INDAUTXU_TEAM_ID ||
-      g.homeTeam?.name?.includes('Indautxu') ||
-      g.awayTeam?.name?.includes('Indautxu')
+      isMatchingDieLigenTeam(g.homeTeam?.name, 'SD Indautxu', 'Indautxu') ||
+      isMatchingDieLigenTeam(g.awayTeam?.name, 'SD Indautxu', 'Indautxu')
     );
   });
 
@@ -261,10 +337,16 @@ export async function getDieLigueDatosLiga(): Promise<DieLigueDatosLigaResponse>
   }
 
   const indautxuAnalyses: FullGamePayload[] = [];
+  const venueMap = new Map<string, string>();
   for (const g of indautxuFinishedGames) {
     try {
       const full = await fetchDieLigenDelivery<FullGamePayload>(`/analysis/game/${g.id}`);
-      if (full) indautxuAnalyses.push(full);
+      if (full) {
+        indautxuAnalyses.push(full);
+        if (full.gameInfo?.id && full.gameInfo?.venue_name) {
+          venueMap.set(full.gameInfo.id, full.gameInfo.venue_name);
+        }
+      }
     } catch (e) {
       console.warn(`No se pudo descargar análisis de ${g.id}:`, e);
     }
@@ -412,76 +494,10 @@ export async function getDieLigueDatosLiga(): Promise<DieLigueDatosLigaResponse>
     return p;
   });
 
-  // 5. Calendario de 30 Jornadas para Indautxu
-  const calendar: DieLigueCalendarMatch[] = [];
-  for (let j = 1; j <= 30; j++) {
-    const contestMatch = indautxuGames.find((g) => g.round?.roundOrderNumber === j);
-
-    if (contestMatch) {
-      const isHome = contestMatch.homeTeam?.id === INDAUTXU_TEAM_ID || contestMatch.homeTeam?.name?.includes('Indautxu');
-      const rivalTeam = isHome ? contestMatch.awayTeam : contestMatch.homeTeam;
-      const statusKey = contestMatch.analysisStatus?.i18NKey || 'OPEN';
-
-      let statusLabel = 'Programado/Pendiente';
-      let statusEnum: DieLigueCalendarMatch['status'] = 'OPEN';
-      if (statusKey === 'FINISHED') {
-        statusLabel = 'Finalizado';
-        statusEnum = 'FINISHED';
-      } else if (statusKey === 'TIMINGS_PENDING') {
-        statusLabel = 'Pendiente de sincronización';
-        statusEnum = 'TIMINGS_PENDING';
-      } else if (statusKey === 'IN_PROGRESS') {
-        statusLabel = 'En proceso de análisis';
-        statusEnum = 'IN_PROGRESS';
-      }
-
-      let horaStr: string | null = null;
-      if (contestMatch.gameDate) {
-        try {
-          const d = new Date(contestMatch.gameDate);
-          horaStr = d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Madrid' });
-        } catch {
-          horaStr = null;
-        }
-      }
-
-      calendar.push({
-        jornada: j,
-        gameId: contestMatch.id,
-        fecha: contestMatch.gameDate || null,
-        hora: horaStr,
-        rival: rivalTeam?.name || 'Rival de Liga',
-        rivalLogo: rivalTeam?.teamLogoUrl || null,
-        esLocal: Boolean(isHome),
-        campo: contestMatch.venue_name || (isHome ? 'Campo Municipal de Iparralde' : null),
-        scoreHome: contestMatch.scoreHome ?? null,
-        scoreAway: contestMatch.scoreAway ?? null,
-        scoreHalftimeHome: null,
-        scoreHalftimeAway: null,
-        status: statusEnum,
-        statusLabel,
-        disponible: true,
-      });
-    } else {
-      // Jornada futura no cargada aún por Die Ligue
-      calendar.push({
-        jornada: j,
-        fecha: null,
-        hora: null,
-        rival: `Jornada ${j}`,
-        rivalLogo: null,
-        esLocal: j % 2 === 0, // Alternancia de sede
-        campo: null,
-        scoreHome: null,
-        scoreAway: null,
-        scoreHalftimeHome: null,
-        scoreHalftimeAway: null,
-        status: 'NOT_PUBLISHED',
-        statusLabel: 'Pendiente de publicación en Die Ligue',
-        disponible: false,
-      });
-    }
-  }
+  // 5. Calendario de partidos del SD Indautxu usando la misma lógica/normalización canónica que Rivales
+  const calendar: DieLigueCalendarMatch[] = indautxuGames
+    .map((g) => mapDieLigueGameToCalendarMatch(g, 'SD Indautxu', 'Indautxu', venueMap.get(g.id)))
+    .sort((a, b) => a.jornada - b.jornada);
 
   // 6. Clasificación calculada a partir de los marcadores FINISHED del grupo
   const groupFinishedGames = allGames.filter((g) => g.analysisStatus?.i18NKey === 'FINISHED');
@@ -801,10 +817,13 @@ export async function getDieLigueRivalData(rivalName: string): Promise<DieLigueR
   const playerRowsMap = new Map<string, DieLigueRivalPlayerRow>();
   const totalMinutosPosibles = finishedGames.length * 90;
 
+  const rivalVenueMap = new Map<string, string>();
   for (const g of finishedGames) {
     try {
       const match = await fetchDieLigenDelivery<{
         gameInfo?: {
+          id?: string;
+          venue_name?: string;
           homeTeam?: { id: string; name: string; players?: Array<{ id: string; playerName: string; shirtNumber: number; starting: boolean; seasonRosterId?: string }> };
           awayTeam?: { id: string; name: string; players?: Array<{ id: string; playerName: string; shirtNumber: number; starting: boolean; seasonRosterId?: string }> };
         };
@@ -820,6 +839,9 @@ export async function getDieLigueRivalData(rivalName: string): Promise<DieLigueR
       }>(`/analysis/game/${g.id}`);
 
       const gi = match.gameInfo;
+      if (gi?.id && gi?.venue_name) {
+        rivalVenueMap.set(gi.id, gi.venue_name);
+      }
       const isHome = gi?.homeTeam?.name === rivalName;
       const rTeam = isHome ? gi?.homeTeam : gi?.awayTeam;
       const rPlayers = rTeam?.players || [];
@@ -898,42 +920,10 @@ export async function getDieLigueRivalData(rivalName: string): Promise<DieLigueR
     return p;
   }).sort((a, b) => b.minutosJugados - a.minutosJugados);
 
-  // Calendario del rival
-  const matches: DieLigueCalendarMatch[] = rivalGames.map((g) => {
-    const isHome = g.homeTeam?.name === rivalName;
-    const opp = isHome ? g.awayTeam : g.homeTeam;
-    const sKey = g.analysisStatus?.i18NKey || 'OPEN';
-    let sLabel = 'Programado/Pendiente';
-    let sEnum: DieLigueCalendarMatch['status'] = 'OPEN';
-    if (sKey === 'FINISHED') {
-      sLabel = 'Finalizado';
-      sEnum = 'FINISHED';
-    } else if (sKey === 'TIMINGS_PENDING') {
-      sLabel = 'Pendiente de sincronización';
-      sEnum = 'TIMINGS_PENDING';
-    } else if (sKey === 'IN_PROGRESS') {
-      sLabel = 'En proceso de análisis';
-      sEnum = 'IN_PROGRESS';
-    }
-
-    return {
-      jornada: g.round?.roundOrderNumber || 0,
-      gameId: g.id,
-      fecha: g.gameDate || null,
-      hora: null,
-      rival: opp?.name || 'Rival',
-      rivalLogo: opp?.teamLogoUrl || null,
-      esLocal: isHome,
-      campo: g.venue_name || null,
-      scoreHome: g.scoreHome ?? null,
-      scoreAway: g.scoreAway ?? null,
-      scoreHalftimeHome: null,
-      scoreHalftimeAway: null,
-      status: sEnum,
-      statusLabel: sLabel,
-      disponible: true,
-    };
-  }).sort((a, b) => a.jornada - b.jornada);
+  // Calendario del rival usando la misma normalización canónica
+  const matches: DieLigueCalendarMatch[] = rivalGames
+    .map((g) => mapDieLigueGameToCalendarMatch(g, rivalName, undefined, rivalVenueMap.get(g.id)))
+    .sort((a, b) => a.jornada - b.jornada);
 
   return {
     id: rivalName,
