@@ -10,7 +10,7 @@
  * - Bind exclusivo a 127.0.0.1:41189 (loopback).
  * - Cero privilegios de administrador.
  * - Cero shell concatenation: child_process.execFile con array de argumentos.
- * - Validación estricta de parámetro 'jornada' (entero 3 a 30).
+ * - Validación estricta de parámetro 'jornada' (entero 1 a 30).
  * - URL canónica PascalCase inmutable: CodTemporada=22, CodCompeticion=33836116, CodGrupo=33836118.
  * - Validación estructural del HTML en memoria (CodCompeticion, CodGrupo, font_widgetL/V, Jornada).
  * - Cero persistencia en disco de HTML ni portapapeles.
@@ -25,7 +25,7 @@ const path = require('path');
 const os = require('os');
 
 const HOST = '127.0.0.1';
-const PORT = 41189;
+const PORT = parseInt(process.env.PORT || '41189', 10);
 const CURL_PATH = 'C:\\Windows\\System32\\curl.exe';
 
 // Allowlist estricta de orígenes autorizados
@@ -68,93 +68,112 @@ function sendJsonResponse(res, statusCode, data, origin) {
   res.end(JSON.stringify(data));
 }
 
-function fetchRfefJornada(jornada) {
+function fetchRfefJornada(jornada, sessionCookiePath) {
   return new Promise((resolve, reject) => {
-    const uniqueId = `rfef_cookie_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.txt`;
-    const cookieFile = path.join(os.tmpdir(), uniqueId);
+    const ownsCookie = !sessionCookiePath;
+    const cookieFile = sessionCookiePath || path.join(os.tmpdir(), `rfef_cookie_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.txt`);
 
-    try {
-      fs.writeFileSync(cookieFile, '');
-    } catch (e) {
-      // Ignorar si falla la creación vacía inicial
+    if (ownsCookie) {
+      try {
+        fs.writeFileSync(cookieFile, '');
+      } catch (e) {
+        // Ignorar si falla la creación vacía inicial
+      }
     }
 
     const url = `https://resultados.rfef.es/pnfg/NPcd/NFG_CmpJornada?cod_primaria=1000120&CodTemporada=22&CodCompeticion=33836116&CodGrupo=33836118&CodJornada=${jornada}`;
 
     const args = [
       '-s',
+      '--http1.1',
       '-L',
       '--cookie-jar', cookieFile,
       '--cookie', cookieFile,
       url
     ];
 
-    execFile(CURL_PATH, args, { maxBuffer: 10 * 1024 * 1024, encoding: 'utf8' }, (error, stdout, stderr) => {
-      // Limpieza obligatoria del archivo temporal de cookies en finally
-      try {
-        if (fs.existsSync(cookieFile)) {
-          fs.unlinkSync(cookieFile);
+    const runCurl = (attempt) => {
+      execFile(CURL_PATH, args, { maxBuffer: 10 * 1024 * 1024, encoding: 'utf8' }, (error, stdout, stderr) => {
+        const html = stdout || '';
+
+        // Si la RFEF devuelve respuesta vacía por negociación de cookies o silenciamiento, reintentar hasta 3 veces (P4.4)
+        if (html.length < 1000 && attempt < 3) {
+          console.log(`[RFEF] Intento ${attempt} vacío (${html.length} bytes) para Jornada ${jornada}. Reintentando con cookie establecida...`);
+          setTimeout(() => runCurl(attempt + 1), 500);
+          return;
         }
-      } catch (cleanupErr) {
-        // Fallback silencioso de limpieza
-      }
 
-      if (error) {
-        return reject({ type: 'CURL_ERROR', message: 'Error de conexión curl con la RFEF.' });
-      }
+        // Limpieza obligatoria del archivo temporal de cookies en finally si es dueño
+        if (ownsCookie) {
+          try {
+            if (fs.existsSync(cookieFile)) {
+              fs.unlinkSync(cookieFile);
+            }
+          } catch (cleanupErr) {
+            // Fallback silencioso de limpieza
+          }
+        }
 
-      const html = stdout || '';
+        if (error) {
+          return reject({ type: 'CURL_ERROR', message: 'Error de conexión curl con la RFEF.' });
+        }
 
-      // Validaciones estructurales idénticas a rfef-fetch.bat
-      if (html.length < 10000) {
-        return reject({ type: 'INVALID_HTML', message: 'Respuesta de la RFEF insuficiente o vacía.' });
-      }
+        // Validaciones estructurales idénticas a rfef-fetch.bat
+        if (html.length < 10000) {
+          return reject({ type: 'INVALID_HTML', message: 'Respuesta de la RFEF insuficiente o vacía.' });
+        }
 
-      if (!html.includes('NFG_CmpJornada')) {
-        return reject({ type: 'INVALID_HTML', message: 'El contenido recibido no contiene la estructura oficial de la RFEF.' });
-      }
+        if (!html.includes('NFG_CmpJornada')) {
+          return reject({ type: 'INVALID_HTML', message: 'El contenido recibido no contiene la estructura oficial de la RFEF.' });
+        }
 
-      if (!html.includes('CodCompeticion=33836116')) {
-        return reject({ type: 'INVALID_HTML', message: 'La respuesta de la RFEF no contiene la competición oficial (CodCompeticion=33836116).' });
-      }
+        if (!html.includes('CodCompeticion=33836116')) {
+          return reject({ type: 'INVALID_HTML', message: 'La respuesta de la RFEF no contiene la competición oficial (CodCompeticion=33836116).' });
+        }
 
-      if (!html.includes('CodGrupo=33836118')) {
-        return reject({ type: 'INVALID_HTML', message: 'La respuesta de la RFEF no contiene el grupo oficial (CodGrupo=33836118).' });
-      }
+        if (!html.includes('CodGrupo=33836118')) {
+          return reject({ type: 'INVALID_HTML', message: 'La respuesta de la RFEF no contiene el grupo oficial (CodGrupo=33836118).' });
+        }
 
-      if (!html.includes('class=font_widgetL') || !html.includes('class=font_widgetV')) {
-        return reject({ type: 'INVALID_HTML', message: 'La página de la RFEF no contiene partidos oficiales (tabla de resultados vacía).' });
-      }
+        if (!html.includes('class=font_widgetL') || !html.includes('class=font_widgetV')) {
+          return reject({ type: 'INVALID_HTML', message: 'La página de la RFEF no contiene partidos oficiales (tabla de resultados vacía).' });
+        }
 
-      const hasJornada =
-        html.includes(`<strong>Jornada</strong> ${jornada}`) ||
-        html.includes(`CodJornada=${jornada}&`) ||
-        html.includes(`Jornada ${jornada}`);
+        const hasJornada =
+          html.includes(`<strong>Jornada</strong> ${jornada}`) ||
+          html.includes(`CodJornada=${jornada}&`) ||
+          html.includes(`Jornada ${jornada}`);
 
-      if (!hasJornada) {
-        return reject({ type: 'INVALID_HTML', message: `El contenido recibido no parece corresponder a la Jornada ${jornada}.` });
-      }
+        if (!hasJornada) {
+          return reject({ type: 'INVALID_HTML', message: `El contenido recibido no parece corresponder a la Jornada ${jornada}.` });
+        }
 
-      resolve(html);
-    });
+        resolve(html);
+      });
+    };
+
+    runCurl(1);
   });
 }
 
-function fetchRfefActa(codActa) {
+function fetchRfefActa(codActa, sessionCookiePath) {
   return new Promise((resolve, reject) => {
-    const uniqueId = `rfef_cookie_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.txt`;
-    const cookieFile = path.join(os.tmpdir(), uniqueId);
+    const ownsCookie = !sessionCookiePath;
+    const cookieFile = sessionCookiePath || path.join(os.tmpdir(), `rfef_cookie_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.txt`);
 
-    try {
-      fs.writeFileSync(cookieFile, '');
-    } catch (e) {
-      // Ignorar si falla la creación vacía inicial
+    if (ownsCookie) {
+      try {
+        fs.writeFileSync(cookieFile, '');
+      } catch (e) {
+        // Ignorar si falla la creación vacía inicial
+      }
     }
 
     const url = `https://resultados.rfef.es/pnfg/NPcd/NFG_CmpPartido?cod_primaria=1000120&CodActa=${codActa}&cod_acta=${codActa}`;
 
     const args = [
       '-s',
+      '--http1.1',
       '-L',
       '--cookie-jar', cookieFile,
       '--cookie', cookieFile,
@@ -165,18 +184,22 @@ function fetchRfefActa(codActa) {
       execFile(CURL_PATH, args, { maxBuffer: 15 * 1024 * 1024, encoding: 'utf8' }, (error, stdout, stderr) => {
         const html = stdout || '';
 
-        // Si la RFEF devuelve respuesta vacía en el primer intento por negociación de cookies, reintentar una vez con la cookie ya establecida
-        if (html.length < 1000 && attempt === 1) {
-          return runCurl(2);
+        // Si la RFEF devuelve respuesta vacía por negociación de cookies o silenciamiento, reintentar hasta 3 veces
+        if (html.length < 1000 && attempt < 3) {
+          console.log(`[RFEF] Intento ${attempt} vacío (${html.length} bytes) para Acta ${codActa}. Reintentando con cookie establecida...`);
+          setTimeout(() => runCurl(attempt + 1), 500);
+          return;
         }
 
-        // Limpieza obligatoria del archivo temporal de cookies en finally
-        try {
-          if (fs.existsSync(cookieFile)) {
-            fs.unlinkSync(cookieFile);
+        // Limpieza obligatoria del archivo temporal de cookies en finally si es dueño
+        if (ownsCookie) {
+          try {
+            if (fs.existsSync(cookieFile)) {
+              fs.unlinkSync(cookieFile);
+            }
+          } catch (cleanupErr) {
+            // Fallback silencioso de limpieza
           }
-        } catch (cleanupErr) {
-          // Fallback silencioso de limpieza
         }
 
         if (error) {
@@ -208,7 +231,7 @@ function extractCodActas(calendarHtml) {
   if (!calendarHtml || typeof calendarHtml !== 'string') return [];
   const codActas = new Set();
 
-  // Extraer enlaces a NFG_CmpPartido que contengan CodActa o cod_acta
+  // Extraer EXCLUSIVAMENTE enlaces a NFG_CmpPartido que contengan CodActa o cod_acta (actas oficiales publicadas)
   const linkRegex = /NFG_CmpPartido[^"'>\s]+/gi;
   let match;
   while ((match = linkRegex.exec(calendarHtml)) !== null) {
@@ -223,6 +246,27 @@ function extractCodActas(calendarHtml) {
   }
 
   return Array.from(codActas);
+}
+
+function extractPendingCodActas(calendarHtml) {
+  if (!calendarHtml || typeof calendarHtml !== 'string') return [];
+  const pendingActas = new Set();
+
+  // Extraer enlaces a NFG_CmpPrevio (partidos no disputados o en previa sin acta oficial publicada aún)
+  const linkRegex = /NFG_CmpPrevio[^"'>\s]+/gi;
+  let match;
+  while ((match = linkRegex.exec(calendarHtml)) !== null) {
+    const urlString = match[0];
+    const idMatch = urlString.match(/[?&](?:CodActa|cod_acta)=(\d+)/i);
+    if (idMatch && idMatch[1]) {
+      const val = parseInt(idMatch[1], 10);
+      if (val > 0) {
+        pendingActas.add(val);
+      }
+    }
+  }
+
+  return Array.from(pendingActas);
 }
 
 const server = http.createServer(async (req, res) => {
@@ -273,10 +317,10 @@ const server = http.createServer(async (req, res) => {
 
     const jornada = parseInt(jornadaParam, 10);
 
-    if (jornada < 3 || jornada > 30) {
+    if (jornada < 1 || jornada > 30) {
       sendJsonResponse(res, 400, {
         ok: false,
-        error: `Jornada inválida: ${jornada}. Solo se admiten jornadas de 3 a 30.`
+        error: `Jornada inválida: ${jornada}. Solo se admiten jornadas de 1 a 30.`
       }, origin);
       return;
     }
@@ -342,7 +386,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Endpoint oficial /jornada-completa (P4.1)
+  // Endpoint oficial /jornada-completa (P4.1 / P4.4 Jornada Parcial)
   if (pathname === '/jornada-completa') {
     const jornadaParam = url.searchParams.get('jornada');
 
@@ -356,29 +400,48 @@ const server = http.createServer(async (req, res) => {
 
     const jornada = parseInt(jornadaParam, 10);
 
-    if (jornada < 3 || jornada > 30) {
+    if (jornada < 1 || jornada > 30) {
       sendJsonResponse(res, 400, {
         ok: false,
-        error: `Jornada inválida: ${jornada}. Solo se admiten jornadas de 3 a 30.`
+        error: `Jornada inválida: ${jornada}. Solo se admiten jornadas de 1 a 30.`
       }, origin);
       return;
     }
 
+    const uniqueSessionId = `rfef_session_j${jornada}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.txt`;
+    const sessionCookiePath = path.join(os.tmpdir(), uniqueSessionId);
     try {
-      const calendarHtml = await fetchRfefJornada(jornada);
+      fs.writeFileSync(sessionCookiePath, '');
+    } catch (e) {
+      // Ignorar si falla la creación vacía inicial
+    }
+
+    try {
+      const calendarHtml = await fetchRfefJornada(jornada, sessionCookiePath);
       const calendarBytes = Buffer.byteLength(calendarHtml, 'utf8');
       const codActas = extractCodActas(calendarHtml);
+      const codActasPendientes = extractPendingCodActas(calendarHtml);
       const actasEncontradas = codActas.length;
 
       const actas = [];
+      const actasNoDisponibles = [];
+
+      // Procesar cada acta oficial de forma estrictamente aislada reutilizando la sesión del calendario (P4.4)
       for (const codActa of codActas) {
-        const actaHtml = await fetchRfefActa(codActa);
-        const actaBytes = Buffer.byteLength(actaHtml, 'utf8');
-        actas.push({
-          codActa,
-          bytes: actaBytes,
-          actaHtml
-        });
+        try {
+          const actaHtml = await fetchRfefActa(codActa, sessionCookiePath);
+          const actaBytes = Buffer.byteLength(actaHtml, 'utf8');
+          actas.push({
+            codActa,
+            bytes: actaBytes,
+            actaHtml
+          });
+        } catch (actaErr) {
+          actasNoDisponibles.push({
+            codActa,
+            error: (actaErr && actaErr.message) ? actaErr.message : 'Acta no disponible o no publicada aún.'
+          });
+        }
       }
 
       sendJsonResponse(res, 200, {
@@ -387,13 +450,24 @@ const server = http.createServer(async (req, res) => {
         bytes: calendarBytes,
         calendarHtml,
         actasEncontradas,
-        actas
+        actasDisponibles: actas.length,
+        actas,
+        actasNoDisponibles,
+        codActasPendientes
       }, origin);
     } catch (err) {
       if (err.type === 'INVALID_HTML') {
         sendJsonResponse(res, 422, { ok: false, error: err.message }, origin);
       } else {
         sendJsonResponse(res, 502, { ok: false, error: err.message || 'Error de adquisición RFEF.' }, origin);
+      }
+    } finally {
+      try {
+        if (fs.existsSync(sessionCookiePath)) {
+          fs.unlinkSync(sessionCookiePath);
+        }
+      } catch (cleanupErr) {
+        // Fallback silencioso de limpieza
       }
     }
     return;
