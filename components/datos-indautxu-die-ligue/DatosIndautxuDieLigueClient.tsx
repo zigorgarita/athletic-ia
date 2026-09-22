@@ -18,9 +18,11 @@ import {
   Clock,
 } from 'lucide-react';
 import { getStaffPasskey } from '@/lib/passkey';
+import { useIndautxuLeagueCalendar } from '@/hooks/useIndautxuLeagueCalendar';
 import {
   DieLigueDatosLigaResponse,
   DieLigueRivalInfo,
+  DieLigueCalendarMatch,
 } from '@/lib/die-ligen/datos-liga';
 import { DieLigueMatchDetailModal } from './DieLigueMatchDetailModal';
 
@@ -51,6 +53,9 @@ export function DatosIndautxuDieLigueClient() {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<DieLigueDatosLigaResponse | null>(null);
+
+  // Tronco oficial de 30 jornadas de Liga del SD Indautxu
+  const { calendar: officialCalendar } = useIndautxuLeagueCalendar();
 
   // Filtros y ordenación de Jugadores
   const [searchTerm, setSearchTerm] = useState('');
@@ -223,16 +228,139 @@ export function DatosIndautxuDieLigueClient() {
       });
   }, [data?.indautxuPlayers, searchTerm, filterDemarcacion, sortField, sortAsc]);
 
+  // Helper de formateo de fechas
+  const formatMatchDate = (fechaStr: string | null) => {
+    if (!fechaStr) return 'Fecha por determinar';
+    try {
+      if (fechaStr.includes('T')) {
+        return new Date(fechaStr).toLocaleDateString('es-ES', {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric',
+        });
+      }
+      const parts = fechaStr.split('-');
+      if (parts.length === 3) {
+        const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+        return d.toLocaleDateString('es-ES', {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric',
+        });
+      }
+      return fechaStr;
+    } catch {
+      return fechaStr;
+    }
+  };
+
+  interface HybridCalendarMatch {
+    jornada: number;
+    gameId?: string;
+    fecha: string | null;
+    hora: string | null;
+    rival: string;
+    rivalLogo?: string | null;
+    esLocal: boolean;
+    campo: string | null;
+    scoreHome: number | null;
+    scoreAway: number | null;
+    status: 'FINISHED' | 'TIMINGS_PENDING' | 'IN_PROGRESS' | 'OPEN' | 'NOT_PUBLISHED';
+    statusLabel: string;
+    hasDieLigue: boolean;
+    disponible: boolean;
+    mainVideoUrl?: string | null;
+    isFinished: boolean;
+  }
+
+  // Calendario híbrido: Tronco oficial de 30 jornadas enriquecido automáticamente con Die Ligue
+  const hybridCalendar = useMemo<HybridCalendarMatch[]>(() => {
+    const dlCalendar = data?.calendar || [];
+    const dlMap = new Map<number, DieLigueCalendarMatch>();
+    for (const dl of dlCalendar) {
+      if (typeof dl.jornada === 'number') {
+        dlMap.set(dl.jornada, dl);
+      }
+    }
+
+    if (!officialCalendar || officialCalendar.length === 0) {
+      return dlCalendar.map((dl) => ({
+        jornada: dl.jornada,
+        gameId: dl.gameId,
+        fecha: dl.fecha,
+        hora: dl.hora,
+        rival: dl.rival,
+        rivalLogo: dl.rivalLogo || null,
+        esLocal: dl.esLocal,
+        campo: dl.campo,
+        scoreHome: dl.scoreHome,
+        scoreAway: dl.scoreAway,
+        status: dl.status,
+        statusLabel: dl.statusLabel,
+        hasDieLigue: true,
+        disponible: dl.disponible,
+        mainVideoUrl: dl.mainVideoUrl || null,
+        isFinished: dl.status === 'FINISHED',
+      }));
+    }
+
+    return officialCalendar.map((om) => {
+      const dl = dlMap.get(om.jornada);
+      if (dl) {
+        return {
+          jornada: om.jornada,
+          gameId: dl.gameId,
+          fecha: dl.fecha || om.fecha || null,
+          hora: dl.hora || om.hora || null,
+          rival: dl.rival || om.rivalNombre,
+          rivalLogo: dl.rivalLogo || om.rivalEscudoUrl || null,
+          esLocal: dl.esLocal ?? om.es_local,
+          campo: dl.campo || om.campo || (dl.esLocal ? 'Campo Municipal de Iparralde' : null),
+          scoreHome: dl.scoreHome,
+          scoreAway: dl.scoreAway,
+          status: dl.status,
+          statusLabel: dl.statusLabel,
+          hasDieLigue: true,
+          disponible: dl.disponible,
+          mainVideoUrl: dl.mainVideoUrl || null,
+          isFinished: dl.status === 'FINISHED',
+        };
+      }
+
+      return {
+        jornada: om.jornada,
+        gameId: undefined,
+        fecha: om.fecha || null,
+        hora: om.hora || null,
+        rival: om.rivalNombre,
+        rivalLogo: om.rivalEscudoUrl || null,
+        esLocal: om.es_local,
+        campo: om.campo || (om.es_local ? 'Campo Municipal de Iparralde' : 'Campo rival por confirmar'),
+        scoreHome: om.es_local ? om.golesIndautxu : om.golesRival,
+        scoreAway: om.es_local ? om.golesRival : om.golesIndautxu,
+        status: 'OPEN' as const,
+        statusLabel: 'Programado en Liga · Pendiente de vídeo/análisis en Die Ligue',
+        hasDieLigue: false,
+        disponible: false,
+        mainVideoUrl: null,
+        isFinished: false,
+      };
+    });
+  }, [officialCalendar, data?.calendar]);
+
+  const analizadosCount = useMemo(() => {
+    return hybridCalendar.filter((m) => m.isFinished && m.hasDieLigue).length;
+  }, [hybridCalendar]);
+
   const filteredCalendar = useMemo(() => {
-    if (!data?.calendar) return [];
-    return data.calendar.filter((m) => {
-      if (calendarFilterEstado === 'jugados' && m.status !== 'FINISHED') return false;
-      if (calendarFilterEstado === 'pendientes' && m.status === 'FINISHED') return false;
+    return hybridCalendar.filter((m) => {
+      if (calendarFilterEstado === 'jugados' && !m.isFinished) return false;
+      if (calendarFilterEstado === 'pendientes' && m.isFinished) return false;
       if (calendarFilterSede === 'casa' && !m.esLocal) return false;
       if (calendarFilterSede === 'fuera' && m.esLocal) return false;
       return true;
     });
-  }, [data?.calendar, calendarFilterEstado, calendarFilterSede]);
+  }, [hybridCalendar, calendarFilterEstado, calendarFilterSede]);
 
   const TABS: TabItem[] = [
     {
@@ -253,8 +381,8 @@ export function DatosIndautxuDieLigueClient() {
       id: 'calendario',
       label: 'CALENDARIO',
       icon: CalendarIcon,
-      badge: data?.calendar ? String(data.calendar.length) : undefined,
-      description: 'Partidos disputados y programados en la competición oficial Die Ligue',
+      badge: hybridCalendar.length > 0 ? String(hybridCalendar.length) : '30',
+      description: 'Calendario oficial de 30 jornadas enriquecido con detalle y vídeo Die Ligue',
     },
     {
       id: 'rivales',
@@ -886,25 +1014,25 @@ export function DatosIndautxuDieLigueClient() {
       )}
 
       {/* 5. Subpestaña: CALENDARIO */}
-      {!loading && !error && activeTab === 'calendario' && data && (
+      {!loading && !error && activeTab === 'calendario' && (
         <div className="space-y-6">
-          {/* Cabecera resumen de partidos Die Ligue */}
+          {/* Cabecera resumen de partidos */}
           <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-2xl bg-slate-900/60 border border-slate-800">
             <div>
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
                 <CalendarIcon className="w-4 h-4 text-blue-400" />
-                <span>Partidos en Die Ligue · SD Indautxu</span>
+                <span>Calendario Oficial · SD Indautxu</span>
                 <span className="text-xs px-2.5 py-0.5 rounded-full bg-blue-950 text-blue-400 border border-blue-800 font-mono font-bold">
-                  {filteredCalendar.length} {filteredCalendar.length === 1 ? 'partido' : 'partidos'}
+                  {hybridCalendar.length} jornadas
                 </span>
-                {data.summary.partidosDisputados > 0 && (
+                {analizadosCount > 0 && (
                   <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800 font-mono font-bold">
-                    {data.summary.partidosDisputados} analizados
+                    {analizadosCount} analizados en Die Ligue
                   </span>
                 )}
               </h3>
               <p className="text-xs text-slate-400 mt-1">
-                Competición oficial Die Ligue: Grupo 2 División de Honor Juvenil (2026/27)
+                Tronco oficial de Liga (30 jornadas) enriquecido automáticamente con telemetría, vídeo íntegro 1080p y clips de Die Ligue
               </p>
             </div>
           </div>
@@ -950,8 +1078,8 @@ export function DatosIndautxuDieLigueClient() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {filteredCalendar.map((match) => {
-                const isFinished = match.status === 'FINISHED';
-                const isNotPublished = match.status === 'NOT_PUBLISHED';
+                const isFinished = match.isFinished;
+                const hasDieLigue = match.hasDieLigue;
 
                 return (
                   <div
@@ -959,12 +1087,12 @@ export function DatosIndautxuDieLigueClient() {
                     className={`p-4 rounded-2xl border transition-all flex flex-col justify-between ${
                       isFinished
                         ? 'bg-slate-900/90 border-slate-800 hover:border-slate-700 shadow-md'
-                        : isNotPublished
-                        ? 'bg-slate-950/40 border-slate-900/80 opacity-70'
-                        : 'bg-slate-900/50 border-amber-900/30'
+                        : hasDieLigue
+                        ? 'bg-slate-900/50 border-amber-900/30'
+                        : 'bg-slate-950/40 border-slate-900/80 hover:border-slate-800/80'
                     }`}
                   >
-                    {/* Cabecera: Jornada, Local/Visitante y Estado Die Ligue */}
+                    {/* Cabecera: Jornada, Local/Visitante y Estado */}
                     <div>
                       <div className="flex items-center justify-between border-b border-slate-800/80 pb-2.5 mb-3 text-xs gap-2">
                         <div className="flex items-center gap-2">
@@ -980,19 +1108,23 @@ export function DatosIndautxuDieLigueClient() {
                           </span>
                         </div>
 
-                        {/* Estado Die Ligue */}
-                        <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full whitespace-nowrap ${
-                          isFinished
-                            ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-500/30'
-                            : isNotPublished
-                            ? 'bg-slate-900 text-slate-500 border border-slate-800'
-                            : 'bg-amber-950/80 text-amber-400 border border-amber-500/30'
-                        }`}>
-                          {match.statusLabel}
-                        </span>
+                        {/* Estado */}
+                        {isFinished ? (
+                          <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full whitespace-nowrap bg-emerald-950/80 text-emerald-400 border border-emerald-500/30">
+                            {match.statusLabel}
+                          </span>
+                        ) : hasDieLigue ? (
+                          <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full whitespace-nowrap bg-amber-950/80 text-amber-400 border border-amber-500/30">
+                            {match.statusLabel}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full whitespace-nowrap bg-slate-900/90 text-slate-400 border border-slate-800">
+                            Programado en Liga
+                          </span>
+                        )}
                       </div>
 
-                      {/* Rival, Metadatos y Resultado */}
+                      {/* Rival, Metadatos y Marcador */}
                       <div className="flex items-center justify-between gap-3">
                         <div className="flex items-center gap-3 min-w-0">
                           {match.rivalLogo ? (
@@ -1003,7 +1135,7 @@ export function DatosIndautxuDieLigueClient() {
                             </div>
                           )}
                           <div className="min-w-0">
-                            <h4 className="text-sm font-bold text-white truncate max-w-[220px]">
+                            <h4 className="text-sm font-bold text-white truncate max-w-[220px]" title={match.rival}>
                               {match.rival}
                             </h4>
 
@@ -1011,13 +1143,7 @@ export function DatosIndautxuDieLigueClient() {
                             <div className="flex items-center gap-1.5 text-[11px] text-slate-400 mt-1">
                               <CalendarIcon className="w-3.5 h-3.5 text-slate-500 shrink-0" />
                               <span>
-                                {match.fecha
-                                  ? new Date(match.fecha).toLocaleDateString('es-ES', {
-                                      day: 'numeric',
-                                      month: 'short',
-                                      year: 'numeric',
-                                    })
-                                  : 'Fecha pendiente'}
+                                {formatMatchDate(match.fecha)}
                                 {match.hora ? ` • ${match.hora}` : ''}
                               </span>
                             </div>
@@ -1026,7 +1152,7 @@ export function DatosIndautxuDieLigueClient() {
                             <div className="flex items-center gap-1.5 text-[11px] text-slate-400 mt-0.5">
                               <MapPin className="w-3.5 h-3.5 text-slate-500 shrink-0" />
                               <span className="truncate max-w-[220px]" title={match.campo || undefined}>
-                                {match.campo || (match.esLocal ? 'Campo Municipal de Iparralde' : 'Campo por determinar')}
+                                {match.campo || (match.esLocal ? 'Campo Municipal de Iparralde' : 'Campo rival por confirmar')}
                               </span>
                             </div>
                           </div>
@@ -1073,14 +1199,15 @@ export function DatosIndautxuDieLigueClient() {
                             <ChevronRight className="w-3.5 h-3.5 opacity-80" />
                           </button>
                         </div>
-                      ) : isNotPublished ? (
-                        <div className="text-xs text-slate-500 italic">
-                          Pendiente de publicación en Die Ligue
-                        </div>
-                      ) : (
+                      ) : hasDieLigue ? (
                         <div className="text-xs text-slate-400 italic flex items-center gap-1.5">
                           <Clock className="w-3.5 h-3.5 text-slate-500" />
                           <span>Análisis aún no publicado en Die Ligue</span>
+                        </div>
+                      ) : (
+                        <div className="text-xs text-slate-400/90 flex items-center gap-1.5 py-0.5">
+                          <Clock className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                          <span>Programado en Liga · Pendiente de vídeo/análisis en Die Ligue</span>
                         </div>
                       )}
                     </div>
@@ -1090,20 +1217,18 @@ export function DatosIndautxuDieLigueClient() {
             </div>
           )}
 
-          {/* Aviso sobre jornadas pendientes de publicación oficial en Die Ligue */}
-          {data.calendar.length < 30 && (
-            <div className="p-3.5 rounded-xl bg-slate-900/40 border border-slate-800/80 text-xs text-slate-400 flex flex-wrap items-center justify-between gap-2">
-              <span className="flex items-center gap-2">
-                <Clock className="w-4 h-4 text-slate-500 shrink-0" />
-                <span>
-                  Mostrando los {data.calendar.length} partidos publicados por Die Ligue. Las siguientes jornadas se irán incorporando automáticamente conforme Die Ligue las active en la competición oficial.
-                </span>
+          {/* Aviso sobre sincronización de jornadas con Die Ligue */}
+          <div className="p-3.5 rounded-xl bg-slate-900/40 border border-slate-800/80 text-xs text-slate-400 flex flex-wrap items-center justify-between gap-2">
+            <span className="flex items-center gap-2">
+              <Clock className="w-4 h-4 text-blue-400 shrink-0" />
+              <span>
+                Calendario oficial de 30 jornadas conectado. Las jornadas disputadas se enriquecen automáticamente con vídeo íntegro 1080p, telemetría y clips conforme Die Ligue publica cada partido.
               </span>
-              <span className="text-[11px] text-slate-500 font-mono">
-                {30 - data.calendar.length} jornadas por publicar
-              </span>
-            </div>
-          )}
+            </span>
+            <span className="text-[11px] text-slate-500 font-mono">
+              {analizadosCount} de {hybridCalendar.length || 30} analizadas en Die Ligue
+            </span>
+          </div>
         </div>
       )}
 
