@@ -12,6 +12,7 @@ interface VideoCardProps {
   category?: string | null;
   videoType?: string | null;
   layout?: 'row' | 'grid';
+  isEditMode?: boolean;
   onPlay: (video: MatchVideo) => void;
   onEdit: (video: MatchVideo) => void;
   onDelete: (id: string) => void;
@@ -22,11 +23,13 @@ export function VideoCard({
   category,
   videoType,
   layout = 'row',
+  isEditMode: isEditModeProp,
   onPlay,
   onEdit,
   onDelete,
 }: VideoCardProps) {
-  const { isEditMode } = useEditMode();
+  const { isEditMode: isEditModeContext } = useEditMode();
+  const canEdit = isEditModeProp !== undefined ? isEditModeProp : isEditModeContext;
   const [isExpanded, setIsExpanded] = useState(false);
   const { type, thumbnailUrl } = parseVideoUrl(video.video_url);
 
@@ -182,24 +185,24 @@ export function VideoCard({
               Reproducir
             </Button>
 
-            {isEditMode && (
+            {canEdit && (
               <div className="flex items-center gap-1.5">
-                <Button
+                <button
+                  type="button"
                   onClick={() => onEdit(video)}
-                  variant="ghost"
-                  className="h-7 w-7 p-0 text-slate-400 hover:text-[#CC0E21] hover:bg-[#CC0E21]/10 rounded-lg"
+                  className="flex items-center justify-center h-7 w-7 text-slate-400 hover:text-[#CC0E21] hover:bg-[#CC0E21]/10 rounded-lg transition-colors"
                   title="Editar vídeo"
                 >
                   <Edit className="h-3.5 w-3.5" />
-                </Button>
-                <Button
+                </button>
+                <button
+                  type="button"
                   onClick={() => onDelete(video.id)}
-                  variant="ghost"
-                  className="h-7 w-7 p-0 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg"
+                  className="flex items-center justify-center h-7 w-7 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
                   title="Eliminar vídeo"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
-                </Button>
+                </button>
               </div>
             )}
           </div>
@@ -293,24 +296,24 @@ export function VideoCard({
               Reproducir
             </Button>
 
-            {isEditMode && (
+            {canEdit && (
               <div className="flex items-center gap-2">
-                <Button
+                <button
+                  type="button"
                   onClick={() => onEdit(video)}
-                  variant="ghost"
-                  className="h-8 w-8 p-0 text-slate-400 hover:text-[#CC0E21] hover:bg-[#CC0E21]/10 rounded-lg"
+                  className="flex items-center justify-center h-8 w-8 text-slate-400 hover:text-[#CC0E21] hover:bg-[#CC0E21]/10 rounded-lg transition-colors"
                   title="Editar vídeo"
                 >
                   <Edit className="h-4 w-4" />
-                </Button>
-                <Button
+                </button>
+                <button
+                  type="button"
                   onClick={() => onDelete(video.id)}
-                  variant="ghost"
-                  className="h-8 w-8 p-0 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg"
+                  className="flex items-center justify-center h-8 w-8 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
                   title="Eliminar vídeo"
                 >
                   <Trash2 className="h-4 w-4" />
-                </Button>
+                </button>
               </div>
             )}
           </div>

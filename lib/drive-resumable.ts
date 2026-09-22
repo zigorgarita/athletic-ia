@@ -25,6 +25,8 @@ export interface UploadProgressInfo {
 export interface DriveResumableUploadOptions {
   file: File;
   passkey?: string;
+  editorUser?: string;
+  editorPass?: string;
   uploadContext?: DriveUploadContext;
   onProgress?: (info: UploadProgressInfo) => void;
   chunkSizeBytes?: number; // Por defecto 4 MiB (4,194,304 bytes)
@@ -33,6 +35,8 @@ export interface DriveResumableUploadOptions {
 export class DriveResumableUploader {
   private file: File;
   private passkey?: string;
+  private editorUser?: string;
+  private editorPass?: string;
   private uploadContext?: DriveUploadContext;
   private onProgress?: (info: UploadProgressInfo) => void;
   private chunkSize: number;
@@ -47,6 +51,8 @@ export class DriveResumableUploader {
   constructor(options: DriveResumableUploadOptions) {
     this.file = options.file;
     this.passkey = options.passkey;
+    this.editorUser = options.editorUser;
+    this.editorPass = options.editorPass;
     this.uploadContext = options.uploadContext;
     this.onProgress = options.onProgress;
     
@@ -55,6 +61,13 @@ export class DriveResumableUploader {
     const baseChunk = options.chunkSizeBytes ? Math.min(options.chunkSizeBytes, defaultChunkSize) : defaultChunkSize;
     // Redondear al múltiplo de 256 KB más cercano
     this.chunkSize = Math.max(256 * 1024, Math.floor(baseChunk / (256 * 1024)) * (256 * 1024));
+  }
+
+  private getAuthHeaders(): Record<string, string> {
+    const headers: Record<string, string> = {};
+    if (this.editorUser) headers['x-editor-user'] = this.editorUser;
+    if (this.editorPass) headers['x-editor-pass'] = this.editorPass;
+    return headers;
   }
 
   /**
@@ -73,7 +86,10 @@ export class DriveResumableUploader {
         const sessionRes = await fetch('/api/google-drive/create-resumable-session', {
           method: 'POST',
           credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...this.getAuthHeaders(),
+          },
           body: JSON.stringify({
             fileName: this.file.name,
             mimeType: this.file.type || 'video/mp4',
@@ -119,6 +135,7 @@ export class DriveResumableUploader {
             'x-upload-url': this.uploadUrl!,
             'Content-Range': `bytes ${startByte}-${endByte}/${total}`,
             'Content-Type': this.file.type || 'video/mp4',
+            ...this.getAuthHeaders(),
           },
           body: chunkBlob,
           signal: this.abortController.signal,
@@ -152,7 +169,10 @@ export class DriveResumableUploader {
           const finalizeRes = await fetch('/api/google-drive/finalize-upload', {
             method: 'POST',
             credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              ...this.getAuthHeaders(),
+            },
             body: JSON.stringify({
               driveFileId,
               fileName: this.file.name,
@@ -197,6 +217,7 @@ export class DriveResumableUploader {
         headers: {
           'x-upload-url': this.uploadUrl,
           'Content-Range': `bytes */${this.file.size}`,
+          ...this.getAuthHeaders(),
         },
       });
 

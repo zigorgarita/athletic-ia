@@ -5,6 +5,7 @@ import { Upload, Link as LinkIcon, Film, AlertCircle, CheckCircle2, Loader2, Pau
 import { isValidVideoUrl, parseVideoUrl } from '@/lib/video';
 import { DriveResumableUploader, UploadProgressInfo } from '@/lib/drive-resumable';
 import { DriveUploadContext } from '@/lib/drive-folders';
+import { useEditMode } from '@/context/EditModeContext';
 
 interface VideoUploaderProps {
   initialUrl?: string;
@@ -21,6 +22,7 @@ interface VideoUploaderProps {
 }
 
 export function VideoUploader({ initialUrl = '', onVideoSelected, className = '', uploadContext }: VideoUploaderProps) {
+  const { currentUser } = useEditMode();
   const [activeTab, setActiveTab] = useState<'url' | 'upload'>('url');
   const [urlInput, setUrlInput] = useState(initialUrl);
   const [urlError, setUrlError] = useState<string | null>(null);
@@ -67,6 +69,8 @@ export function VideoUploader({ initialUrl = '', onVideoSelected, className = ''
     const newUploader = new DriveResumableUploader({
       file,
       passkey,
+      editorUser: currentUser?.id,
+      editorPass: currentUser?.pass,
       uploadContext,
       onProgress: (info) => {
         setProgressInfo(info);

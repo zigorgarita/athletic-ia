@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { isCoachSessionAuthorized, isCoachSessionAuthorizedFromRequest } from '@/lib/auth/staff-session';
-import { isEditorSessionAuthorized, isEditorSessionAuthorizedFromRequest } from '@/lib/auth/session';
+import { verifyServerAuthorization } from '@/lib/auth-server';
 import { getSupabaseServerClient } from '@/lib/supabase-server';
 
 export const dynamic = 'force-dynamic';
@@ -90,14 +89,12 @@ function sanitizeEvaluationItem(item: Record<string, unknown>): Record<string, u
 
 export async function POST(req: Request) {
   try {
-    const authorized =
-      (await isCoachSessionAuthorized()) ||
-      isCoachSessionAuthorizedFromRequest(req) ||
-      (await isEditorSessionAuthorized()) ||
-      isEditorSessionAuthorizedFromRequest(req);
-
-    if (!authorized) {
-      return NextResponse.json({ error: 'No autorizado: Sesión de cuerpo técnico requerida.' }, { status: 401 });
+    const authCheck = await verifyServerAuthorization(req);
+    if (!authCheck.authorized) {
+      return NextResponse.json(
+        { error: authCheck.error || 'No autorizado: Se requiere sesión de cuerpo técnico o credenciales de editor válidas.' },
+        { status: 401 }
+      );
     }
 
     const body = await req.json().catch(() => null);

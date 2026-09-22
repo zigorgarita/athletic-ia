@@ -1,4 +1,6 @@
 import 'server-only';
+import { isMatchingDieLigenTeam, DieLigenTeamMatchItem } from './mapping';
+export type { DieLigenTeamMatchItem } from './mapping';
 
 /**
  * Cliente exclusivo de servidor para la API de Die Ligen (coaches.ligen.football).
@@ -333,6 +335,129 @@ export async function fetchDieLigenDelivery<T>(endpoint: string, options: Reques
   }
 
   return (await res.text()) as unknown as T;
+}
+
+/**
+ * Resuelve dinámicamente el identificador de la competición activa.
+ * 1. Variable de entorno personalizada si existiera.
+ * 2. Competiciones suscritas de la temporada activa en Die Ligen.
+ * 3. Fallback canónico para División de Honor Juvenil G2 (DHJ2_CONTEST_ID).
+ */
+export async function resolveActiveContestId(preferredContestName?: string): Promise<string> {
+  const custom = process.env.DIE_LIGEN_CONTEST_ID?.trim();
+  if (custom) return custom;
+
+  try {
+    const seasonYears = await fetchDieLigen<DieLigenSeasonYear[]>('/season-years');
+    if (Array.isArray(seasonYears)) {
+      const currentSeason = seasonYears.find((sy) => sy.currentSeasonYear === true) || seasonYears[0];
+      if (currentSeason?.id !== undefined) {
+        const response = await fetchDieLigen<DieLigenSubscribedContestsResponse | DieLigenContestItem[]>(
+          `/subscribed-contests/${currentSeason.id}`
+        );
+        const contestList = Array.isArray(response)
+          ? response
+          : Array.isArray((response as DieLigenSubscribedContestsResponse)?.subscribedContests)
+          ? (response as DieLigenSubscribedContestsResponse).subscribedContests || []
+          : [];
+
+        if (preferredContestName && contestList.length > 0) {
+          const match = contestList.find((c) => {
+            const name = (c?.name || '').toLowerCase();
+            return name.includes(preferredContestName.toLowerCase());
+          });
+          if (match?.id) return String(match.id);
+        }
+
+        if (contestList.length > 0 && contestList[0]?.id) {
+          return String(contestList[0].id);
+        }
+      }
+    }
+  } catch {
+    // Si falla la consulta dinámica, recurrir al fallback seguro de la 26/27
+  }
+
+  return DHJ2_CONTEST_ID;
+}
+
+/**
+ * Consulta los partidos disponibles de un rival en la competición activa.
+ */
+export async function getDieLigenMatchesForTeam(params: {
+  clubName: string;
+  shortName?: string | null;
+  contestId?: string;
+}): Promise<DieLigenTeamMatchItem[]> {
+  const contestId = params.contestId || (await resolveActiveContestId());
+
+  const contestData = await fetchDieLigenDelivery<{
+    games?: Array<{
+      id: string;
+      round?: { roundOrderNumber?: number; name?: string };
+      homeTeam?: { id?: string; name?: string };
+      awayTeam?: { id?: string; name?: string };
+      analysisStatus?: { i18NKey?: string };
+      scoreHome?: number | null;
+      scoreAway?: number | null;
+    }>;
+  }>(`/analysis/contest/${contestId}`);
+
+  const rawGames = contestData?.games || [];
+  const matches: DieLigenTeamMatchItem[] = [];
+
+  for (const g of rawGames) {
+    if (!g.id) continue;
+    const isHome = isMatchingDieLigenTeam(g.homeTeam?.name, params.clubName, params.shortName);
+    const isAway = !isHome && isMatchingDieLigenTeam(g.awayTeam?.name, params.clubName, params.shortName);
+
+    if (!isHome && !isAway) continue;
+
+    const jornada = g.round?.roundOrderNumber || 0;
+    const opponentName = isHome ? (g.awayTeam?.name || 'Rival') : (g.homeTeam?.name || 'Rival');
+    const statusKey = g.analysisStatus?.i18NKey || 'OPEN';
+    const isAnalyzed = statusKey === 'FINISHED';
+
+    let scoreFormatted: string | undefined;
+    if (g.scoreHome !== null && g.scoreHome !== undefined && g.scoreAway !== null && g.scoreAway !== undefined) {
+      scoreFormatted = `${g.scoreHome} - ${g.scoreAway}`;
+    }
+
+    matches.push({
+      gameId: g.id,
+      jornada,
+      roundName: g.round?.name,
+      homeTeam: { id: g.homeTeam?.id, name: g.homeTeam?.name || 'Local' },
+      awayTeam: { id: g.awayTeam?.id, name: g.awayTeam?.name || 'Visitante' },
+      isHome,
+      opponentName,
+      scoreHome: g.scoreHome,
+      scoreAway: g.scoreAway,
+      scoreFormatted,
+      analysisStatus: statusKey,
+      isAnalyzed,
+    });
+  }
+
+  // Ordenar por jornada ascendente (1, 2, 3...)
+  matches.sort((a, b) => a.jornada - b.jornada);
+  return matches;
+}
+
+/**
+ * Obtiene el documento JSON original completo e íntegro de un partido de Die Ligen.
+ */
+export async function getDieLigenGameRawJson(gameId: string): Promise<Record<string, unknown>> {
+  if (!gameId || typeof gameId !== 'string') {
+    throw new DieLigenError('Identificador de partido gameId no válido.', 'DIE_LIGEN_UPSTREAM_ERROR');
+  }
+
+  const rawData = await fetchDieLigenDelivery<Record<string, unknown>>(`/analysis/game/${gameId}`);
+  if (!rawData || typeof rawData !== 'object') {
+    throw new DieLigenError('Respuesta vacía o inválida recibida de Die Ligen.', 'DIE_LIGEN_UPSTREAM_ERROR');
+  }
+
+  return rawData;
 }
 
 export interface DieLigenTimelineEvent {

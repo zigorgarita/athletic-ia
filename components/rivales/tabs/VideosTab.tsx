@@ -172,6 +172,7 @@ export function VideosTab({ club, season }: VideosTabProps) {
               category={video.categoria}
               videoType={video.tipo}
               layout="grid"
+              isEditMode={isEditMode}
               onPlay={handlePlayAdapter} 
               onEdit={handleEditAdapter} 
               onDelete={handleDeleteAdapter} 

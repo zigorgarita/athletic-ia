@@ -382,7 +382,7 @@ export function DocumentsTab({ club, season }: DocumentsTabProps) {
           id="doctab-die-ligen-panel"
           aria-labelledby="doctab-die-ligen"
         >
-          <DieLigenTab />
+          <DieLigenTab club={club} season={season} />
         </div>
       )}
 
