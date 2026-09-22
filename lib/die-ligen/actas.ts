@@ -48,6 +48,8 @@ export interface DieLigueEventActa {
   esAutogol?: boolean;
   tipoTarjeta?: 'AMARILLA' | 'ROJA' | 'DOBLE_AMARILLA';
   videoUrl?: string | null;
+  start?: number | null;
+  end?: number | null;
 }
 
 export interface DieLigueMatchActa {
@@ -218,6 +220,8 @@ export async function getDieLigueJornadaActas(jornada: number): Promise<DieLigue
           id: string;
           categoryName: string;
           defensiveEvent: boolean;
+          start?: number;
+          end?: number;
           gameTime: number;
           eventTime: number;
           gameTimeString?: string;
@@ -265,7 +269,9 @@ export async function getDieLigueJornadaActas(jornada: number): Promise<DieLigue
       for (const e of nuclearEvents) {
         const minuto = parseMinute(e.gameTimeString, e.gameTime ?? e.eventTime);
         const isHome = e.teamType === 'HOME' || e.team?.id === gameInfo.homeTeam?.id;
-        const videoClip = e.videos?.[0]?.videoUrl || null;
+        const videoClip = e.videos?.[0]?.videoUrl || gameInfo.mainVideoUrl || null;
+        const start = typeof e.start === 'number' ? e.start : null;
+        const end = typeof e.end === 'number' ? e.end : null;
 
         if (e.categoryName === 'GOAL') {
           const scorer = e.selectedPlayers?.find((p) => p.tag?.i18NKey === 'SCORER')?.player;
@@ -284,6 +290,8 @@ export async function getDieLigueJornadaActas(jornada: number): Promise<DieLigue
             jugadorSecundario: assist ? { id: assist.id, nombre: assist.playerName, dorsal: assist.shirtNumber } : undefined,
             esAutogol: isOwnGoal,
             videoUrl: videoClip,
+            start,
+            end,
           });
         } else if (e.categoryName === 'CARD') {
           const offender = e.selectedPlayers?.find((p) => p.tag?.i18NKey === 'OFFENDING_PLAYER')?.player;
@@ -301,6 +309,8 @@ export async function getDieLigueJornadaActas(jornada: number): Promise<DieLigue
             jugadorPrincipal: offender ? { id: offender.id, nombre: offender.playerName, dorsal: offender.shirtNumber } : undefined,
             tipoTarjeta: isRed ? 'ROJA' : isDoubleYellow ? 'DOBLE_AMARILLA' : 'AMARILLA',
             videoUrl: videoClip,
+            start,
+            end,
           });
         } else if (e.categoryName === 'SUBSTITUTION') {
           const pIn = e.selectedPlayers?.find((p) => p.tag?.i18NKey === 'PLAYER_IN')?.player;
@@ -317,6 +327,8 @@ export async function getDieLigueJornadaActas(jornada: number): Promise<DieLigue
             jugadorPrincipal: pIn ? { id: pIn.id, nombre: pIn.playerName, dorsal: pIn.shirtNumber } : undefined,
             jugadorSecundario: pOut ? { id: pOut.id, nombre: pOut.playerName, dorsal: pOut.shirtNumber } : undefined,
             videoUrl: videoClip,
+            start,
+            end,
           });
         }
       }

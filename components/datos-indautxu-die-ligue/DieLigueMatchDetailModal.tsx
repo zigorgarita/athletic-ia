@@ -16,7 +16,8 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { getStaffPasskey } from '@/lib/passkey';
-import { DieLigueMatchActa } from '@/lib/die-ligen/actas';
+import { DieLigueMatchActa, DieLigueEventActa } from '@/lib/die-ligen/actas';
+import { DieLigueClipModal } from './DieLigueClipModal';
 
 interface DieLigueMatchDetailModalProps {
   isOpen: boolean;
@@ -39,6 +40,29 @@ export function DieLigueMatchDetailModal({
   const [match, setMatch] = useState<DieLigueMatchActa | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'alineaciones' | 'eventos' | 'tactica'>('alineaciones');
+  const [selectedClip, setSelectedClip] = useState<{
+    videoUrl: string;
+    start: number;
+    end: number;
+    title: string;
+    subtitle?: string;
+  } | null>(null);
+
+  const getEventClipTitle = (ev: DieLigueEventActa): string => {
+    if (ev.tipo === 'GOL') {
+      const actor = ev.jugadorPrincipal ? `#${ev.jugadorPrincipal.dorsal} ${ev.jugadorPrincipal.nombre}` : 'Gol';
+      return `⚽ ${ev.esAutogol ? 'Autogol' : 'Gol'} de ${actor} (${ev.minutoTexto})`;
+    }
+    if (ev.tipo === 'TARJETA') {
+      const actor = ev.jugadorPrincipal ? `#${ev.jugadorPrincipal.dorsal} ${ev.jugadorPrincipal.nombre}` : 'Jugador';
+      const cardIcon = ev.tipoTarjeta === 'ROJA' ? '🟥' : '🟨';
+      return `${cardIcon} Tarjeta ${ev.tipoTarjeta?.toLowerCase()} para ${actor} (${ev.minutoTexto})`;
+    }
+    if (ev.tipo === 'SUSTITUCION') {
+      return `🔄 Cambio (${ev.minutoTexto}): Entra #${ev.jugadorPrincipal?.dorsal ?? ''} ${ev.jugadorPrincipal?.nombre ?? ''}`;
+    }
+    return `Clip de evento (${ev.minutoTexto})`;
+  };
 
   useEffect(() => {
     if (!isOpen || !jornada) return;
@@ -355,15 +379,27 @@ export function DieLigueMatchDetailModal({
                             )}
                           </div>
 
-                          {ev.videoUrl && (
-                            <a
-                              href={ev.videoUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="px-2 py-0.5 rounded bg-blue-600/10 text-blue-400 hover:bg-blue-600/20 text-[10px] font-bold border border-blue-500/20 flex items-center gap-1"
+                          {Boolean(
+                            ev.videoUrl &&
+                            typeof ev.start === 'number' &&
+                            typeof ev.end === 'number' &&
+                            ev.end > ev.start
+                          ) && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setSelectedClip({
+                                  videoUrl: ev.videoUrl!,
+                                  start: ev.start!,
+                                  end: ev.end!,
+                                  title: getEventClipTitle(ev),
+                                  subtitle: `${match.homeTeam.name} vs ${match.awayTeam.name} • Jornada ${jornada}`,
+                                })
+                              }
+                              className="px-2 py-0.5 rounded bg-blue-600/10 text-blue-400 hover:bg-blue-600/20 text-[10px] font-bold border border-blue-500/20 flex items-center gap-1 transition-colors cursor-pointer"
                             >
                               <Play className="w-2.5 h-2.5" /> Clip
-                            </a>
+                            </button>
                           )}
                         </div>
                       ))}
@@ -392,6 +428,19 @@ export function DieLigueMatchDetailModal({
           )}
         </div>
       </div>
+
+      {/* Modal Interno de Reproducción de Clip por Tramo [start, end] */}
+      {selectedClip && (
+        <DieLigueClipModal
+          isOpen={true}
+          onClose={() => setSelectedClip(null)}
+          videoUrl={selectedClip.videoUrl}
+          start={selectedClip.start}
+          end={selectedClip.end}
+          title={selectedClip.title}
+          subtitle={selectedClip.subtitle}
+        />
+      )}
     </div>
   );
 }
