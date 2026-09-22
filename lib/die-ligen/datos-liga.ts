@@ -92,6 +92,22 @@ export interface DieLigueRivalInfo {
   matches: DieLigueCalendarMatch[];
 }
 
+export interface DieLigueTrayectoriaItem {
+  jornada: number;
+  posicion: number;
+  puntos: number;
+  partidosJugados: number;
+  ganados: number;
+  empatados: number;
+  perdidos: number;
+  golesFavor: number;
+  golesContra: number;
+  partidosCompletadosJornada: number;
+  totalPartidosJornada: number;
+  esCompleta: boolean;
+  esProvisional: boolean;
+}
+
 export interface DieLigueDatosLigaResponse {
   summary: {
     partidosDisputados: number;
@@ -105,6 +121,7 @@ export interface DieLigueDatosLigaResponse {
   indautxuPlayers: DieLiguePlayerStatRow[];
   standings: DieLigueStandingRow[];
   standingsCompletitud: string;
+  indautxuTrayectoria: DieLigueTrayectoriaItem[];
   calendar: DieLigueCalendarMatch[];
   rivals: Array<{
     id: string;
@@ -569,6 +586,150 @@ export async function getDieLigueDatosLiga(): Promise<DieLigueDatosLigaResponse>
       return row;
     });
 
+  // 6.b Trayectoria del SD Indautxu calculada jornada a jornada
+  const indautxuTrayectoria: DieLigueTrayectoriaItem[] = [];
+  const maxRoundsDiscovered = Math.max(
+    ...allGames.map((g) => g.round?.roundOrderNumber || 0),
+    0
+  );
+
+  for (let j = 1; j <= maxRoundsDiscovered; j++) {
+    const roundGames = allGames.filter((g) => (g.round?.roundOrderNumber || 0) === j);
+    if (roundGames.length === 0) continue;
+
+    const roundFinished = roundGames.filter(
+      (g) => g.analysisStatus?.i18NKey === 'FINISHED' && g.scoreHome !== null && g.scoreHome !== undefined && g.scoreAway !== null && g.scoreAway !== undefined
+    );
+    const esCompleta = roundGames.length > 0 && roundFinished.length === roundGames.length;
+
+    // Verificar si Indautxu ha disputado su encuentro en esta jornada
+    const indautxuMatchInRound = roundGames.find(
+      (g) => g.homeTeam?.id === INDAUTXU_TEAM_ID || g.awayTeam?.id === INDAUTXU_TEAM_ID || g.homeTeam?.name?.includes('Indautxu') || g.awayTeam?.name?.includes('Indautxu')
+    );
+    const indautxuJugado = Boolean(
+      indautxuMatchInRound &&
+      indautxuMatchInRound.analysisStatus?.i18NKey === 'FINISHED' &&
+      indautxuMatchInRound.scoreHome !== null &&
+      indautxuMatchInRound.scoreHome !== undefined &&
+      indautxuMatchInRound.scoreAway !== null &&
+      indautxuMatchInRound.scoreAway !== undefined
+    );
+
+    if (!indautxuJugado) {
+      // Si Indautxu no ha jugado esta jornada todavía, omitirla
+      continue;
+    }
+
+    // Calcular la clasificación acumulada exclusivamente con partidos FINISHED hasta la jornada j
+    const gamesUpToJ = allGames.filter(
+      (g) => (g.round?.roundOrderNumber || 0) <= j &&
+             g.analysisStatus?.i18NKey === 'FINISHED' &&
+             g.scoreHome !== null && g.scoreHome !== undefined &&
+             g.scoreAway !== null && g.scoreAway !== undefined
+    );
+
+    const standingsMapJ = new Map<string, {
+      equipoId: string;
+      nombre: string;
+      partidosJugados: number;
+      ganados: number;
+      empatados: number;
+      perdidos: number;
+      golesFavor: number;
+      golesContra: number;
+      diferenciaGoles: number;
+      puntos: number;
+      esIndautxu: boolean;
+    }>();
+
+    for (const gm of gamesUpToJ) {
+      const hT = gm.homeTeam;
+      const aT = gm.awayTeam;
+      if (!hT || !aT) continue;
+
+      const sH: number = gm.scoreHome!;
+      const sA: number = gm.scoreAway!;
+
+      const getOrInit = (t: { id?: string; name?: string }) => {
+        const key = t.name || t.id || '';
+        let row = standingsMapJ.get(key);
+        if (!row) {
+          row = {
+            equipoId: t.id || '',
+            nombre: t.name || '',
+            partidosJugados: 0,
+            ganados: 0,
+            empatados: 0,
+            perdidos: 0,
+            golesFavor: 0,
+            golesContra: 0,
+            diferenciaGoles: 0,
+            puntos: 0,
+            esIndautxu: Boolean(t.name?.includes('Indautxu') || t.id === INDAUTXU_TEAM_ID),
+          };
+          standingsMapJ.set(key, row);
+        }
+        return row;
+      };
+
+      const rH = getOrInit(hT);
+      const rA = getOrInit(aT);
+
+      rH.partidosJugados += 1;
+      rA.partidosJugados += 1;
+      rH.golesFavor += sH;
+      rH.golesContra += sA;
+      rA.golesFavor += sA;
+      rA.golesContra += sH;
+
+      if (sH > sA) {
+        rH.ganados += 1;
+        rH.puntos += 3;
+        rA.perdidos += 1;
+      } else if (sH < sA) {
+        rA.ganados += 1;
+        rA.puntos += 3;
+        rH.perdidos += 1;
+      } else {
+        rH.empatados += 1;
+        rA.empatados += 1;
+        rH.puntos += 1;
+        rA.puntos += 1;
+      }
+    }
+
+    const sortedJ = Array.from(standingsMapJ.values())
+      .map((r) => {
+        r.diferenciaGoles = r.golesFavor - r.golesContra;
+        return r;
+      })
+      .sort((a, b) => {
+        if (b.puntos !== a.puntos) return b.puntos - a.puntos;
+        if (b.diferenciaGoles !== a.diferenciaGoles) return b.diferenciaGoles - a.diferenciaGoles;
+        return b.golesFavor - a.golesFavor;
+      });
+
+    const indautxuIdx = sortedJ.findIndex((r) => r.esIndautxu);
+    if (indautxuIdx >= 0) {
+      const indRow = sortedJ[indautxuIdx];
+      indautxuTrayectoria.push({
+        jornada: j,
+        posicion: indautxuIdx + 1,
+        puntos: indRow.puntos,
+        partidosJugados: indRow.partidosJugados,
+        ganados: indRow.ganados,
+        empatados: indRow.empatados,
+        perdidos: indRow.perdidos,
+        golesFavor: indRow.golesFavor,
+        golesContra: indRow.golesContra,
+        partidosCompletadosJornada: roundFinished.length,
+        totalPartidosJornada: roundGames.length,
+        esCompleta,
+        esProvisional: !esCompleta,
+      });
+    }
+  }
+
   // 7. Lista de Rivales únicos
   const rivalsMap = new Map<string, { id: string; nombre: string; logoUrl?: string | null; partidosDisputados: number }>();
   for (const g of allGames) {
@@ -607,6 +768,7 @@ export async function getDieLigueDatosLiga(): Promise<DieLigueDatosLigaResponse>
     indautxuPlayers: indautxuPlayersList,
     standings: sortedStandings,
     standingsCompletitud: `${groupFinishedGames.length}/24 partidos procesados (provisional hasta sincronización completa)`,
+    indautxuTrayectoria,
     calendar,
     rivals: rivalsList,
   };
