@@ -47,6 +47,7 @@ export function DieLigueMatchDetailModal({
   const [activeTacticalTab, setActiveTacticalTab] = useState<'ofensivos' | 'defensivos'>('ofensivos');
   const [offensiveFilter, setOffensiveFilter] = useState<string>('todos');
   const [defensiveFilter, setDefensiveFilter] = useState<string>('todos');
+  const [teamFilter, setTeamFilter] = useState<'todos' | 'local' | 'visitante'>('todos');
   const [downloadingEventId, setDownloadingEventId] = useState<string | null>(null);
   const [clipDownloadError, setClipDownloadError] = useState<string | null>(null);
   const [selectedClip, setSelectedClip] = useState<{
@@ -597,8 +598,15 @@ export function DieLigueMatchDetailModal({
 
                   {activeTab === 'tacticos' && (() => {
                     const allTactical = match.tacticalEvents || [];
-                    const offensiveEvents = allTactical.filter((e) => e.esOfensivo);
-                    const defensiveEvents = allTactical.filter((e) => !e.esOfensivo);
+                    const teamFiltered =
+                      teamFilter === 'todos'
+                        ? allTactical
+                        : teamFilter === 'local'
+                        ? allTactical.filter((e) => e.esLocal)
+                        : allTactical.filter((e) => !e.esLocal);
+
+                    const offensiveEvents = teamFiltered.filter((e) => e.esOfensivo);
+                    const defensiveEvents = teamFiltered.filter((e) => !e.esOfensivo);
 
                     const offensiveFilterOptions = [
                       { key: 'todos', label: 'Todos', count: offensiveEvents.length },
@@ -692,6 +700,46 @@ export function DieLigueMatchDetailModal({
                               ? 'Eventos ofensivos con corte de clip Die Ligue'
                               : 'Acciones defensivas y del rival analizadas'}
                           </span>
+                        </div>
+
+                        {/* Filtro por equipo: Todos | Equipo local | Equipo visitante */}
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-[11px] text-slate-400 font-medium mr-1">Equipo:</span>
+                          <button
+                            type="button"
+                            onClick={() => setTeamFilter('todos')}
+                            className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-all shrink-0 cursor-pointer ${
+                              teamFilter === 'todos'
+                                ? 'bg-slate-700 text-white font-bold shadow-sm'
+                                : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
+                            }`}
+                          >
+                            Todos
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setTeamFilter('local')}
+                            className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-all shrink-0 cursor-pointer ${
+                              teamFilter === 'local'
+                                ? 'bg-slate-700 text-white font-bold shadow-sm'
+                                : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
+                            }`}
+                            title={match.homeTeam.name}
+                          >
+                            Equipo local ({match.homeTeam.name})
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setTeamFilter('visitante')}
+                            className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-all shrink-0 cursor-pointer ${
+                              teamFilter === 'visitante'
+                                ? 'bg-slate-700 text-white font-bold shadow-sm'
+                                : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
+                            }`}
+                            title={match.awayTeam.name}
+                          >
+                            Equipo visitante ({match.awayTeam.name})
+                          </button>
                         </div>
 
                         {/* Filtros rápidos Ofensivos */}
