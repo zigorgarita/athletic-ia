@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { Play, Pause, RotateCcw, X, Volume2, VolumeX, Maximize, Film } from 'lucide-react';
+import { Play, Pause, RotateCcw, X, Volume2, VolumeX, Maximize, Film, Download, RefreshCw } from 'lucide-react';
 
 export interface DieLigueClipModalProps {
   isOpen: boolean;
@@ -11,6 +11,8 @@ export interface DieLigueClipModalProps {
   end: number;
   title: string;
   subtitle?: string;
+  onDownload?: () => void;
+  isDownloading?: boolean;
 }
 
 function formatDuration(sec: number): string {
@@ -27,6 +29,8 @@ export function DieLigueClipModal({
   end,
   title,
   subtitle,
+  onDownload,
+  isDownloading = false,
 }: DieLigueClipModalProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const progressBarRef = useRef<HTMLDivElement>(null);
@@ -312,8 +316,29 @@ export function DieLigueClipModal({
                 title="Volver al inicio del clip"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Repetir clip</span>
+                <span className="hidden sm:inline">Repetir</span>
               </button>
+
+              {onDownload && (
+                <button
+                  onClick={onDownload}
+                  disabled={isDownloading}
+                  className="px-2.5 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 font-bold flex items-center gap-1.5 transition-colors border border-emerald-500/30 disabled:opacity-50"
+                  title="Descargar vídeo MP4 recortado oficial de Die Ligue"
+                >
+                  {isDownloading ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span className="hidden sm:inline">Generando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Download className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Descargar clip</span>
+                    </>
+                  )}
+                </button>
+              )}
 
               <div className="text-slate-300 font-mono font-bold text-[11px] sm:text-xs ml-1">
                 <span>{formatDuration(elapsed)}</span>

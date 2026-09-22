@@ -14,6 +14,7 @@ import {
   RefreshCw,
   CheckCircle2,
   AlertTriangle,
+  Download,
 } from 'lucide-react';
 import { getStaffPasskey } from '@/lib/passkey';
 import { DieLigueMatchActa, DieLigueEventActa } from '@/lib/die-ligen/actas';
@@ -40,6 +41,8 @@ export function DieLigueMatchDetailModal({
   const [match, setMatch] = useState<DieLigueMatchActa | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'alineaciones' | 'eventos' | 'tactica'>('alineaciones');
+  const [downloadingEventId, setDownloadingEventId] = useState<string | null>(null);
+  const [clipDownloadError, setClipDownloadError] = useState<string | null>(null);
   const [selectedClip, setSelectedClip] = useState<{
     videoUrl: string;
     start: number;
@@ -47,6 +50,69 @@ export function DieLigueMatchDetailModal({
     title: string;
     subtitle?: string;
   } | null>(null);
+
+  const handleDownloadNativeClip = async (ev: DieLigueEventActa) => {
+    if (!match || !ev.videoUrl || typeof ev.start !== 'number' || typeof ev.end !== 'number') return;
+    setDownloadingEventId(ev.id);
+    setClipDownloadError(null);
+
+    try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        Accept: 'application/json, video/mp4, */*',
+      };
+      const staffPasskey = getStaffPasskey() || process.env.NEXT_PUBLIC_COACH_PASSKEY || '';
+      if (staffPasskey) headers['x-staff-passkey'] = staffPasskey;
+
+      const res = await fetch('/api/die-ligen/download-clip', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          trimStart: ev.start,
+          trimEnd: ev.end,
+          homeTeamName: match.homeTeam.name,
+          awayTeamName: match.awayTeam.name,
+          gameDate: match.fecha,
+          videoUrl: ev.videoUrl,
+          translatedEventName: ev.tipo === 'GOL' ? 'Gol' : ev.tipo === 'TARJETA' ? 'Tarjeta' : 'Cambio',
+          gameMinutes: ev.minutoTexto,
+        }),
+      });
+
+      if (!res.ok) {
+        let errMsg = `Error en el servidor al generar clip (HTTP ${res.status})`;
+        try {
+          const errJson = await res.json();
+          if (errJson?.error) errMsg = errJson.error;
+        } catch {
+          // ignore non-json
+        }
+        throw new Error(errMsg);
+      }
+
+      const blob = await res.blob();
+      const disposition = res.headers.get('content-disposition');
+      let filename = `clip_${match.homeTeam.name}_vs_${match.awayTeam.name}_${ev.tipo.toLowerCase()}_min${ev.minuto}.mp4`;
+      if (disposition && disposition.includes('filename=')) {
+        const matchName = disposition.match(/filename="?([^";]+)"?/);
+        if (matchName?.[1]) filename = matchName[1];
+      }
+
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error al descargar clip recortado';
+      setClipDownloadError(msg);
+    } finally {
+      setDownloadingEventId(null);
+    }
+  };
 
   const getEventClipTitle = (ev: DieLigueEventActa): string => {
     if (ev.tipo === 'GOL') {
@@ -354,55 +420,99 @@ export function DieLigueMatchDetailModal({
                   )}
 
                   {activeTab === 'eventos' && (
-                    <div className="space-y-2">
-                      {match.events.map((ev) => (
-                        <div key={ev.id} className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs">
-                          <div className="flex items-center gap-2.5">
-                            <span className="font-mono font-bold text-blue-400 bg-blue-950/60 px-1.5 py-0.5 rounded text-[11px]">
-                              {ev.minutoTexto}
-                            </span>
-                            {ev.tipo === 'GOL' && (
-                              <span>
-                                ⚽ <strong>{ev.esAutogol ? 'Autogol' : 'Gol'}</strong> de {ev.jugadorPrincipal ? `#${ev.jugadorPrincipal.dorsal} ${ev.jugadorPrincipal.nombre}` : 'Jugador'} ({ev.equipoNombre})
-                                {ev.jugadorSecundario && <span className="text-slate-400 ml-1">🅰️ #{ev.jugadorSecundario.dorsal} {ev.jugadorSecundario.nombre}</span>}
+                    <div className="space-y-3">
+                      {clipDownloadError && (
+                        <div className="p-3 rounded-xl bg-red-950/40 border border-red-800 text-red-300 text-xs flex items-center justify-between">
+                          <span>{clipDownloadError}</span>
+                          <button
+                            onClick={() => setClipDownloadError(null)}
+                            className="text-red-400 hover:text-white ml-2 text-xs font-bold"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      )}
+
+                      {match.events.length === 0 ? (
+                        <p className="text-xs text-slate-500 italic py-4 text-center">
+                          No hay eventos registrados en este partido.
+                        </p>
+                      ) : (
+                        match.events.map((ev) => (
+                          <div
+                            key={ev.id}
+                            className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-3 text-xs"
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <span className="font-mono font-bold text-blue-400 bg-blue-950/60 px-1.5 py-0.5 rounded text-[11px] shrink-0">
+                                {ev.minutoTexto}
                               </span>
-                            )}
-                            {ev.tipo === 'TARJETA' && (
-                              <span>
-                                {ev.tipoTarjeta === 'ROJA' ? '🟥' : '🟨'} Tarjeta {ev.tipoTarjeta?.toLowerCase()} para {ev.jugadorPrincipal ? `#${ev.jugadorPrincipal.dorsal} ${ev.jugadorPrincipal.nombre}` : 'Jugador'} ({ev.equipoNombre})
-                              </span>
-                            )}
-                            {ev.tipo === 'SUSTITUCION' && (
-                              <span>
-                                🔄 Cambio ({ev.equipoNombre}): Entra #{ev.jugadorPrincipal?.dorsal} {ev.jugadorPrincipal?.nombre}, sale #{ev.jugadorSecundario?.dorsal} {ev.jugadorSecundario?.nombre}
-                              </span>
+                              {ev.tipo === 'GOL' && (
+                                <span className="truncate">
+                                  ⚽ <strong>{ev.esAutogol ? 'Autogol' : 'Gol'}</strong> de {ev.jugadorPrincipal ? `#${ev.jugadorPrincipal.dorsal} ${ev.jugadorPrincipal.nombre}` : 'Jugador'} ({ev.equipoNombre})
+                                  {ev.jugadorSecundario && <span className="text-slate-400 ml-1">🅰️ #{ev.jugadorSecundario.dorsal} {ev.jugadorSecundario.nombre}</span>}
+                                </span>
+                              )}
+                              {ev.tipo === 'TARJETA' && (
+                                <span className="truncate">
+                                  {ev.tipoTarjeta === 'ROJA' ? '🟥' : '🟨'} Tarjeta {ev.tipoTarjeta?.toLowerCase()} para {ev.jugadorPrincipal ? `#${ev.jugadorPrincipal.dorsal} ${ev.jugadorPrincipal.nombre}` : 'Jugador'} ({ev.equipoNombre})
+                                </span>
+                              )}
+                              {ev.tipo === 'SUSTITUCION' && (
+                                <span className="truncate">
+                                  🔄 Cambio ({ev.equipoNombre}): Entra #{ev.jugadorPrincipal?.dorsal} {ev.jugadorPrincipal?.nombre}, sale #{ev.jugadorSecundario?.dorsal} {ev.jugadorSecundario?.nombre}
+                                </span>
+                              )}
+                            </div>
+
+                            {Boolean(
+                              ev.videoUrl &&
+                              typeof ev.start === 'number' &&
+                              typeof ev.end === 'number' &&
+                              ev.end > ev.start
+                            ) && (
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setSelectedClip({
+                                      videoUrl: ev.videoUrl!,
+                                      start: ev.start!,
+                                      end: ev.end!,
+                                      title: getEventClipTitle(ev),
+                                      subtitle: `${match.homeTeam.name} vs ${match.awayTeam.name} • Jornada ${jornada}`,
+                                    })
+                                  }
+                                  className="px-2 py-0.5 rounded bg-blue-600/10 text-blue-400 hover:bg-blue-600/20 text-[10px] font-bold border border-blue-500/20 flex items-center gap-1 transition-colors cursor-pointer"
+                                  title="Ver clip instantáneo en reproductor"
+                                >
+                                  <Play className="w-2.5 h-2.5" /> Ver clip
+                                </button>
+
+                                <button
+                                  type="button"
+                                  disabled={downloadingEventId === ev.id}
+                                  onClick={() => handleDownloadNativeClip(ev)}
+                                  className="px-2 py-0.5 rounded bg-emerald-600/10 text-emerald-400 hover:bg-emerald-600/20 disabled:opacity-50 text-[10px] font-bold border border-emerald-500/20 flex items-center gap-1 transition-colors cursor-pointer"
+                                  title="Descargar archivo MP4 recortado oficial de Die Ligue"
+                                >
+                                  {downloadingEventId === ev.id ? (
+                                    <>
+                                      <RefreshCw className="w-2.5 h-2.5 animate-spin" />
+                                      <span>Generando...</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Download className="w-2.5 h-2.5" />
+                                      <span>Descargar clip</span>
+                                    </>
+                                  )}
+                                </button>
+                              </div>
                             )}
                           </div>
-
-                          {Boolean(
-                            ev.videoUrl &&
-                            typeof ev.start === 'number' &&
-                            typeof ev.end === 'number' &&
-                            ev.end > ev.start
-                          ) && (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setSelectedClip({
-                                  videoUrl: ev.videoUrl!,
-                                  start: ev.start!,
-                                  end: ev.end!,
-                                  title: getEventClipTitle(ev),
-                                  subtitle: `${match.homeTeam.name} vs ${match.awayTeam.name} • Jornada ${jornada}`,
-                                })
-                              }
-                              className="px-2 py-0.5 rounded bg-blue-600/10 text-blue-400 hover:bg-blue-600/20 text-[10px] font-bold border border-blue-500/20 flex items-center gap-1 transition-colors cursor-pointer"
-                            >
-                              <Play className="w-2.5 h-2.5" /> Clip
-                            </button>
-                          )}
-                        </div>
-                      ))}
+                        ))
+                      )}
                     </div>
                   )}
 
@@ -439,6 +549,15 @@ export function DieLigueMatchDetailModal({
           end={selectedClip.end}
           title={selectedClip.title}
           subtitle={selectedClip.subtitle}
+          onDownload={() => {
+            const targetEv = match?.events.find(
+              (e) => e.start === selectedClip.start && e.end === selectedClip.end
+            );
+            if (targetEv) {
+              handleDownloadNativeClip(targetEv);
+            }
+          }}
+          isDownloading={Boolean(downloadingEventId)}
         />
       )}
     </div>
