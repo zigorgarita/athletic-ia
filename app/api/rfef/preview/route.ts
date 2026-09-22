@@ -372,19 +372,61 @@ export async function POST(req: NextRequest) {
       // 7.2 Comparación de jugadores de Indautxu contra public.players (SOLO SELECT)
       const { data: dbIndautxuPlayers } = await supabase
         .from('players')
-        .select('id, nombre, dorsal, rfef_player_id, foto_url');
+        .select('id, nombre, apellidos, alias, dorsal, rfef_player_id, foto_url');
 
-      const dbPlayersByRfef = new Map();
-      const dbPlayersByName = new Map();
+      const dbPlayersByRfef = new Map<number, any>();
       (dbIndautxuPlayers || []).forEach((p) => {
         if (p.rfef_player_id) dbPlayersByRfef.set(p.rfef_player_id, p);
-        if (p.nombre) dbPlayersByName.set(normalizeString(p.nombre), p);
       });
 
       indPlayers.forEach((p) => {
-        const found =
-          dbPlayersByRfef.get(p.rfefPlayerId) ||
-          dbPlayersByName.get(normalizeString(p.nombre));
+        // Prioridad 1: rfef_player_id
+        let found = p.rfefPlayerId ? dbPlayersByRfef.get(p.rfefPlayerId) : null;
+
+        if (!found) {
+          const normActaName = normalizeString(p.nombre);
+
+          // Prioridad 2: Nombre completo normalizado (nombre + apellidos o apellidos + nombre)
+          for (const dbP of dbIndautxuPlayers || []) {
+            const normFull1 = normalizeString((dbP.nombre || '') + ' ' + (dbP.apellidos || ''));
+            const normFull2 = normalizeString((dbP.apellidos || '') + ' ' + (dbP.nombre || ''));
+            if ((normFull1 && normActaName === normFull1) || (normFull2 && normActaName === normFull2)) {
+              found = dbP;
+              break;
+            }
+          }
+
+          // Prioridad 3: Apellidos / Alias suficientemente discriminantes (no resolver por nombre de pila aislado)
+          if (!found) {
+            const candidates: { player: any; score: number }[] = [];
+            for (const dbP of dbIndautxuPlayers || []) {
+              const normNombre = normalizeString(dbP.nombre);
+              const normApellidos = normalizeString(dbP.apellidos);
+              const normAlias = normalizeString(dbP.alias);
+
+              const hasApellidos = normApellidos.length >= 4 && normActaName.includes(normApellidos);
+              const hasAlias = normAlias.length >= 4 && normAlias !== normNombre && normActaName.includes(normAlias);
+
+              if (hasApellidos || hasAlias) {
+                // Si además coincide el nombre de pila, es match de máxima confianza
+                if (normNombre && normActaName.includes(normNombre)) {
+                  candidates.push({ player: dbP, score: 2 });
+                } else {
+                  candidates.push({ player: dbP, score: 1 });
+                }
+              }
+            }
+
+            if (candidates.length === 1) {
+              found = candidates[0].player;
+            } else if (candidates.length > 1) {
+              candidates.sort((a, b) => b.score - a.score);
+              if (candidates[0].score > candidates[1].score) {
+                found = candidates[0].player;
+              }
+            }
+          }
+        }
 
         if (!found) {
           unlinkedOwnPlayers.push({

@@ -165,7 +165,7 @@ function fetchRfefJornada(jornada, sessionCookiePath, globalStartTime, cancelTok
         url
       ];
 
-      currentChild = execFile(CURL_PATH, args, { maxBuffer: 10 * 1024 * 1024, encoding: 'utf8' }, (error, stdout) => {
+      currentChild = execFile(CURL_PATH, args, { maxBuffer: 10 * 1024 * 1024, encoding: 'latin1' }, (error, stdout) => {
         currentChild = null;
         const html = stdout || '';
 
@@ -302,7 +302,7 @@ function fetchRfefActa(codActa, mainSessionCookiePath, globalStartTime, cancelTo
         url
       ];
 
-      currentChild = execFile(CURL_PATH, args, { maxBuffer: 15 * 1024 * 1024, encoding: 'utf8' }, (error, stdout) => {
+      currentChild = execFile(CURL_PATH, args, { maxBuffer: 15 * 1024 * 1024, encoding: 'latin1' }, (error, stdout) => {
         currentChild = null;
         const html = stdout || '';
 
