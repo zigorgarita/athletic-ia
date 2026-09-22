@@ -52,6 +52,38 @@ export interface DieLigueEventActa {
   end?: number | null;
 }
 
+export type TacticalCategoryKey =
+  | 'tiros'
+  | 'ocasiones'
+  | 'centros'
+  | 'corneres'
+  | 'faltas'
+  | 'penaltis'
+  | 'saques_puerta';
+
+export interface DieLigueTacticalEventActa {
+  id: string;
+  categoryName: string;
+  tipoClave: TacticalCategoryKey;
+  nombreTipo: string;
+  esOfensivo: boolean;
+  minuto: number;
+  minutoTexto: string;
+  equipoId: string;
+  equipoNombre: string;
+  esLocal: boolean;
+  jugadorPrincipal?: {
+    id: string;
+    nombre: string;
+    dorsal: number;
+  };
+  labels: string[];
+  rawLabels?: string[];
+  videoUrl: string;
+  start: number;
+  end: number;
+}
+
 export interface DieLigueMatchActa {
   id: string;
   jornada: number;
@@ -81,6 +113,7 @@ export interface DieLigueMatchActa {
     players: DieLiguePlayerActa[];
   };
   events: DieLigueEventActa[];
+  tacticalEvents?: DieLigueTacticalEventActa[];
   mainVideoUrl: string | null;
 }
 
@@ -181,6 +214,7 @@ export async function getDieLigueJornadaActas(jornada: number): Promise<DieLigue
           players: [],
         },
         events: [],
+        tacticalEvents: [],
         mainVideoUrl: null,
       });
       continue;
@@ -348,6 +382,152 @@ export async function getDieLigueJornadaActas(jornada: number): Promise<DieLigue
 
       parsedEvents.sort((a, b) => a.minuto - b.minuto);
 
+      // Diccionario de etiquetas i18n
+      const LABEL_TRANSLATIONS: Record<string, string> = {
+        PENALTY_BOX: 'Área',
+        OUTSIDE_BOX: 'Fuera de área',
+        ON_TARGET: 'A portería',
+        OFF_TARGET: 'Fuera',
+        BLOCKED: 'Bloqueado',
+        WOODWORK: 'Poste',
+        HIGH_CROSS: 'Centro aéreo',
+        LOW_CROSS: 'Centro raso',
+        SHORT: 'En corto',
+        LONG: 'En largo',
+        DIRECT: 'Directo',
+        INDIRECT: 'Indirecto',
+        LEFT_WING: 'Banda izq.',
+        RIGHT_WING: 'Banda der.',
+        CENTER: 'Centro',
+        COUNTER_ATTACK: 'Contraataque',
+        BUILD_UP: 'Construcción',
+        SET_PIECE: 'ABP',
+        HEAD: 'Cabeza',
+        FOOT: 'Pie',
+        FIRST_TOUCH: 'Primer toque',
+        SAVED: 'Parada',
+        CROSS: 'Centro',
+        PASS: 'Pase',
+        DRIBBLE: 'Regate',
+      };
+
+      const formatLabelKey = (k: string): string => {
+        if (LABEL_TRANSLATIONS[k]) return LABEL_TRANSLATIONS[k];
+        return k
+          .toLowerCase()
+          .split('_')
+          .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+          .join(' ');
+      };
+
+      const offensiveConfig: Record<string, { tipoClave: TacticalCategoryKey; nombreTipo: string }> = {
+        SHOT: { tipoClave: 'tiros', nombreTipo: 'Tiro' },
+        CHANCE_WITHOUT_SHOT: { tipoClave: 'ocasiones', nombreTipo: 'Ocasión sin tiro' },
+        CROSS_HIGH_AND_LOW: { tipoClave: 'centros', nombreTipo: 'Centro' },
+        CORNER: { tipoClave: 'corneres', nombreTipo: 'Córner a favor' },
+        FREEKICK: { tipoClave: 'faltas', nombreTipo: 'Falta a favor' },
+        PENALTY: { tipoClave: 'penaltis', nombreTipo: 'Penalti a favor' },
+        GOAL_KICK: { tipoClave: 'saques_puerta', nombreTipo: 'Saque de puerta' },
+      };
+
+      const defensiveConfig: Record<string, { tipoClave: TacticalCategoryKey; nombreTipo: string }> = {
+        SHOT_DEFENSIVE: { tipoClave: 'tiros', nombreTipo: 'Tiro recibido' },
+        CHANCE_WITHOUT_SHOT_DEFENSIVE: { tipoClave: 'ocasiones', nombreTipo: 'Ocasión rival' },
+        CROSS_HIGH_LOW_DEFENSIVE: { tipoClave: 'centros', nombreTipo: 'Centro recibido' },
+        CORNER_DEFENSIVE: { tipoClave: 'corneres', nombreTipo: 'Córner en contra' },
+        FREEKICK_DEFENSIVE: { tipoClave: 'faltas', nombreTipo: 'Falta en contra' },
+        PENALTY_DEFENSIVE: { tipoClave: 'penaltis', nombreTipo: 'Penalti en contra' },
+        GOAL_KICK_OPPONENT: { tipoClave: 'saques_puerta', nombreTipo: 'Saque de puerta rival' },
+      };
+
+      const parsedTacticalEvents: DieLigueTacticalEventActa[] = [];
+
+      for (const e of rawEvents) {
+        // Excluir goles, tarjetas y sustituciones (pertenecen a Cronología)
+        if (['GOAL', 'CARD', 'SUBSTITUTION'].includes(e.categoryName)) {
+          continue;
+        }
+
+        let isDef = Boolean(e.defensiveEvent);
+        let cfg: { tipoClave: TacticalCategoryKey; nombreTipo: string } | null = null;
+        let esOfensivo = false;
+
+        if (defensiveConfig[e.categoryName]) {
+          isDef = true;
+          esOfensivo = false;
+          cfg = defensiveConfig[e.categoryName];
+        } else if (offensiveConfig[e.categoryName]) {
+          if (isDef) {
+            esOfensivo = false;
+            const foundDefKey = Object.keys(defensiveConfig).find(
+              (k) => defensiveConfig[k].tipoClave === offensiveConfig[e.categoryName].tipoClave
+            );
+            cfg = foundDefKey ? defensiveConfig[foundDefKey] : offensiveConfig[e.categoryName];
+          } else {
+            esOfensivo = true;
+            cfg = offensiveConfig[e.categoryName];
+          }
+        }
+
+        if (!cfg) continue;
+
+        const start = typeof e.start === 'number' ? e.start : null;
+        const end = typeof e.end === 'number' ? e.end : null;
+        const videoClip = e.videos?.[0]?.videoUrl || gameInfo.mainVideoUrl || null;
+
+        if (!videoClip || start === null || end === null || end <= start) {
+          continue;
+        }
+
+        const minuto = parseMinute(e.gameTimeString, e.gameTime ?? e.eventTime);
+        const isHome = e.teamType === 'HOME' || e.team?.id === gameInfo.homeTeam?.id;
+        const equipoNombre = e.team?.name || (isHome ? gameInfo.homeTeam?.name || 'Local' : gameInfo.awayTeam?.name || 'Visitante');
+
+        const primaryPlayer = e.selectedPlayers?.find((p) => p.player)?.player;
+
+        const labels: string[] = [];
+        const rawLabels: string[] = [];
+        if (e.selectedLabels && Array.isArray(e.selectedLabels)) {
+          for (const l of e.selectedLabels) {
+            const rawKey = l.i18NKey || l.tag?.i18NKey;
+            if (rawKey && !rawLabels.includes(rawKey)) {
+              rawLabels.push(rawKey);
+              const labelText = formatLabelKey(rawKey);
+              if (labelText && !labels.includes(labelText)) {
+                labels.push(labelText);
+              }
+            }
+          }
+        }
+
+        parsedTacticalEvents.push({
+          id: e.id,
+          categoryName: e.categoryName,
+          tipoClave: cfg.tipoClave,
+          nombreTipo: cfg.nombreTipo,
+          esOfensivo,
+          minuto,
+          minutoTexto: e.gameTimeString || `${minuto}'`,
+          equipoId: e.team?.id || '',
+          equipoNombre,
+          esLocal: isHome,
+          jugadorPrincipal: primaryPlayer
+            ? {
+                id: primaryPlayer.id,
+                nombre: primaryPlayer.playerName,
+                dorsal: primaryPlayer.shirtNumber,
+              }
+            : undefined,
+          labels,
+          rawLabels,
+          videoUrl: videoClip,
+          start,
+          end,
+        });
+      }
+
+      parsedTacticalEvents.sort((a, b) => a.minuto - b.minuto || (a.start ?? 0) - (b.start ?? 0));
+
       // Función para procesar jugadores y minutaje de cada equipo
       const buildTeamPlayers = (
         rawPlayers: Array<{
@@ -501,6 +681,7 @@ export async function getDieLigueJornadaActas(jornada: number): Promise<DieLigue
           players: awayPlayers,
         },
         events: parsedEvents,
+        tacticalEvents: parsedTacticalEvents,
         mainVideoUrl: gameInfo.mainVideoUrl || null,
       });
     } catch (err: unknown) {
@@ -531,6 +712,7 @@ export async function getDieLigueJornadaActas(jornada: number): Promise<DieLigue
           players: [],
         },
         events: [],
+        tacticalEvents: [],
         mainVideoUrl: null,
       });
     }

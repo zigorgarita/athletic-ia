@@ -15,9 +15,12 @@ import {
   CheckCircle2,
   AlertTriangle,
   Download,
+  Flame,
+  ShieldAlert,
+  Swords,
 } from 'lucide-react';
 import { getStaffPasskey } from '@/lib/passkey';
-import { DieLigueMatchActa, DieLigueEventActa } from '@/lib/die-ligen/actas';
+import { DieLigueMatchActa, DieLigueEventActa, DieLigueTacticalEventActa } from '@/lib/die-ligen/actas';
 import { DieLigueClipModal } from './DieLigueClipModal';
 
 interface DieLigueMatchDetailModalProps {
@@ -40,7 +43,10 @@ export function DieLigueMatchDetailModal({
   const [loading, setLoading] = useState(false);
   const [match, setMatch] = useState<DieLigueMatchActa | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'alineaciones' | 'eventos' | 'tactica'>('alineaciones');
+  const [activeTab, setActiveTab] = useState<'alineaciones' | 'eventos' | 'tacticos' | 'tactica'>('alineaciones');
+  const [activeTacticalTab, setActiveTacticalTab] = useState<'ofensivos' | 'defensivos'>('ofensivos');
+  const [offensiveFilter, setOffensiveFilter] = useState<string>('todos');
+  const [defensiveFilter, setDefensiveFilter] = useState<string>('todos');
   const [downloadingEventId, setDownloadingEventId] = useState<string | null>(null);
   const [clipDownloadError, setClipDownloadError] = useState<string | null>(null);
   const [selectedClip, setSelectedClip] = useState<{
@@ -50,6 +56,69 @@ export function DieLigueMatchDetailModal({
     title: string;
     subtitle?: string;
   } | null>(null);
+
+  const handleDownloadTacticalClip = async (ev: DieLigueTacticalEventActa) => {
+    if (!match || !ev.videoUrl || typeof ev.start !== 'number' || typeof ev.end !== 'number') return;
+    setDownloadingEventId(ev.id);
+    setClipDownloadError(null);
+
+    try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        Accept: 'application/json, video/mp4, */*',
+      };
+      const staffPasskey = getStaffPasskey() || process.env.NEXT_PUBLIC_COACH_PASSKEY || '';
+      if (staffPasskey) headers['x-staff-passkey'] = staffPasskey;
+
+      const res = await fetch('/api/die-ligen/download-clip', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          trimStart: ev.start,
+          trimEnd: ev.end,
+          homeTeamName: match.homeTeam.name,
+          awayTeamName: match.awayTeam.name,
+          gameDate: match.fecha,
+          videoUrl: ev.videoUrl,
+          translatedEventName: ev.nombreTipo,
+          gameMinutes: ev.minutoTexto,
+        }),
+      });
+
+      if (!res.ok) {
+        let errMsg = `Error en el servidor al generar clip (HTTP ${res.status})`;
+        try {
+          const errJson = await res.json();
+          if (errJson?.error) errMsg = errJson.error;
+        } catch {
+          // ignore non-json
+        }
+        throw new Error(errMsg);
+      }
+
+      const blob = await res.blob();
+      const disposition = res.headers.get('content-disposition');
+      let filename = `clip_${match.homeTeam.name}_vs_${match.awayTeam.name}_${ev.tipoClave}_min${ev.minuto}.mp4`;
+      if (disposition && disposition.includes('filename=')) {
+        const matchName = disposition.match(/filename="?([^";]+)"?/);
+        if (matchName?.[1]) filename = matchName[1];
+      }
+
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error al descargar clip recortado';
+      setClipDownloadError(msg);
+    } finally {
+      setDownloadingEventId(null);
+    }
+  };
 
   const handleDownloadNativeClip = async (ev: DieLigueEventActa) => {
     if (!match || !ev.videoUrl || typeof ev.start !== 'number' || typeof ev.end !== 'number') return;
@@ -316,6 +385,16 @@ export function DieLigueMatchDetailModal({
                       <ArrowRightLeft className="w-3.5 h-3.5" /> Cronología ({match.events.length})
                     </button>
                     <button
+                      onClick={() => setActiveTab('tacticos')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                        activeTab === 'tacticos'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                      }`}
+                    >
+                      <Swords className="w-3.5 h-3.5" /> Clips tácticos ({match.tacticalEvents?.length || 0})
+                    </button>
+                    <button
                       onClick={() => setActiveTab('tactica')}
                       className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
                         activeTab === 'tactica'
@@ -515,6 +594,269 @@ export function DieLigueMatchDetailModal({
                       )}
                     </div>
                   )}
+
+                  {activeTab === 'tacticos' && (() => {
+                    const allTactical = match.tacticalEvents || [];
+                    const offensiveEvents = allTactical.filter((e) => e.esOfensivo);
+                    const defensiveEvents = allTactical.filter((e) => !e.esOfensivo);
+
+                    const offensiveFilterOptions = [
+                      { key: 'todos', label: 'Todos', count: offensiveEvents.length },
+                      { key: 'tiros', label: 'Tiros', count: offensiveEvents.filter((e) => e.tipoClave === 'tiros').length },
+                      { key: 'ocasiones', label: 'Ocasiones', count: offensiveEvents.filter((e) => e.tipoClave === 'ocasiones').length },
+                      { key: 'centros', label: 'Centros', count: offensiveEvents.filter((e) => e.tipoClave === 'centros').length },
+                      { key: 'corneres', label: 'Córneres', count: offensiveEvents.filter((e) => e.tipoClave === 'corneres').length },
+                      { key: 'faltas', label: 'Faltas', count: offensiveEvents.filter((e) => e.tipoClave === 'faltas').length },
+                      { key: 'penaltis', label: 'Penaltis', count: offensiveEvents.filter((e) => e.tipoClave === 'penaltis').length },
+                      { key: 'saques_puerta', label: 'Saques de puerta', count: offensiveEvents.filter((e) => e.tipoClave === 'saques_puerta').length },
+                    ];
+
+                    const defensiveFilterOptions = [
+                      { key: 'todos', label: 'Todos', count: defensiveEvents.length },
+                      { key: 'tiros', label: 'Tiros recibidos', count: defensiveEvents.filter((e) => e.tipoClave === 'tiros').length },
+                      { key: 'ocasiones', label: 'Ocasiones rival', count: defensiveEvents.filter((e) => e.tipoClave === 'ocasiones').length },
+                      { key: 'centros', label: 'Centros recibidos', count: defensiveEvents.filter((e) => e.tipoClave === 'centros').length },
+                      { key: 'corneres', label: 'Córneres', count: defensiveEvents.filter((e) => e.tipoClave === 'corneres').length },
+                      { key: 'faltas', label: 'Faltas', count: defensiveEvents.filter((e) => e.tipoClave === 'faltas').length },
+                      { key: 'penaltis', label: 'Penaltis', count: defensiveEvents.filter((e) => e.tipoClave === 'penaltis').length },
+                      { key: 'saques_puerta', label: 'Saques de puerta rival', count: defensiveEvents.filter((e) => e.tipoClave === 'saques_puerta').length },
+                    ];
+
+                    const currentEvents =
+                      activeTacticalTab === 'ofensivos'
+                        ? offensiveFilter === 'todos'
+                          ? offensiveEvents
+                          : offensiveEvents.filter((e) => e.tipoClave === offensiveFilter)
+                        : defensiveFilter === 'todos'
+                        ? defensiveEvents
+                        : defensiveEvents.filter((e) => e.tipoClave === defensiveFilter);
+
+                    return (
+                      <div className="space-y-4">
+                        {clipDownloadError && (
+                          <div className="p-3 rounded-xl bg-red-950/40 border border-red-800 text-red-300 text-xs flex items-center justify-between">
+                            <span>{clipDownloadError}</span>
+                            <button
+                              onClick={() => setClipDownloadError(null)}
+                              className="text-red-400 hover:text-white ml-2 text-xs font-bold cursor-pointer"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Sub-subpestañas: Ofensivos | Defensivos */}
+                        <div className="flex items-center justify-between border-b border-slate-800 pb-3 flex-wrap gap-2">
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setActiveTacticalTab('ofensivos');
+                                setOffensiveFilter('todos');
+                              }}
+                              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                                activeTacticalTab === 'ofensivos'
+                                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm shadow-amber-500/10'
+                                  : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
+                              }`}
+                            >
+                              <Flame className="w-3.5 h-3.5 text-amber-400" />
+                              <span>Ofensivos</span>
+                              <span className="px-1.5 py-0.2 rounded-full bg-slate-900 text-amber-400 text-[10px] font-mono border border-slate-800">
+                                {offensiveEvents.length}
+                              </span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setActiveTacticalTab('defensivos');
+                                setDefensiveFilter('todos');
+                              }}
+                              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                                activeTacticalTab === 'defensivos'
+                                  ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40 shadow-sm shadow-blue-500/10'
+                                  : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
+                              }`}
+                            >
+                              <ShieldAlert className="w-3.5 h-3.5 text-blue-400" />
+                              <span>Defensivos</span>
+                              <span className="px-1.5 py-0.2 rounded-full bg-slate-900 text-blue-400 text-[10px] font-mono border border-slate-800">
+                                {defensiveEvents.length}
+                              </span>
+                            </button>
+                          </div>
+
+                          <span className="text-[11px] text-slate-500 italic">
+                            {activeTacticalTab === 'ofensivos'
+                              ? 'Eventos ofensivos con corte de clip Die Ligue'
+                              : 'Acciones defensivas y del rival analizadas'}
+                          </span>
+                        </div>
+
+                        {/* Filtros rápidos Ofensivos */}
+                        {activeTacticalTab === 'ofensivos' && (
+                          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+                            {offensiveFilterOptions.map((opt) => (
+                              <button
+                                key={opt.key}
+                                type="button"
+                                onClick={() => setOffensiveFilter(opt.key)}
+                                className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-all shrink-0 flex items-center gap-1.5 cursor-pointer ${
+                                  offensiveFilter === opt.key
+                                    ? 'bg-amber-500 text-slate-950 font-bold'
+                                    : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800 hover:border-slate-700'
+                                }`}
+                              >
+                                <span>{opt.label}</span>
+                                <span
+                                  className={`text-[10px] font-mono px-1 rounded ${
+                                    offensiveFilter === opt.key
+                                      ? 'bg-slate-950/20 text-slate-950'
+                                      : 'bg-slate-900 text-slate-400'
+                                  }`}
+                                >
+                                  {opt.count}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Filtros rápidos Defensivos */}
+                        {activeTacticalTab === 'defensivos' && (
+                          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+                            {defensiveFilterOptions.map((opt) => (
+                              <button
+                                key={opt.key}
+                                type="button"
+                                onClick={() => setDefensiveFilter(opt.key)}
+                                className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-all shrink-0 flex items-center gap-1.5 cursor-pointer ${
+                                  defensiveFilter === opt.key
+                                    ? 'bg-blue-500 text-slate-950 font-bold'
+                                    : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800 hover:border-slate-700'
+                                }`}
+                              >
+                                <span>{opt.label}</span>
+                                <span
+                                  className={`text-[10px] font-mono px-1 rounded ${
+                                    defensiveFilter === opt.key
+                                      ? 'bg-slate-950/20 text-slate-950'
+                                      : 'bg-slate-900 text-slate-400'
+                                  }`}
+                                >
+                                  {opt.count}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Lista de eventos tácticos */}
+                        <div className="space-y-2">
+                          {currentEvents.length === 0 ? (
+                            <p className="text-xs text-slate-500 italic py-6 text-center bg-slate-950/40 rounded-xl border border-slate-900">
+                              No hay clips registrados en esta categoría para este partido.
+                            </p>
+                          ) : (
+                            currentEvents.map((ev) => (
+                              <div
+                                key={ev.id}
+                                className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-3 text-xs hover:border-slate-700 transition-colors"
+                              >
+                                <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                  <span
+                                    className={`font-mono font-bold px-1.5 py-0.5 rounded text-[11px] shrink-0 border ${
+                                      ev.esOfensivo
+                                        ? 'text-amber-400 bg-amber-950/40 border-amber-900/40'
+                                        : 'text-blue-400 bg-blue-950/40 border-blue-900/40'
+                                    }`}
+                                  >
+                                    {ev.minutoTexto}
+                                  </span>
+
+                                  <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                                    <span className="font-semibold text-white truncate shrink-0">
+                                      {ev.nombreTipo}
+                                    </span>
+
+                                    {ev.jugadorPrincipal && (
+                                      <span className="text-slate-300 truncate">
+                                        <strong className="font-mono text-slate-100 mr-1">
+                                          #{ev.jugadorPrincipal.dorsal}
+                                        </strong>
+                                        {ev.jugadorPrincipal.nombre}
+                                      </span>
+                                    )}
+
+                                    <span className="text-[11px] text-slate-400 shrink-0">
+                                      ({ev.equipoNombre})
+                                    </span>
+
+                                    {ev.labels.length > 0 && (
+                                      <div className="flex items-center gap-1 flex-wrap">
+                                        {ev.labels.map((lbl) => (
+                                          <span
+                                            key={lbl}
+                                            className="px-1.5 py-0.5 rounded bg-slate-900 text-slate-300 text-[10px] border border-slate-800 font-medium"
+                                          >
+                                            {lbl}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setSelectedClip({
+                                        videoUrl: ev.videoUrl,
+                                        start: ev.start,
+                                        end: ev.end,
+                                        title: `${ev.nombreTipo} ${
+                                          ev.jugadorPrincipal
+                                            ? `- #${ev.jugadorPrincipal.dorsal} ${ev.jugadorPrincipal.nombre}`
+                                            : ''
+                                        } (${ev.minutoTexto})`,
+                                        subtitle: `${match.homeTeam.name} vs ${match.awayTeam.name} • Jornada ${jornada}`,
+                                      })
+                                    }
+                                    className="px-2 py-0.5 rounded bg-blue-600/10 text-blue-400 hover:bg-blue-600/20 text-[10px] font-bold border border-blue-500/20 flex items-center gap-1 transition-colors cursor-pointer"
+                                    title="Ver clip instantáneo en reproductor"
+                                  >
+                                    <Play className="w-2.5 h-2.5" /> Ver clip
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    disabled={downloadingEventId === ev.id}
+                                    onClick={() => handleDownloadTacticalClip(ev)}
+                                    className="px-2 py-0.5 rounded bg-emerald-600/10 text-emerald-400 hover:bg-emerald-600/20 disabled:opacity-50 text-[10px] font-bold border border-emerald-500/20 flex items-center gap-1 transition-colors cursor-pointer"
+                                    title="Descargar archivo MP4 recortado oficial de Die Ligue"
+                                  >
+                                    {downloadingEventId === ev.id ? (
+                                      <>
+                                        <RefreshCw className="w-2.5 h-2.5 animate-spin" />
+                                        <span>Generando...</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Download className="w-2.5 h-2.5" />
+                                        <span>Descargar clip</span>
+                                      </>
+                                    )}
+                                  </button>
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   {activeTab === 'tactica' && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
