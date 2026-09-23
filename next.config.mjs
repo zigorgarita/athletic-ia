@@ -1,5 +1,13 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  experimental: {
+    serverComponentsExternalPackages: ['@ffmpeg-installer/ffmpeg', '@ffmpeg-installer/linux-x64'],
+    outputFileTracingIncludes: {
+      '/api/die-ligen/merge-clips': [
+        './node_modules/@ffmpeg-installer/**/*',
+      ],
+    },
+  },
   images: {
     remotePatterns: [
       {

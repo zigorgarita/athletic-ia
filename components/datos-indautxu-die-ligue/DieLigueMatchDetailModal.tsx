@@ -18,10 +18,12 @@ import {
   Flame,
   ShieldAlert,
   Swords,
+  Check,
 } from 'lucide-react';
 import { getStaffPasskey } from '@/lib/passkey';
 import { DieLigueMatchActa, DieLigueEventActa, DieLigueTacticalEventActa } from '@/lib/die-ligen/actas';
 import { DieLigueClipModal } from './DieLigueClipModal';
+import { ClipsMergeDrawer } from './ClipsMergeDrawer';
 
 interface DieLigueMatchDetailModalProps {
   isOpen: boolean;
@@ -50,6 +52,7 @@ export function DieLigueMatchDetailModal({
   const [teamFilter, setTeamFilter] = useState<'todos' | 'local' | 'visitante'>('todos');
   const [downloadingEventId, setDownloadingEventId] = useState<string | null>(null);
   const [clipDownloadError, setClipDownloadError] = useState<string | null>(null);
+  const [selectedClips, setSelectedClips] = useState<DieLigueTacticalEventActa[]>([]);
   const [selectedClip, setSelectedClip] = useState<{
     videoUrl: string;
     start: number;
@@ -57,6 +60,36 @@ export function DieLigueMatchDetailModal({
     title: string;
     subtitle?: string;
   } | null>(null);
+
+  const handleToggleSelectClip = (clip: DieLigueTacticalEventActa) => {
+    setSelectedClips((prev) => {
+      const exists = prev.some((c) => c.id === clip.id);
+      if (exists) {
+        return prev.filter((c) => c.id !== clip.id);
+      } else {
+        return [...prev, clip];
+      }
+    });
+  };
+
+  const handleRemoveSelectedClip = (clipId: string) => {
+    setSelectedClips((prev) => prev.filter((c) => c.id !== clipId));
+  };
+
+  const handleMoveSelectedClip = (index: number, direction: 'up' | 'down') => {
+    setSelectedClips((prev) => {
+      const next = [...prev];
+      const targetIndex = direction === 'up' ? index - 1 : index + 1;
+      if (targetIndex < 0 || targetIndex >= next.length) return prev;
+      const [moved] = next.splice(index, 1);
+      next.splice(targetIndex, 0, moved);
+      return next;
+    });
+  };
+
+  const handleClearSelectedClips = () => {
+    setSelectedClips([]);
+  };
 
   const handleDownloadTacticalClip = async (ev: DieLigueTacticalEventActa) => {
     if (!match || !ev.videoUrl || typeof ev.start !== 'number' || typeof ev.end !== 'number') return;
@@ -206,6 +239,7 @@ export function DieLigueMatchDetailModal({
     const loadMatchDetail = async () => {
       setLoading(true);
       setError(null);
+      setSelectedClips([]);
       try {
         const headers: Record<string, string> = { Accept: 'application/json' };
         const staffPasskey = getStaffPasskey() || process.env.NEXT_PUBLIC_COACH_PASSKEY || '';
@@ -807,101 +841,138 @@ export function DieLigueMatchDetailModal({
                               No hay clips registrados en esta categoría para este partido.
                             </p>
                           ) : (
-                            currentEvents.map((ev) => (
-                              <div
-                                key={ev.id}
-                                className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-3 text-xs hover:border-slate-700 transition-colors"
-                              >
-                                <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                                  <span
-                                    className={`font-mono font-bold px-1.5 py-0.5 rounded text-[11px] shrink-0 border ${
-                                      ev.esOfensivo
-                                        ? 'text-amber-400 bg-amber-950/40 border-amber-900/40'
-                                        : 'text-blue-400 bg-blue-950/40 border-blue-900/40'
-                                    }`}
-                                  >
-                                    {ev.minutoTexto}
-                                  </span>
+                            currentEvents.map((ev) => {
+                              const isSelected = selectedClips.some((c) => c.id === ev.id);
+                              return (
+                                <div
+                                  key={ev.id}
+                                  className={`p-2.5 rounded-xl border flex items-center justify-between gap-3 text-xs transition-colors ${
+                                    isSelected
+                                      ? 'bg-amber-950/20 border-amber-500/50 shadow-sm shadow-amber-500/5'
+                                      : 'bg-slate-950 border-slate-800 hover:border-slate-700'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                    {/* Checkbox discreto para selección múltiple */}
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleToggleSelectClip(ev);
+                                      }}
+                                      className={`w-4 h-4 rounded border flex items-center justify-center transition-colors cursor-pointer shrink-0 ${
+                                        isSelected
+                                          ? 'bg-amber-500 border-amber-400 text-slate-950 shadow-xs'
+                                          : 'bg-slate-900 border-slate-700 hover:border-slate-500 text-transparent'
+                                      }`}
+                                      title={
+                                        isSelected
+                                          ? 'Deseleccionar clip'
+                                          : 'Seleccionar clip para recopilatorio'
+                                      }
+                                    >
+                                      <Check className="w-3 h-3 stroke-[3]" />
+                                    </button>
 
-                                  <div className="flex items-center gap-2 min-w-0 flex-wrap">
-                                    <span className="font-semibold text-white truncate shrink-0">
-                                      {ev.nombreTipo}
+                                    <span
+                                      className={`font-mono font-bold px-1.5 py-0.5 rounded text-[11px] shrink-0 border ${
+                                        ev.esOfensivo
+                                          ? 'text-amber-400 bg-amber-950/40 border-amber-900/40'
+                                          : 'text-blue-400 bg-blue-950/40 border-blue-900/40'
+                                      }`}
+                                    >
+                                      {ev.minutoTexto}
                                     </span>
 
-                                    {ev.jugadorPrincipal && (
-                                      <span className="text-slate-300 truncate">
-                                        <strong className="font-mono text-slate-100 mr-1">
-                                          #{ev.jugadorPrincipal.dorsal}
-                                        </strong>
-                                        {ev.jugadorPrincipal.nombre}
+                                    <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                                      <span className="font-semibold text-white truncate shrink-0">
+                                        {ev.nombreTipo}
                                       </span>
-                                    )}
 
-                                    <span className="text-[11px] text-slate-400 shrink-0">
-                                      ({ev.equipoNombre})
-                                    </span>
+                                      {ev.jugadorPrincipal && (
+                                        <span className="text-slate-300 truncate">
+                                          <strong className="font-mono text-slate-100 mr-1">
+                                            #{ev.jugadorPrincipal.dorsal}
+                                          </strong>
+                                          {ev.jugadorPrincipal.nombre}
+                                        </span>
+                                      )}
 
-                                    {ev.labels.length > 0 && (
-                                      <div className="flex items-center gap-1 flex-wrap">
-                                        {ev.labels.map((lbl) => (
-                                          <span
-                                            key={lbl}
-                                            className="px-1.5 py-0.5 rounded bg-slate-900 text-slate-300 text-[10px] border border-slate-800 font-medium"
-                                          >
-                                            {lbl}
-                                          </span>
-                                        ))}
-                                      </div>
-                                    )}
+                                      <span className="text-[11px] text-slate-400 shrink-0">
+                                        ({ev.equipoNombre})
+                                      </span>
+
+                                      {ev.labels.length > 0 && (
+                                        <div className="flex items-center gap-1 flex-wrap">
+                                          {ev.labels.map((lbl) => (
+                                            <span
+                                              key={lbl}
+                                              className="px-1.5 py-0.5 rounded bg-slate-900 text-slate-300 text-[10px] border border-slate-800 font-medium"
+                                            >
+                                              {lbl}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setSelectedClip({
+                                          videoUrl: ev.videoUrl,
+                                          start: ev.start,
+                                          end: ev.end,
+                                          title: `${ev.nombreTipo} ${
+                                            ev.jugadorPrincipal
+                                              ? `- #${ev.jugadorPrincipal.dorsal} ${ev.jugadorPrincipal.nombre}`
+                                              : ''
+                                          } (${ev.minutoTexto})`,
+                                          subtitle: `${match.homeTeam.name} vs ${match.awayTeam.name} • Jornada ${jornada}`,
+                                        })
+                                      }
+                                      className="px-2 py-0.5 rounded bg-blue-600/10 text-blue-400 hover:bg-blue-600/20 text-[10px] font-bold border border-blue-500/20 flex items-center gap-1 transition-colors cursor-pointer"
+                                      title="Ver clip instantáneo en reproductor"
+                                    >
+                                      <Play className="w-2.5 h-2.5" /> Ver clip
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      disabled={downloadingEventId === ev.id}
+                                      onClick={() => handleDownloadTacticalClip(ev)}
+                                      className="px-2 py-0.5 rounded bg-emerald-600/10 text-emerald-400 hover:bg-emerald-600/20 disabled:opacity-50 text-[10px] font-bold border border-emerald-500/20 flex items-center gap-1 transition-colors cursor-pointer"
+                                      title="Descargar archivo MP4 recortado oficial de Die Ligue"
+                                    >
+                                      {downloadingEventId === ev.id ? (
+                                        <>
+                                          <RefreshCw className="w-2.5 h-2.5 animate-spin" />
+                                          <span>Generando...</span>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Download className="w-2.5 h-2.5" />
+                                          <span>Descargar clip</span>
+                                        </>
+                                      )}
+                                    </button>
                                   </div>
                                 </div>
-
-                                <div className="flex items-center gap-1.5 shrink-0">
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      setSelectedClip({
-                                        videoUrl: ev.videoUrl,
-                                        start: ev.start,
-                                        end: ev.end,
-                                        title: `${ev.nombreTipo} ${
-                                          ev.jugadorPrincipal
-                                            ? `- #${ev.jugadorPrincipal.dorsal} ${ev.jugadorPrincipal.nombre}`
-                                            : ''
-                                        } (${ev.minutoTexto})`,
-                                        subtitle: `${match.homeTeam.name} vs ${match.awayTeam.name} • Jornada ${jornada}`,
-                                      })
-                                    }
-                                    className="px-2 py-0.5 rounded bg-blue-600/10 text-blue-400 hover:bg-blue-600/20 text-[10px] font-bold border border-blue-500/20 flex items-center gap-1 transition-colors cursor-pointer"
-                                    title="Ver clip instantáneo en reproductor"
-                                  >
-                                    <Play className="w-2.5 h-2.5" /> Ver clip
-                                  </button>
-
-                                  <button
-                                    type="button"
-                                    disabled={downloadingEventId === ev.id}
-                                    onClick={() => handleDownloadTacticalClip(ev)}
-                                    className="px-2 py-0.5 rounded bg-emerald-600/10 text-emerald-400 hover:bg-emerald-600/20 disabled:opacity-50 text-[10px] font-bold border border-emerald-500/20 flex items-center gap-1 transition-colors cursor-pointer"
-                                    title="Descargar archivo MP4 recortado oficial de Die Ligue"
-                                  >
-                                    {downloadingEventId === ev.id ? (
-                                      <>
-                                        <RefreshCw className="w-2.5 h-2.5 animate-spin" />
-                                        <span>Generando...</span>
-                                      </>
-                                    ) : (
-                                      <>
-                                        <Download className="w-2.5 h-2.5" />
-                                        <span>Descargar clip</span>
-                                      </>
-                                    )}
-                                  </button>
-                                </div>
-                              </div>
-                            ))
+                              );
+                            })
                           )}
                         </div>
+
+                        {/* Bandeja de unión y compilación de clips seleccionados */}
+                        <ClipsMergeDrawer
+                          match={match}
+                          selectedClips={selectedClips}
+                          onRemoveClip={handleRemoveSelectedClip}
+                          onMoveClip={handleMoveSelectedClip}
+                          onClearSelection={handleClearSelectedClips}
+                        />
                       </div>
                     );
                   })()}
