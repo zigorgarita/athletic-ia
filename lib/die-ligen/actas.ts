@@ -384,31 +384,95 @@ export async function getDieLigueJornadaActas(jornada: number): Promise<DieLigue
 
       // Diccionario de etiquetas i18n
       const LABEL_TRANSLATIONS: Record<string, string> = {
+        // Zonas del campo y áreas
         PENALTY_BOX: 'Área',
         OUTSIDE_BOX: 'Fuera de área',
-        ON_TARGET: 'A portería',
-        OFF_TARGET: 'Fuera',
-        BLOCKED: 'Bloqueado',
-        WOODWORK: 'Poste',
+        OUTSIDE_PENALTY_BOX: 'Fuera de área',
+        OPPOSITION_HALF: 'Campo rival',
+        OWN_HALF: 'Campo propio',
+        LEFT_CROSS_ZONE: 'Zona centro izq.',
+        RIGHT_CROSS_ZONE: 'Zona centro der.',
+        LEFT_WING: 'Banda izq.',
+        RIGHT_WING: 'Banda der.',
+        HALF_LEFT: 'Pasillo int. izq.',
+        HALF_RIGHT: 'Pasillo int. der.',
+        CENTER: 'Centro',
+        CENTRAL: 'Zona central',
+        MID: 'Zona media',
+        LEFT: 'Izquierda',
+        RIGHT: 'Derecha',
+        DEEP: 'En profundidad',
+
+        // Balón parado (ABP) y reinicios
+        SET_PIECE: 'ABP',
+        CORNER: 'Córner',
+        LEFT_CORNER: 'Córner izq.',
+        RIGHT_CORNER: 'Córner der.',
+        FREE_KICK: 'Falta',
+        PENALTY: 'Penalti',
+        THROW_IN: 'Saque de banda',
+
+        // Tipos de centro y pases
+        CROSS: 'Centro',
         HIGH_CROSS: 'Centro aéreo',
         LOW_CROSS: 'Centro raso',
+        CROSS_HIGH_AND_LOW: 'Centro',
+        HIGH_CROSS_FROM_OPEN_PLAY: 'Centro aéreo en juego',
+        LOW_CROSS_FROM_OPEN_PLAY: 'Centro raso en juego',
+        CROSS_TOWARDS_GOAL: 'Centro cerrado',
+        CROSS_AWAY_FROM_GOAL: 'Centro abierto',
+        PASS: 'Pase',
+        PASS_FROM_OPEN_PLAY: 'Pase en juego',
+        COMBINATION: 'Combinada',
+        SOLO_RUN: 'Conducción',
+        DRIBBLE: 'Regate',
+        FIRST_TOUCH: 'Primer toque',
         SHORT: 'En corto',
         LONG: 'En largo',
         DIRECT: 'Directo',
         INDIRECT: 'Indirecto',
-        LEFT_WING: 'Banda izq.',
-        RIGHT_WING: 'Banda der.',
-        CENTER: 'Centro',
+        VERTICAL: 'Vertical',
+
+        // Tipos de tiro y desenlace
+        SHOT: 'Tiro',
+        CHANCE_WITHOUT_SHOT: 'Ocasión sin tiro',
+        SAVED_SHOT: 'Tiro parado',
+        ON_TARGET: 'A portería',
+        OFF_TARGET: 'Fuera',
+        BLOCKED: 'Bloqueado',
+        NOT_BLOCKED: 'No bloqueado',
+        WOODWORK: 'Poste',
+        SAVED: 'Parada',
+        NEAR_POST: 'Primer palo',
+        FAR_POST: 'Segundo palo',
+        NO_CHANCE: 'Sin ocasión',
+        GOAL: 'Gol',
+        GOAL_DISALLOWED: 'Gol anulado',
+        OWN_GOAL: 'Autogol',
+        DIRECTLY_CONVERTED: 'Gol directo',
+
+        // Acciones defensivas y recuperación
+        INTERCEPTION: 'Interceptación',
+        BALL_RECOVERY: 'Recuperación',
+        BALL_LOSS_OPPONENT: 'Pérdida rival',
+        DUEL: 'Duelo',
         COUNTER_ATTACK: 'Contraataque',
         BUILD_UP: 'Construcción',
-        SET_PIECE: 'ABP',
+
+        // Faltas y amonestaciones
+        YELLOW: 'Amarilla',
+        YELLOW_RED: 'Doble amarilla',
+        RED: 'Roja',
+
+        // Partes del cuerpo
         HEAD: 'Cabeza',
         FOOT: 'Pie',
-        FIRST_TOUCH: 'Primer toque',
-        SAVED: 'Parada',
-        CROSS: 'Centro',
-        PASS: 'Pase',
-        DRIBBLE: 'Regate',
+
+        // Respuestas y miscelánea
+        YES: 'Sí',
+        NO: 'No',
+        OUT_OF_PLAY: 'Balón fuera',
+        OTHER: 'Otro',
       };
 
       const formatLabelKey = (k: string): string => {
