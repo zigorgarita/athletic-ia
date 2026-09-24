@@ -1,4 +1,4 @@
-﻿/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * ============================================================================
  * POST /api/rfef/apply
@@ -74,7 +74,43 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Body inválido: Se esperaba JSON.' }, { status: 400 });
     }
 
-    const { jornada, calendarHtml, actas, dbMatchId } = body || {};
+    const { action, matchId, playerId, stat, jornada, calendarHtml, actas, dbMatchId } = body || {};
+
+    // =========================================================================
+    // 2.A Operación Quirúrgica: Reparación atómica de una sola stat de jugador
+    // =========================================================================
+    if (action === 'surgical-repair-stat') {
+      if (!matchId || !playerId || !stat) {
+        return NextResponse.json(
+          { error: 'Faltan parámetros obligatorios: matchId, playerId o stat.' },
+          { status: 400 }
+        );
+      }
+      const supabase = getSupabaseServerClient();
+      const { data: upserted, error: upsertErr } = await supabase
+        .from('match_player_stats')
+        .upsert(
+          {
+            match_id: matchId,
+            player_id: playerId,
+            titular: Boolean(stat.titular),
+            minutos: Number(stat.minutos || 0),
+            goles: Number(stat.goles || 0),
+            asistencias: Number(stat.asistencias || 0),
+            tarjeta_amarilla: Boolean(stat.tarjeta_amarilla),
+            tarjeta_roja: Boolean(stat.tarjeta_roja),
+            origen: 'rfef',
+          },
+          { onConflict: 'match_id,player_id' }
+        )
+        .select('*')
+        .single();
+
+      if (upsertErr) {
+        return NextResponse.json({ ok: false, error: upsertErr.message }, { status: 500 });
+      }
+      return NextResponse.json({ ok: true, data: upserted }, { status: 200 });
+    }
 
     // Validar jornada
     const jornadaNum = typeof jornada === 'number' ? jornada : parseInt(String(jornada), 10);

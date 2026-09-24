@@ -513,21 +513,61 @@ export async function applyJornadaRFEF(params: {
       const indPlayers = indIsLocal
         ? [...indautxuActa.localTitulares, ...indautxuActa.localSuplentes]
         : [...indautxuActa.visitTitulares, ...indautxuActa.visitSuplentes];
-      const { data: ownPlayers, error: ownErr } = await supabase.from('players').select('id, rfef_player_id');
+      const { data: ownPlayers, error: ownErr } = await supabase
+        .from('players')
+        .select('id, nombre, apellidos, alias, rfef_player_id');
       if (ownErr) {
         globalErrors.push(`Error cargando public.players: ${ownErr.message}`);
       } else {
         const ownPlayerByRfefId = new Map<number, string>();
         for (const op of ownPlayers || []) {
-          if (op.rfef_player_id) ownPlayerByRfefId.set(op.rfef_player_id, op.id);
+          if (op.rfef_player_id) ownPlayerByRfefId.set(Number(op.rfef_player_id), op.id);
         }
         const statsUpserts: any[] = [];
         for (const p of indPlayers) {
-          const playerId = ownPlayerByRfefId.get(p.rfefPlayerId);
+          let playerId = ownPlayerByRfefId.get(p.rfefPlayerId);
+
+          // Fallback de identidad cuando rfef_player_id aún no está vinculado
           if (!playerId) {
-            globalErrors.push(`Stats Indautxu: rfef_player_id=${p.rfefPlayerId} (${p.nombre}) no en public.players. Stat omitida.`);
-            continue;
+            const normActaName = normalizeClubName(p.nombre);
+            const candidates: { id: string; fullName: string; score: number }[] = [];
+
+            for (const op of ownPlayers || []) {
+              const fullName = `${op.nombre || ''} ${op.apellidos || ''}`.trim();
+              const normFull1 = normalizeClubName(fullName);
+              const normFull2 = normalizeClubName(`${op.apellidos || ''} ${op.nombre || ''}`);
+              const normAlias = normalizeClubName(op.alias || '');
+
+              if (normFull1 === normActaName || normFull2 === normActaName) {
+                candidates.push({ id: op.id, fullName, score: 3 });
+              } else if (normAlias && normAlias.length >= 4 && normActaName.includes(normAlias)) {
+                candidates.push({ id: op.id, fullName, score: 2 });
+              }
+            }
+
+            if (candidates.length === 1 && candidates[0].score >= 2) {
+              // Coincidencia ÚNICA e INEQUÍVOCA -> Asignar y vincular rfef_player_id
+              playerId = candidates[0].id;
+              await supabase
+                .from('players')
+                .update({ rfef_player_id: p.rfefPlayerId })
+                .eq('id', playerId)
+                .is('rfef_player_id', null);
+              ownPlayerByRfefId.set(p.rfefPlayerId, playerId);
+            } else if (candidates.length > 1) {
+              // Ambigüedad: NO asignar automáticamente, reportar bloqueo y pedir revisión
+              globalErrors.push(
+                `BLOQUEO AMBIGÜEDAD: Jugador RFEF "${p.nombre}" (rfef_id=${p.rfefPlayerId}) coincide con múltiples jugadores (${candidates.map((c) => c.fullName).join(', ')}). No se asigna automáticamente. Revisión requerida.`
+              );
+              continue;
+            } else {
+              globalErrors.push(
+                `Stats Indautxu: Jugador RFEF "${p.nombre}" (rfef_id=${p.rfefPlayerId}) no encontrado en public.players. Stat omitida.`
+              );
+              continue;
+            }
           }
+
           const firstName = (p.nombre || '').split(' ')[0];
           const playerCards = indautxuActa.cards.filter(
             (c) => c.esLocal === indIsLocal && firstName && c.nombre?.includes(firstName)
@@ -538,10 +578,15 @@ export async function applyJornadaRFEF(params: {
             (g) => g.esLocal === indIsLocal && !g.isPropia && firstName && g.autor?.includes(firstName)
           ).length;
           statsUpserts.push({
-            match_id: dbMatchId, player_id: playerId,
-            titular: p.rol === 'Titular', minutos: p.minutos,
-            goles: playerGoals, asistencias: 0,
-            tarjeta_amarilla: tieneAmarilla, tarjeta_roja: tieneRoja,
+            match_id: dbMatchId,
+            player_id: playerId,
+            titular: p.rol === 'Titular',
+            minutos: p.minutos,
+            goles: playerGoals,
+            asistencias: 0,
+            tarjeta_amarilla: tieneAmarilla,
+            tarjeta_roja: tieneRoja,
+            origen: 'rfef',
           });
         }
         if (statsUpserts.length > 0) {
