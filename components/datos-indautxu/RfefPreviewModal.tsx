@@ -48,6 +48,11 @@ export function RfefPreviewModal({
   const [pasteError, setPasteError] = useState<string | null>(null);
   const [showManualPaste, setShowManualPaste] = useState<boolean>(false);
   const [manualHtml, setManualHtml] = useState<string>('');
+  // --- Botón Infinito RFEF: apply state ---
+  const [bridgePayload, setBridgePayload] = useState<{ calendarHtml: string; actas: Array<{ codActa: number; actaHtml: string }> } | null>(null);
+  const [applying, setApplying] = useState<boolean>(false);
+  const [applyResult, setApplyResult] = useState<any | null>(null);
+  const [showApplyConfirm, setShowApplyConfirm] = useState<boolean>(false);
 
   const fetchFromBridgeAndPreview = async (j: number) => {
     if (loading) return;
@@ -99,6 +104,14 @@ export function RfefPreviewModal({
         return;
       }
 
+      // Guardar el paquete bridge en estado (evita segunda consulta a RFEF en el apply)
+      setBridgePayload({
+        calendarHtml: payload.calendarHtml,
+        actas: payload.actas.map((a: any) => ({ codActa: a.codActa, actaHtml: a.actaHtml })),
+      });
+      setApplyResult(null);
+      setShowApplyConfirm(false);
+
       await fetchPreview(j, payload.calendarHtml, payload.actas);
     } catch (err: any) {
       setError(err.message || 'Error al procesar el calendario y actas desde el puente local.');
@@ -108,10 +121,59 @@ export function RfefPreviewModal({
   };
 
   const loadData = (targetJornada: number) => {
+    setBridgePayload(null);
+    setApplyResult(null);
+    setShowApplyConfirm(false);
     if (isEditMode) {
       fetchFromBridgeAndPreview(targetJornada);
     } else {
       fetchPreview(targetJornada);
+    }
+  };
+
+  // --- Botón Infinito RFEF: lógica de apply ---
+  const canApply =
+    isEditMode &&
+    !loading &&
+    !applying &&
+    !!bridgePayload &&
+    !!data &&
+    data.rfefLive === true &&
+    (data.blockers?.length ?? 1) === 0 &&
+    (data.availability?.actasAvailableCount ?? 0) === 8 &&
+    (data.matches?.length ?? 0) === 8;
+
+  const handleApplyConfirm = async () => {
+    if (!canApply || !bridgePayload || !data) return;
+    setShowApplyConfirm(false);
+    setApplying(true);
+    setApplyResult(null);
+    try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      const staffPasskey = (typeof window !== 'undefined' ? localStorage.getItem('staff_passkey') : null) ||
+        process.env.NEXT_PUBLIC_COACH_PASSKEY || 'indautxu2026';
+      if (staffPasskey) headers['x-staff-passkey'] = staffPasskey;
+      if (currentUser?.id && currentUser?.pass) {
+        headers['x-editor-user'] = currentUser.id;
+        headers['x-editor-pass'] = currentUser.pass;
+      }
+      const dbMatchId = data.comparisonWithDb?.dbMatchId || '';
+      const res = await fetch('/api/rfef/apply', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          jornada,
+          calendarHtml: bridgePayload.calendarHtml,
+          actas: bridgePayload.actas,
+          dbMatchId,
+        }),
+      });
+      const json = await res.json();
+      setApplyResult(json);
+    } catch (err: any) {
+      setApplyResult({ ok: false, error: err?.message || 'Error de red al ejecutar el apply.' });
+    } finally {
+      setApplying(false);
     }
   };
 
@@ -1228,11 +1290,78 @@ export function RfefPreviewModal({
           )}
         </div>
 
+        {/* Resultado del Apply (panel fijo sobre el footer) */}
+        {applyResult && (
+          <div className={`px-6 py-4 border-t shrink-0 space-y-2 ${
+            applyResult.ok ? 'bg-emerald-950/60 border-emerald-800/60' : 'bg-rose-950/60 border-rose-800/60'
+          }`}>
+            <div className={`flex items-center gap-2 font-bold text-sm ${
+              applyResult.ok ? 'text-emerald-300' : 'text-rose-300'
+            }`}>
+              {applyResult.ok ? <CheckCircle2 className="w-5 h-5" /> : <XCircle className="w-5 h-5" />}
+              {applyResult.ok ? `J${jornada} aplicada correctamente` : `Error al aplicar J${jornada}`}
+              {applyResult.abortReason && (
+                <span className="text-xs font-normal text-rose-300/80 ml-1">{applyResult.abortReason}</span>
+              )}
+            </div>
+            {applyResult.summary && (
+              <div className="text-xs text-slate-300 grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <div>Creadas: <span className="font-mono font-bold text-emerald-400">{applyResult.summary.creadas}</span></div>
+                <div>Ya existentes: <span className="font-mono font-bold text-amber-400">{applyResult.summary.yaExistentes}</span></div>
+                <div>Errores: <span className="font-mono font-bold text-rose-400">{applyResult.summary.errores}</span></div>
+                <div>Stats: <span className="font-mono font-bold text-slate-200">{applyResult.summary.totalStatsInserted}</span></div>
+              </div>
+            )}
+            <div className="space-y-1 max-h-40 overflow-y-auto">
+              {(applyResult.actas || []).map((a: any) => (
+                <div key={a.codActa} className={`text-[11px] font-mono px-2 py-0.5 rounded ${
+                  a.status === 'CREADA' ? 'text-emerald-300 bg-emerald-950/40'
+                  : a.status === 'YA_EXISTENTE_NO_DUPLICADA' ? 'text-amber-300 bg-amber-950/40'
+                  : 'text-rose-300 bg-rose-950/40'
+                }`}>{a.message}</div>
+              ))}
+              {(applyResult.errors || []).length > 0 && (
+                <div className="mt-1 text-[11px] text-rose-300/80 font-mono space-y-0.5">
+                  {applyResult.errors.map((e: string, i: number) => <div key={i}>⚠ {e}</div>)}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Diálogo de confirmación del Apply */}
+        {showApplyConfirm && (
+          <div className="px-6 py-4 border-t border-amber-800/60 bg-amber-950/50 shrink-0 space-y-3">
+            <div className="flex items-center gap-2 text-amber-300 font-bold text-sm">
+              <AlertTriangle className="w-5 h-5" />
+              Confirmar aplicación de Jornada {jornada}
+            </div>
+            <div className="text-xs text-amber-200/80 space-y-1">
+              <div>Se escribirán en Supabase: <strong className="text-white">8 official_matches</strong> (70692442 = YA EXISTENTE),</div>
+              <div>stats de jugadores rivales y estadísticas de SD Indautxu.</div>
+              <div className="text-amber-400 font-medium">Esta operación es idempotente: ejecutarla dos veces no crea duplicados.</div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowApplyConfirm(false)}
+                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold transition-colors"
+              >Cancelar</button>
+              <button
+                onClick={handleApplyConfirm}
+                className="px-4 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5"
+              >
+                <Activity className="w-3.5 h-3.5" />
+                Confirmar — Aplicar J{jornada}
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Pie del Modal */}
         <div className="px-6 py-3.5 border-t border-slate-800/80 bg-slate-950/80 flex items-center justify-between flex-wrap gap-3 shrink-0">
           <div className="text-[11px] text-slate-500 flex items-center gap-1.5">
             <Info className="w-3.5 h-3.5 text-slate-400" />
-            Panel de previsualización sin modificaciones en la base de datos.
+            {canApply ? 'Paquete 8/8 listo. Puedes aplicar la jornada.' : 'Panel de previsualización sin modificaciones en la base de datos.'}
           </div>
 
           <div className="flex items-center gap-2">
@@ -1244,12 +1373,28 @@ export function RfefPreviewModal({
             </button>
             <button
               onClick={() => fetchPreview(jornada)}
-              disabled={loading}
+              disabled={loading || applying}
               className="px-4 py-2 bg-red-600/90 hover:bg-red-600 text-white rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 disabled:opacity-50"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
               Reconsultar RFEF
             </button>
+            {canApply && !applyResult && !showApplyConfirm && (
+              <button
+                id="rfef-apply-jornada-btn"
+                onClick={() => setShowApplyConfirm(true)}
+                disabled={applying}
+                className="px-4 py-2 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg text-xs font-bold transition-all shadow-lg shadow-emerald-950/50 flex items-center gap-1.5 disabled:opacity-50 animate-in fade-in duration-300"
+              >
+                <Activity className={`w-3.5 h-3.5 ${applying ? 'animate-pulse' : ''}`} />
+                {applying ? 'Aplicando...' : `Aplicar J${jornada}`}
+              </button>
+            )}
+            {applying && (
+              <span className="px-4 py-2 bg-emerald-900/50 text-emerald-300 rounded-lg text-xs font-bold flex items-center gap-1.5 border border-emerald-800">
+                <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Aplicando J{jornada}...
+              </span>
+            )}
           </div>
         </div>
 
