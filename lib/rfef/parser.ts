@@ -44,6 +44,11 @@ export interface ParsedActaPlayer {
   isLocal: boolean;
   clubNombre: string;
   minutos: number;
+  minutoEntrada?: number | null;
+  minutoSalida?: number | null;
+  expulsado?: boolean;
+  minutoExpulsion?: number | null;
+  tipoExpulsion?: 'doble_amarilla' | 'roja_directa' | null;
   hasOfficialPhoto: boolean;
   photoType: 'base64_real' | 'silueta_placeholder' | 'url_externa' | 'none';
   photoDataUrl?: string | null;
@@ -64,6 +69,15 @@ export interface ParsedActaCard {
   minuto: number;
   nombre: string;
   tipo: 'Amarilla' | 'Roja Directa' | 'Doble Amarilla' | 'Otra';
+  esLocal: boolean;
+}
+
+export interface ParsedActaExpulsion {
+  minuto: number;
+  dorsal?: number | null;
+  nombre: string;
+  motivo: string;
+  tipo: 'doble_amarilla' | 'roja_directa';
   esLocal: boolean;
 }
 
@@ -90,6 +104,7 @@ export interface ParsedActa {
   golesVisitante: number;
   goals: ParsedActaGoal[];
   cards: ParsedActaCard[];
+  expulsions?: ParsedActaExpulsion[];
   substitutions: ParsedActaSubstitution[];
   localTitulares: ParsedActaPlayer[];
   localSuplentes: ParsedActaPlayer[];
@@ -145,6 +160,20 @@ export function stripHtml(text: string | null | undefined): string {
     .replace(/&Oacute;/g, 'Ó')
     .replace(/&Uacute;/g, 'Ú')
     .replace(/&Ntilde;/g, 'Ñ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Normaliza nombres de clubes para comparaciones
+ */
+export function normalizeClubName(str: string | null | undefined): string {
+  return (str || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[.,]/g, '')
+    .replace(/\b(de|del|el|la|los|las|cf|fc|cd|sd|ud|sad|ke)\b/gi, '')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -499,23 +528,202 @@ export function parseActaPage(html: string, codActa: string): ParsedActa {
   );
   const visitSuplentesRaw = rawPlayers.filter((p) => posSup2 !== -1 && p.pIndex > posSup2);
 
-  // Calcular minutos para cada jugador
+  // Tarjetas
+  function parseCardsFromSection(sectionHtml: string, isLocal: boolean): ParsedActaCard[] {
+    const cards: ParsedActaCard[] = [];
+    const trRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
+    let tr;
+    while ((tr = trRegex.exec(sectionHtml)) !== null) {
+      const row = tr[1];
+      const isAmarilla = row.includes('tarj_amar.gif') || row.includes('Amarilla');
+      const isRoja = row.includes('tarj_roja.gif') || row.includes('Roja');
+      const match = row.match(
+        /<span class=["']?font-blue["']?>\((\d+)(?:'\+?(\d+)?)?'?\)\s*<\/span>\s*([^<]+)/i
+      );
+      if (match) {
+        cards.push({
+          minuto: parseInt(match[1], 10),
+          nombre: stripHtml(match[3]),
+          tipo: isRoja ? 'Roja Directa' : isAmarilla ? 'Amarilla' : 'Otra',
+          esLocal: isLocal,
+        });
+      }
+    }
+    // Consolidar 2 amarillas al mismo jugador como Doble Amarilla
+    const yellowCounts = new Map<string, number>();
+    for (const c of cards) {
+      const fn = c.nombre.split(',')[0].trim().toLowerCase();
+      if (c.tipo === 'Amarilla') {
+        const cnt = (yellowCounts.get(fn) || 0) + 1;
+        yellowCounts.set(fn, cnt);
+        if (cnt >= 2) {
+          c.tipo = 'Doble Amarilla';
+        }
+      }
+    }
+    return cards;
+  }
+
+  const cardsLocal =
+    posTarj1 !== -1
+      ? parseCardsFromSection(
+          html.substring(posTarj1, posSubs2 !== -1 ? posSubs2 : posTarj1 + 3500),
+          true
+        )
+      : [];
+  const cardsVisit =
+    posTarj2 !== -1
+      ? parseCardsFromSection(html.substring(posTarj2, posTarj2 + 4000), false)
+      : [];
+  const cards = [...cardsLocal, ...cardsVisit];
+
+  // Expulsiones desde el bloque textual del acta
+  function parseExpulsionsFromHtml(
+    htmlContent: string,
+    localClub: string,
+    visitClub: string
+  ): { localExpulsions: ParsedActaExpulsion[]; visitExpulsions: ParsedActaExpulsion[] } {
+    const localExpulsions: ParsedActaExpulsion[] = [];
+    const visitExpulsions: ParsedActaExpulsion[] = [];
+
+    const idxExp = htmlContent.indexOf('EXPULSIONES');
+    if (idxExp === -1) return { localExpulsions, visitExpulsions };
+
+    const idxOtras = htmlContent.indexOf('OTRAS INCIDENCIAS', idxExp);
+    const expBlock = htmlContent.substring(idxExp, idxOtras !== -1 ? idxOtras : idxExp + 3000);
+    const cleanExp = expBlock.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ');
+
+    const expRegex = /-\s*([^:]+)\s*:\s*En el minuto\s*(\d+)[\s\S]*?el jugador\s*\((\d+)\)\s*([^f]+?)\s*fue expulsado por el siguiente motivo:\s*([^.]+)/gi;
+    let m;
+    while ((m = expRegex.exec(cleanExp)) !== null) {
+      const clubName = m[1].trim();
+      const minuto = parseInt(m[2], 10);
+      const dorsal = parseInt(m[3], 10);
+      const nombre = m[4].trim();
+      const motivo = m[5].trim();
+      const isDobleAmarilla =
+        motivo.toLowerCase().includes('doble') || motivo.toLowerCase().includes('amarilla');
+      const tipo: 'doble_amarilla' | 'roja_directa' = isDobleAmarilla
+        ? 'doble_amarilla'
+        : 'roja_directa';
+
+      const normClub = normalizeClubName(clubName);
+      const normLocal = normalizeClubName(localClub);
+      const isLocal = normLocal.includes(normClub) || normClub.includes(normLocal);
+
+      const expObj: ParsedActaExpulsion = {
+        minuto,
+        dorsal,
+        nombre,
+        motivo,
+        tipo,
+        esLocal: isLocal,
+      };
+
+      if (isLocal) {
+        localExpulsions.push(expObj);
+      } else {
+        visitExpulsions.push(expObj);
+      }
+    }
+
+    return { localExpulsions, visitExpulsions };
+  }
+
+  const { localExpulsions, visitExpulsions } = parseExpulsionsFromHtml(
+    html,
+    localClubNombre,
+    visitorClubNombre
+  );
+  const expulsions = [...localExpulsions, ...visitExpulsions];
+
+  // Calcular minutos para cada jugador (con corte estricto por expulsión)
   function buildPlayersWithMinutes(
     players: RawParsedPlayer[],
     rol: 'Titular' | 'Suplente',
     isLocal: boolean,
     clubNombre: string,
-    teamSubs: ParsedActaSubstitution[]
+    teamSubs: ParsedActaSubstitution[],
+    teamCards: ParsedActaCard[],
+    teamExpulsions: ParsedActaExpulsion[]
   ): ParsedActaPlayer[] {
     return players.map((p) => {
       let minutos = 0;
+      let minutoEntrada: number | null = null;
+      let minutoSalida: number | null = null;
+
       if (rol === 'Titular') {
+        minutoEntrada = 0;
         const subOut = teamSubs.find((s) => s.saleDorsal === p.dorsal);
-        minutos = subOut ? subOut.minuto : 90;
+        if (subOut) {
+          minutoSalida = subOut.minuto;
+          minutos = subOut.minuto;
+        } else {
+          minutoSalida = 90;
+          minutos = 90;
+        }
       } else {
         const subIn = teamSubs.find((s) => s.entraDorsal === p.dorsal);
-        minutos = subIn ? 90 - subIn.minuto : 0;
+        if (subIn) {
+          minutoEntrada = subIn.minuto;
+          const subOut = teamSubs.find((s) => s.saleDorsal === p.dorsal);
+          if (subOut) {
+            minutoSalida = subOut.minuto;
+            minutos = Math.max(0, subOut.minuto - subIn.minuto);
+          } else {
+            minutoSalida = 90;
+            minutos = Math.max(0, 90 - subIn.minuto);
+          }
+        } else {
+          minutos = 0;
+        }
       }
+
+      // Comprobar si el futbolista sufrió expulsión (por texto de incidencias o por tarjetas)
+      const firstName = (p.nombre || '').split(' ')[0];
+      const expFromText = teamExpulsions.find(
+        (e) => (p.dorsal && e.dorsal === p.dorsal) || (firstName && e.nombre.includes(firstName))
+      );
+
+      const pCards = teamCards.filter(
+        (c) => firstName && c.nombre.includes(firstName)
+      );
+      const hasDirectRed = pCards.some((c) => c.tipo === 'Roja Directa');
+      const yellowCount = pCards.filter((c) => c.tipo === 'Amarilla').length;
+      const hasDoubleYellow = yellowCount >= 2 || pCards.some((c) => c.tipo === 'Doble Amarilla');
+
+      let expulsado = false;
+      let minutoExpulsion: number | null = null;
+      let tipoExpulsion: 'doble_amarilla' | 'roja_directa' | null = null;
+
+      if (expFromText) {
+        expulsado = true;
+        minutoExpulsion = expFromText.minuto;
+        tipoExpulsion = expFromText.tipo;
+      } else if (hasDirectRed) {
+        expulsado = true;
+        const redCard = pCards.find((c) => c.tipo === 'Roja Directa');
+        minutoExpulsion = redCard ? redCard.minuto : 90;
+        tipoExpulsion = 'roja_directa';
+      } else if (hasDoubleYellow) {
+        expulsado = true;
+        const yellows = pCards.filter((c) => c.tipo === 'Amarilla' || c.tipo === 'Doble Amarilla');
+        minutoExpulsion = yellows[yellows.length - 1]?.minuto ?? 90;
+        tipoExpulsion = 'doble_amarilla';
+      }
+
+      // Corte de minutos estricto por expulsión (nunca más de 90', nunca negativo)
+      if (expulsado && minutoExpulsion !== null) {
+        if (rol === 'Titular') {
+          minutoSalida = Math.min(minutoSalida ?? 90, minutoExpulsion);
+          minutos = minutoSalida;
+        } else if (minutoEntrada !== null) {
+          minutoSalida = Math.min(minutoSalida ?? 90, minutoExpulsion);
+          minutos = Math.max(0, minutoSalida - minutoEntrada);
+        }
+      }
+
+      minutos = Math.max(0, Math.min(90, minutos));
 
       return {
         rfefPlayerId: p.rfefPlayerId,
@@ -525,6 +733,11 @@ export function parseActaPage(html: string, codActa: string): ParsedActa {
         isLocal,
         clubNombre,
         minutos,
+        minutoEntrada,
+        minutoSalida,
+        expulsado,
+        minutoExpulsion,
+        tipoExpulsion,
         hasOfficialPhoto: p.hasOfficialPhoto,
         photoType: p.photoType,
         photoDataUrl: p.photoDataUrl,
@@ -538,28 +751,36 @@ export function parseActaPage(html: string, codActa: string): ParsedActa {
     'Titular',
     true,
     localClubNombre,
-    localSubs
+    localSubs,
+    cardsLocal,
+    localExpulsions
   );
   const localSuplentes = buildPlayersWithMinutes(
     localSuplentesRaw,
     'Suplente',
     true,
     localClubNombre,
-    localSubs
+    localSubs,
+    cardsLocal,
+    localExpulsions
   );
   const visitTitulares = buildPlayersWithMinutes(
     visitTitularesRaw,
     'Titular',
     false,
     visitorClubNombre,
-    visitSubs
+    visitSubs,
+    cardsVisit,
+    visitExpulsions
   );
   const visitSuplentes = buildPlayersWithMinutes(
     visitSuplentesRaw,
     'Suplente',
     false,
     visitorClubNombre,
-    visitSubs
+    visitSubs,
+    cardsVisit,
+    visitExpulsions
   );
 
   const allPlayers = [
@@ -633,43 +854,6 @@ export function parseActaPage(html: string, codActa: string): ParsedActa {
     }
   }
 
-  // Tarjetas
-  function parseCardsFromSection(sectionHtml: string, isLocal: boolean): ParsedActaCard[] {
-    const cards: ParsedActaCard[] = [];
-    const trRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
-    let tr;
-    while ((tr = trRegex.exec(sectionHtml)) !== null) {
-      const row = tr[1];
-      const isAmarilla = row.includes('tarj_amar.gif') || row.includes('Amarilla');
-      const isRoja = row.includes('tarj_roja.gif') || row.includes('Roja');
-      const match = row.match(
-        /<span class=font-blue>\((\d+)(?:'\+?(\d+)?)?'?\)\s*<\/span>\s*([^<]+)/i
-      );
-      if (match) {
-        cards.push({
-          minuto: parseInt(match[1], 10),
-          nombre: stripHtml(match[3]),
-          tipo: isRoja ? 'Roja Directa' : isAmarilla ? 'Amarilla' : 'Otra',
-          esLocal: isLocal,
-        });
-      }
-    }
-    return cards;
-  }
-
-  const cardsLocal =
-    posTarj1 !== -1
-      ? parseCardsFromSection(
-          html.substring(posTarj1, posSubs2 !== -1 ? posSubs2 : posTarj1 + 3500),
-          true
-        )
-      : [];
-  const cardsVisit =
-    posTarj2 !== -1
-      ? parseCardsFromSection(html.substring(posTarj2, posTarj2 + 4000), false)
-      : [];
-  const cards = [...cardsLocal, ...cardsVisit];
-
   const isIndautxuMatch =
     localClubNombre.toLowerCase().includes('indautxu') ||
     visitorClubNombre.toLowerCase().includes('indautxu');
@@ -693,6 +877,7 @@ export function parseActaPage(html: string, codActa: string): ParsedActa {
     golesVisitante,
     goals,
     cards,
+    expulsions,
     substitutions,
     localTitulares,
     localSuplentes,

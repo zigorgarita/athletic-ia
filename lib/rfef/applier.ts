@@ -427,8 +427,8 @@ export async function applyJornadaRFEF(params: {
           (c) => c.esLocal === team.isLocal && firstName && c.nombre?.includes(firstName)
         );
         const amarillas = Math.min(playerCards.filter((c) => c.tipo === 'Amarilla' || c.tipo === 'Doble Amarilla').length, 2);
-        const dobleAmarilla = playerCards.some((c) => c.tipo === 'Doble Amarilla');
-        const roja = !dobleAmarilla && playerCards.some((c) => c.tipo === 'Roja Directa');
+        const dobleAmarilla = p.tipoExpulsion === 'doble_amarilla' || playerCards.some((c) => c.tipo === 'Doble Amarilla');
+        const roja = p.tipoExpulsion === 'roja_directa' || (!dobleAmarilla && playerCards.some((c) => c.tipo === 'Roja Directa'));
         const playerGoals = parsedActa.goals.filter(
           (g) => g.esLocal === team.isLocal && !g.isPropia && firstName && g.autor?.includes(firstName)
         ).length;
@@ -513,24 +513,31 @@ export async function applyJornadaRFEF(params: {
       const indPlayers = indIsLocal
         ? [...indautxuActa.localTitulares, ...indautxuActa.localSuplentes]
         : [...indautxuActa.visitTitulares, ...indautxuActa.visitSuplentes];
+      const golesContra = indIsLocal ? indautxuActa.golesVisitante : indautxuActa.golesLocal;
+
       const { data: ownPlayers, error: ownErr } = await supabase
         .from('players')
-        .select('id, nombre, apellidos, alias, rfef_player_id');
+        .select('id, nombre, apellidos, alias, rfef_player_id, demarcacion');
       if (ownErr) {
         globalErrors.push(`Error cargando public.players: ${ownErr.message}`);
       } else {
-        const ownPlayerByRfefId = new Map<number, string>();
+        const ownPlayerByRfefId = new Map<number, { id: string; demarcacion: string | null }>();
+        const ownPlayerById = new Map<string, { id: string; demarcacion: string | null }>();
         for (const op of ownPlayers || []) {
-          if (op.rfef_player_id) ownPlayerByRfefId.set(Number(op.rfef_player_id), op.id);
+          ownPlayerById.set(op.id, { id: op.id, demarcacion: op.demarcacion || null });
+          if (op.rfef_player_id) {
+            ownPlayerByRfefId.set(Number(op.rfef_player_id), { id: op.id, demarcacion: op.demarcacion || null });
+          }
         }
         const statsUpserts: any[] = [];
         for (const p of indPlayers) {
-          let playerId = ownPlayerByRfefId.get(p.rfefPlayerId);
+          let playerEntry = ownPlayerByRfefId.get(p.rfefPlayerId);
+          let playerId = playerEntry?.id;
 
           // Fallback de identidad cuando rfef_player_id aún no está vinculado
           if (!playerId) {
             const normActaName = normalizeClubName(p.nombre);
-            const candidates: { id: string; fullName: string; score: number }[] = [];
+            const candidates: { id: string; fullName: string; score: number; demarcacion: string | null }[] = [];
 
             for (const op of ownPlayers || []) {
               const fullName = `${op.nombre || ''} ${op.apellidos || ''}`.trim();
@@ -539,9 +546,9 @@ export async function applyJornadaRFEF(params: {
               const normAlias = normalizeClubName(op.alias || '');
 
               if (normFull1 === normActaName || normFull2 === normActaName) {
-                candidates.push({ id: op.id, fullName, score: 3 });
+                candidates.push({ id: op.id, fullName, score: 3, demarcacion: op.demarcacion || null });
               } else if (normAlias && normAlias.length >= 4 && normActaName.includes(normAlias)) {
-                candidates.push({ id: op.id, fullName, score: 2 });
+                candidates.push({ id: op.id, fullName, score: 2, demarcacion: op.demarcacion || null });
               }
             }
 
@@ -553,7 +560,8 @@ export async function applyJornadaRFEF(params: {
                 .update({ rfef_player_id: p.rfefPlayerId })
                 .eq('id', playerId)
                 .is('rfef_player_id', null);
-              ownPlayerByRfefId.set(p.rfefPlayerId, playerId);
+              ownPlayerByRfefId.set(p.rfefPlayerId, { id: playerId, demarcacion: candidates[0].demarcacion });
+              ownPlayerById.set(playerId, { id: playerId, demarcacion: candidates[0].demarcacion });
             } else if (candidates.length > 1) {
               // Ambigüedad: NO asignar automáticamente, reportar bloqueo y pedir revisión
               globalErrors.push(
@@ -572,21 +580,57 @@ export async function applyJornadaRFEF(params: {
           const playerCards = indautxuActa.cards.filter(
             (c) => c.esLocal === indIsLocal && firstName && c.nombre?.includes(firstName)
           );
-          const tieneAmarilla = playerCards.some((c) => c.tipo === 'Amarilla' || c.tipo === 'Doble Amarilla');
-          const tieneRoja = playerCards.some((c) => c.tipo === 'Roja Directa' || c.tipo === 'Doble Amarilla');
+
+          const esDobleAmarilla =
+            p.tipoExpulsion === 'doble_amarilla' || playerCards.some((c) => c.tipo === 'Doble Amarilla');
+          const esRojaDirecta =
+            p.tipoExpulsion === 'roja_directa' ||
+            (!esDobleAmarilla && playerCards.some((c) => c.tipo === 'Roja Directa'));
+
+          // En doble amarilla: tarjeta_amarilla=true, doble_amarilla=true, roja_directa=false, tarjeta_roja=false
+          // En roja directa: doble_amarilla=false, roja_directa=true, tarjeta_roja=true
+          const tieneAmarilla =
+            esDobleAmarilla || playerCards.some((c) => c.tipo === 'Amarilla' || c.tipo === 'Doble Amarilla');
+          const tarjetaRoja = esRojaDirecta;
+
           const playerGoals = indautxuActa.goals.filter(
             (g) => g.esLocal === indIsLocal && !g.isPropia && firstName && g.autor?.includes(firstName)
           ).length;
+
+          const indSubs = indautxuActa.substitutions.filter((s) => s.esLocal === indIsLocal);
+          const subIn = indSubs.find((s) => s.entraDorsal === p.dorsal);
+          const subOut = indSubs.find((s) => s.saleDorsal === p.dorsal);
+          const minutoEntrada = p.minutoEntrada !== undefined && p.minutoEntrada !== null ? p.minutoEntrada : (subIn ? subIn.minuto : null);
+          const minutoSalida = p.minutoSalida !== undefined && p.minutoSalida !== null ? p.minutoSalida : (subOut ? subOut.minuto : (p.rol === 'Titular' ? 90 : null));
+          const esTitular = p.rol === 'Titular';
+          const esSuplente = !esTitular;
+          const entroBanquillo = esSuplente && (p.minutos > 0 || minutoEntrada !== null);
+
+          // Asignar goles encajados al portero titular, 0 al resto
+          const playerDemarcacion = ownPlayerById.get(playerId)?.demarcacion;
+          const esPortero = playerDemarcacion === 'Portero' || p.dorsal === 1;
+          const golesEncajados = esTitular && esPortero ? golesContra : 0;
+
           statsUpserts.push({
             match_id: dbMatchId,
             player_id: playerId,
-            titular: p.rol === 'Titular',
+            titular: esTitular,
             minutos: p.minutos,
             goles: playerGoals,
+            goles_encajados: golesEncajados,
             asistencias: 0,
             tarjeta_amarilla: tieneAmarilla,
-            tarjeta_roja: tieneRoja,
+            doble_amarilla: esDobleAmarilla,
+            roja_directa: esRojaDirecta,
+            tarjeta_roja: tarjetaRoja,
+            rfef_acta_id: indautxuCodActa,
             origen: 'rfef',
+            convocado: true,
+            suplente: esSuplente,
+            entro_banquillo: entroBanquillo,
+            dorsal_partido: p.dorsal ?? null,
+            minuto_entrada: minutoEntrada,
+            minuto_salida: minutoSalida,
           });
         }
         if (statsUpserts.length > 0) {
