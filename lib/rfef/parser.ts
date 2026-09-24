@@ -580,8 +580,7 @@ export function parseActaPage(html: string, codActa: string): ParsedActa {
   // Expulsiones desde el bloque textual del acta
   function parseExpulsionsFromHtml(
     htmlContent: string,
-    localClub: string,
-    visitClub: string
+    localClub: string
   ): { localExpulsions: ParsedActaExpulsion[]; visitExpulsions: ParsedActaExpulsion[] } {
     const localExpulsions: ParsedActaExpulsion[] = [];
     const visitExpulsions: ParsedActaExpulsion[] = [];
@@ -632,8 +631,7 @@ export function parseActaPage(html: string, codActa: string): ParsedActa {
 
   const { localExpulsions, visitExpulsions } = parseExpulsionsFromHtml(
     html,
-    localClubNombre,
-    visitorClubNombre
+    localClubNombre
   );
   const expulsions = [...localExpulsions, ...visitExpulsions];
 

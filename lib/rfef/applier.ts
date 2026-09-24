@@ -532,7 +532,7 @@ export async function applyJornadaRFEF(params: {
         }
         const statsUpserts: any[] = [];
         for (const p of indPlayers) {
-          let playerEntry = ownPlayerByRfefId.get(p.rfefPlayerId);
+          const playerEntry = ownPlayerByRfefId.get(p.rfefPlayerId);
           let playerId = playerEntry?.id;
 
           // Fallback de identidad cuando rfef_player_id aún no está vinculado
@@ -649,7 +649,6 @@ export async function applyJornadaRFEF(params: {
   }
 
   // PASO 12: Persistir clasificación oficial si se suministró HTML
-  let standingsUpserted = 0;
   if (standingsHtml) {
     const stResult = await applyOfficialStandingsRFEF({
       supabase,
@@ -658,8 +657,6 @@ export async function applyJornadaRFEF(params: {
     });
     if (!stResult.ok) {
       globalErrors.push(...stResult.errors);
-    } else {
-      standingsUpserted = stResult.inserted;
     }
   }
 
