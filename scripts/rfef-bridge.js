@@ -153,7 +153,7 @@ function fetchRfefJornada(jornada, sessionCookiePath, globalStartTime, cancelTok
       }
 
       const curlTimeoutSec = calculateCurlTimeoutSec(remainingMs);
-      const url = `https://resultados.rfef.es/pnfg/NPcd/NFG_CmpJornada?cod_primaria=1000120&CodTemporada=22&CodCompeticion=33836116&CodGrupo=33836118&CodJornada=${jornada}`;
+      const url = `https://resultados.rfef.es/pnfg/NPcd/NFG_CmpJornada?cod_primaria=1000120&CodCompeticion=33836116&CodGrupo=33836118&CodTemporada=22&CodJornada=${jornada}&Sch_Codigo_Delegacion=&Sch_Tipo_Juego=`;
 
       const args = [
         '-s',

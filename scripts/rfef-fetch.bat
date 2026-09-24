@@ -47,7 +47,7 @@ set "FINAL_HTML=scratch\rfef_jornada_%JORNADA%.html"
 
 REM 3. Endpoint canónico oficial RFEF (DHJ Grupo 2)
 set "BASE_URL=https://resultados.rfef.es/pnfg/NPcd/NFG_CmpJornada"
-set "URL=%BASE_URL%?cod_primaria=1000120&CodTemporada=22&CodCompeticion=33836116&CodGrupo=33836118&CodJornada=%JORNADA%"
+set "URL=%BASE_URL%?cod_primaria=1000120&CodCompeticion=33836116&CodGrupo=33836118&CodTemporada=22&CodJornada=%JORNADA%&Sch_Codigo_Delegacion=&Sch_Tipo_Juego="
 
 echo [INFO] Consultando RFEF oficial para Jornada %JORNADA% via Schannel...
 

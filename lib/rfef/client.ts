@@ -198,14 +198,14 @@ export interface RFEFFetchResult {
 /**
  * Consulta la página de calendario/partidos de una jornada específica detallando el origen (live vs snapshot).
  */
-export function fetchRFEFCalendarPageDetailed(jornada: number): RFEFFetchResult {
-  const url = `${RFEF_CONSTANTS.BASE_URL}/NFG_CmpJornada?cod_primaria=${RFEF_CONSTANTS.COD_PRIMARIA}&CodTemporada=${RFEF_CONSTANTS.COD_TEMPORADA}&CodCompeticion=${RFEF_CONSTANTS.COD_COMPETICION}&CodGrupo=${RFEF_CONSTANTS.COD_GRUPO}&CodJornada=${jornada}`;
+export function fetchRFEFCalendarPageDetailed(jornada: number, sessionCookiePath?: string): RFEFFetchResult {
+  const url = `${RFEF_CONSTANTS.BASE_URL}/NFG_CmpJornada?cod_primaria=${RFEF_CONSTANTS.COD_PRIMARIA}&CodCompeticion=${RFEF_CONSTANTS.COD_COMPETICION}&CodGrupo=${RFEF_CONSTANTS.COD_GRUPO}&CodTemporada=${RFEF_CONSTANTS.COD_TEMPORADA}&CodJornada=${jornada}&Sch_Codigo_Delegacion=&Sch_Tipo_Juego=`;
   let liveHtml = '';
   let liveError: string | undefined;
   let diagnostic: RFEFHttpDiagnostic | undefined;
 
   try {
-    const rawRes = fetchRFEFRawWithDiagnostic(url);
+    const rawRes = fetchRFEFRawWithDiagnostic(url, 15000, sessionCookiePath);
     liveHtml = rawRes.html;
     diagnostic = rawRes.diagnostic;
     if (diagnostic.curlError) {
@@ -325,7 +325,7 @@ export function fetchRFEFActaPage(codActa: string | number): string {
  * Consulta la clasificación oficial de una jornada específica detallando el origen (live vs snapshot).
  */
 export function fetchRFEFStandingsPageDetailed(jornada: number, sessionCookiePath?: string): RFEFFetchResult {
-  const url = `${RFEF_CONSTANTS.BASE_URL}/NFG_VisClasificacion?cod_primaria=${RFEF_CONSTANTS.COD_PRIMARIA}&codjornada=${jornada}&codcompeticion=${RFEF_CONSTANTS.COD_COMPETICION}&codgrupo=${RFEF_CONSTANTS.COD_GRUPO}`;
+  const url = `${RFEF_CONSTANTS.BASE_URL}/NFG_VisClasificacion?cod_primaria=${RFEF_CONSTANTS.COD_PRIMARIA}&codjornada=${jornada}&codcompeticion=${RFEF_CONSTANTS.COD_COMPETICION}&codgrupo=${RFEF_CONSTANTS.COD_GRUPO}&codjornada=${jornada}`;
   let liveHtml = '';
   let liveError: string | undefined;
 
