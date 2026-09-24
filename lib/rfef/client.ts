@@ -324,13 +324,13 @@ export function fetchRFEFActaPage(codActa: string | number): string {
 /**
  * Consulta la clasificación oficial de una jornada específica detallando el origen (live vs snapshot).
  */
-export function fetchRFEFStandingsPageDetailed(jornada: number): RFEFFetchResult {
-  const url = `${RFEF_CONSTANTS.BASE_URL}/NFG_VisClasificacion?cod_primaria=${RFEF_CONSTANTS.COD_PRIMARIA}&CodTemporada=${RFEF_CONSTANTS.COD_TEMPORADA}&CodCompeticion=${RFEF_CONSTANTS.COD_COMPETICION}&CodGrupo=${RFEF_CONSTANTS.COD_GRUPO}&CodJornada=${jornada}`;
+export function fetchRFEFStandingsPageDetailed(jornada: number, sessionCookiePath?: string): RFEFFetchResult {
+  const url = `${RFEF_CONSTANTS.BASE_URL}/NFG_VisClasificacion?cod_primaria=${RFEF_CONSTANTS.COD_PRIMARIA}&codjornada=${jornada}&codcompeticion=${RFEF_CONSTANTS.COD_COMPETICION}&codgrupo=${RFEF_CONSTANTS.COD_GRUPO}`;
   let liveHtml = '';
   let liveError: string | undefined;
 
   try {
-    liveHtml = fetchRFEFRaw(url);
+    liveHtml = fetchRFEFRaw(url, 15000, sessionCookiePath);
   } catch (err: any) {
     liveError = err.message || String(err);
   }

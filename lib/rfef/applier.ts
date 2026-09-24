@@ -15,7 +15,7 @@
  */
 
 import { SupabaseClient } from '@supabase/supabase-js';
-import { parseCalendarPage, parseActaPage, ParsedActa } from './parser';
+import { parseCalendarPage, parseActaPage, parseStandingsPage, ParsedActa, ParsedStandingRow } from './parser';
 
 // ---------------------------------------------------------------------------
 // Tipos públicos
@@ -94,8 +94,9 @@ export async function applyJornadaRFEF(params: {
   calendarHtml: string;
   actas: ActaInput[];
   dbMatchId: string;
+  standingsHtml?: string;
 }): Promise<ApplyJornadaResult> {
-  const { supabase, jornada, calendarHtml, actas, dbMatchId } = params;
+  const { supabase, jornada, calendarHtml, actas, dbMatchId, standingsHtml } = params;
 
   // PASO 1: Exactamente 8 actas — ley absoluta
   if (!actas || actas.length !== 8) {
@@ -647,6 +648,21 @@ export async function applyJornadaRFEF(params: {
     }
   }
 
+  // PASO 12: Persistir clasificación oficial si se suministró HTML
+  let standingsUpserted = 0;
+  if (standingsHtml) {
+    const stResult = await applyOfficialStandingsRFEF({
+      supabase,
+      jornada,
+      standingsHtml,
+    });
+    if (!stResult.ok) {
+      globalErrors.push(...stResult.errors);
+    } else {
+      standingsUpserted = stResult.inserted;
+    }
+  }
+
   const allActasOk = actaResults.every(
     (r) => r.status === 'CREADA' || r.status === 'YA_EXISTENTE_NO_DUPLICADA'
   );
@@ -661,4 +677,122 @@ export async function applyJornadaRFEF(params: {
     indautxuStatsUpserted,
     errors: globalErrors,
   };
+}
+
+/**
+ * ============================================================================
+ * PERSISTENCIA OFICIAL DE LA CLASIFICACIÓN RFEF
+ * ============================================================================
+ * Aplica de forma idempotente las 16 filas de clasificación de una jornada
+ * a public.official_standings resolviendo cada club canónicamente.
+ * ============================================================================
+ */
+export async function applyOfficialStandingsRFEF(params: {
+  supabase: SupabaseClient;
+  jornada: number;
+  standingsHtml?: string;
+  standingsRows?: ParsedStandingRow[];
+  temporada?: string;
+}): Promise<{ ok: boolean; inserted: number; errors: string[] }> {
+  const { supabase, jornada, standingsHtml, temporada = '2026-27' } = params;
+  let rows = params.standingsRows;
+
+  if (!rows && standingsHtml) {
+    const parsed = parseStandingsPage(standingsHtml, jornada);
+    if (parsed.standingsAvailable) {
+      rows = parsed.rows;
+    } else {
+      return { ok: false, inserted: 0, errors: [parsed.reasonIfNotAvailable || 'Clasificación RFEF no disponible'] };
+    }
+  }
+
+  if (!rows || rows.length !== 16) {
+    return { ok: false, inserted: 0, errors: [`Se esperaban exactamente 16 filas de clasificación (recibidas: ${rows?.length || 0})`] };
+  }
+
+  const { data: allClubs, error: clubsErr } = await supabase
+    .from('clubs')
+    .select('id, nombre, rfef_club_id');
+  if (clubsErr || !allClubs) {
+    return { ok: false, inserted: 0, errors: [`Error cargando clubs: ${clubsErr?.message || 'Sin datos'}`] };
+  }
+
+  // Mapeo canónico RFEF: Nombre / patrón -> rfef_club_id (DHJ Grupo 2)
+  const RFEF_CLUB_ID_PATTERNS: Array<{ regex: RegExp; rfefClubId: number }> = [
+    { regex: /indautxu/i, rfefClubId: 33836524 },
+    { regex: /leioa/i, rfefClubId: 23289700 },
+    { regex: /cultural|leonesa/i, rfefClubId: 33836521 },
+    { regex: /alav[eé]s/i, rfefClubId: 205484 },
+    { regex: /arratia/i, rfefClubId: 33836523 },
+    { regex: /santutxu/i, rfefClubId: 205567 },
+    { regex: /danok/i, rfefClubId: 900361152 },
+    { regex: /mareo/i, rfefClubId: 33836522 },
+    { regex: /valladolid/i, rfefClubId: 205459 },
+    { regex: /beto[nñ]o/i, rfefClubId: 23289793 },
+    { regex: /eibar/i, rfefClubId: 205540 },
+    { regex: /unionistas/i, rfefClubId: 207449 },
+    { regex: /antiguoko/i, rfefClubId: 205603 },
+    { regex: /sociedad/i, rfefClubId: 205597 },
+    { regex: /athletic/i, rfefClubId: 205514 },
+    { regex: /logro[nñ][eé]s/i, rfefClubId: 205744 },
+  ];
+
+  const clubByRfefClubId = new Map<number, { id: string; nombre: string }>();
+  const clubByNormName = new Map<string, { id: string; nombre: string }>();
+  for (const c of allClubs) {
+    if (c.rfef_club_id) clubByRfefClubId.set(Number(c.rfef_club_id), c);
+    clubByNormName.set(normalizeClubName(c.nombre), c);
+  }
+
+  function resolveClub(nombre: string): { id: string; nombre: string } | null {
+    for (const pat of RFEF_CLUB_ID_PATTERNS) {
+      if (pat.regex.test(nombre)) {
+        const found = clubByRfefClubId.get(pat.rfefClubId);
+        if (found) return found;
+      }
+    }
+    const norm = normalizeClubName(nombre);
+    if (clubByNormName.has(norm)) return clubByNormName.get(norm)!;
+    return null;
+  }
+
+  const standingsToUpsert: any[] = [];
+  const errors: string[] = [];
+
+  for (const r of rows) {
+    const club = resolveClub(r.nombre);
+    if (!club) {
+      errors.push(`No se pudo resolver el club para "${r.nombre}" en clasificación J${jornada}`);
+      continue;
+    }
+    standingsToUpsert.push({
+      temporada,
+      jornada,
+      posicion: r.pos,
+      club_id: club.id,
+      pj: r.pj,
+      g: r.pg,
+      e: r.pe,
+      p: r.pp,
+      gf: r.gf,
+      gc: r.gc,
+      dg: r.dg,
+      puntos: r.pts,
+      source: 'RFEF_OFFICIAL_WEB',
+    });
+  }
+
+  if (errors.length > 0) {
+    return { ok: false, inserted: 0, errors };
+  }
+
+  const { error: upsertErr } = await supabase
+    .from('official_standings')
+    .upsert(standingsToUpsert, { onConflict: 'temporada,jornada,club_id' });
+
+  if (upsertErr) {
+    return { ok: false, inserted: 0, errors: [`Error upsert official_standings: ${upsertErr.message}`] };
+  }
+
+  return { ok: true, inserted: standingsToUpsert.length, errors: [] };
 }

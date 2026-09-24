@@ -166,6 +166,7 @@ export function RfefPreviewModal({
           calendarHtml: bridgePayload.calendarHtml,
           actas: bridgePayload.actas,
           dbMatchId,
+          standingsHtml: data.standingsHtml || undefined,
         }),
       });
       const json = await res.json();

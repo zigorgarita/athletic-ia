@@ -18,7 +18,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyServerAuthorization } from '@/lib/auth-server';
 import { getSupabaseServerClient } from '@/lib/supabase-server';
-import { applyJornadaRFEF, ActaInput } from '@/lib/rfef/applier';
+import { applyJornadaRFEF, applyOfficialStandingsRFEF, ActaInput } from '@/lib/rfef/applier';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,7 +33,8 @@ export const dynamic = 'force-dynamic';
  *     { codActa: number, actaHtml: string },
  *     ...
  *   ],
- *   dbMatchId: string          // UUID de public.matches para el partido Indautxu
+ *   dbMatchId: string,         // UUID de public.matches para el partido Indautxu
+ *   standingsHtml?: string     // Opcional: HTML oficial de clasificación para persistir
  * }
  */
 export async function POST(req: NextRequest) {
@@ -74,7 +75,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Body inválido: Se esperaba JSON.' }, { status: 400 });
     }
 
-    const { action, matchId, playerId, stat, jornada, calendarHtml, actas, dbMatchId } = body || {};
+    const { action, matchId, playerId, stat, jornada, calendarHtml, actas, dbMatchId, standingsHtml, standingsRows } = body || {};
 
     // =========================================================================
     // 2.A Operación Quirúrgica: Reparación atómica de una sola stat de jugador
@@ -110,6 +111,30 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: false, error: upsertErr.message }, { status: 500 });
       }
       return NextResponse.json({ ok: true, data: upserted }, { status: 200 });
+    }
+
+    // =========================================================================
+    // 2.B Operación Quirúrgica: Aplicar únicamente clasificación oficial
+    // =========================================================================
+    if (action === 'apply-standings') {
+      const jornadaNum = typeof jornada === 'number' ? jornada : parseInt(String(jornada), 10);
+      if (!jornadaNum || (!standingsHtml && !standingsRows)) {
+        return NextResponse.json(
+          { error: 'Faltan parámetros obligatorios: jornada y standingsHtml o standingsRows.' },
+          { status: 400 }
+        );
+      }
+      const supabase = getSupabaseServerClient();
+      const stResult = await applyOfficialStandingsRFEF({
+        supabase,
+        jornada: jornadaNum,
+        standingsHtml,
+        standingsRows,
+      });
+      if (!stResult.ok) {
+        return NextResponse.json({ ok: false, errors: stResult.errors }, { status: 422 });
+      }
+      return NextResponse.json({ ok: true, inserted: stResult.inserted }, { status: 200 });
     }
 
     // Validar jornada
@@ -183,6 +208,7 @@ export async function POST(req: NextRequest) {
       calendarHtml: calendarHtml.trim(),
       actas: actasInput,
       dbMatchId: dbMatchId.trim(),
+      standingsHtml: typeof standingsHtml === 'string' && standingsHtml.trim().length > 500 ? standingsHtml.trim() : undefined,
     });
 
     // =========================================================================

@@ -661,6 +661,7 @@ export async function POST(req: NextRequest) {
         discardedSilhouettesCount,
       },
       standings: standingsRows,
+      standingsHtml: clasifResult.html || null,
       blockers,
       warnings,
       readOnlyAudit: {
