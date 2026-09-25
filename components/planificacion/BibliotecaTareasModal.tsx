@@ -37,6 +37,7 @@ export function BibliotecaTareasModal({ isOpen, onClose, onSelectTask }: Bibliot
         const { data, error } = await supabase
           .from('planning_task_library')
           .select('*')
+          .or('aprobada.is.null,aprobada.eq.true')  // NULL=legado · TRUE=aprobada · FALSE=borrador oculto
           .order('nombre', { ascending: true });
         if (error) throw error;
         setTasks(data || []);

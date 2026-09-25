@@ -754,6 +754,32 @@ export interface PlanningTaskLibrary {
   observaciones: string | null;
   creado_por: string;
   created_at: string;
+  // ── Fase 2: Contenido táctico enriquecido (desde PDF) ──
+  desarrollo?: string | null;
+  organizacion?: string | null;
+  consignas?: string[] | null;
+  transicion_rec?: string | null;
+  transicion_perd?: string | null;
+  // ── Fase 2: Trazabilidad de origen (solo staff/editor) ──
+  fuente_pdf_url?: string | null;
+  sesion_origen_id?: string | null;
+  numero_tarea_pdf?: number | null;
+  // ── Fase 2: Ciclo de vida ──
+  // NULL = legado/manual visible · FALSE = borrador PDF · TRUE = aprobada visible
+  aprobada?: boolean | null;
+  revisada_por?: string | null;
+  revisada_at?: string | null;
+  confianza_global?: 'alta' | 'media' | 'baja' | null;
+}
+
+export interface PlanningTaskLibraryConcept {
+  id: string;
+  library_id: string;
+  categoria: 'ATAQUE' | 'DEFENSA' | 'TRANSICIONES' | 'ABP' | 'CONDICIONAL' | 'MENTAL';
+  concepto: string;
+  aprobado_por: string;
+  aprobado_at: string;
+  created_at: string;
 }
 
 export interface PlanningSessionPlayer {

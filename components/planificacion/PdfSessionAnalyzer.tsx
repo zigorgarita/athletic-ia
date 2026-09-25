@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Sparkles, ChevronDown, ChevronUp, AlertTriangle, CheckCircle2, Zap, HelpCircle, Users, Clock, Maximize2, Target, List, ArrowRight, Shuffle, X } from 'lucide-react';
+import { Sparkles, ChevronDown, ChevronUp, AlertTriangle, CheckCircle2, Zap, HelpCircle, Users, Clock, Maximize2, Target, List, ArrowRight, Shuffle, X, BookOpen } from 'lucide-react';
 import { getStaffPasskey } from '@/lib/passkey';
 import type { PdfAnalysisResult, PdfTaskDraft, GrupoJugadores, FieldConfianza } from '@/app/api/planificacion/analyze-pdf/route';
+import { TaskToLibraryModal } from './TaskToLibraryModal';
 
 // ──────────────────────────────────────────────────────────────────────────────
 // HELPERS DE CONFIANZA
@@ -103,9 +104,10 @@ const GRUPO_COLORS: Record<string, string> = {
 interface TaskCardProps {
   tarea: PdfTaskDraft;
   globalGroups: GrupoJugadores[];
+  onSaveToLibrary: (tarea: PdfTaskDraft) => void;
 }
 
-function TaskCard({ tarea, globalGroups }: TaskCardProps) {
+function TaskCard({ tarea, globalGroups, onSaveToLibrary }: TaskCardProps) {
   const [expanded, setExpanded] = useState(false);
 
   const nombre = tarea.nombre.valor ?? `Tarea ${tarea.numero_tarea}`;
@@ -290,6 +292,18 @@ function TaskCard({ tarea, globalGroups }: TaskCardProps) {
               </div>
             </div>
           )}
+
+          {/* Botón Guardar en Biblioteca */}
+          <div className="pt-2 border-t border-slate-800 flex justify-end">
+            <button
+              type="button"
+              onClick={() => onSaveToLibrary(tarea)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-extrabold bg-[#CC0E21]/10 hover:bg-[#CC0E21]/20 border border-[#CC0E21]/30 text-[#CC0E21] transition-all"
+            >
+              <BookOpen className="h-3 w-3" />
+              Guardar en Biblioteca →
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -309,6 +323,9 @@ export function PdfSessionAnalyzer({ pdfUrl, sessionId }: PdfSessionAnalyzerProp
   const [result, setResult] = useState<PdfAnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dismissed, setDismissed] = useState(false);
+  // Fase 2: modal de guardado en biblioteca
+  const [tareaParaBiblioteca, setTareaParaBiblioteca] = useState<PdfTaskDraft | null>(null);
+  const [savedIds, setSavedIds] = useState<Record<number, string>>({}); // numero_tarea -> library_id
 
   if (!pdfUrl || dismissed) return null;
 
@@ -481,11 +498,19 @@ export function PdfSessionAnalyzer({ pdfUrl, sessionId }: PdfSessionAnalyzerProp
           {/* Tareas detectadas */}
           <div className="space-y-3">
             {result.tareas.map(tarea => (
-              <TaskCard
-                key={tarea.numero_tarea}
-                tarea={tarea}
-                globalGroups={result.grupos_globales}
-              />
+              <div key={tarea.numero_tarea} className="relative">
+                <TaskCard
+                  tarea={tarea}
+                  globalGroups={result.grupos_globales}
+                  onSaveToLibrary={setTareaParaBiblioteca}
+                />
+                {savedIds[tarea.numero_tarea] && (
+                  <div className="mt-1 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-[9px] font-bold text-emerald-400 flex items-center gap-1.5">
+                    <CheckCircle2 className="h-3 w-3" />
+                    Guardado como borrador en biblioteca
+                  </div>
+                )}
+              </div>
             ))}
           </div>
 
@@ -500,6 +525,22 @@ export function PdfSessionAnalyzer({ pdfUrl, sessionId }: PdfSessionAnalyzerProp
             </button>
           </div>
         </div>
+      )}
+
+      {/* Modal de revisión para guardar en biblioteca (Fase 2) */}
+      {tareaParaBiblioteca && result && (
+        <TaskToLibraryModal
+          isOpen={true}
+          tarea={tareaParaBiblioteca}
+          pdfUrl={pdfUrl}
+          sessionId={sessionId}
+          totalTareasPdf={result.tareas.length}
+          onClose={() => setTareaParaBiblioteca(null)}
+          onSaved={(libraryId) => {
+            setSavedIds(prev => ({ ...prev, [tareaParaBiblioteca.numero_tarea]: libraryId }));
+            setTareaParaBiblioteca(null);
+          }}
+        />
       )}
     </div>
   );
