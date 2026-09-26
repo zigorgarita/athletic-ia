@@ -121,7 +121,7 @@ export function TaskToLibraryModal({
 
   // Conceptos: aprobados uno a uno
   const [conceptosSugeridos, setConceptosSugeridos] = useState<
-    { categoria: CategoriaConcepto; concepto: string; estado: 'pendiente' | 'aprobado' | 'rechazado' }[]
+    { categoria: CategoriaConcepto | null; concepto: string; estado: 'pendiente' | 'aprobado' | 'rechazado' }[]
   >([]);
   const [manualConceptoCat, setManualConceptoCat] = useState<CategoriaConcepto>('ATAQUE');
   const [manualConceptoVal, setManualConceptoVal] = useState('');
@@ -155,10 +155,14 @@ export function TaskToLibraryModal({
     );
     // Conceptos sugeridos
     const conceptos = (tarea.conceptos_sugeridos.valor ?? []).map(c => {
-      // Inferir categoría desde el catálogo
-      let cat: CategoriaConcepto = 'ATAQUE';
+      // Inferir categoría desde el catálogo SOLO si hay coincidencia exacta (sin fallback a ATAQUE)
+      let cat: CategoriaConcepto | null = null;
+      const cNorm = c.trim().toLowerCase();
       for (const [k, vs] of Object.entries(CONCEPTOS_TACTICOS)) {
-        if (vs.includes(c as never)) { cat = k as CategoriaConcepto; break; }
+        if (vs.some(v => v.trim().toLowerCase() === cNorm)) {
+          cat = k as CategoriaConcepto;
+          break;
+        }
       }
       return { categoria: cat, concepto: c, estado: 'pendiente' as const };
     });
@@ -194,7 +198,7 @@ export function TaskToLibraryModal({
   // ── Conceptos finales a guardar ──
   const conceptosAprobados: ConceptoAprobado[] = [
     ...conceptosSugeridos
-      .filter(c => c.estado === 'aprobado')
+      .filter((c): c is typeof c & { categoria: CategoriaConcepto } => c.estado === 'aprobado' && c.categoria !== null)
       .map(c => ({ categoria: c.categoria, concepto: c.concepto })),
     ...manualConceptosExtra,
   ];
@@ -487,19 +491,43 @@ export function TaskToLibraryModal({
               <div className="space-y-1.5">
                 {conceptosSugeridos.map((c, i) => (
                   <div key={i} className="flex items-center justify-between gap-2 rounded-lg bg-slate-950/50 border border-slate-800 px-3 py-2">
-                    <div className="min-w-0">
-                      <p className="text-[8px] font-black text-slate-600 uppercase tracking-wider">{c.categoria}</p>
+                    <div className="min-w-0 flex-1">
+                      <div className="mb-1">
+                        <select
+                          value={c.categoria ?? ''}
+                          onChange={e => {
+                            const val = (e.target.value || null) as CategoriaConcepto | null;
+                            setConceptosSugeridos(prev =>
+                              prev.map((x, idx) => idx === i ? { ...x, categoria: val, estado: val ? x.estado : 'pendiente' } : x)
+                            );
+                          }}
+                          className={`text-[8px] font-black uppercase tracking-wider rounded px-1.5 py-0.5 outline-none border transition-colors ${
+                            c.categoria
+                              ? 'bg-slate-900 border-slate-700 text-slate-300 focus:border-[#CC0E21]'
+                              : 'bg-amber-500/10 border-amber-500/30 text-amber-400 focus:border-amber-400'
+                          }`}
+                        >
+                          <option value="">Sin categoría / Revisión necesaria</option>
+                          {Object.keys(CONCEPTOS_TACTICOS).map(cat => (
+                            <option key={cat} value={cat}>{cat}</option>
+                          ))}
+                        </select>
+                      </div>
                       <p className="text-[10px] text-slate-300 font-semibold">{c.concepto}</p>
                     </div>
                     <div className="flex gap-1.5 shrink-0">
                       <button
                         type="button"
+                        disabled={!c.categoria}
+                        title={!c.categoria ? 'Selecciona una categoría antes de aprobar' : undefined}
                         onClick={() => setConceptosSugeridos(prev =>
                           prev.map((x, idx) => idx === i ? { ...x, estado: 'aprobado' } : x)
                         )}
                         className={`px-2 py-1 rounded-lg text-[9px] font-bold transition-all ${
                           c.estado === 'aprobado'
                             ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                            : !c.categoria
+                            ? 'bg-slate-800/40 text-slate-600 border border-slate-800 cursor-not-allowed'
                             : 'bg-slate-800 text-slate-400 hover:text-emerald-300 border border-slate-700'
                         }`}
                       >
