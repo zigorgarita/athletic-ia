@@ -25,10 +25,11 @@ export interface GrupoJugadores {
 
 export interface PdfTaskDraft {
   numero_tarea: number;
+  pagina_pdf?: DetectedField<number>;
   nombre: DetectedField<string>;
   tipo_tarea: DetectedField<string>;
-  duracion_minutos: DetectedField<string>;     // texto libre: "20 min" | "4 series × 4-5 min"
-  num_jugadores: DetectedField<string>;
+  duracion_minutos: DetectedField<string>;     // texto libre literal: "20 min" | "4 series de 4-5 min"
+  num_jugadores: DetectedField<string>;        // texto libre literal: "22" | "Grupos de 6-8 jugadores..."
   espacio: DetectedField<string>;
   objetivo: DetectedField<string>;
   organizacion: DetectedField<string>;
@@ -61,11 +62,13 @@ Recibirás un PDF de una sesión de entrenamiento. Tu única tarea es extraer la
 NORMAS ESTRICTAS:
 - No inventes datos. Si un campo no aparece en el PDF, asigna confianza "no_detectado" y valor null.
 - confianza "alta": el dato aparece textualmente en el PDF sin ambigüedad.
-- confianza "media": el dato se puede inferir de forma razonada (ej: "4 series × 4-5 min" → ~20 min).
+- confianza "media": el dato se puede inferir de forma razonada.
 - confianza "baja": es una sugerencia basada en el contexto general, sin evidencia directa.
 - Los conceptos_sugeridos SIEMPRE tendrán confianza "baja" aunque coincidan con el catálogo. Son sugerencias, no hechos.
 - Para los grupos de jugadores de portada: extrae todos los equipos/grupos que aparezcan con sus listas de jugadores.
 - Para tipo_tarea, usa únicamente: Calentamiento, Rondo, Posesión, Finalización, ABP, Técnica, Táctica, Físico, Partido condicionado, Juego Aéreo, Recuperación. Si no encaja exactamente, usa confianza "baja" con la opción más próxima.
+- pagina_pdf: número de página física del PDF (1-indexed) donde comienza o se ubica esta tarea. Si no es determinable, valor null y confianza "no_detectado".
+- duracion_minutos y num_jugadores: conserva el texto LITERAL EXACTO que aparece en el PDF (ej: "4 series de 4-5 minutos", "Grupos de 6-8 jugadores por repetición"). NUNCA fuerces ni reduzcas ese texto a un número único si hay series, rangos o grupos.
 
 Devuelve ÚNICAMENTE un objeto JSON válido con esta estructura exacta. Sin texto extra, sin markdown, sin comentarios:
 
@@ -78,6 +81,7 @@ Devuelve ÚNICAMENTE un objeto JSON válido con esta estructura exacta. Sin text
   "tareas": [
     {
       "numero_tarea": number,
+      "pagina_pdf": { "valor": number | null, "confianza": "alta"|"media"|"baja"|"no_detectado" },
       "nombre": { "valor": string | null, "confianza": "alta"|"media"|"baja"|"no_detectado" },
       "tipo_tarea": { "valor": string | null, "confianza": "alta"|"media"|"baja"|"no_detectado" },
       "duracion_minutos": { "valor": string | null, "confianza": "alta"|"media"|"baja"|"no_detectado" },

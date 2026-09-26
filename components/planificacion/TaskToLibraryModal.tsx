@@ -80,6 +80,19 @@ function FieldLabel({
   );
 }
 
+function parseUnambiguousInt(raw: string | null | undefined): string {
+  if (!raw) return '';
+  const trimmed = raw.trim();
+  // Detecta únicamente números puros inequívocos (ej: "20", "20 min", "15'", "22", "22 jug")
+  const match = trimmed.match(/^(\d+)(?:\s*(?:min|minutos|'|jug|jugadores|j))?$/i);
+  if (match) {
+    const val = parseInt(match[1], 10);
+    return isNaN(val) ? '' : String(val);
+  }
+  // Si contiene series, rangos, grupos o texto explicativo, se deja en blanco para no falsear el número
+  return '';
+}
+
 // ──────────────────────────────────────────────────────────────────────────────
 // PROPS DEL MODAL
 // ──────────────────────────────────────────────────────────────────────────────
@@ -143,8 +156,9 @@ export function TaskToLibraryModal({
     if (!isOpen) return;
     setNombre(tarea.nombre.valor ?? '');
     setTipoTarea(tarea.tipo_tarea.valor ?? '');
-    setMinutos(tarea.duracion_minutos.valor ?? '');
-    setJugadores(tarea.num_jugadores.valor ?? '');
+    // Solo rellenar numérico si el texto del PDF es inequívoco (sin series, rangos ni grupos)
+    setMinutos(parseUnambiguousInt(tarea.duracion_minutos.valor));
+    setJugadores(parseUnambiguousInt(tarea.num_jugadores.valor));
     setEspacio(tarea.espacio.valor ?? '');
     setObjetivo(tarea.objetivo.valor ?? '');
     setOrganizacion(tarea.organizacion.valor ?? '');
@@ -234,12 +248,18 @@ export function TaskToLibraryModal({
 
       const staffName = currentUser?.name?.trim() ? currentUser.name.trim() : 'Cuerpo Técnico';
 
+      const parsedMin = parseInt(minutos, 10);
+      const parsedJug = parseInt(jugadores, 10);
+
       const payload = {
         nombre: nombre.trim(),
         tipo_tarea: tipoTarea.trim(),
         creado_por: staffName,
-        minutos_defecto: parseInt(minutos) || null,
-        jugadores_defecto: parseInt(jugadores) || null,
+        minutos_defecto: !isNaN(parsedMin) && parsedMin > 0 ? parsedMin : null,
+        jugadores_defecto: !isNaN(parsedJug) && parsedJug > 0 ? parsedJug : null,
+        duracion_texto_pdf: tarea.duracion_minutos.valor?.trim() || null,
+        jugadores_texto_pdf: tarea.num_jugadores.valor?.trim() || null,
+        pagina_pdf: tarea.pagina_pdf?.valor ?? null,
         espacio_defecto: espacio.trim() || null,
         objetivo: objetivo.trim() || null,
         descripcion: descripcion.trim() || '',
@@ -338,27 +358,37 @@ export function TaskToLibraryModal({
                 </select>
               </div>
               <div className="space-y-1">
-                <FieldLabel icon={<Clock className="h-3 w-3"/>} label="Duración" confianza={tarea.duracion_minutos.valor ? tarea.duracion_minutos.confianza : 'no_detectado'} />
+                <FieldLabel icon={<Clock className="h-3 w-3"/>} label="Duración (minutos)" confianza={tarea.duracion_minutos.valor ? tarea.duracion_minutos.confianza : 'no_detectado'} />
                 <input
-                  type="text"
+                  type="number"
                   value={minutos}
                   onChange={e => setMinutos(e.target.value)}
-                  placeholder="ej: 20 o 4 series × 5 min"
+                  placeholder="ej: 20"
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none focus:border-[#CC0E21] transition-colors"
                 />
+                {tarea.duracion_minutos.valor && (
+                  <p className="text-[9px] text-slate-500 font-mono truncate" title={tarea.duracion_minutos.valor}>
+                    📄 PDF: &quot;{tarea.duracion_minutos.valor}&quot;
+                  </p>
+                )}
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <FieldLabel icon={<Users className="h-3 w-3"/>} label="Jugadores" confianza={tarea.num_jugadores.valor ? tarea.num_jugadores.confianza : 'no_detectado'} />
+                <FieldLabel icon={<Users className="h-3 w-3"/>} label="Jugadores (nº)" confianza={tarea.num_jugadores.valor ? tarea.num_jugadores.confianza : 'no_detectado'} />
                 <input
-                  type="text"
+                  type="number"
                   value={jugadores}
                   onChange={e => setJugadores(e.target.value)}
-                  placeholder="ej: 22 o grupos de 6-8"
+                  placeholder="ej: 22"
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none focus:border-[#CC0E21] transition-colors"
                 />
+                {tarea.num_jugadores.valor && (
+                  <p className="text-[9px] text-slate-500 font-mono truncate" title={tarea.num_jugadores.valor}>
+                    📄 PDF: &quot;{tarea.num_jugadores.valor}&quot;
+                  </p>
+                )}
               </div>
               <div className="space-y-1">
                 <FieldLabel icon={<Maximize2 className="h-3 w-3"/>} label="Espacio" confianza={tarea.espacio.valor ? tarea.espacio.confianza : 'no_detectado'} />
@@ -632,6 +662,12 @@ export function TaskToLibraryModal({
                   Tarea {tarea.numero_tarea}{totalTareasPdf ? ` de ${totalTareasPdf}` : ''}
                 </span>
               </div>
+              {tarea.pagina_pdf?.valor && (
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-600 font-bold w-20 shrink-0">Página PDF</span>
+                  <span className="text-slate-400">Pág. {tarea.pagina_pdf.valor}</span>
+                </div>
+              )}
               <div className="flex items-center gap-2">
                 <span className="text-slate-600 font-bold w-20 shrink-0">Confianza IA</span>
                 <MiniConfBadge confianza={tarea.nombre.confianza} />

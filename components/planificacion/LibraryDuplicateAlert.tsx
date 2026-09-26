@@ -38,10 +38,11 @@ export function detectDuplicate(
   const newSig = buildDuplicateSignature(nombre, tipo, minutos);
 
   for (const task of existingTasks) {
+    const taskMin = task.minutos_defecto ?? 0;
     const existingSig = buildDuplicateSignature(
       task.nombre,
       task.tipo_tarea,
-      task.minutos_defecto
+      taskMin
     );
     // Firma exacta
     if (newSig === existingSig) {
@@ -49,7 +50,7 @@ export function detectDuplicate(
     }
     // Posible variante: mismo tipo + duración similar (±10 min) pero nombre diferente
     const sameTipo = normalize(tipo) === normalize(task.tipo_tarea);
-    const minutesDiff = Math.abs(minutos - task.minutos_defecto);
+    const minutesDiff = Math.abs(minutos - taskMin);
     const nombreSimilar =
       normalize(nombre).includes(normalize(task.nombre).split(' ')[0]) ||
       normalize(task.nombre).includes(normalize(nombre).split(' ')[0]);

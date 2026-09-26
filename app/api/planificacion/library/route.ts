@@ -91,6 +91,8 @@ export interface LibraryPostPayload {
   // Campos de contenido (opcionales pero enriquecidos desde PDF)
   minutos_defecto?: number | null;
   jugadores_defecto?: number | null;
+  duracion_texto_pdf?: string | null;
+  jugadores_texto_pdf?: string | null;
   espacio_defecto?: string | null;
   objetivo?: string | null;
   descripcion?: string | null;         // campo libre, no prerellenado desde PDF
@@ -155,8 +157,10 @@ export async function POST(req: Request) {
       nombre:             payload.nombre.trim(),
       tipo_tarea:         payload.tipo_tarea.trim(),
       creado_por:         staffIdentity,
-      minutos_defecto:    payload.minutos_defecto ?? 0,
+      minutos_defecto:    payload.minutos_defecto ?? null,
       jugadores_defecto:  payload.jugadores_defecto ?? null,
+      duracion_texto_pdf: payload.duracion_texto_pdf ?? null,
+      jugadores_texto_pdf: payload.jugadores_texto_pdf ?? null,
       espacio_defecto:    payload.espacio_defecto ?? null,
       objetivo:           payload.objetivo ?? null,
       descripcion:        payload.descripcion ?? '',  // campo libre, puede estar vacío

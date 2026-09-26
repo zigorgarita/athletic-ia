@@ -28,7 +28,7 @@ ALTER TABLE public.planning_task_library
   ADD COLUMN IF NOT EXISTS fuente_pdf_url     TEXT          DEFAULT NULL,
   ADD COLUMN IF NOT EXISTS sesion_origen_id   UUID          DEFAULT NULL
     REFERENCES public.planning_sessions(id)
-    ON DELETE SET NULL,
+    ON DELETE RESTRICT,
   ADD COLUMN IF NOT EXISTS numero_tarea_pdf   SMALLINT      DEFAULT NULL,
   ADD COLUMN IF NOT EXISTS pagina_pdf         SMALLINT      DEFAULT NULL,
   -- Ciclo de vida y calidad
@@ -54,7 +54,7 @@ CREATE TABLE IF NOT EXISTS public.planning_task_library_concepts (
   id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   library_id   UUID        NOT NULL
                  REFERENCES public.planning_task_library(id)
-                 ON DELETE CASCADE,
+                 ON DELETE RESTRICT,
   categoria    TEXT        NOT NULL
                  CHECK (categoria IN (
                    'ATAQUE','DEFENSA','TRANSICIONES','ABP','CONDICIONAL','MENTAL'
@@ -99,18 +99,6 @@ BEGIN
       ON public.planning_task_library_concepts
       FOR INSERT TO service_role
       WITH CHECK (true);
-  END IF;
-
-  -- Borrado: solo service_role
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_policies
-    WHERE tablename = 'planning_task_library_concepts'
-      AND policyname = 'ptlc_delete'
-  ) THEN
-    CREATE POLICY "ptlc_delete"
-      ON public.planning_task_library_concepts
-      FOR DELETE TO service_role
-      USING (true);
   END IF;
 END $$;
 

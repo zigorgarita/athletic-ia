@@ -746,7 +746,7 @@ export interface PlanningTaskLibrary {
   id: string;
   nombre: string;
   tipo_tarea: string;
-  minutos_defecto: number;
+  minutos_defecto: number | null;
   jugadores_defecto: number | null;
   espacio_defecto: string | null;
   objetivo: string | null;
@@ -760,6 +760,8 @@ export interface PlanningTaskLibrary {
   consignas?: string[] | null;
   transicion_rec?: string | null;
   transicion_perd?: string | null;
+  duracion_texto_pdf?: string | null;
+  jugadores_texto_pdf?: string | null;
   // ── Fase 2: Trazabilidad de origen (solo staff/editor) ──
   fuente_pdf_url?: string | null;
   sesion_origen_id?: string | null;

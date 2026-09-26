@@ -331,7 +331,7 @@ export function BibliotecaTareasModal({ isOpen, onClose, onSelectTask }: Bibliot
                       <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 font-semibold">
                         {t.tipo_tarea}
                       </span>
-                      <span>{t.minutos_defecto} min</span>
+                      <span className="truncate max-w-[120px]">{t.duracion_texto_pdf || (t.minutos_defecto ? `${t.minutos_defecto} min` : 'Sin duración')}</span>
                       {t.creado_por && (
                         <span className="text-slate-500 truncate">· {t.creado_por}</span>
                       )}
@@ -435,22 +435,50 @@ export function BibliotecaTareasModal({ isOpen, onClose, onSelectTask }: Bibliot
                 </div>
 
                 <div className="grid grid-cols-3 gap-2">
-                  <div className="bg-slate-950 p-2 rounded-xl border border-slate-800 flex flex-col items-center justify-center">
+                  <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 flex flex-col items-center justify-center text-center">
                     <Clock className="h-3.5 w-3.5 text-slate-400 mb-0.5" />
-                    <span className="text-[9px] text-slate-500 font-bold">DURACIÓN</span>
-                    <span className="text-xs font-black text-slate-200">{previewTask.minutos_defecto} min</span>
+                    <span className="text-[9px] text-slate-500 font-bold uppercase">DURACIÓN</span>
+                    {previewTask.duracion_texto_pdf ? (
+                      <div className="space-y-0.5 mt-0.5">
+                        <span className="text-xs font-black text-slate-200 block leading-tight">
+                          {previewTask.duracion_texto_pdf}
+                        </span>
+                        {previewTask.minutos_defecto != null && (
+                          <span className="text-[9px] text-slate-400 font-medium block">
+                            (~{previewTask.minutos_defecto} min est.)
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-xs font-black text-slate-200 mt-0.5">
+                        {previewTask.minutos_defecto != null ? `${previewTask.minutos_defecto} min` : 'N/A'}
+                      </span>
+                    )}
                   </div>
-                  <div className="bg-slate-950 p-2 rounded-xl border border-slate-800 flex flex-col items-center justify-center">
+                  <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 flex flex-col items-center justify-center text-center">
                     <Users className="h-3.5 w-3.5 text-slate-400 mb-0.5" />
-                    <span className="text-[9px] text-slate-500 font-bold">JUGADORES</span>
-                    <span className="text-xs font-black text-slate-200">
-                      {previewTask.jugadores_defecto ? `${previewTask.jugadores_defecto} jug` : 'N/A'}
-                    </span>
+                    <span className="text-[9px] text-slate-500 font-bold uppercase">JUGADORES</span>
+                    {previewTask.jugadores_texto_pdf ? (
+                      <div className="space-y-0.5 mt-0.5">
+                        <span className="text-xs font-black text-slate-200 block leading-tight">
+                          {previewTask.jugadores_texto_pdf}
+                        </span>
+                        {previewTask.jugadores_defecto != null && (
+                          <span className="text-[9px] text-slate-400 font-medium block">
+                            ({previewTask.jugadores_defecto} jug est.)
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-xs font-black text-slate-200 mt-0.5">
+                        {previewTask.jugadores_defecto != null ? `${previewTask.jugadores_defecto} jug` : 'N/A'}
+                      </span>
+                    )}
                   </div>
-                  <div className="bg-slate-950 p-2 rounded-xl border border-slate-800 flex flex-col items-center justify-center">
+                  <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 flex flex-col items-center justify-center text-center">
                     <Maximize className="h-3.5 w-3.5 text-slate-400 mb-0.5" />
-                    <span className="text-[9px] text-slate-500 font-bold">ESPACIO</span>
-                    <span className="text-xs font-black text-slate-200 truncate max-w-full">
+                    <span className="text-[9px] text-slate-500 font-bold uppercase">ESPACIO</span>
+                    <span className="text-xs font-black text-slate-200 truncate max-w-full mt-0.5">
                       {previewTask.espacio_defecto || 'N/A'}
                     </span>
                   </div>
