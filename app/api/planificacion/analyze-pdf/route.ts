@@ -159,16 +159,26 @@ export async function POST(req: Request): Promise<NextResponse<PdfAnalysisResult
           mediaParts: [{ mimeType, data: pdfBase64 }],
         },
       ],
-      { temperature: 0.1, maxTokens: 8192 }
+      { temperature: 0.1, maxTokens: 16384, responseMimeType: 'application/json' }
     );
+
+    if (response.finishReason === 'MAX_TOKENS') {
+      throw new Error('El análisis del PDF excedió el límite máximo de tokens (MAX_TOKENS). La respuesta quedó incompleta.');
+    }
 
     // Extraer JSON limpio de la respuesta
     const rawText = response.content.trim();
-    const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error('La respuesta de Gemini no contiene un JSON válido.');
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(rawText);
+    } catch {
+      const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error('La respuesta de Gemini no contiene un JSON válido.');
+      }
+      parsed = JSON.parse(jsonMatch[0]);
     }
-    rawJson = JSON.parse(jsonMatch[0]);
+    rawJson = parsed as Record<string, unknown>;
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Error en el análisis con Gemini.';
     console.error('[analyze-pdf] Error Gemini:', msg);
