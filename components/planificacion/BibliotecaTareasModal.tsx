@@ -517,19 +517,27 @@ export function BibliotecaTareasModal({ isOpen, onClose, onSelectTask }: Bibliot
                   </div>
                 )}
 
-                {previewTask.consignas && previewTask.consignas.length > 0 && (
-                  <div className="space-y-1">
-                    <span className="text-xs font-bold text-slate-400">Consignas</span>
-                    <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 space-y-1">
-                      {previewTask.consignas.map((c, idx) => (
-                        <div key={idx} className="flex items-start gap-1.5 text-xs text-slate-300">
-                          <span className="text-[#CC0E21] font-black">•</span>
-                          <span>{c}</span>
-                        </div>
-                      ))}
+                {(() => {
+                  const consignasList: string[] = Array.isArray(previewTask.consignas)
+                    ? previewTask.consignas.map(c => String(c).trim()).filter(Boolean)
+                    : typeof previewTask.consignas === 'string' && (previewTask.consignas as string).trim()
+                      ? (previewTask.consignas as string).split(/\r?\n/).map(s => s.replace(/^[-•*–—\d+.)\s]+/, '').trim()).filter(Boolean)
+                      : [];
+                  if (consignasList.length === 0) return null;
+                  return (
+                    <div className="space-y-1">
+                      <span className="text-xs font-bold text-slate-400">Consignas</span>
+                      <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 space-y-1">
+                        {consignasList.map((c, idx) => (
+                          <div key={idx} className="flex items-start gap-1.5 text-xs text-slate-300">
+                            <span className="text-[#CC0E21] font-black">•</span>
+                            <span>{c}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
 
                 {(previewTask.transicion_rec || previewTask.transicion_perd) && (
                   <div className="space-y-2">

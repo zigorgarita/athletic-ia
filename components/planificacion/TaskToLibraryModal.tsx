@@ -132,6 +132,7 @@ export function TaskToLibraryModal({
 
   // Consignas: checkbox por ítem
   const [consignasItems, setConsignasItems] = useState<{ texto: string; activa: boolean }[]>([]);
+  const [nuevaConsigna, setNuevaConsigna] = useState('');
 
   // Conceptos: aprobados uno a uno
   const [conceptosSugeridos, setConceptosSugeridos] = useState<
@@ -166,10 +167,21 @@ export function TaskToLibraryModal({
     setDescripcion(''); // campo libre, siempre vacío al abrir
     setTransicionRec(tarea.transicion_tras_recuperacion.valor ?? '');
     setTransicionPerd(tarea.transicion_tras_perdida.valor ?? '');
-    // Consignas
+    // Consignas: normalizar con robustez ante string[], string multilínea o texto
+    let consignasArray: string[] = [];
+    const val: unknown = tarea.consignas?.valor;
+    if (Array.isArray(val)) {
+      consignasArray = val.map(c => String(c).trim()).filter(Boolean);
+    } else if (typeof val === 'string' && val.trim().length > 0) {
+      consignasArray = val
+        .split(/\r?\n/)
+        .map(s => s.replace(/^[-•*–—\d+.)\s]+/, '').trim())
+        .filter(Boolean);
+    }
     setConsignasItems(
-      (tarea.consignas.valor ?? []).map(c => ({ texto: c, activa: true }))
+      consignasArray.map(c => ({ texto: c, activa: true }))
     );
+    setNuevaConsigna('');
     // Conceptos sugeridos
     const conceptos = (tarea.conceptos_sugeridos.valor ?? []).map(c => {
       // Inferir categoría desde el catálogo SOLO si hay coincidencia exacta (sin fallback a ATAQUE)
@@ -265,7 +277,7 @@ export function TaskToLibraryModal({
         descripcion: descripcion.trim() || '',
         organizacion: organizacion.trim() || null,
         desarrollo: desarrollo.trim() || null,
-        consignas: consignasItems.filter(c => c.activa).map(c => c.texto),
+        consignas: consignasItems.filter(c => c.activa && c.texto.trim()).map(c => c.texto.trim()),
         transicion_rec: transicionRec.trim() || null,
         transicion_perd: transicionPerd.trim() || null,
         fuente_pdf_url: pdfUrl || null,
@@ -451,34 +463,71 @@ export function TaskToLibraryModal({
           </section>
 
           {/* CONSIGNAS */}
-          {consignasItems.length > 0 && (
-            <section className="space-y-2">
-              <h4 className="text-[9px] font-black text-slate-500 uppercase tracking-widest border-b border-slate-800 pb-1 flex items-center justify-between">
-                <span>Consignas</span>
-                <MiniConfBadge confianza={tarea.consignas.confianza} />
-              </h4>
-              <p className="text-[9px] text-slate-500 italic">Desmarca las que no quieras conservar:</p>
-              <div className="space-y-1.5">
-                {consignasItems.map((item, i) => (
-                  <label key={i} className="flex items-start gap-2 cursor-pointer group">
-                    <input
-                      type="checkbox"
-                      checked={item.activa}
-                      onChange={e => setConsignasItems(prev =>
-                        prev.map((c, idx) => idx === i ? { ...c, activa: e.target.checked } : c)
-                      )}
-                      className="mt-0.5 shrink-0 accent-[#CC0E21]"
-                    />
-                    <span className={`text-[10px] leading-snug transition-colors ${
-                      item.activa ? 'text-slate-300' : 'text-slate-600 line-through'
-                    }`}>
-                      {item.texto}
-                    </span>
-                  </label>
-                ))}
-              </div>
-            </section>
-          )}
+          <section className="space-y-2">
+            <h4 className="text-[9px] font-black text-slate-500 uppercase tracking-widest border-b border-slate-800 pb-1 flex items-center justify-between">
+              <span>Consignas</span>
+              <MiniConfBadge confianza={tarea.consignas?.valor ? tarea.consignas.confianza : 'no_detectado'} />
+            </h4>
+            {consignasItems.length > 0 ? (
+              <>
+                <p className="text-[9px] text-slate-500 italic">Desmarca las que no quieras conservar:</p>
+                <div className="space-y-1.5">
+                  {consignasItems.map((item, i) => (
+                    <label key={i} className="flex items-start gap-2 cursor-pointer group">
+                      <input
+                        type="checkbox"
+                        checked={item.activa}
+                        onChange={e => setConsignasItems(prev =>
+                          prev.map((c, idx) => idx === i ? { ...c, activa: e.target.checked } : c)
+                        )}
+                        className="mt-0.5 shrink-0 accent-[#CC0E21]"
+                      />
+                      <span className={`text-[10px] leading-snug transition-colors ${
+                        item.activa ? 'text-slate-300' : 'text-slate-600 line-through'
+                      }`}>
+                        {item.texto}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <p className="text-[10px] text-slate-600 italic">Sin consignas detectadas en el PDF.</p>
+            )}
+
+            {/* Añadir consigna manual */}
+            <div className="flex gap-2 pt-1">
+              <input
+                type="text"
+                value={nuevaConsigna}
+                onChange={e => setNuevaConsigna(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (nuevaConsigna.trim()) {
+                      setConsignasItems(prev => [...prev, { texto: nuevaConsigna.trim(), activa: true }]);
+                      setNuevaConsigna('');
+                    }
+                  }
+                }}
+                placeholder="Añadir consigna..."
+                className="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-300 placeholder-slate-600 outline-none focus:border-[#CC0E21]"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  if (nuevaConsigna.trim()) {
+                    setConsignasItems(prev => [...prev, { texto: nuevaConsigna.trim(), activa: true }]);
+                    setNuevaConsigna('');
+                  }
+                }}
+                disabled={!nuevaConsigna.trim()}
+                className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-slate-800 text-slate-300 hover:text-white disabled:opacity-40"
+              >
+                + Añadir
+              </button>
+            </div>
+          </section>
 
           {/* TRANSICIONES */}
           <section className="space-y-3">

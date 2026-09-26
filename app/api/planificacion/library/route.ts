@@ -168,7 +168,9 @@ export async function POST(req: Request) {
       // Fase 2: contenido enriquecido
       desarrollo:         payload.desarrollo ?? null,
       organizacion:       payload.organizacion ?? null,
-      consignas:          payload.consignas ?? null,
+      consignas:          Array.isArray(payload.consignas) && payload.consignas.length > 0
+        ? payload.consignas.map(c => String(c).trim()).filter(Boolean)
+        : null,
       transicion_rec:     payload.transicion_rec ?? null,
       transicion_perd:    payload.transicion_perd ?? null,
       // Trazabilidad

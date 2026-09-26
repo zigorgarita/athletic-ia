@@ -69,6 +69,7 @@ NORMAS ESTRICTAS:
 - Para tipo_tarea, usa únicamente: Calentamiento, Rondo, Posesión, Finalización, ABP, Técnica, Táctica, Físico, Partido condicionado, Juego Aéreo, Recuperación. Si no encaja exactamente, usa confianza "baja" con la opción más próxima.
 - pagina_pdf: número de página física del PDF (1-indexed) donde comienza o se ubica esta tarea. Si no es determinable, valor null y confianza "no_detectado".
 - duracion_minutos y num_jugadores: conserva el texto LITERAL EXACTO que aparece en el PDF (ej: "4 series de 4-5 minutos", "Grupos de 6-8 jugadores por repetición"). NUNCA fuerces ni reduzcas ese texto a un número único si hay series, rangos o grupos.
+- Para consignas: extrae las consignas, reglas de provocación o normas del ejercicio que aparezcan en la tarea (ej: bajo encabezados "CONSIGNAS", "REGLAS", "NORMAS", etc.) como un array de strings. Cada elemento del array debe ser una consigna o regla individual.
 
 Devuelve ÚNICAMENTE un objeto JSON válido con esta estructura exacta. Sin texto extra, sin markdown, sin comentarios:
 
@@ -184,7 +185,21 @@ export async function POST(req: Request): Promise<NextResponse<PdfAnalysisResult
         ? (rawJson.grupos_globales as GrupoJugadores[])
         : [],
       tareas: Array.isArray(rawJson.tareas)
-        ? (rawJson.tareas as PdfTaskDraft[])
+        ? (rawJson.tareas as PdfTaskDraft[]).map(t => {
+            if (t?.consignas?.valor) {
+              if (typeof t.consignas.valor === 'string') {
+                t.consignas.valor = (t.consignas.valor as string)
+                  .split(/\r?\n/)
+                  .map(s => s.replace(/^[-•*–—\d+.)\s]+/, '').trim())
+                  .filter(Boolean);
+              } else if (Array.isArray(t.consignas.valor)) {
+                t.consignas.valor = (t.consignas.valor as unknown[])
+                  .map(s => String(s).replace(/^[-•*–—\d+.)\s]+/, '').trim())
+                  .filter(Boolean);
+              }
+            }
+            return t;
+          })
         : [],
     };
 
