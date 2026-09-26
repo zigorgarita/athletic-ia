@@ -203,13 +203,12 @@ export function TaskToLibraryModal({
     setViewingDuplicate(null);
   }, [isOpen, tarea]);
 
-  // ── Cargar tareas existentes para detección de duplicados ──
+  // ── Cargar tareas existentes para detección de duplicados (activas y borradores) ──
   useEffect(() => {
     if (!isOpen) return;
     supabase
       .from('planning_task_library')
       .select('*')
-      .or('aprobada.is.null,aprobada.eq.true')  // solo tareas activas
       .then(({ data }) => setExistingTasks((data ?? []) as PlanningTaskLibrary[]));
   }, [isOpen]);
 
@@ -756,13 +755,26 @@ export function TaskToLibraryModal({
           {viewingDuplicate && (
             <div className="rounded-xl border border-slate-700 bg-slate-950/60 px-4 py-3 space-y-1.5">
               <div className="flex items-center justify-between">
-                <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Tarea existente en biblioteca</p>
+                <div className="flex items-center gap-1.5">
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">
+                    {viewingDuplicate.aprobada === false
+                      ? 'Borrador PDF · Staff existente'
+                      : 'Tarea existente en Biblioteca Activa'}
+                  </p>
+                  <span className={`text-[8px] px-1.5 py-0.5 rounded font-bold uppercase ${
+                    viewingDuplicate.aprobada === false
+                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                      : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                  }`}>
+                    {viewingDuplicate.aprobada === false ? 'Borrador PDF' : 'Biblioteca Activa'}
+                  </span>
+                </div>
                 <button type="button" onClick={() => setViewingDuplicate(null)} className="text-slate-600 hover:text-slate-300">
                   <X className="h-3.5 w-3.5" />
                 </button>
               </div>
               <p className="text-xs font-bold text-slate-200">{viewingDuplicate.nombre}</p>
-              <p className="text-[9px] text-slate-500">{viewingDuplicate.tipo_tarea} · {viewingDuplicate.minutos_defecto} min</p>
+              <p className="text-[9px] text-slate-500">{viewingDuplicate.tipo_tarea} · {viewingDuplicate.minutos_defecto ?? '—'} min</p>
               {viewingDuplicate.objetivo && <p className="text-[10px] text-slate-400 leading-snug">{viewingDuplicate.objetivo}</p>}
             </div>
           )}
@@ -778,8 +790,15 @@ export function TaskToLibraryModal({
 
         {/* Footer */}
         <div className="px-5 py-4 border-t border-slate-800 bg-slate-950/20 flex items-center justify-between gap-3 shrink-0">
-          <div className="text-[9px] text-slate-600">
-            aprobada = FALSE · Borrador no visible en biblioteca activa
+          <div className="text-[9px] text-slate-500 max-w-xs">
+            {duplicate?.type === 'exact_name' ? (
+              <span className="text-red-400 font-bold flex items-center gap-1">
+                <AlertTriangle className="h-3 w-3 shrink-0" />
+                Ya existe en {duplicate.location === 'borrador' ? 'Borradores PDF · Staff' : 'Biblioteca Activa'} (nombre único)
+              </span>
+            ) : (
+              'aprobada = FALSE · Borrador no visible en biblioteca activa'
+            )}
           </div>
           <div className="flex gap-2">
             <button
@@ -792,7 +811,7 @@ export function TaskToLibraryModal({
             <button
               type="button"
               onClick={handleSave}
-              disabled={saving || !nombre.trim() || !tipoTarea.trim()}
+              disabled={saving || !nombre.trim() || !tipoTarea.trim() || duplicate?.type === 'exact_name'}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-extrabold transition-all bg-[#CC0E21]/90 hover:bg-[#CC0E21] text-white disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {saving ? (
