@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { getStaffPasskey } from '@/lib/passkey';
+import { useEditMode } from '@/context/EditModeContext';
 import type { PlanningTaskLibrary } from '@/types';
 import type { PdfTaskDraft, FieldConfianza } from '@/app/api/planificacion/analyze-pdf/route';
 import { detectDuplicate, LibraryDuplicateAlert, DuplicateMatch } from './LibraryDuplicateAlert';
@@ -135,6 +136,8 @@ export function TaskToLibraryModal({
   const [existingTasks, setExistingTasks] = useState<PlanningTaskLibrary[]>([]);
   const [viewingDuplicate, setViewingDuplicate] = useState<PlanningTaskLibrary | null>(null);
 
+  const { currentUser } = useEditMode();
+
   // ── Prerellenar formulario desde la tarea PDF ──
   useEffect(() => {
     if (!isOpen) return;
@@ -229,10 +232,12 @@ export function TaskToLibraryModal({
       const passkey = getStaffPasskey();
       if (passkey) headers['x-staff-passkey'] = passkey;
 
+      const staffName = currentUser?.name?.trim() ? currentUser.name.trim() : 'Cuerpo Técnico';
+
       const payload = {
         nombre: nombre.trim(),
         tipo_tarea: tipoTarea.trim(),
-        creado_por: 'Aitor Cófreces',
+        creado_por: staffName,
         minutos_defecto: parseInt(minutos) || null,
         jugadores_defecto: parseInt(jugadores) || null,
         espacio_defecto: espacio.trim() || null,

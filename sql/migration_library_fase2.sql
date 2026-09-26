@@ -11,7 +11,7 @@
 -- ============================================================
 
 -- ────────────────────────────────────────────────────────────
--- BLOQUE 1: 12 columnas nuevas en planning_task_library
+-- BLOQUE 1: 13 columnas nuevas en planning_task_library (incluye pagina_pdf)
 -- ADD COLUMN IF NOT EXISTS → operación 100% no destructiva
 -- Filas existentes: todos los valores nuevos quedan a NULL
 -- aprobada DEFAULT NULL → tareas actuales siguen siendo visibles
@@ -30,6 +30,7 @@ ALTER TABLE public.planning_task_library
     REFERENCES public.planning_sessions(id)
     ON DELETE SET NULL,
   ADD COLUMN IF NOT EXISTS numero_tarea_pdf   SMALLINT      DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS pagina_pdf         SMALLINT      DEFAULT NULL,
   -- Ciclo de vida y calidad
   -- NULL = legado/manual visible · FALSE = borrador PDF oculto · TRUE = aprobada visible
   ADD COLUMN IF NOT EXISTS aprobada           BOOLEAN       DEFAULT NULL,
@@ -74,23 +75,44 @@ CREATE TABLE IF NOT EXISTS public.planning_task_library_concepts (
 ALTER TABLE public.planning_task_library_concepts
   ENABLE ROW LEVEL SECURITY;
 
--- Lectura: cualquier usuario autenticado puede leer conceptos
-CREATE POLICY "ptlc_select"
-  ON public.planning_task_library_concepts
-  FOR SELECT TO authenticated
-  USING (true);
+DO $$
+BEGIN
+  -- Lectura: cualquier usuario autenticado puede leer conceptos
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE tablename = 'planning_task_library_concepts'
+      AND policyname = 'ptlc_select'
+  ) THEN
+    CREATE POLICY "ptlc_select"
+      ON public.planning_task_library_concepts
+      FOR SELECT TO authenticated
+      USING (true);
+  END IF;
 
--- Escritura: solo service_role (usado por los API routes del servidor)
-CREATE POLICY "ptlc_insert"
-  ON public.planning_task_library_concepts
-  FOR INSERT TO service_role
-  WITH CHECK (true);
+  -- Escritura: solo service_role (usado por los API routes del servidor)
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE tablename = 'planning_task_library_concepts'
+      AND policyname = 'ptlc_insert'
+  ) THEN
+    CREATE POLICY "ptlc_insert"
+      ON public.planning_task_library_concepts
+      FOR INSERT TO service_role
+      WITH CHECK (true);
+  END IF;
 
--- Borrado: solo service_role
-CREATE POLICY "ptlc_delete"
-  ON public.planning_task_library_concepts
-  FOR DELETE TO service_role
-  USING (true);
+  -- Borrado: solo service_role
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE tablename = 'planning_task_library_concepts'
+      AND policyname = 'ptlc_delete'
+  ) THEN
+    CREATE POLICY "ptlc_delete"
+      ON public.planning_task_library_concepts
+      FOR DELETE TO service_role
+      USING (true);
+  END IF;
+END $$;
 
 
 -- ────────────────────────────────────────────────────────────

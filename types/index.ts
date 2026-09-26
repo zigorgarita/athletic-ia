@@ -764,6 +764,7 @@ export interface PlanningTaskLibrary {
   fuente_pdf_url?: string | null;
   sesion_origen_id?: string | null;
   numero_tarea_pdf?: number | null;
+  pagina_pdf?: number | null;
   // ── Fase 2: Ciclo de vida ──
   // NULL = legado/manual visible · FALSE = borrador PDF · TRUE = aprobada visible
   aprobada?: boolean | null;

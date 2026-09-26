@@ -1,10 +1,28 @@
 import { NextResponse } from 'next/server';
 import { isCoachSessionAuthorized, isCoachSessionAuthorizedFromRequest } from '@/lib/auth/staff-session';
-import { isEditorSessionAuthorized, isEditorSessionAuthorizedFromRequest } from '@/lib/auth/session';
+import { isEditorSessionAuthorized, isEditorSessionAuthorizedFromRequest, verifySessionToken } from '@/lib/auth/session';
 import { getSupabaseServerClient } from '@/lib/supabase-server';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+
+/**
+ * Extrae la identidad verificada del staff a partir de la cookie de sesión staff_session (Zigor, Aitor, etc.)
+ * Si no hay sesión nominal de editor, utiliza el nombre provisto o recurre al genérico "Cuerpo Técnico".
+ */
+function resolveStaffIdentity(req: Request, clientProvidedName?: string | null): string {
+  try {
+    const cookieHeader = req.headers.get('cookie') || '';
+    const match = cookieHeader.match(/(?:^|;\s*)staff_session=([^;]+)/);
+    if (match) {
+      const session = verifySessionToken(match[1]);
+      if (session?.name?.trim()) {
+        return session.name.trim();
+      }
+    }
+  } catch {}
+  return clientProvidedName?.trim() || 'Cuerpo Técnico';
+}
 
 // ──────────────────────────────────────────────────────────────────────────────
 // DELETE — Eliminar tarea de biblioteca (existente, no modificado)
@@ -86,6 +104,7 @@ export interface LibraryPostPayload {
   fuente_pdf_url?: string | null;
   sesion_origen_id?: string | null;
   numero_tarea_pdf?: number | null;
+  pagina_pdf?: number | null;
   confianza_global?: 'alta' | 'media' | 'baja' | null;
   // Conceptos aprobados explícitamente por el usuario
   conceptos_aprobados?: Array<{
@@ -125,6 +144,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'El campo creado_por es obligatorio.' }, { status: 400 });
     }
 
+    const staffIdentity = resolveStaffIdentity(req, payload.creado_por);
+
     const supabaseServer = getSupabaseServerClient();
 
     // 3. INSERT en planning_task_library
@@ -133,7 +154,7 @@ export async function POST(req: Request) {
     const insertData = {
       nombre:             payload.nombre.trim(),
       tipo_tarea:         payload.tipo_tarea.trim(),
-      creado_por:         payload.creado_por.trim(),
+      creado_por:         staffIdentity,
       minutos_defecto:    payload.minutos_defecto ?? 0,
       jugadores_defecto:  payload.jugadores_defecto ?? null,
       espacio_defecto:    payload.espacio_defecto ?? null,
@@ -150,6 +171,7 @@ export async function POST(req: Request) {
       fuente_pdf_url:     payload.fuente_pdf_url ?? null,
       sesion_origen_id:   payload.sesion_origen_id ?? null,
       numero_tarea_pdf:   payload.numero_tarea_pdf ?? null,
+      pagina_pdf:         payload.pagina_pdf ?? null,
       confianza_global:   payload.confianza_global ?? null,
       // Estado: siempre FALSE para borradores desde PDF
       aprobada:           false,
@@ -178,7 +200,7 @@ export async function POST(req: Request) {
         library_id:   libraryId,
         categoria:    c.categoria,
         concepto:     c.concepto,
-        aprobado_por: payload.creado_por.trim(),
+        aprobado_por: staffIdentity,
       }));
 
       const { error: conceptError } = await supabaseServer
@@ -193,7 +215,7 @@ export async function POST(req: Request) {
 
     console.log(
       `[API /api/planificacion/library POST] Borrador guardado: ${libraryId} | ` +
-      `Conceptos aprobados: ${conceptosAprobados.length} | aprobada=FALSE | 0 writes sobre datos existentes`
+      `Creador/Aprobador: ${staffIdentity} | Conceptos: ${conceptosAprobados.length} | aprobada=FALSE`
     );
 
     return NextResponse.json({
@@ -205,6 +227,66 @@ export async function POST(req: Request) {
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Error interno del servidor.';
     console.error('[API /api/planificacion/library POST] Excepción inesperada:', err);
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// PATCH — Aprobar borrador de tarea e incorporarlo a la biblioteca activa
+// Solo cambia aprobada = TRUE, revisada_por, revisada_at en esa única fila
+// 0 borrados, 0 fusiones, no modifica ninguna otra tarea
+// ──────────────────────────────────────────────────────────────────────────────
+export async function PATCH(req: Request) {
+  try {
+    const authorized =
+      (await isCoachSessionAuthorized()) ||
+      isCoachSessionAuthorizedFromRequest(req) ||
+      (await isEditorSessionAuthorized()) ||
+      isEditorSessionAuthorizedFromRequest(req);
+
+    if (!authorized) {
+      return NextResponse.json({ error: 'No autorizado: Sesión de cuerpo técnico requerida.' }, { status: 401 });
+    }
+
+    const body = await req.json().catch(() => null);
+    const id = typeof body?.id === 'string' ? body.id.trim() : '';
+
+    if (!id) {
+      return NextResponse.json({ error: 'ID de tarea requerido para aprobar.' }, { status: 400 });
+    }
+
+    const revisadaPor = resolveStaffIdentity(req, body?.revisada_por);
+    const supabaseServer = getSupabaseServerClient();
+
+    const { data: updatedTask, error: updateError } = await supabaseServer
+      .from('planning_task_library')
+      .update({
+        aprobada: true,
+        revisada_por: revisadaPor,
+        revisada_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select('*')
+      .single();
+
+    if (updateError) {
+      console.error('[API /api/planificacion/library PATCH] Error actualizando borrador:', updateError);
+      return NextResponse.json({ error: `Error aprobando tarea: ${updateError.message}` }, { status: 500 });
+    }
+
+    console.log(
+      `[API /api/planificacion/library PATCH] Tarea aprobada: ${id} | ` +
+      `Revisada por: ${revisadaPor} | aprobada=TRUE`
+    );
+
+    return NextResponse.json({
+      ok: true,
+      task: updatedTask,
+      mensaje: 'Tarea aprobada e incorporada a la biblioteca activa.',
+    });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Error interno del servidor.';
+    console.error('[API /api/planificacion/library PATCH] Excepción inesperada:', err);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
