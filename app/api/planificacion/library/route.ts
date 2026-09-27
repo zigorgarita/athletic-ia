@@ -55,6 +55,20 @@ export async function DELETE(req: Request) {
 
     const supabaseServer = getSupabaseServerClient();
 
+    // Protección de borradores: los borradores de PDF nunca se pueden eliminar
+    const { data: targetTask } = await supabaseServer
+      .from('planning_task_library')
+      .select('id, aprobada')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (targetTask && targetTask.aprobada === false) {
+      return NextResponse.json(
+        { error: 'Operación no permitida: Los borradores de PDF están protegidos contra eliminación.' },
+        { status: 403 }
+      );
+    }
+
     const { error: deleteError } = await supabaseServer
       .from('planning_task_library')
       .delete()

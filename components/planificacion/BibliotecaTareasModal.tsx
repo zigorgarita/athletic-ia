@@ -91,6 +91,11 @@ export function BibliotecaTareasModal({ isOpen, onClose, onSelectTask }: Bibliot
 
   const handleDeleteTask = async (taskId: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    const taskToDelete = [...activeTasks, ...draftTasks].find(t => t.id === taskId);
+    if (taskToDelete?.aprobada === false) {
+      setFeedbackMsg({ type: 'error', text: 'Los borradores de PDF están protegidos y no pueden eliminarse.' });
+      return;
+    }
     if (!confirm('¿Estás seguro de que deseas eliminar esta tarea de la biblioteca?')) return;
     try {
       const headers: Record<string, string> = {};
@@ -338,13 +343,16 @@ export function BibliotecaTareasModal({ isOpen, onClose, onSelectTask }: Bibliot
                     </div>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
-                    <button
-                      onClick={(e) => handleDeleteTask(t.id, e)}
-                      className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-slate-900 rounded-lg transition-all"
-                      title="Eliminar"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
+                    {/* Botón de eliminar reservado exclusivamente para biblioteca activa; NUNCA para borradores PDF */}
+                    {t.aprobada !== false && (
+                      <button
+                        onClick={(e) => handleDeleteTask(t.id, e)}
+                        className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-slate-900 rounded-lg transition-all"
+                        title="Eliminar"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
                     {t.aprobada === false ? (
                       <button
                         type="button"
