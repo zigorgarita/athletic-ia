@@ -208,14 +208,12 @@ export async function POST(req: Request) {
   let fecha: string;
   let pdfUrl: string;
   let analysisResult: PdfAnalysisResult;
-  let originalFileName: string | undefined;
 
   try {
     const body = await req.json();
     fecha = typeof body?.fecha === 'string' ? body.fecha.trim() : '';
     pdfUrl = typeof body?.pdfUrl === 'string' ? body.pdfUrl.trim() : '';
     analysisResult = body?.analysisResult as PdfAnalysisResult;
-    originalFileName = typeof body?.originalFileName === 'string' ? body.originalFileName.trim() : undefined;
 
     if (!fecha || !fecha.match(/^\d{4}-\d{2}-\d{2}$/)) {
       return NextResponse.json({ error: 'Fecha inválida o requerida (formato YYYY-MM-DD).' }, { status: 400 });
@@ -291,20 +289,8 @@ export async function POST(req: Request) {
     const { buffer: origBuffer } = await downloadFileFromUrl(pdfUrl);
     const origHash = createHash('sha256').update(origBuffer).digest('hex');
 
-    // Determinar nombre del original
-    let baseOrigName = originalFileName;
-    if (!baseOrigName) {
-      try {
-        const urlObj = new URL(pdfUrl);
-        const pathParts = urlObj.pathname.split('/');
-        baseOrigName = pathParts[pathParts.length - 1];
-      } catch {
-        baseOrigName = `${fecha} - Sesion Aitor - Original.pdf`;
-      }
-    }
-    if (!baseOrigName || !baseOrigName.toLowerCase().endsWith('.pdf')) {
-      baseOrigName = `${baseOrigName || 'sesion'}.pdf`;
-    }
+    // Determinar nombre canónico legible del original: YYYY-MM-DD - Original Aitor.pdf
+    const baseOrigName = `${fecha} - Original Aitor.pdf`;
 
     // Comprobar si ya existe archivo con idéntico SHA-256
     const identicalOrig = existingFileHashes.find(item => item.hash === origHash);
@@ -343,7 +329,7 @@ export async function POST(req: Request) {
     console.error('[sync-drive] Error procesando PDF original:', msg);
     originalResult = {
       status: 'failed',
-      fileName: originalFileName || `${fecha} - Original.pdf`,
+      fileName: `${fecha} - Original Aitor.pdf`,
       error: msg,
     };
   }
