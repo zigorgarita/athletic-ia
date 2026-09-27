@@ -12,6 +12,7 @@ import {
 import { useEditMode } from '@/context/EditModeContext';
 import { getDaysOfWeek, getDaysOfMonthGrid, parseLocalYYYYMMDD, formatLocalYYYYMMDD } from '@/lib/dateUtils';
 import { BibliotecaTareasModal } from './BibliotecaTareasModal';
+import { PdfSessionAnalyzer } from './PdfSessionAnalyzer';
 import { useClubLogos } from '@/hooks/useClubLogos';
 import { MatchBadge } from './MatchBadge';
 import { PlanningTaskLibrary, Match, TrainingAttendance, TrainingEvaluation } from '@/types';
@@ -2110,6 +2111,15 @@ export function PlanificacionClient() {
                   </div>
                 </div>
               </div>
+
+              {/* ── PROTOTIPO: Análisis de sesión desde PDF ── */}
+              {isEditMode && getPdfUrl() && (
+                <PdfSessionAnalyzer
+                  pdfUrl={getPdfUrl()}
+                  sessionId={sessionForm.id && !sessionForm.id.startsWith('temp-') ? sessionForm.id : undefined}
+                  sessionDate={sessionForm.fecha}
+                />
+              )}
             </div>
           )}
 

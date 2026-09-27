@@ -88,6 +88,7 @@ export class GeminiProvider implements AIProvider {
               systemInstruction,
               temperature: config?.temperature ?? 0.2,
               maxOutputTokens: config?.maxTokens,
+              responseMimeType: config?.responseMimeType,
             }
           });
 
@@ -132,6 +133,7 @@ export class GeminiProvider implements AIProvider {
           return {
             content: response.text || '',
             model: currentModel,
+            finishReason: candidate0?.finishReason || null,
           };
         } catch (error: unknown) {
           const duration = Date.now() - startTime;

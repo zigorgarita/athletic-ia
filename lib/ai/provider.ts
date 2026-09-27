@@ -5,6 +5,7 @@ export interface AIProviderConfig {
   model: string;
   maxTokens?: number;
   temperature?: number;
+  responseMimeType?: string;
 }
 
 export interface AIMediaPart {
@@ -22,6 +23,7 @@ export interface AIResponse {
   content: string;
   usage?: { promptTokens: number; completionTokens: number };
   model: string;
+  finishReason?: string | null;
 }
 
 export interface AIProvider {
