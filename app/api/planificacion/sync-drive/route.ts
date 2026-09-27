@@ -108,7 +108,21 @@ async function getDriveFileSha256(accessToken: string, file: DriveFileInfo): Pro
 }
 
 /**
- * Guarda los metadatos de hash SHA-256 en Drive para consultas instantáneas futuras.
+ * Convierte cualquier estructura u objeto en JSON canónico determinista con claves ordenadas alfabéticamente.
+ */
+function stableStringify(obj: unknown): string {
+  if (obj === null || typeof obj !== 'object') {
+    return JSON.stringify(obj);
+  }
+  if (Array.isArray(obj)) {
+    return '[' + obj.map(stableStringify).join(',') + ']';
+  }
+  const keys = Object.keys(obj as Record<string, unknown>).sort();
+  return '{' + keys.map(k => JSON.stringify(k) + ':' + stableStringify((obj as Record<string, unknown>)[k])).join(',') + '}';
+}
+
+/**
+ * Guarda los metadatos de hash SHA-256 binario en Drive (para PDF original de Aitor).
  */
 async function attachSha256Metadata(accessToken: string, fileId: string, hash: string): Promise<void> {
   try {
@@ -125,6 +139,27 @@ async function attachSha256Metadata(accessToken: string, fileId: string, hash: s
     });
   } catch (err) {
     console.warn(`[sync-drive] Advertencia al adjuntar metadata de hash al archivo ${fileId}:`, err);
+  }
+}
+
+/**
+ * Guarda los metadatos de hash lógico estable en Drive (para Desglose Athletic IA).
+ */
+async function attachDesgloseMetadata(accessToken: string, fileId: string, logicalHash: string): Promise<void> {
+  try {
+    await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}`, {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json; charset=UTF-8',
+      },
+      body: JSON.stringify({
+        description: `DESGLOSE_HASH: ${logicalHash}`,
+        appProperties: { desglose_hash: logicalHash },
+      }),
+    });
+  } catch (err) {
+    console.warn(`[sync-drive] Advertencia al adjuntar metadata de desglose a ${fileId}:`, err);
   }
 }
 
@@ -313,7 +348,7 @@ export async function POST(req: Request) {
     };
   }
 
-  // 6. Procesamiento del DESGLOSE ATHLETIC IA
+  // 6. Procesamiento del DESGLOSE ATHLETIC IA con HASH LÓGICO ESTABLE DETERMINISTA
   let desgloseResult: {
     status: 'uploaded' | 'already_exists' | 'failed';
     fileName: string;
@@ -324,45 +359,83 @@ export async function POST(req: Request) {
   };
 
   try {
-    // Generar PDF vectorial usando exportPlanificacionDesglosePdf con action: 'none'
-    const doc = exportPlanificacionDesglosePdf({
+    // A. Calcular SHA-256 lógico determinista sobre fecha, pdfUrl y analysisResult normalizado con orden estable de claves
+    const desglosePayload = {
       fecha,
-      tituloSesion: analysisResult.titulo_sesion,
       pdfUrl,
-      result: analysisResult,
-      action: 'none',
-    });
-
-    const arrayBuffer = doc.output('arraybuffer');
-    const desgloseBuffer = Buffer.from(arrayBuffer);
-    const desgloseHash = createHash('sha256').update(desgloseBuffer).digest('hex');
+      analysisResult,
+    };
+    const desgloseLogicalHash = createHash('sha256')
+      .update(stableStringify(desglosePayload))
+      .digest('hex');
 
     const baseDesgloseName = `${fecha} - Desglose Athletic IA.pdf`;
 
-    // Comprobar si ya existe archivo con idéntico SHA-256
-    const identicalDesglose = existingFileHashes.find(item => item.hash === desgloseHash);
+    // B. Comprobar si ya existe un archivo con exactamente este desglose_hash
+    const identicalByHash = existingFiles.find(f => {
+      const propHash = f.appProperties?.desglose_hash;
+      const descHash = f.description && f.description.startsWith('DESGLOSE_HASH:')
+        ? f.description.replace('DESGLOSE_HASH:', '').trim()
+        : null;
+      return propHash === desgloseLogicalHash || descHash === desgloseLogicalHash;
+    });
 
-    if (identicalDesglose) {
+    if (identicalByHash) {
       desgloseResult = {
         status: 'already_exists',
-        fileName: identicalDesglose.file.name,
-        fileId: identicalDesglose.file.id,
-        hash: desgloseHash,
-        driveUrl: `https://drive.google.com/file/d/${identicalDesglose.file.id}/view`,
+        fileName: identicalByHash.name,
+        fileId: identicalByHash.id,
+        hash: desgloseLogicalHash,
+        driveUrl: `https://drive.google.com/file/d/${identicalByHash.id}/view`,
       };
     } else {
-      // Si el nombre ya existe pero con contenido distinto, versionar (_v2, _v3)
-      const finalDesgloseName = resolveVersionedName(baseDesgloseName, existingFileNames);
-      const uploadRes = await uploadGenericBufferToDrive(desgloseBuffer, finalDesgloseName, 'application/pdf', sessionFolderId);
-      await attachSha256Metadata(accessToken, uploadRes.driveFileId, desgloseHash);
+      // C. Reconocimiento de archivos previos sin metadatos de hash (de la prueba inicial):
+      // Si ya existe un archivo de desglose para esta sesión y aún no tenía desglose_hash grabado,
+      // adoptamos el archivo asociándole el hash lógico mediante PATCH, evitando crear un duplicado superfluo.
+      const candidateLegacy = existingFiles
+        .filter(f => f.name.includes(`${fecha} - Desglose Athletic IA`))
+        .sort((a, b) => b.name.localeCompare(a.name))[0];
 
-      desgloseResult = {
-        status: 'uploaded',
-        fileName: finalDesgloseName,
-        fileId: uploadRes.driveFileId,
-        hash: desgloseHash,
-        driveUrl: uploadRes.url,
-      };
+      const legacyHasDifferentHash =
+        candidateLegacy?.appProperties?.desglose_hash &&
+        candidateLegacy.appProperties.desglose_hash !== desgloseLogicalHash;
+
+      if (candidateLegacy && !legacyHasDifferentHash) {
+        await attachDesgloseMetadata(accessToken, candidateLegacy.id, desgloseLogicalHash);
+        desgloseResult = {
+          status: 'already_exists',
+          fileName: candidateLegacy.name,
+          fileId: candidateLegacy.id,
+          hash: desgloseLogicalHash,
+          driveUrl: `https://drive.google.com/file/d/${candidateLegacy.id}/view`,
+        };
+      } else {
+        // D. Si es un desglose con contenido nuevo o modificado respecto a los anteriores:
+        // Generar PDF vectorial usando exportPlanificacionDesglosePdf con action: 'none'
+        const doc = exportPlanificacionDesglosePdf({
+          fecha,
+          tituloSesion: analysisResult.titulo_sesion,
+          pdfUrl,
+          result: analysisResult,
+          action: 'none',
+        });
+
+        const arrayBuffer = doc.output('arraybuffer');
+        const desgloseBuffer = Buffer.from(arrayBuffer);
+
+        // Versionar (_v2, _v3, etc.) si el nombre ya existe
+        const finalDesgloseName = resolveVersionedName(baseDesgloseName, existingFileNames);
+        const uploadRes = await uploadGenericBufferToDrive(desgloseBuffer, finalDesgloseName, 'application/pdf', sessionFolderId);
+        await attachDesgloseMetadata(accessToken, uploadRes.driveFileId, desgloseLogicalHash);
+
+        desgloseResult = {
+          status: 'uploaded',
+          fileName: finalDesgloseName,
+          fileId: uploadRes.driveFileId,
+          hash: desgloseLogicalHash,
+          driveUrl: uploadRes.url,
+        };
+      }
     }
   } catch (desgloseErr: unknown) {
     const msg = desgloseErr instanceof Error ? desgloseErr.message : String(desgloseErr);
