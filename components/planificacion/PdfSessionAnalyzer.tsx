@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Sparkles, ChevronDown, ChevronUp, AlertTriangle, CheckCircle2, Zap, HelpCircle, Users, Clock, Maximize2, Target, List, ArrowRight, Shuffle, X, BookOpen, Download, FileText, ExternalLink } from 'lucide-react';
+import { Sparkles, ChevronDown, ChevronUp, AlertTriangle, CheckCircle2, Zap, HelpCircle, Users, Clock, Maximize2, Target, List, ArrowRight, Shuffle, X, BookOpen, Download, FileText, ExternalLink, CloudUpload, Folder, Check } from 'lucide-react';
 import { getStaffPasskey } from '@/lib/passkey';
 import type { PdfAnalysisResult, PdfTaskDraft, GrupoJugadores, FieldConfianza } from '@/app/api/planificacion/analyze-pdf/route';
 import { TaskToLibraryModal } from './TaskToLibraryModal';
@@ -331,6 +331,17 @@ export function PdfSessionAnalyzer({ pdfUrl, sessionId, sessionDate }: PdfSessio
 
   const fechaEfectiva = sessionDate || new Date().toISOString().split('T')[0];
 
+  // Sincronización con Google Drive (Fase 2)
+  const [driveSyncing, setDriveSyncing] = useState(false);
+  const [driveSyncResult, setDriveSyncResult] = useState<{
+    success: boolean;
+    folder?: { id: string; name: string; path: string; driveUrl?: string };
+    original?: { status: 'uploaded' | 'already_exists' | 'failed'; fileName: string; fileId?: string; driveUrl?: string; error?: string };
+    desglose?: { status: 'uploaded' | 'already_exists' | 'failed'; fileName: string; fileId?: string; driveUrl?: string; error?: string };
+    error?: string;
+  } | null>(null);
+  const [driveSyncError, setDriveSyncError] = useState<string | null>(null);
+
   const handleDownloadPdf = () => {
     if (!result) return;
     exportPlanificacionDesglosePdf({
@@ -351,6 +362,42 @@ export function PdfSessionAnalyzer({ pdfUrl, sessionId, sessionDate }: PdfSessio
       result,
       action: 'preview',
     });
+  };
+
+  const handleSyncDrive = async () => {
+    if (!result || driveSyncing) return;
+    setDriveSyncing(true);
+    setDriveSyncError(null);
+
+    try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      const passkey = getStaffPasskey();
+      if (passkey) headers['x-staff-passkey'] = passkey;
+
+      const res = await fetch('/api/planificacion/sync-drive', {
+        method: 'POST',
+        headers,
+        credentials: 'include',
+        body: JSON.stringify({
+          fecha: fechaEfectiva,
+          pdfUrl,
+          analysisResult: result,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || `Error ${res.status} al sincronizar con Google Drive`);
+      }
+
+      setDriveSyncResult(data);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error al conectar con Google Drive.';
+      setDriveSyncError(msg);
+    } finally {
+      setDriveSyncing(false);
+    }
   };
 
   if (!pdfUrl || dismissed) return null;
@@ -518,6 +565,171 @@ export function PdfSessionAnalyzer({ pdfUrl, sessionId, sessionDate }: PdfSessio
                 Descargar PDF
               </button>
             </div>
+          </div>
+
+          {/* Panel de Sincronización Google Drive (Fase 2) */}
+          <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="h-8 w-8 rounded-lg bg-sky-500/15 border border-sky-500/30 flex items-center justify-center shrink-0">
+                  <CloudUpload className="h-4 w-4 text-sky-400" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-xs font-black text-slate-100">
+                      Google Drive · TAREAS 26-27
+                    </p>
+                    {/* Badge de estado global */}
+                    {!driveSyncResult && !driveSyncError && !driveSyncing && (
+                      <span className="text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
+                        Pendiente
+                      </span>
+                    )}
+                    {driveSyncing && (
+                      <span className="text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300 border border-sky-500/30 animate-pulse">
+                        Archivando…
+                      </span>
+                    )}
+                    {driveSyncResult && !driveSyncError && (
+                      <span className="text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+                        <Check className="h-2.5 w-2.5" />
+                        {driveSyncResult.original?.status === 'already_exists' && driveSyncResult.desglose?.status === 'already_exists'
+                          ? 'Ya existía'
+                          : 'Archivado en Drive'}
+                      </span>
+                    )}
+                    {driveSyncError && (
+                      <span className="text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 border border-red-500/30 flex items-center gap-1">
+                        <AlertTriangle className="h-2.5 w-2.5" />
+                        Error al archivar en Drive
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[9px] text-slate-400 font-mono">
+                    TAREAS 26-27 / {fechaEfectiva} - Sesión Aitor /
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleSyncDrive}
+                  disabled={driveSyncing}
+                  className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-[10px] font-extrabold transition-all shadow-sm ${
+                    driveSyncing
+                      ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
+                      : 'bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-500/40'
+                  }`}
+                  title="Archivar PDF original y Desglose Athletic IA en Google Drive"
+                >
+                  {driveSyncing ? (
+                    <>
+                      <span className="h-3 w-3 rounded-full border-2 border-sky-400/30 border-t-sky-400 animate-spin" />
+                      Archivando…
+                    </>
+                  ) : (
+                    <>
+                      <CloudUpload className="h-3.5 w-3.5" />
+                      {driveSyncResult ? 'Volver a sincronizar' : 'Archivar en Drive'}
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Error visible sin bloquear la app */}
+            {driveSyncError && (
+              <div className="p-2.5 rounded-lg bg-red-950/30 border border-red-800/40 text-[10px] text-red-300 space-y-1">
+                <div className="font-bold flex items-center gap-1.5">
+                  <AlertTriangle className="h-3.5 w-3.5 text-red-400 shrink-0" />
+                  Error de sincronización con Google Drive:
+                </div>
+                <p className="opacity-90 pl-5">{driveSyncError}</p>
+                <p className="text-[9px] text-slate-400 pl-5">Planificación y los datos de Supabase permanecen intactos.</p>
+              </div>
+            )}
+
+            {/* Detalles individuales de cada archivo si ya hay resultado */}
+            {driveSyncResult && (
+              <div className="pt-2 border-t border-slate-800/80 space-y-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[10px]">
+                  {/* Archivo 1: Original de Aitor */}
+                  <div className="p-2 rounded-lg bg-slate-950 border border-slate-850 flex items-start justify-between gap-2">
+                    <div className="space-y-0.5 min-w-0">
+                      <span className="text-[8px] font-black uppercase text-slate-500 tracking-wider block">PDF Original Aitor</span>
+                      <p className="font-mono text-slate-300 truncate" title={driveSyncResult.original?.fileName}>
+                        {driveSyncResult.original?.fileName || 'PDF Original'}
+                      </p>
+                      {driveSyncResult.original?.error && (
+                        <p className="text-red-400 text-[9px]">{driveSyncResult.original.error}</p>
+                      )}
+                    </div>
+                    <div className="shrink-0">
+                      {driveSyncResult.original?.status === 'uploaded' && (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
+                          <Check className="h-2.5 w-2.5" /> Archivado en Drive
+                        </span>
+                      )}
+                      {driveSyncResult.original?.status === 'already_exists' && (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-bold bg-sky-500/15 text-sky-400 border border-sky-500/25">
+                          Ya existía
+                        </span>
+                      )}
+                      {driveSyncResult.original?.status === 'failed' && (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-bold bg-red-500/15 text-red-400 border border-red-500/25">
+                          Error
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Archivo 2: Desglose Athletic IA */}
+                  <div className="p-2 rounded-lg bg-slate-950 border border-slate-850 flex items-start justify-between gap-2">
+                    <div className="space-y-0.5 min-w-0">
+                      <span className="text-[8px] font-black uppercase text-slate-500 tracking-wider block">Desglose Athletic IA</span>
+                      <p className="font-mono text-slate-300 truncate" title={driveSyncResult.desglose?.fileName}>
+                        {driveSyncResult.desglose?.fileName || 'Desglose PDF'}
+                      </p>
+                      {driveSyncResult.desglose?.error && (
+                        <p className="text-red-400 text-[9px]">{driveSyncResult.desglose.error}</p>
+                      )}
+                    </div>
+                    <div className="shrink-0">
+                      {driveSyncResult.desglose?.status === 'uploaded' && (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
+                          <Check className="h-2.5 w-2.5" /> Archivado en Drive
+                        </span>
+                      )}
+                      {driveSyncResult.desglose?.status === 'already_exists' && (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-bold bg-sky-500/15 text-sky-400 border border-sky-500/25">
+                          Ya existía
+                        </span>
+                      )}
+                      {driveSyncResult.desglose?.status === 'failed' && (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-bold bg-red-500/15 text-red-400 border border-red-500/25">
+                          Error
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {driveSyncResult.folder?.driveUrl && (
+                  <div className="flex justify-end pt-1">
+                    <a
+                      href={driveSyncResult.folder.driveUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-[9px] font-bold text-sky-400 hover:text-sky-300 underline"
+                    >
+                      <Folder className="h-3 w-3" />
+                      Abrir carpeta en Google Drive →
+                    </a>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Metadata de sesión */}

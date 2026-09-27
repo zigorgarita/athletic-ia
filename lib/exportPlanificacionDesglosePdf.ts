@@ -7,7 +7,7 @@ export interface ExportPlanificacionDesglosePdfOptions {
   pdfUrl?: string | null;
   pdfFileName?: string | null;
   result: PdfAnalysisResult;
-  action?: 'download' | 'preview'; // 'download' por defecto, 'preview' abre en nueva pestaña
+  action?: 'download' | 'preview' | 'none'; // 'download' por defecto, 'preview' abre en nueva pestaña, 'none' solo retorna doc
 }
 
 // ─── CONSTANTES GEOMÉTRICAS Y DE COLOR (A4) ───────────────────────────────────
@@ -507,12 +507,15 @@ export function exportPlanificacionDesglosePdf(options: ExportPlanificacionDesgl
   const fileName = `${fecha} - Desglose Athletic IA.pdf`;
 
   if (action === 'preview') {
-    const blob = doc.output('blob');
-    const blobUrl = URL.createObjectURL(blob);
-    window.open(blobUrl, '_blank');
-  } else {
+    if (typeof window !== 'undefined') {
+      const blob = doc.output('blob');
+      const blobUrl = URL.createObjectURL(blob);
+      window.open(blobUrl, '_blank');
+    }
+  } else if (action === 'download') {
     doc.save(fileName);
   }
+  // Si action === 'none', no se hace nada y se retorna la instancia de doc
 
   return doc;
 }
