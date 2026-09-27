@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -2117,6 +2117,7 @@ export function PlanificacionClient() {
                 <PdfSessionAnalyzer
                   pdfUrl={getPdfUrl()}
                   sessionId={sessionForm.id && !sessionForm.id.startsWith('temp-') ? sessionForm.id : undefined}
+                  sessionDate={sessionForm.fecha}
                 />
               )}
             </div>

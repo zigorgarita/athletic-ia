@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Sparkles, ChevronDown, ChevronUp, AlertTriangle, CheckCircle2, Zap, HelpCircle, Users, Clock, Maximize2, Target, List, ArrowRight, Shuffle, X, BookOpen } from 'lucide-react';
+import { Sparkles, ChevronDown, ChevronUp, AlertTriangle, CheckCircle2, Zap, HelpCircle, Users, Clock, Maximize2, Target, List, ArrowRight, Shuffle, X, BookOpen, Download, FileText, ExternalLink } from 'lucide-react';
 import { getStaffPasskey } from '@/lib/passkey';
 import type { PdfAnalysisResult, PdfTaskDraft, GrupoJugadores, FieldConfianza } from '@/app/api/planificacion/analyze-pdf/route';
 import { TaskToLibraryModal } from './TaskToLibraryModal';
+import { exportPlanificacionDesglosePdf } from '@/lib/exportPlanificacionDesglosePdf';
 
 // ──────────────────────────────────────────────────────────────────────────────
 // HELPERS DE CONFIANZA
@@ -316,9 +317,10 @@ function TaskCard({ tarea, globalGroups, onSaveToLibrary }: TaskCardProps) {
 interface PdfSessionAnalyzerProps {
   pdfUrl: string;
   sessionId?: string;
+  sessionDate?: string;
 }
 
-export function PdfSessionAnalyzer({ pdfUrl, sessionId }: PdfSessionAnalyzerProps) {
+export function PdfSessionAnalyzer({ pdfUrl, sessionId, sessionDate }: PdfSessionAnalyzerProps) {
   const [analyzing, setAnalyzing] = useState(false);
   const [result, setResult] = useState<PdfAnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -326,6 +328,30 @@ export function PdfSessionAnalyzer({ pdfUrl, sessionId }: PdfSessionAnalyzerProp
   // Fase 2: modal de guardado en biblioteca
   const [tareaParaBiblioteca, setTareaParaBiblioteca] = useState<PdfTaskDraft | null>(null);
   const [savedIds, setSavedIds] = useState<Record<number, string>>({}); // numero_tarea -> library_id
+
+  const fechaEfectiva = sessionDate || new Date().toISOString().split('T')[0];
+
+  const handleDownloadPdf = () => {
+    if (!result) return;
+    exportPlanificacionDesglosePdf({
+      fecha: fechaEfectiva,
+      tituloSesion: result.titulo_sesion,
+      pdfUrl,
+      result,
+      action: 'download',
+    });
+  };
+
+  const handlePreviewPdf = () => {
+    if (!result) return;
+    exportPlanificacionDesglosePdf({
+      fecha: fechaEfectiva,
+      tituloSesion: result.titulo_sesion,
+      pdfUrl,
+      result,
+      action: 'preview',
+    });
+  };
 
   if (!pdfUrl || dismissed) return null;
 
@@ -454,6 +480,43 @@ export function PdfSessionAnalyzer({ pdfUrl, sessionId }: PdfSessionAnalyzerProp
               <p className="text-[9px] text-slate-400 leading-relaxed">
                 Este desglose es generado por IA a partir del PDF. No se ha modificado ningún dato de la sesión. Valida cada campo antes de cualquier uso.
               </p>
+            </div>
+          </div>
+
+          {/* Acción de Generación y Descarga de PDF de Desglose */}
+          <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-xl bg-slate-900 border border-slate-800">
+            <div className="flex items-center gap-2.5">
+              <div className="h-8 w-8 rounded-lg bg-[#CC0E21]/15 border border-[#CC0E21]/30 flex items-center justify-center shrink-0">
+                <FileText className="h-4 w-4 text-[#CC0E21]" />
+              </div>
+              <div>
+                <p className="text-xs font-black text-slate-100">
+                  Desglose Athletic IA
+                </p>
+                <p className="text-[9px] text-slate-400 font-mono">
+                  {fechaEfectiva} - Desglose Athletic IA.pdf
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handlePreviewPdf}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-colors"
+                title="Abrir vista previa del documento en nueva pestaña"
+              >
+                <ExternalLink className="h-3 w-3 text-slate-400" />
+                Previsualizar
+              </button>
+              <button
+                type="button"
+                onClick={handleDownloadPdf}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-extrabold bg-[#CC0E21] hover:bg-[#b00c1c] text-white transition-colors shadow-sm"
+                title="Descargar archivo PDF estructurado"
+              >
+                <Download className="h-3 w-3" />
+                Descargar PDF
+              </button>
             </div>
           </div>
 
