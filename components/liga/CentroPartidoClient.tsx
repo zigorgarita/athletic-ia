@@ -30,6 +30,7 @@ import { uploadToStorage } from '@/lib/storage';
 import { useOfficialMatches, OfficialMatch, OfficialPlayerStat } from '@/hooks/useOfficialMatches';
 import { OfficialMatchModal } from '@/components/rivales/modals/OfficialMatchModal';
 import { DieLigenTimeline } from './DieLigenTimeline';
+import { DieLigenMatchSection } from './dieligen/DieLigenMatchSection';
 import {
   Trophy, MapPin, Users, Shield, Film,
   BookOpen, Plus, FolderOpen, Save, Trash2, FileText, ClipboardList,
@@ -2267,6 +2268,9 @@ export function CentroPartidoClient({ matchId }: CentroPartidoClientProps) {
                       </div>
                     </div>
                   </div>
+
+                  {/* NUEVO ACCESO INFORME DIE LIGEN (AÑADIDO SIN BORRAR PLACEHOLDER) */}
+                  <DieLigenMatchSection match={match} />
 
                 </div>
 
