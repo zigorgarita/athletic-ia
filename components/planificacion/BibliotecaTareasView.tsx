@@ -1051,7 +1051,7 @@ export function BibliotecaTareasView({
 
         {/* ── FICHA DETALLADA (COLUMNA DERECHA) ── */}
         {selectedTask ? (
-          <div className="lg:w-5/12 bg-slate-900/80 border border-slate-800 rounded-2xl p-5 overflow-y-auto space-y-4 shadow-xl flex flex-col justify-between">
+          <div className="lg:w-5/12 bg-slate-900/80 border border-slate-800 rounded-2xl p-5 overflow-y-auto space-y-4 shadow-xl flex flex-col justify-between relative">
             <div className="space-y-4">
               {/* Header de la ficha */}
               <div className="flex items-start justify-between gap-2 border-b border-slate-800/80 pb-3">
@@ -1108,17 +1108,40 @@ export function BibliotecaTareasView({
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedTask(null);
-                    setIsEditing(false);
-                  }}
-                  className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors shrink-0"
-                  title="Cerrar ficha"
-                >
-                  <X className="h-4 w-4" />
-                </button>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {!isEditing ? (
+                    <button
+                      type="button"
+                      onClick={() => startEditing(selectedTask)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-950/60 hover:bg-sky-900/80 text-sky-300 hover:text-white border border-sky-600/40 text-xs font-bold transition-all shadow-sm"
+                      title="Editar campos de la ficha"
+                    >
+                      <Edit3 className="h-3.5 w-3.5 text-sky-400" />
+                      <span>Editar Ficha</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={cancelEditing}
+                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold"
+                      title="Cancelar edición"
+                    >
+                      Cancelar
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedTask(null);
+                      setIsEditing(false);
+                    }}
+                    className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                    title="Cerrar ficha"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
 
               {/* Grid de métricas clave: Duración, Jugadores, Espacio */}
@@ -1502,8 +1525,8 @@ export function BibliotecaTareasView({
               )}
             </div>
 
-            {/* Acciones al pie de la ficha */}
-            <div className="pt-4 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-2">
+            {/* Acciones al pie de la ficha (Sticky) */}
+            <div className="sticky bottom-0 -mx-5 -mb-5 p-3.5 bg-slate-950/95 border-t border-slate-800/90 backdrop-blur-md flex flex-wrap items-center justify-between gap-2 z-20">
               <div>
                 {isEditing ? (
                   <span className="text-[10px] text-sky-400 font-bold flex items-center gap-1">
