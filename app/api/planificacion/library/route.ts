@@ -274,35 +274,97 @@ export async function PATCH(req: Request) {
     if (!id) {
       return NextResponse.json({ error: 'ID de tarea requerido para aprobar.' }, { status: 400 });
     }
-
     const revisadaPor = resolveStaffIdentity(req, body?.revisada_por);
     const supabaseServer = getSupabaseServerClient();
 
+    const isSoloGuardar = body?.solo_guardar === true;
+    const isAprobar = body?.aprobar === true || (!isSoloGuardar && body?.aprobar !== false);
+
+    const updateData: Record<string, unknown> = {};
+
+    // 1. Gestión de estado de aprobación
+    if (isAprobar) {
+      updateData.aprobada = true;
+      updateData.revisada_por = revisadaPor;
+      updateData.revisada_at = new Date().toISOString();
+    } else if (isSoloGuardar) {
+      // Mantiene en Borrador Staff; si estaba aprobada, vuelve a borrador para nueva revisión
+      updateData.aprobada = false;
+    }
+
+    // 2. Campos editables de contenido (si vienen provistos)
+    if (typeof body?.nombre === 'string' && body.nombre.trim()) {
+      updateData.nombre = body.nombre.trim();
+    }
+    if (typeof body?.tipo_tarea === 'string' && body.tipo_tarea.trim()) {
+      updateData.tipo_tarea = body.tipo_tarea.trim();
+    }
+    if ('minutos_defecto' in body) {
+      updateData.minutos_defecto = typeof body.minutos_defecto === 'number' ? body.minutos_defecto : null;
+    }
+    if ('duracion_texto_pdf' in body) {
+      updateData.duracion_texto_pdf = typeof body.duracion_texto_pdf === 'string' && body.duracion_texto_pdf.trim() ? body.duracion_texto_pdf.trim() : null;
+    }
+    if ('jugadores_defecto' in body) {
+      updateData.jugadores_defecto = typeof body.jugadores_defecto === 'number' ? body.jugadores_defecto : null;
+    }
+    if ('jugadores_texto_pdf' in body) {
+      updateData.jugadores_texto_pdf = typeof body.jugadores_texto_pdf === 'string' && body.jugadores_texto_pdf.trim() ? body.jugadores_texto_pdf.trim() : null;
+    }
+    if ('espacio_defecto' in body) {
+      updateData.espacio_defecto = typeof body.espacio_defecto === 'string' && body.espacio_defecto.trim() ? body.espacio_defecto.trim() : null;
+    }
+    if ('objetivo' in body) {
+      updateData.objetivo = typeof body.objetivo === 'string' && body.objetivo.trim() ? body.objetivo.trim() : null;
+    }
+    if ('organizacion' in body) {
+      updateData.organizacion = typeof body.organizacion === 'string' && body.organizacion.trim() ? body.organizacion.trim() : null;
+    }
+    if ('desarrollo' in body) {
+      updateData.desarrollo = typeof body.desarrollo === 'string' && body.desarrollo.trim() ? body.desarrollo.trim() : null;
+    }
+    if ('consignas' in body) {
+      if (Array.isArray(body.consignas)) {
+        updateData.consignas = body.consignas.map((c: unknown) => String(c).trim()).filter(Boolean);
+      } else if (typeof body.consignas === 'string') {
+        updateData.consignas = body.consignas
+          .split(/\r?\n/)
+          .map((s: string) => s.replace(/^[-•*–—\d+.)\s]+/, '').trim())
+          .filter(Boolean);
+      } else {
+        updateData.consignas = null;
+      }
+    }
+    if ('transicion_rec' in body) {
+      updateData.transicion_rec = typeof body.transicion_rec === 'string' && body.transicion_rec.trim() ? body.transicion_rec.trim() : null;
+    }
+    if ('transicion_perd' in body) {
+      updateData.transicion_perd = typeof body.transicion_perd === 'string' && body.transicion_perd.trim() ? body.transicion_perd.trim() : null;
+    }
+
     const { data: updatedTask, error: updateError } = await supabaseServer
       .from('planning_task_library')
-      .update({
-        aprobada: true,
-        revisada_por: revisadaPor,
-        revisada_at: new Date().toISOString(),
-      })
+      .update(updateData)
       .eq('id', id)
       .select('*')
       .single();
 
     if (updateError) {
-      console.error('[API /api/planificacion/library PATCH] Error actualizando borrador:', updateError);
-      return NextResponse.json({ error: `Error aprobando tarea: ${updateError.message}` }, { status: 500 });
+      console.error('[API /api/planificacion/library PATCH] Error actualizando tarea:', updateError);
+      return NextResponse.json({ error: `Error actualizando tarea: ${updateError.message}` }, { status: 500 });
     }
 
     console.log(
-      `[API /api/planificacion/library PATCH] Tarea aprobada: ${id} | ` +
-      `Revisada por: ${revisadaPor} | aprobada=TRUE`
+      `[API /api/planificacion/library PATCH] Tarea actualizada: ${id} | ` +
+      `aprobada=${updateData.aprobada} | revisada_por=${revisadaPor}`
     );
 
     return NextResponse.json({
       ok: true,
       task: updatedTask,
-      mensaje: 'Tarea aprobada e incorporada a la biblioteca activa.',
+      mensaje: isAprobar
+        ? 'Tarea aprobada e incorporada a la biblioteca activa.'
+        : 'Borrador actualizado correctamente.',
     });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Error interno del servidor.';

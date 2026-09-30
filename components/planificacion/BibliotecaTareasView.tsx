@@ -3,9 +3,10 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Search, BookOpen, Clock, Users, Maximize, Target, Check, X,
-  CheckCircle2, ArrowRight, Shuffle, Link2, FileText,
+  CheckCircle2, ArrowRight, Shuffle, FileText,
   AlertCircle, RotateCcw, Eye, Calendar,
-  SlidersHorizontal, ChevronDown, Layers, HelpCircle
+  SlidersHorizontal, ChevronDown, Layers, HelpCircle,
+  Edit3, Lock
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { PlanningTaskLibrary } from '@/types';
@@ -25,6 +26,22 @@ interface BibliotecaTareasViewProps {
   onClose?: () => void;
   onSelectTask?: (task: PlanningTaskLibrary) => void;
 }
+
+const TIPOS_TAREA_PRESET = [
+  'Posesión',
+  'Táctica',
+  'Juego Aéreo',
+  'Finalización',
+  'Partido condicionado',
+  'Rondo',
+  'Calentamiento',
+  'ABP',
+  'Técnica',
+  'Físico',
+  'Fuerza',
+  'Velocidad',
+  'Recuperación'
+];
 
 export function BibliotecaTareasView({
   isEmbedded = false,
@@ -56,6 +73,39 @@ export function BibliotecaTareasView({
   // Detail view state (Ficha)
   const [selectedTask, setSelectedTask] = useState<PlanningTaskLibrary | null>(null);
 
+  // Editing state for Ficha
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState<{
+    nombre: string;
+    tipo_tarea: string;
+    duracion_texto_pdf: string;
+    minutos_defecto: number | null;
+    jugadores_texto_pdf: string;
+    jugadores_defecto: number | null;
+    espacio_defecto: string;
+    objetivo: string;
+    organizacion: string;
+    desarrollo: string;
+    consignas_text: string;
+    transicion_rec: string;
+    transicion_perd: string;
+  }>({
+    nombre: '',
+    tipo_tarea: '',
+    duracion_texto_pdf: '',
+    minutos_defecto: null,
+    jugadores_texto_pdf: '',
+    jugadores_defecto: null,
+    espacio_defecto: '',
+    objetivo: '',
+    organizacion: '',
+    desarrollo: '',
+    consignas_text: '',
+    transicion_rec: '',
+    transicion_perd: ''
+  });
+  const [savingTask, setSavingTask] = useState(false);
+
   // Staff approval state
   const [approvingId, setApprovingId] = useState<string | null>(null);
   const [feedbackMsg, setFeedbackMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -85,6 +135,50 @@ export function BibliotecaTareasView({
   useEffect(() => {
     fetchTasks();
   }, [fetchTasks]);
+
+  // Map each task to its tactical profile for fast filtering and display
+  const tasksWithProfile = useMemo(() => {
+    return tasks.map(t => {
+      const fecha = (t as unknown as { planning_sessions?: { fecha: string } })?.planning_sessions?.fecha || null;
+      const profile = resolveTaskTacticalProfile(t, fecha);
+      return {
+        task: t,
+        fecha,
+        profile
+      };
+    });
+  }, [tasks]);
+
+  // Dynamic task counts per family and per concept based on real tasks in library
+  const { familyCounts, conceptCounts } = useMemo(() => {
+    const famCounts: Record<string, number> = {};
+    const conCounts: Record<string, number> = {};
+
+    TACTICAL_FAMILIES.forEach(f => {
+      famCounts[f.id] = 0;
+      f.concepts.forEach(c => {
+        conCounts[c] = 0;
+      });
+    });
+
+    tasksWithProfile.forEach(({ profile }) => {
+      // Unique families in this task
+      const seenFamilies = new Set<string>();
+      profile.familias.forEach(f => {
+        if (!seenFamilies.has(f.id)) {
+          seenFamilies.add(f.id);
+          famCounts[f.id] = (famCounts[f.id] || 0) + 1;
+        }
+      });
+
+      // Canonical concepts in this task
+      profile.conceptos_canonicos.forEach(c => {
+        conCounts[c] = (conCounts[c] || 0) + 1;
+      });
+    });
+
+    return { familyCounts: famCounts, conceptCounts: conCounts };
+  }, [tasksWithProfile]);
 
   // Concepts available for the chosen family
   const availableConcepts = useMemo(() => {
@@ -129,19 +223,6 @@ export function BibliotecaTareasView({
       players: Array.from(players).sort(),
       dates: Array.from(dates).sort()
     };
-  }, [tasks]);
-
-  // Map each task to its tactical profile for fast filtering and display
-  const tasksWithProfile = useMemo(() => {
-    return tasks.map(t => {
-      const fecha = (t as unknown as { planning_sessions?: { fecha: string } })?.planning_sessions?.fecha || null;
-      const profile = resolveTaskTacticalProfile(t, fecha);
-      return {
-        task: t,
-        fecha,
-        profile
-      };
-    });
   }, [tasks]);
 
   // Apply all guided + optional filters
@@ -236,7 +317,129 @@ export function BibliotecaTareasView({
     selectedDate !== 'todos' ||
     selectedStatus !== 'todos';
 
-  // Handle staff approving a draft task
+  // Start editing a task
+  const startEditing = (task: PlanningTaskLibrary) => {
+    const rawConsignas = task.consignas as unknown;
+    let consignasText = '';
+    if (Array.isArray(rawConsignas)) {
+      consignasText = (rawConsignas as unknown[])
+        .map(c => String(c).trim())
+        .filter(c => Boolean(c) && c !== 'No detectado')
+        .join('\n');
+    } else if (typeof rawConsignas === 'string' && rawConsignas.trim()) {
+      consignasText = rawConsignas.trim();
+    }
+
+    setEditForm({
+      nombre: task.nombre || '',
+      tipo_tarea: task.tipo_tarea || 'Posesión',
+      duracion_texto_pdf: task.duracion_texto_pdf || (task.minutos_defecto ? `${task.minutos_defecto} min` : ''),
+      minutos_defecto: task.minutos_defecto,
+      jugadores_texto_pdf: task.jugadores_texto_pdf || (task.jugadores_defecto ? `${task.jugadores_defecto} jug` : ''),
+      jugadores_defecto: task.jugadores_defecto,
+      espacio_defecto: task.espacio_defecto || '',
+      objetivo: task.objetivo || '',
+      organizacion: task.organizacion && task.organizacion !== 'No detectado' ? task.organizacion : '',
+      desarrollo: task.desarrollo && task.desarrollo !== 'No detectado' ? task.desarrollo : '',
+      consignas_text: consignasText,
+      transicion_rec: task.transicion_rec || '',
+      transicion_perd: task.transicion_perd || ''
+    });
+    setIsEditing(true);
+  };
+
+  const cancelEditing = () => {
+    setIsEditing(false);
+  };
+
+  // Save task changes (solo_guardar = true keeps draft; isApprove = true sets aprobada = true)
+  const handleSaveTask = async (isApprove: boolean) => {
+    if (!selectedTask) return;
+    setSavingTask(true);
+    setFeedbackMsg(null);
+    try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      const staffPasskey = getStaffPasskey();
+      if (staffPasskey) headers['x-staff-passkey'] = staffPasskey;
+
+      const staffName = currentUser?.name?.trim() ? currentUser.name.trim() : 'Cuerpo Técnico';
+
+      // Parse consignas into array
+      const parsedConsignas = editForm.consignas_text
+        .split(/\r?\n/)
+        .map(s => s.replace(/^[-•*–—\d+.)\s]+/, '').trim())
+        .filter(Boolean);
+
+      // Attempt to extract numeric minutes if provided
+      let numMinutos = editForm.minutos_defecto;
+      if (editForm.duracion_texto_pdf) {
+        const m = editForm.duracion_texto_pdf.match(/(\d+)\s*(?:min|'|m)/i);
+        if (m) numMinutos = parseInt(m[1], 10);
+      }
+
+      // Attempt to extract numeric players if provided
+      let numJugadores = editForm.jugadores_defecto;
+      if (editForm.jugadores_texto_pdf) {
+        const m = editForm.jugadores_texto_pdf.match(/(\d+)\s*(?:jug|j)/i);
+        if (m) numJugadores = parseInt(m[1], 10);
+      }
+
+      const bodyPayload = {
+        id: selectedTask.id,
+        nombre: editForm.nombre.trim(),
+        tipo_tarea: editForm.tipo_tarea.trim(),
+        duracion_texto_pdf: editForm.duracion_texto_pdf.trim() || null,
+        minutos_defecto: numMinutos,
+        jugadores_texto_pdf: editForm.jugadores_texto_pdf.trim() || null,
+        jugadores_defecto: numJugadores,
+        espacio_defecto: editForm.espacio_defecto.trim() || null,
+        objetivo: editForm.objetivo.trim() || null,
+        organizacion: editForm.organizacion.trim() || null,
+        desarrollo: editForm.desarrollo.trim() || null,
+        consignas: parsedConsignas.length > 0 ? parsedConsignas : null,
+        transicion_rec: editForm.transicion_rec.trim() || null,
+        transicion_perd: editForm.transicion_perd.trim() || null,
+        solo_guardar: !isApprove,
+        aprobar: isApprove,
+        revisada_por: staffName
+      };
+
+      const response = await fetch('/api/planificacion/library', {
+        method: 'PATCH',
+        headers,
+        credentials: 'include',
+        body: JSON.stringify(bodyPayload)
+      });
+
+      const resJson = await response.json().catch(() => null);
+      if (!response.ok || !resJson?.ok) {
+        throw new Error(resJson?.error || `Error ${response.status} al guardar la tarea`);
+      }
+
+      const updatedTask: PlanningTaskLibrary = resJson.task;
+
+      setTasks(prev => prev.map(t => (t.id === selectedTask.id ? updatedTask : t)));
+      setSelectedTask(updatedTask);
+      setIsEditing(false);
+
+      setFeedbackMsg({
+        type: 'success',
+        text: isApprove
+          ? `✓ ¡Tarea "${updatedTask.nombre}" aprobada por ${staffName} e incorporada a la biblioteca activa!`
+          : `✓ Tarea "${updatedTask.nombre}" guardada correctamente como Borrador Staff.`
+      });
+    } catch (err: unknown) {
+      console.error(err);
+      setFeedbackMsg({
+        type: 'error',
+        text: err instanceof Error ? err.message : 'Error al guardar la tarea.'
+      });
+    } finally {
+      setSavingTask(false);
+    }
+  };
+
+  // Handle staff approving a draft task directly
   const handleApproveDraft = async (task: PlanningTaskLibrary) => {
     if (!task) return;
     setApprovingId(task.id);
@@ -254,6 +457,7 @@ export function BibliotecaTareasView({
         credentials: 'include',
         body: JSON.stringify({
           id: task.id,
+          aprobar: true,
           revisada_por: staffName
         })
       });
@@ -276,7 +480,7 @@ export function BibliotecaTareasView({
       }
       setFeedbackMsg({
         type: 'success',
-        text: `✓ ¡Tarea "${task.nombre}" aprobada por ${staffName} e incorporada a la biblioteca!`
+        text: `✓ ¡Tarea "${task.nombre}" aprobada por ${staffName} e incorporada a la biblioteca activa!`
       });
     } catch (err: unknown) {
       console.error(err);
@@ -376,7 +580,7 @@ export function BibliotecaTareasView({
         {/* ── MOTOR DE BÚSQUEDA GUIADA: FAMILIA → CONCEPTO ── */}
         <div className="mt-4 pt-4 border-t border-slate-800/80 space-y-3">
           <div className="grid grid-cols-1 md:grid-cols-12 gap-2.5">
-            {/* Desplegable 1: Familia */}
+            {/* Desplegable 1: Familia (Contador real de tareas por familia) */}
             <div className="md:col-span-4 space-y-1">
               <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
                 <Layers className="h-3 w-3 text-[#CC0E21]" />
@@ -388,18 +592,21 @@ export function BibliotecaTareasView({
                   onChange={e => handleFamilyChange(e.target.value)}
                   className="w-full appearance-none bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-[#CC0E21] rounded-xl px-3 py-2 text-xs font-bold text-slate-100 transition-all cursor-pointer focus:outline-none pr-8"
                 >
-                  <option value="todas">Todas las Familias ({TACTICAL_FAMILIES.length})</option>
-                  {TACTICAL_FAMILIES.map(fam => (
-                    <option key={fam.id} value={fam.id}>
-                      {fam.label} ({fam.concepts.length})
-                    </option>
-                  ))}
+                  <option value="todas">Todas las Familias ({tasksWithProfile.length})</option>
+                  {TACTICAL_FAMILIES.map(fam => {
+                    const count = familyCounts[fam.id] || 0;
+                    return (
+                      <option key={fam.id} value={fam.id}>
+                        {fam.label} ({count})
+                      </option>
+                    );
+                  })}
                 </select>
                 <ChevronDown className="absolute right-2.5 top-2.5 h-3.5 w-3.5 text-slate-500 pointer-events-none" />
               </div>
             </div>
 
-            {/* Desplegable 2: Concepto Canónico (Dinámico según familia) */}
+            {/* Desplegable 2: Concepto Canónico (Contador real de tareas por concepto) */}
             <div className="md:col-span-5 space-y-1">
               <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
                 <Target className="h-3 w-3 text-sky-400" />
@@ -418,14 +625,17 @@ export function BibliotecaTareasView({
                 >
                   <option value="todos">
                     {selectedFamily === 'todas'
-                      ? 'Todos los conceptos (catálogo completo)'
-                      : `Todos los conceptos de ${activeFamilyObj?.label}`}
+                      ? `Todos los conceptos (${tasksWithProfile.length})`
+                      : `Todos los conceptos de ${activeFamilyObj?.label} (${familyCounts[selectedFamily] || 0})`}
                   </option>
-                  {availableConcepts.map(c => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
+                  {availableConcepts.map(c => {
+                    const count = conceptCounts[c] || 0;
+                    return (
+                      <option key={c} value={c}>
+                        {c} ({count})
+                      </option>
+                    );
+                  })}
                 </select>
                 <ChevronDown className="absolute right-2.5 top-2.5 h-3.5 w-3.5 text-slate-500 pointer-events-none" />
               </div>
@@ -633,7 +843,7 @@ export function BibliotecaTareasView({
                 <button
                   type="button"
                   onClick={handleResetFilters}
-                  className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-850 hover:bg-slate-800 text-slate-300 text-xs font-bold"
+                  className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-855 hover:bg-slate-800 text-slate-300 text-xs font-bold"
                 >
                   <RotateCcw className="h-3 w-3" />
                   Restablecer filtros
@@ -648,7 +858,10 @@ export function BibliotecaTareasView({
               return (
                 <div
                   key={task.id}
-                  onClick={() => setSelectedTask(task)}
+                  onClick={() => {
+                    setSelectedTask(task);
+                    setIsEditing(false);
+                  }}
                   className={`group p-3.5 rounded-2xl border transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
                     isSelected
                       ? 'bg-slate-850/90 border-[#CC0E21]/60 shadow-lg shadow-black/40 ring-1 ring-[#CC0E21]/40'
@@ -742,6 +955,7 @@ export function BibliotecaTareasView({
                       onClick={e => {
                         e.stopPropagation();
                         setSelectedTask(task);
+                        setIsEditing(false);
                       }}
                       className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-white border border-slate-700 text-xs font-bold transition-all shadow-sm"
                     >
@@ -775,11 +989,26 @@ export function BibliotecaTareasView({
             <div className="space-y-4">
               {/* Header de la ficha */}
               <div className="flex items-start justify-between gap-2 border-b border-slate-800/80 pb-3">
-                <div className="space-y-1">
+                <div className="space-y-1 flex-1 min-w-0 pr-2">
                   <div className="flex items-center gap-2">
-                    <span className="text-[9px] uppercase font-black tracking-wider text-[#CC0E21] bg-[#CC0E21]/10 border border-[#CC0E21]/20 px-2 py-0.5 rounded-md">
-                      {selectedTask.tipo_tarea}
-                    </span>
+                    {isEditing ? (
+                      <select
+                        value={editForm.tipo_tarea}
+                        onChange={e => setEditForm({ ...editForm, tipo_tarea: e.target.value })}
+                        className="bg-slate-950 border border-slate-700 text-[#CC0E21] font-bold text-xs rounded-lg px-2 py-1 focus:outline-none focus:border-[#CC0E21]"
+                      >
+                        {TIPOS_TAREA_PRESET.map(t => (
+                          <option key={t} value={t}>
+                            {t}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span className="text-[9px] uppercase font-black tracking-wider text-[#CC0E21] bg-[#CC0E21]/10 border border-[#CC0E21]/20 px-2 py-0.5 rounded-md">
+                        {selectedTask.tipo_tarea}
+                      </span>
+                    )}
+
                     {selectedTask.aprobada === false ? (
                       <span className="px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider bg-amber-500/15 text-amber-400 border border-amber-500/30">
                         Borrador Staff
@@ -790,10 +1019,22 @@ export function BibliotecaTareasView({
                       </span>
                     )}
                   </div>
-                  <h3 className="text-base font-black text-white leading-tight">
-                    {selectedTask.nombre}
-                  </h3>
-                  <div className="text-[10px] text-slate-400 flex items-center gap-2">
+
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={editForm.nombre}
+                      onChange={e => setEditForm({ ...editForm, nombre: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-700 focus:border-[#CC0E21] rounded-xl px-3 py-1.5 text-sm font-black text-white focus:outline-none mt-1"
+                      placeholder="Nombre de la tarea..."
+                    />
+                  ) : (
+                    <h3 className="text-base font-black text-white leading-tight mt-1">
+                      {selectedTask.nombre}
+                    </h3>
+                  )}
+
+                  <div className="text-[10px] text-slate-400 flex items-center gap-2 pt-0.5">
                     <span>Creado por: {selectedTask.creado_por || 'Cuerpo Técnico'}</span>
                     {selectedTask.revisada_por && (
                       <span>· Aprobado por: {selectedTask.revisada_por}</span>
@@ -803,8 +1044,11 @@ export function BibliotecaTareasView({
 
                 <button
                   type="button"
-                  onClick={() => setSelectedTask(null)}
-                  className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                  onClick={() => {
+                    setSelectedTask(null);
+                    setIsEditing(false);
+                  }}
+                  className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors shrink-0"
                   title="Cerrar ficha"
                 >
                   <X className="h-4 w-4" />
@@ -818,33 +1062,65 @@ export function BibliotecaTareasView({
                   <span className="text-[9px] text-slate-500 font-extrabold uppercase block">
                     DURACIÓN
                   </span>
-                  <span className="text-xs font-black text-slate-200 block truncate mt-0.5">
-                    {selectedTask.duracion_texto_pdf ||
-                      (selectedTask.minutos_defecto
-                        ? `${selectedTask.minutos_defecto} min`
-                        : 'No detectado')}
-                  </span>
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={editForm.duracion_texto_pdf}
+                      onChange={e => setEditForm({ ...editForm, duracion_texto_pdf: e.target.value })}
+                      placeholder="ej. 15 min"
+                      className="w-full bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-xs text-center text-white focus:outline-none focus:border-[#CC0E21] mt-0.5"
+                    />
+                  ) : (
+                    <span className="text-xs font-black text-slate-200 block truncate mt-0.5">
+                      {selectedTask.duracion_texto_pdf ||
+                        (selectedTask.minutos_defecto
+                          ? `${selectedTask.minutos_defecto} min`
+                          : 'No detectado')}
+                    </span>
+                  )}
                 </div>
+
                 <div className="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800/80 text-center">
                   <Users className="h-3.5 w-3.5 text-slate-400 mx-auto mb-1" />
                   <span className="text-[9px] text-slate-500 font-extrabold uppercase block">
                     JUGADORES
                   </span>
-                  <span className="text-xs font-black text-slate-200 block truncate mt-0.5">
-                    {selectedTask.jugadores_texto_pdf ||
-                      (selectedTask.jugadores_defecto
-                        ? `${selectedTask.jugadores_defecto} jug`
-                        : 'No detectado')}
-                  </span>
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={editForm.jugadores_texto_pdf}
+                      onChange={e => setEditForm({ ...editForm, jugadores_texto_pdf: e.target.value })}
+                      placeholder="ej. 11v11"
+                      className="w-full bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-xs text-center text-white focus:outline-none focus:border-[#CC0E21] mt-0.5"
+                    />
+                  ) : (
+                    <span className="text-xs font-black text-slate-200 block truncate mt-0.5">
+                      {selectedTask.jugadores_texto_pdf ||
+                        (selectedTask.jugadores_defecto
+                          ? `${selectedTask.jugadores_defecto} jug`
+                          : 'No detectado')}
+                    </span>
+                  )}
                 </div>
+
                 <div className="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800/80 text-center">
                   <Maximize className="h-3.5 w-3.5 text-slate-400 mx-auto mb-1" />
                   <span className="text-[9px] text-slate-500 font-extrabold uppercase block">
                     ESPACIO
                   </span>
-                  <span className="text-xs font-black text-slate-200 block truncate mt-0.5">
-                    {selectedTask.espacio_defecto || 'No detectado'}
-                  </span>
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={editForm.espacio_defecto}
+                      onChange={e => setEditForm({ ...editForm, espacio_defecto: e.target.value })}
+                      placeholder="ej. Medio campo"
+                      className="w-full bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-xs text-center text-white focus:outline-none focus:border-[#CC0E21] mt-0.5"
+                    />
+                  ) : (
+                    <span className="text-xs font-black text-slate-200 block truncate mt-0.5">
+                      {selectedTask.espacio_defecto || 'No detectado'}
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -857,9 +1133,16 @@ export function BibliotecaTareasView({
 
                 return (
                   <div className="space-y-2.5 bg-slate-950/50 p-3.5 rounded-xl border border-slate-800/80">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                      <Target className="h-3 w-3 text-[#CC0E21]" />
-                      Análisis Táctico (Diccionario v2)
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <Target className="h-3 w-3 text-[#CC0E21]" />
+                        Análisis Táctico (Diccionario v2)
+                      </span>
+                      {isEditing && (
+                        <span className="text-[8px] font-mono text-slate-500 flex items-center gap-1">
+                          <Lock className="h-2.5 w-2.5" /> Conceptos protegidos (auditoría en curso)
+                        </span>
+                      )}
                     </span>
 
                     {/* Conceptos canónicos validados */}
@@ -893,11 +1176,11 @@ export function BibliotecaTareasView({
                       </div>
                     )}
 
-                    {/* Términos originales del PDF */}
+                    {/* Términos originales del PDF (Inmutables) */}
                     {profile.conceptos_originales.length > 0 && (
                       <div className="space-y-1 pt-1 border-t border-slate-850">
-                        <span className="text-[9px] font-bold text-slate-500 uppercase">
-                          Términos Originales Detectados:
+                        <span className="text-[9px] font-bold text-slate-500 uppercase flex items-center gap-1">
+                          <Lock className="h-2.5 w-2.5 text-slate-600" /> Términos Originales Detectados:
                         </span>
                         <div className="flex flex-wrap gap-1">
                           {profile.conceptos_originales.map((o, idx) => (
@@ -929,9 +1212,6 @@ export function BibliotecaTareasView({
                             </span>
                           ))}
                         </div>
-                        <p className="text-[9px] text-slate-500 leading-tight">
-                          Términos no asignados a un canónico único por ambigüedad. Se incorporarán al diccionario en próximas revisiones.
-                        </p>
                       </div>
                     )}
                   </div>
@@ -939,106 +1219,180 @@ export function BibliotecaTareasView({
               })()}
 
               {/* Objetivo */}
-              {selectedTask.objetivo && (
-                <div className="space-y-1">
-                  <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
-                    <Target className="h-3.5 w-3.5 text-[#CC0E21]" /> Objetivo
-                  </span>
-                  <div className="p-3 bg-slate-950/70 rounded-xl border border-slate-800/80 text-xs text-slate-300 leading-relaxed whitespace-pre-wrap">
-                    {selectedTask.objetivo}
-                  </div>
-                </div>
-              )}
+              <div className="space-y-1">
+                <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                  <Target className="h-3.5 w-3.5 text-[#CC0E21]" /> Objetivo
+                </span>
+                {isEditing ? (
+                  <textarea
+                    rows={3}
+                    value={editForm.objetivo}
+                    onChange={e => setEditForm({ ...editForm, objetivo: e.target.value })}
+                    placeholder="Describir el objetivo táctico/técnico principal..."
+                    className="w-full bg-slate-950 border border-slate-700 focus:border-[#CC0E21] rounded-xl p-2.5 text-xs text-slate-200 focus:outline-none"
+                  />
+                ) : (
+                  selectedTask.objetivo && (
+                    <div className="p-3 bg-slate-950/70 rounded-xl border border-slate-800/80 text-xs text-slate-300 leading-relaxed whitespace-pre-wrap">
+                      {selectedTask.objetivo}
+                    </div>
+                  )
+                )}
+              </div>
 
               {/* Organización */}
-              {selectedTask.organizacion && selectedTask.organizacion !== 'No detectado' && (
-                <div className="space-y-1">
-                  <span className="text-xs font-bold text-slate-400">Organización</span>
-                  <div className="p-3 bg-slate-950/70 rounded-xl border border-slate-800/80 text-xs text-slate-300 leading-relaxed">
-                    {selectedTask.organizacion}
-                  </div>
-                </div>
-              )}
+              <div className="space-y-1">
+                <span className="text-xs font-bold text-slate-400">Organización</span>
+                {isEditing ? (
+                  <textarea
+                    rows={2}
+                    value={editForm.organizacion}
+                    onChange={e => setEditForm({ ...editForm, organizacion: e.target.value })}
+                    placeholder="Distribución de jugadores, postas, rotaciones..."
+                    className="w-full bg-slate-950 border border-slate-700 focus:border-[#CC0E21] rounded-xl p-2.5 text-xs text-slate-200 focus:outline-none"
+                  />
+                ) : (
+                  selectedTask.organizacion && selectedTask.organizacion !== 'No detectado' && (
+                    <div className="p-3 bg-slate-950/70 rounded-xl border border-slate-800/80 text-xs text-slate-300 leading-relaxed">
+                      {selectedTask.organizacion}
+                    </div>
+                  )
+                )}
+              </div>
 
               {/* Desarrollo */}
-              {selectedTask.desarrollo && selectedTask.desarrollo !== 'No detectado' && (
-                <div className="space-y-1">
-                  <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
-                    <FileText className="h-3.5 w-3.5 text-sky-400" /> Desarrollo
-                  </span>
-                  <div className="p-3 bg-slate-950/70 rounded-xl border border-slate-800/80 text-xs text-slate-300 leading-relaxed whitespace-pre-wrap">
-                    {selectedTask.desarrollo}
-                  </div>
-                </div>
-              )}
+              <div className="space-y-1">
+                <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                  <FileText className="h-3.5 w-3.5 text-sky-400" /> Desarrollo
+                </span>
+                {isEditing ? (
+                  <textarea
+                    rows={4}
+                    value={editForm.desarrollo}
+                    onChange={e => setEditForm({ ...editForm, desarrollo: e.target.value })}
+                    placeholder="Explicación detallada de la secuencia de juego..."
+                    className="w-full bg-slate-950 border border-slate-700 focus:border-[#CC0E21] rounded-xl p-2.5 text-xs text-slate-200 focus:outline-none"
+                  />
+                ) : (
+                  selectedTask.desarrollo && selectedTask.desarrollo !== 'No detectado' && (
+                    <div className="p-3 bg-slate-950/70 rounded-xl border border-slate-800/80 text-xs text-slate-300 leading-relaxed whitespace-pre-wrap">
+                      {selectedTask.desarrollo}
+                    </div>
+                  )
+                )}
+              </div>
 
               {/* Consignas */}
-              {(() => {
-                const rawConsignas = selectedTask.consignas as unknown;
-                const consignasList: string[] = Array.isArray(rawConsignas)
-                  ? (rawConsignas as unknown[])
-                      .map(c => String(c).trim())
-                      .filter(c => Boolean(c) && c !== 'No detectado')
-                  : typeof rawConsignas === 'string' && rawConsignas.trim()
-                  ? rawConsignas
-                      .split(/\r?\n/)
-                      .map(s => s.replace(/^[-•*–—\d+.)\s]+/, '').trim())
-                      .filter(s => Boolean(s) && s !== 'No detectado')
-                  : [];
-
-                if (consignasList.length === 0) return null;
-
-                return (
+              <div className="space-y-1">
+                <span className="text-xs font-bold text-slate-400">Consignas Tácticas</span>
+                {isEditing ? (
                   <div className="space-y-1">
-                    <span className="text-xs font-bold text-slate-400">Consignas Tácticas</span>
-                    <div className="p-3 bg-slate-950/70 rounded-xl border border-slate-800/80 space-y-1">
-                      {consignasList.map((c, idx) => (
-                        <div key={idx} className="flex items-start gap-1.5 text-xs text-slate-300">
-                          <span className="text-[#CC0E21] font-black">•</span>
-                          <span>{c}</span>
-                        </div>
-                      ))}
-                    </div>
+                    <textarea
+                      rows={4}
+                      value={editForm.consignas_text}
+                      onChange={e => setEditForm({ ...editForm, consignas_text: e.target.value })}
+                      placeholder="Una consigna por línea..."
+                      className="w-full bg-slate-950 border border-slate-700 focus:border-[#CC0E21] rounded-xl p-2.5 text-xs text-slate-200 focus:outline-none font-mono"
+                    />
+                    <span className="text-[9px] text-slate-500 block">
+                      Tip: Escribe cada consigna en una línea separada.
+                    </span>
                   </div>
-                );
-              })()}
+                ) : (
+                  (() => {
+                    const rawConsignas = selectedTask.consignas as unknown;
+                    const consignasList: string[] = Array.isArray(rawConsignas)
+                      ? (rawConsignas as unknown[])
+                          .map(c => String(c).trim())
+                          .filter(c => Boolean(c) && c !== 'No detectado')
+                      : typeof rawConsignas === 'string' && rawConsignas.trim()
+                      ? rawConsignas
+                          .split(/\r?\n/)
+                          .map(s => s.replace(/^[-•*–—\d+.)\s]+/, '').trim())
+                          .filter(s => Boolean(s) && s !== 'No detectado')
+                      : [];
+
+                    if (consignasList.length === 0) return null;
+
+                    return (
+                      <div className="p-3 bg-slate-950/70 rounded-xl border border-slate-800/80 space-y-1">
+                        {consignasList.map((c, idx) => (
+                          <div key={idx} className="flex items-start gap-1.5 text-xs text-slate-300">
+                            <span className="text-[#CC0E21] font-black">•</span>
+                            <span>{c}</span>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()
+                )}
+              </div>
 
               {/* Transiciones (Recuperación / Pérdida) */}
-              {(selectedTask.transicion_rec || selectedTask.transicion_perd) && (
-                <div className="space-y-2">
-                  <span className="text-xs font-bold text-slate-400">Transiciones</span>
+              <div className="space-y-2">
+                <span className="text-xs font-bold text-slate-400">Transiciones</span>
+                {isEditing ? (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {selectedTask.transicion_rec && (
-                      <div className="p-2.5 bg-slate-950/70 rounded-xl border border-emerald-900/30 space-y-0.5">
-                        <span className="text-[9px] font-black text-emerald-400 uppercase tracking-wider flex items-center gap-1">
-                          <ArrowRight className="h-2.5 w-2.5" /> Tras recuperación
-                        </span>
-                        <p className="text-[11px] text-slate-300 leading-snug">
-                          {selectedTask.transicion_rec}
-                        </p>
-                      </div>
-                    )}
-                    {selectedTask.transicion_perd && (
-                      <div className="p-2.5 bg-slate-950/70 rounded-xl border border-red-900/30 space-y-0.5">
-                        <span className="text-[9px] font-black text-red-400 uppercase tracking-wider flex items-center gap-1">
-                          <Shuffle className="h-2.5 w-2.5" /> Tras pérdida
-                        </span>
-                        <p className="text-[11px] text-slate-300 leading-snug">
-                          {selectedTask.transicion_perd}
-                        </p>
-                      </div>
-                    )}
+                    <div className="space-y-1">
+                      <span className="text-[10px] text-emerald-400 font-bold block flex items-center gap-1">
+                        <ArrowRight className="h-2.5 w-2.5" /> Tras recuperación:
+                      </span>
+                      <textarea
+                        rows={2}
+                        value={editForm.transicion_rec}
+                        onChange={e => setEditForm({ ...editForm, transicion_rec: e.target.value })}
+                        placeholder="Comportamiento tras recuperar..."
+                        className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2 text-xs text-slate-200 focus:outline-none"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-[10px] text-red-400 font-bold block flex items-center gap-1">
+                        <Shuffle className="h-2.5 w-2.5" /> Tras pérdida:
+                      </span>
+                      <textarea
+                        rows={2}
+                        value={editForm.transicion_perd}
+                        onChange={e => setEditForm({ ...editForm, transicion_perd: e.target.value })}
+                        placeholder="Comportamiento tras perder..."
+                        className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2 text-xs text-slate-200 focus:outline-none"
+                      />
+                    </div>
                   </div>
-                </div>
-              )}
+                ) : (
+                  (selectedTask.transicion_rec || selectedTask.transicion_perd) && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {selectedTask.transicion_rec && (
+                        <div className="p-2.5 bg-slate-950/70 rounded-xl border border-emerald-900/30 space-y-0.5">
+                          <span className="text-[9px] font-black text-emerald-400 uppercase tracking-wider flex items-center gap-1">
+                            <ArrowRight className="h-2.5 w-2.5" /> Tras recuperación
+                          </span>
+                          <p className="text-[11px] text-slate-300 leading-snug">
+                            {selectedTask.transicion_rec}
+                          </p>
+                        </div>
+                      )}
+                      {selectedTask.transicion_perd && (
+                        <div className="p-2.5 bg-slate-950/70 rounded-xl border border-red-900/30 space-y-0.5">
+                          <span className="text-[9px] font-black text-red-400 uppercase tracking-wider flex items-center gap-1">
+                            <Shuffle className="h-2.5 w-2.5" /> Tras pérdida
+                          </span>
+                          <p className="text-[11px] text-slate-300 leading-snug">
+                            {selectedTask.transicion_perd}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )
+                )}
+              </div>
 
-              {/* Trazabilidad de origen PDF */}
+              {/* Trazabilidad de origen PDF (SIEMPRE INMUTABLE) */}
               {(selectedTask.fuente_pdf_url ||
                 selectedTask.numero_tarea_pdf ||
                 selectedTask.pagina_pdf) && (
                 <div className="space-y-1 pt-2 border-t border-slate-800/60">
                   <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                    <Link2 className="h-3 w-3" /> Trazabilidad del Documento
+                    <Lock className="h-2.5 w-2.5 text-slate-600" /> Trazabilidad del Documento (Solo lectura)
                   </span>
                   <div className="p-2.5 bg-slate-950/70 rounded-xl border border-slate-800/80 space-y-1 text-[10px]">
                     {selectedTask.fuente_pdf_url && (
@@ -1074,42 +1428,100 @@ export function BibliotecaTareasView({
             {/* Acciones al pie de la ficha */}
             <div className="pt-4 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-2">
               <div>
-                {selectedTask.aprobada === false && (
+                {isEditing ? (
+                  <span className="text-[10px] text-sky-400 font-bold flex items-center gap-1">
+                    <Edit3 className="h-3 w-3" /> Modo Edición de Ficha
+                  </span>
+                ) : selectedTask.aprobada === false ? (
                   <span className="text-[10px] text-amber-300/80 font-semibold block">
-                    Borrador PDF · Requiere aprobación explícita de staff
+                    Borrador Staff · Requiere aprobación explícita de staff
+                  </span>
+                ) : (
+                  <span className="text-[10px] text-emerald-400 font-semibold block">
+                    ✓ Ejercicio activo en biblioteca
                   </span>
                 )}
               </div>
 
               <div className="flex items-center gap-2">
-                {selectedTask.aprobada === false && (
-                  <Button
-                    onClick={() => handleApproveDraft(selectedTask)}
-                    disabled={approvingId === selectedTask.id}
-                    className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs"
-                  >
-                    {approvingId === selectedTask.id ? (
-                      <>
-                        <span className="h-3 w-3 rounded-full border-2 border-white/30 border-t-white animate-spin mr-1.5" />
-                        Aprobando...
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
-                        Aprobar Tarea
-                      </>
-                    )}
-                  </Button>
-                )}
+                {isEditing ? (
+                  <>
+                    <Button
+                      variant="secondary"
+                      onClick={cancelEditing}
+                      disabled={savingTask}
+                      className="text-xs"
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      onClick={() => handleSaveTask(false)}
+                      disabled={savingTask}
+                      className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs"
+                    >
+                      {savingTask ? 'Guardando...' : 'Guardar Borrador'}
+                    </Button>
+                    <Button
+                      onClick={() => handleSaveTask(true)}
+                      disabled={savingTask}
+                      className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs"
+                    >
+                      {savingTask ? (
+                        <>
+                          <span className="h-3 w-3 rounded-full border-2 border-white/30 border-t-white animate-spin mr-1.5" />
+                          Guardando...
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+                          Guardar y Aprobar
+                        </>
+                      )}
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    {/* Botón de Editar Ficha */}
+                    <button
+                      type="button"
+                      onClick={() => startEditing(selectedTask)}
+                      className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-200 hover:text-white border border-slate-700 text-xs font-bold transition-all shadow-sm"
+                    >
+                      <Edit3 className="h-3.5 w-3.5 text-sky-400" />
+                      <span>Editar Ficha</span>
+                    </button>
 
-                {onSelectTask && (
-                  <Button
-                    onClick={() => onSelectTask(selectedTask)}
-                    className="text-xs font-black"
-                  >
-                    <Check className="h-3.5 w-3.5 mr-1" />
-                    Importar Ejercicio
-                  </Button>
+                    {/* Botón de Aprobar directo si está en borrador */}
+                    {selectedTask.aprobada === false && (
+                      <Button
+                        onClick={() => handleApproveDraft(selectedTask)}
+                        disabled={approvingId === selectedTask.id}
+                        className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs"
+                      >
+                        {approvingId === selectedTask.id ? (
+                          <>
+                            <span className="h-3 w-3 rounded-full border-2 border-white/30 border-t-white animate-spin mr-1.5" />
+                            Aprobando...
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+                            Aprobar Tarea
+                          </>
+                        )}
+                      </Button>
+                    )}
+
+                    {onSelectTask && (
+                      <Button
+                        onClick={() => onSelectTask(selectedTask)}
+                        className="text-xs font-black"
+                      >
+                        <Check className="h-3.5 w-3.5 mr-1" />
+                        Importar Ejercicio
+                      </Button>
+                    )}
+                  </>
                 )}
               </div>
             </div>
