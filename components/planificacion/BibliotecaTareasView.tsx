@@ -43,6 +43,62 @@ const TIPOS_TAREA_PRESET = [
   'Recuperación'
 ];
 
+/**
+ * Resuelve la URL pública y el nombre visible del PDF de origen de una tarea.
+ * - Si fuente_pdf_url es http:// o https://, la usa directamente.
+ * - Si contiene solo el nombre del archivo, obtiene la URL pública desde la sesión vinculada.
+ * - Mantiene como texto visible el nombre original del PDF.
+ * - Si no existe URL válida, devuelve url = null para mostrar como texto sin enlace (evita 404).
+ */
+function resolveTaskPdfSource(
+  task: PlanningTaskLibrary | null,
+  allTasks: PlanningTaskLibrary[]
+): { url: string | null; displayName: string } {
+  if (!task) return { url: null, displayName: '' };
+  const rawUrl = task.fuente_pdf_url?.trim() || '';
+  if (!rawUrl) return { url: null, displayName: '' };
+
+  // 1. Si ya es una URL absoluta HTTP o HTTPS, usar directamente
+  if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
+    const filename = rawUrl.split('/').pop() || 'Documento PDF';
+    return { url: rawUrl, displayName: filename };
+  }
+
+  // 2. Si contiene solo el nombre del archivo (ej. "2026-08-03 - Original Aitor.pdf")
+  const displayName = rawUrl;
+  let resolvedUrl: string | null = null;
+
+  // Buscar en joined planning_sessions del propio objeto
+  const joinedSession = (task as unknown as {
+    planning_sessions?: { evaluacion_observaciones?: string | null };
+  })?.planning_sessions;
+
+  let obs = joinedSession?.evaluacion_observaciones || null;
+
+  // Fallback: si no viniera joined en este objeto, buscar en allTasks por sesion_origen_id
+  if (!obs && task.sesion_origen_id) {
+    const match = allTasks.find(
+      t => t.sesion_origen_id === task.sesion_origen_id &&
+        (t as unknown as { planning_sessions?: { evaluacion_observaciones?: string | null } })?.planning_sessions?.evaluacion_observaciones
+    );
+    if (match) {
+      obs = (match as unknown as { planning_sessions?: { evaluacion_observaciones?: string | null } })?.planning_sessions?.evaluacion_observaciones || null;
+    }
+  }
+
+  if (obs && obs.includes('PDF:')) {
+    const match = obs.match(/PDF:\s*(\S+)/);
+    if (match && match[1] && (match[1].startsWith('http://') || match[1].startsWith('https://'))) {
+      resolvedUrl = match[1].trim();
+    }
+  }
+
+  return {
+    url: resolvedUrl,
+    displayName
+  };
+}
+
 export function BibliotecaTareasView({
   isEmbedded = false,
   isModal = false,
@@ -117,7 +173,7 @@ export function BibliotecaTareasView({
       setErrorMsg(null);
       const { data, error } = await supabase
         .from('planning_task_library')
-        .select('*, planning_sessions(fecha)')
+        .select('*, planning_sessions(fecha, evaluacion_observaciones)')
         .order('created_at', { ascending: true });
 
       if (error) throw error;
@@ -1395,19 +1451,30 @@ export function BibliotecaTareasView({
                     <Lock className="h-2.5 w-2.5 text-slate-600" /> Trazabilidad del Documento (Solo lectura)
                   </span>
                   <div className="p-2.5 bg-slate-950/70 rounded-xl border border-slate-800/80 space-y-1 text-[10px]">
-                    {selectedTask.fuente_pdf_url && (
-                      <div className="flex items-center gap-2">
-                        <span className="text-slate-500 font-bold w-16 shrink-0">PDF:</span>
-                        <a
-                          href={selectedTask.fuente_pdf_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-sky-400 underline truncate hover:text-sky-300"
-                        >
-                          {selectedTask.fuente_pdf_url.split('/').pop()}
-                        </a>
-                      </div>
-                    )}
+                    {(() => {
+                      const pdfInfo = resolveTaskPdfSource(selectedTask, tasks);
+                      if (!pdfInfo.displayName) return null;
+                      return (
+                        <div className="flex items-center gap-2">
+                          <span className="text-slate-500 font-bold w-16 shrink-0">PDF:</span>
+                          {pdfInfo.url ? (
+                            <a
+                              href={pdfInfo.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sky-400 underline truncate hover:text-sky-300"
+                              title="Abrir documento PDF original en nueva pestaña"
+                            >
+                              {pdfInfo.displayName}
+                            </a>
+                          ) : (
+                            <span className="text-slate-300 truncate" title="Documento no disponible para descarga directa">
+                              {pdfInfo.displayName}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })()}
                     {selectedTask.numero_tarea_pdf && (
                       <div className="flex items-center gap-2">
                         <span className="text-slate-500 font-bold w-16 shrink-0">Nº Tarea:</span>
