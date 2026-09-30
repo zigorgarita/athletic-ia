@@ -47,6 +47,7 @@ const TIPOS_TAREA_PRESET = [
  * Resuelve la URL pública y el nombre visible del PDF de origen de una tarea.
  * - Si fuente_pdf_url es http:// o https://, la usa directamente.
  * - Si contiene solo el nombre del archivo, obtiene la URL pública desde la sesión vinculada.
+ * - Si pagina_pdf existe (> 0), añade el fragmento #page={pagina_pdf} para abrir directamente en esa página.
  * - Mantiene como texto visible el nombre original del PDF.
  * - Si no existe URL válida, devuelve url = null para mostrar como texto sin enlace (evita 404).
  */
@@ -58,10 +59,19 @@ function resolveTaskPdfSource(
   const rawUrl = task.fuente_pdf_url?.trim() || '';
   if (!rawUrl) return { url: null, displayName: '' };
 
+  const withPageFragment = (url: string | null): string | null => {
+    if (!url) return null;
+    const pageNum = task.pagina_pdf ? Number(task.pagina_pdf) : null;
+    if (pageNum && pageNum > 0 && !url.includes('#')) {
+      return `${url}#page=${pageNum}`;
+    }
+    return url;
+  };
+
   // 1. Si ya es una URL absoluta HTTP o HTTPS, usar directamente
   if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
-    const filename = rawUrl.split('/').pop() || 'Documento PDF';
-    return { url: rawUrl, displayName: filename };
+    const filename = rawUrl.split('/').pop()?.split('#')[0] || 'Documento PDF';
+    return { url: withPageFragment(rawUrl), displayName: filename };
   }
 
   // 2. Si contiene solo el nombre del archivo (ej. "2026-08-03 - Original Aitor.pdf")
@@ -94,7 +104,7 @@ function resolveTaskPdfSource(
   }
 
   return {
-    url: resolvedUrl,
+    url: withPageFragment(resolvedUrl),
     displayName
   };
 }
@@ -1463,7 +1473,7 @@ export function BibliotecaTareasView({
                               target="_blank"
                               rel="noopener noreferrer"
                               className="text-sky-400 underline truncate hover:text-sky-300"
-                              title="Abrir documento PDF original en nueva pestaña"
+                              title={selectedTask.pagina_pdf ? `Abrir PDF original en la página ${selectedTask.pagina_pdf}` : 'Abrir documento PDF original en nueva pestaña'}
                             >
                               {pdfInfo.displayName}
                             </a>
