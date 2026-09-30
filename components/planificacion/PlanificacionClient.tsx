@@ -12,6 +12,7 @@ import {
 import { useEditMode } from '@/context/EditModeContext';
 import { getDaysOfWeek, getDaysOfMonthGrid, parseLocalYYYYMMDD, formatLocalYYYYMMDD } from '@/lib/dateUtils';
 import { BibliotecaTareasModal } from './BibliotecaTareasModal';
+import { BibliotecaTareasView } from './BibliotecaTareasView';
 import { PdfSessionAnalyzer } from './PdfSessionAnalyzer';
 import { useClubLogos } from '@/hooks/useClubLogos';
 import { MatchBadge } from './MatchBadge';
@@ -100,8 +101,18 @@ export function PlanificacionClient() {
   const { getLogo } = useClubLogos();
   const [rivalImageError, setRivalImageError] = useState(false);
   // Views and navigation
-  const [viewMode, setViewMode] = useState<'semanal' | 'mensual'>('semanal');
+  const [viewMode, setViewMode] = useState<'semanal' | 'mensual' | 'biblioteca'>('semanal');
   const [loading, setLoading] = useState(true);
+
+  // Auto-activate biblioteca if ?tab=biblioteca or ?view=biblioteca
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('tab') === 'biblioteca' || params.get('view') === 'biblioteca') {
+        setViewMode('biblioteca');
+      }
+    }
+  }, []);
   
   // Nombres de días abreviados en español y cálculo de semana
   const [currentMonday, setCurrentMonday] = useState<Date>(() => {
@@ -420,7 +431,9 @@ export function PlanificacionClient() {
 
   // Fetch period sessions when currentMonday or viewMode changes
   useEffect(() => {
-    fetchWeekData(currentMonday, viewMode);
+    if (viewMode !== 'biblioteca') {
+      fetchWeekData(currentMonday, viewMode as 'semanal' | 'mensual');
+    }
   }, [currentMonday, viewMode, fetchWeekData]);
 
   // Recalcular automáticamente duracion_total al cambiar hora_inicio u hora_fin
@@ -656,7 +669,9 @@ export function PlanificacionClient() {
         evaluacion_observaciones: newEvaluacionObservaciones
       }));
 
-      await fetchWeekData(currentMonday, viewMode);
+      if (viewMode !== 'biblioteca') {
+        await fetchWeekData(currentMonday, viewMode as 'semanal' | 'mensual');
+      }
       triggerToast('¡Archivo PDF subido y vinculado a la sesión con éxito!');
     } catch (err: unknown) {
       console.error('Error uploading/persisting PDF:', err);
@@ -861,7 +876,9 @@ export function PlanificacionClient() {
 
       triggerToast('¡Sesión guardada con éxito en Supabase!');
       setIsPanelOpen(false);
-      fetchWeekData(currentMonday, viewMode);
+      if (viewMode !== 'biblioteca') {
+        fetchWeekData(currentMonday, viewMode as 'semanal' | 'mensual');
+      }
     } catch (err) {
       console.error('Error saving session:', err);
       triggerToast(err instanceof Error ? err.message : 'Error al guardar la sesión');
@@ -1020,27 +1037,31 @@ export function PlanificacionClient() {
               </h1>
             </div>
             <div className="flex bg-slate-950 border border-slate-855 p-1 rounded-xl gap-1 items-center">
-              <button 
-                onClick={handlePrevPeriod}
-                className="px-1.5 py-0.5 rounded text-slate-500 hover:text-slate-200 font-bold transition-all text-xs"
-                title={viewMode === 'semanal' ? "Semana anterior" : "Mes anterior"}
-              >
-                ◀
-              </button>
-              <span className="text-[9px] font-bold text-slate-400 font-mono tracking-tighter uppercase px-1">
-                {viewMode === 'semanal' 
-                  ? `W: ${currentMonday.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' })}`
-                  : currentMonday.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })
-                }
-              </span>
-              <button 
-                onClick={handleNextPeriod}
-                className="px-1.5 py-0.5 rounded text-slate-500 hover:text-slate-200 font-bold transition-all text-xs"
-                title={viewMode === 'semanal' ? "Semana siguiente" : "Mes siguiente"}
-              >
-                ▶
-              </button>
-              <span className="text-slate-800 text-xs">|</span>
+              {viewMode !== 'biblioteca' && (
+                <>
+                  <button 
+                    onClick={handlePrevPeriod}
+                    className="px-1.5 py-0.5 rounded text-slate-500 hover:text-slate-200 font-bold transition-all text-xs"
+                    title={viewMode === 'semanal' ? "Semana anterior" : "Mes anterior"}
+                  >
+                    ◀
+                  </button>
+                  <span className="text-[9px] font-bold text-slate-400 font-mono tracking-tighter uppercase px-1">
+                    {viewMode === 'semanal' 
+                      ? `W: ${currentMonday.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' })}`
+                      : currentMonday.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })
+                    }
+                  </span>
+                  <button 
+                    onClick={handleNextPeriod}
+                    className="px-1.5 py-0.5 rounded text-slate-500 hover:text-slate-200 font-bold transition-all text-xs"
+                    title={viewMode === 'semanal' ? "Semana siguiente" : "Mes siguiente"}
+                  >
+                    ▶
+                  </button>
+                  <span className="text-slate-800 text-xs">|</span>
+                </>
+              )}
               <button 
                 onClick={() => setViewMode('semanal')}
                 className={`text-[9px] px-2.5 py-1 font-bold rounded transition-all ${viewMode === 'semanal' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:text-slate-350'}`}
@@ -1052,6 +1073,14 @@ export function PlanificacionClient() {
                 className={`text-[9px] px-2.5 py-1 font-bold rounded transition-all ${viewMode === 'mensual' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:text-slate-355'}`}
               >
                 Mensual
+              </button>
+              <span className="text-slate-800 text-xs">|</span>
+              <button 
+                onClick={() => setViewMode('biblioteca')}
+                className={`text-[9px] px-2.5 py-1 font-bold rounded transition-all flex items-center gap-1.5 ${viewMode === 'biblioteca' ? 'bg-[#CC0E21] text-white shadow-md shadow-red-900/30' : 'text-slate-400 hover:text-slate-200'}`}
+              >
+                <BookOpen className="h-3 w-3" />
+                Biblioteca
               </button>
             </div>
           </div>
@@ -1141,8 +1170,10 @@ export function PlanificacionClient() {
         </div>
       </div>
 
-      {/* VISTA PRINCIPAL: CALENDARIO SEMANAL */}
-      {viewMode === 'semanal' ? (
+      {/* VISTA PRINCIPAL: BIBLIOTECA, CALENDARIO SEMANAL O MENSUAL */}
+      {viewMode === 'biblioteca' ? (
+        <BibliotecaTareasView isEmbedded={true} />
+      ) : viewMode === 'semanal' ? (
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-7 gap-3.5">
             {sessions.map((session) => {
