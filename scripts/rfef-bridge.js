@@ -678,7 +678,119 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Endpoint oficial /jornada-completa (P4.1 / P4.4 Jornada Parcial con Presupuesto Global Duro)
+/**
+ * Adquisición de Calendario + Actas de la jornada con sesión de cookies aislada.
+ */
+async function fetchRfefCalendarioYActas(jornada, globalStartTime, cancelToken) {
+  const startTime = globalStartTime || Date.now();
+  const calendarUrl = `https://resultados.rfef.es/pnfg/NPcd/NFG_CmpJornada?cod_primaria=1000120&CodCompeticion=33836116&CodGrupo=33836118&CodTemporada=22&CodJornada=${jornada}&Sch_Codigo_Delegacion=&Sch_Tipo_Juego=`;
+  const sessionCookiePath = path.join(os.tmpdir(), `rfef_session_cal_j${jornada}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.txt`);
+  try {
+    fs.writeFileSync(sessionCookiePath, '');
+  } catch (e) {}
+
+  try {
+    // 1. Adquirir calendario
+    const { html: calendarHtml } = await fetchRfefJornada(jornada, sessionCookiePath, startTime, cancelToken);
+    const calendarBytes = Buffer.byteLength(calendarHtml, 'utf8');
+    const codActas = extractCodActas(calendarHtml);
+    const codActasPendientes = extractPendingCodActas(calendarHtml);
+    const actasEncontradas = codActas.length;
+
+    const actas = [];
+    const actasNoDisponibles = [];
+
+    // 2. Procesar cada acta oficial reutilizando la sesión del calendario protegida
+    for (const codActa of codActas) {
+      if (calculateRemainingMs(startTime) < 500) {
+        actasNoDisponibles.push({
+          codActa,
+          error: 'Tiempo límite global agotado antes de procesar este acta.'
+        });
+        continue;
+      }
+
+      try {
+        const actaHtml = await fetchRfefActa(codActa, sessionCookiePath, startTime, cancelToken);
+        const actaBytes = Buffer.byteLength(actaHtml, 'utf8');
+        actas.push({
+          codActa,
+          bytes: actaBytes,
+          actaHtml
+        });
+      } catch (actaErr) {
+        actasNoDisponibles.push({
+          codActa,
+          error: (actaErr && actaErr.message) ? actaErr.message : 'Acta no disponible o no publicada aún.'
+        });
+      }
+    }
+
+    return {
+      ok: true,
+      url: calendarUrl,
+      bytes: calendarBytes,
+      calendarHtml,
+      actasEncontradas,
+      actasDisponibles: actas.length,
+      actas,
+      actasNoDisponibles,
+      codActasPendientes,
+      error: null,
+      failedUrl: null
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      url: calendarUrl,
+      error: (err && err.message) ? err.message : 'Error al obtener calendario oficial RFEF.',
+      failedUrl: calendarUrl,
+      calendarHtml: null,
+      bytes: 0,
+      actasEncontradas: 0,
+      actasDisponibles: 0,
+      actas: [],
+      actasNoDisponibles: [],
+      codActasPendientes: []
+    };
+  } finally {
+    try {
+      if (fs.existsSync(sessionCookiePath)) {
+        fs.unlinkSync(sessionCookiePath);
+      }
+    } catch (e) {}
+  }
+}
+
+/**
+ * Adquisición de Clasificación de la jornada con sesión de cookies aislada.
+ */
+async function fetchRfefStandingsIsolated(jornada, globalStartTime, cancelToken) {
+  const startTime = globalStartTime || Date.now();
+  const standingsUrl = `https://resultados.rfef.es/pnfg/NPcd/NFG_VisClasificacion?cod_primaria=1000120&codcompeticion=33836116&codgrupo=33836118&codjornada=${jornada}`;
+  try {
+    const { html } = await fetchRfefStandings(jornada, null, startTime, cancelToken);
+    return {
+      ok: true,
+      url: standingsUrl,
+      bytes: Buffer.byteLength(html, 'utf8'),
+      standingsHtml: html,
+      error: null,
+      failedUrl: null
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      url: standingsUrl,
+      error: (err && err.message) ? err.message : 'Clasificación oficial no disponible aún en RFEF.',
+      failedUrl: standingsUrl,
+      standingsHtml: null,
+      bytes: 0
+    };
+  }
+}
+
+  // Endpoint oficial /jornada-completa (Adquisición desacoplada e independiente)
   if (pathname === '/jornada-completa') {
     const jornadaParam = url.searchParams.get('jornada');
 
@@ -701,109 +813,40 @@ const server = http.createServer(async (req, res) => {
     }
 
     const startTime = Date.now();
-    const uniqueSessionId = `rfef_session_j${jornada}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.txt`;
-    const sessionCookiePath = path.join(os.tmpdir(), uniqueSessionId);
-    try {
-      fs.writeFileSync(sessionCookiePath, '');
-    } catch (e) {}
 
     try {
-      // 1. Adquirir calendario de la jornada compartiendo la sesión base
-      const { html: calendarHtml } = await fetchRfefJornada(jornada, sessionCookiePath, startTime, cancelToken);
-      const calendarBytes = Buffer.byteLength(calendarHtml, 'utf8');
-      const codActas = extractCodActas(calendarHtml);
-      const codActasPendientes = extractPendingCodActas(calendarHtml);
-      const actasEncontradas = codActas.length;
-
-      const actas = [];
-      const actasNoDisponibles = [];
-
-      // 2. Procesar cada acta oficial de forma estrictamente aislada reutilizando la sesión del calendario protegida (P4.4)
-      for (const codActa of codActas) {
-        // Comprobar presupuesto antes de lanzar cada acta
-        if (calculateRemainingMs(startTime) < 500) {
-          actasNoDisponibles.push({
-            codActa,
-            error: 'Tiempo límite global agotado antes de procesar este acta.'
-          });
-          continue;
-        }
-
-        try {
-          // Se pasa la sesión válida principal; si necesita reintentos avanzados usará un jar aislado sin tocar la principal
-          const actaHtml = await fetchRfefActa(codActa, sessionCookiePath, startTime, cancelToken);
-          const actaBytes = Buffer.byteLength(actaHtml, 'utf8');
-          actas.push({
-            codActa,
-            bytes: actaBytes,
-            actaHtml
-          });
-        } catch (actaErr) {
-          actasNoDisponibles.push({
-            codActa,
-            error: (actaErr && actaErr.message) ? actaErr.message : 'Acta no disponible o no publicada aún.'
-          });
-        }
-      }
-
-      // 3. Adquirir clasificación oficial de la jornada compartiendo la sesión base protegida
-      let standingsHtml = null;
-      let standingsError = null;
-      if (calculateRemainingMs(startTime) > 500) {
-        try {
-          const stRes = await fetchRfefStandings(jornada, sessionCookiePath, startTime, cancelToken);
-          standingsHtml = stRes.html;
-        } catch (stErr) {
-          standingsError = (stErr && stErr.message) ? stErr.message : 'Clasificación no disponible aún.';
-        }
-      }
+      // 2 adquisiciones estrictamente independientes con sesiones de cookies no compartidas
+      const calResult = await fetchRfefCalendarioYActas(jornada, startTime, cancelToken);
+      const clasifResult = await fetchRfefStandingsIsolated(jornada, startTime, cancelToken);
 
       sendJsonResponse(res, 200, {
         ok: true,
         jornada,
-        bytes: calendarBytes,
-        calendarHtml,
-        actasEncontradas,
-        actasDisponibles: actas.length,
-        actas,
-        actasNoDisponibles,
-        codActasPendientes,
-        standingsHtml,
-        standingsError,
+        // Objetos diagnósticos independientes por URL oficial
+        calendar: calResult,
+        standings: clasifResult,
+        // Retrocompatibilidad
+        bytes: calResult.bytes,
+        calendarHtml: calResult.calendarHtml || '',
+        actasEncontradas: calResult.actasEncontradas,
+        actasDisponibles: calResult.actasDisponibles,
+        actas: calResult.actas,
+        actasNoDisponibles: calResult.actasNoDisponibles,
+        codActasPendientes: calResult.codActasPendientes,
+        calendarError: calResult.ok ? null : calResult.error,
+        calendarFailedUrl: calResult.ok ? null : calResult.url,
+        standingsHtml: clasifResult.standingsHtml || null,
+        standingsError: clasifResult.ok ? null : clasifResult.error,
+        standingsFailedUrl: clasifResult.ok ? null : clasifResult.url,
         elapsedMs: Date.now() - startTime
       }, origin);
     } catch (err) {
-      if (err.type === 'RFEF_TEMPORARILY_UNAVAILABLE') {
-        sendJsonResponse(res, 422, {
-          ok: false,
-          code: 'RFEF_TEMPORARILY_UNAVAILABLE',
-          error: err.message,
-          retriesExhausted: err.retriesExhausted || 4,
-          elapsedMs: err.elapsedMs || (Date.now() - startTime)
-        }, origin);
-      } else if (err.type === 'INVALID_HTML') {
-        sendJsonResponse(res, 422, {
-          ok: false,
-          code: 'INVALID_HTML',
-          error: err.message,
-          elapsedMs: Date.now() - startTime
-        }, origin);
-      } else {
-        sendJsonResponse(res, 502, {
-          ok: false,
-          code: 'FETCH_ERROR',
-          error: err.message || 'Error de adquisición RFEF.',
-          elapsedMs: Date.now() - startTime
-        }, origin);
-      }
-    } finally {
-      try {
-        if (fs.existsSync(sessionCookiePath)) {
-          fs.unlinkSync(sessionCookiePath);
-        }
-      } catch (cleanupErr) {
-        // Fallback silencioso de limpieza
-      }
+      sendJsonResponse(res, 502, {
+        ok: false,
+        code: 'BRIDGE_ERROR',
+        error: err.message || 'Error general en el puente RFEF.',
+        elapsedMs: Date.now() - startTime
+      }, origin);
     }
     return;
   }

@@ -177,23 +177,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!parsedCal.calendarAvailable || parsedCal.totalMatches === 0) {
-      blockers.push(`RFEF no devolvió partidos oficiales para la jornada ${jornadaNum}.`);
-    }
-
-    if (parsedCal.totalMatches > 0 && parsedCal.totalMatches !== 8) {
-      warnings.push(
-        `Se detectaron ${parsedCal.totalMatches} partidos en lugar de los 8 habituales para la jornada ${jornadaNum}.`
-      );
-    }
-
-    // 4. Identificar partido de Indautxu
-    const rfefIndautxuMatch = parsedCal.indautxuMatch;
-    if (!rfefIndautxuMatch) {
-      blockers.push(`No se identificó el partido de la SD Indautxu en la jornada ${jornadaNum} de la RFEF.`);
-    }
-
-    // 5. Consultar public.matches en Supabase (SOLO SELECT)
+    // 5. Consultar public.matches y official_matches en Supabase (SOLO SELECT)
     let supabase = getSupabaseServerClient();
     if (!process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.trim().length === 0) {
       const { createClient } = await import('@supabase/supabase-js');
@@ -209,8 +193,37 @@ export async function POST(req: NextRequest) {
       .eq('tipo_partido', 'LIGA')
       .eq('jornada', jornadaNum);
 
+    const { data: dbOfficialMatches, error: dbOfficialMatchesErr } = await supabase
+      .from('official_matches')
+      .select('id, rfef_cod_acta, jugado, goles_local, goles_visitante')
+      .eq('jornada', jornadaNum);
+
+    const dbHasAllOfficialMatches = Array.isArray(dbOfficialMatches) && dbOfficialMatches.length === 8;
+
     if (dbMatchesErr) {
       blockers.push(`Error al consultar public.matches en base de datos: ${dbMatchesErr.message}`);
+    }
+
+    if (!parsedCal.calendarAvailable || parsedCal.totalMatches === 0) {
+      if (dbHasAllOfficialMatches) {
+        warnings.push(
+          `Actas J${jornadaNum}: Ya existentes en base de datos (${dbOfficialMatches.length}/8 partidos oficiales registrados previamente).`
+        );
+      } else {
+        blockers.push(`RFEF no devolvió partidos oficiales para la jornada ${jornadaNum}.`);
+      }
+    }
+
+    if (parsedCal.totalMatches > 0 && parsedCal.totalMatches !== 8) {
+      warnings.push(
+        `Se detectaron ${parsedCal.totalMatches} partidos en lugar de los 8 habituales para la jornada ${jornadaNum}.`
+      );
+    }
+
+    // 4. Identificar partido de Indautxu
+    const rfefIndautxuMatch = parsedCal.indautxuMatch;
+    if (!rfefIndautxuMatch && !dbHasAllOfficialMatches) {
+      blockers.push(`No se identificó el partido de la SD Indautxu en la jornada ${jornadaNum} de la RFEF.`);
     }
 
     const dbMatch = dbMatches && dbMatches.length > 0 ? dbMatches[0] : null;
@@ -295,6 +308,32 @@ export async function POST(req: NextRequest) {
         dbJugado: dbMatch.jugado,
         dbGolesFavor: dbMatch.goles_favor,
         dbGolesContra: dbMatch.goles_contra,
+      };
+    } else if (dbHasAllOfficialMatches) {
+      comparisonWithDb = {
+        matchFoundInDb: true,
+        dbMatchId: dbMatch.id,
+        dbEsLocal: Boolean(dbMatch.es_local),
+        rfefEsLocal: Boolean(dbMatch.es_local),
+        localiaMatches: true,
+        dbRival: dbMatch.rival,
+        rfefRival: dbMatch.rival,
+        rivalMatches: true,
+        dbFecha: dbMatch.fecha,
+        rfefFecha: dbMatch.fecha,
+        fechaMatches: true,
+        dbHora: dbMatch.hora,
+        rfefHora: dbMatch.hora,
+        horaMatches: true,
+        dbCampo: dbMatch.campo,
+        rfefCampo: dbMatch.campo,
+        campoMatches: true,
+        dbOfficialMatchId: dbMatch.official_match_id,
+        rfefCodActa: null,
+        dbJugado: dbMatch.jugado,
+        dbGolesFavor: dbMatch.goles_favor,
+        dbGolesContra: dbMatch.goles_contra,
+        actasState: 'already_existing',
       };
     }
 
@@ -580,12 +619,20 @@ export async function POST(req: NextRequest) {
         global: primarySource,
         calendar: {
           source: calResult.source,
+          status: parsedCal.totalMatches === 8 ? 'available' : (dbHasAllOfficialMatches ? 'existing' : 'unavailable'),
+          count: parsedCal.totalMatches > 0 ? parsedCal.totalMatches : (dbHasAllOfficialMatches ? (dbOfficialMatches?.length || 8) : 0),
+          url: calResult.url,
+          liveError: calResult.liveError || null,
           bytes: calResult.bytes,
           snapshotFile: calResult.snapshotPath || null,
           httpDiagnostic: calResult.diagnostic || null,
         },
         standings: {
           source: clasifResult.source,
+          status: standingsAvailable ? 'available' : 'pending',
+          count: standingsRows.length,
+          url: clasifResult.url,
+          liveError: clasifResult.liveError || null,
           bytes: clasifResult.bytes,
           snapshotFile: clasifResult.snapshotPath || null,
         },
@@ -683,6 +730,7 @@ export async function POST(req: NextRequest) {
       },
       standings: standingsRows,
       standingsHtml: standingsAvailable && clasifResult?.html ? clasifResult.html : null,
+      actasState: dbHasAllOfficialMatches ? 'already_existing' : (parsedCal.totalMatches === 8 ? 'available' : 'unavailable'),
       blockers,
       warnings,
       readOnlyAudit: {

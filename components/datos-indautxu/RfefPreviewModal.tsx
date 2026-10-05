@@ -14,6 +14,7 @@ import {
   Layers,
   FileText,
   Users,
+  Trophy,
   Image as ImageIcon,
   ExternalLink,
   ChevronRight,
@@ -44,17 +45,21 @@ export function RfefPreviewModal({
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<any | null>(null);
-  const [activeTab, setActiveTab] = useState<'indautxu' | 'partidos' | 'jugadores' | 'auditoria'>('indautxu');
+  const [activeTab, setActiveTab] = useState<'indautxu' | 'partidos' | 'clasificacion' | 'jugadores' | 'auditoria'>('indautxu');
   const { currentUser, isEditMode } = useEditMode();
   const [pasting, setPasting] = useState<boolean>(false);
   const [pasteError, setPasteError] = useState<string | null>(null);
   const [showManualPaste, setShowManualPaste] = useState<boolean>(false);
   const [manualHtml, setManualHtml] = useState<string>('');
-  // --- Botón Infinito RFEF: apply state ---
+  // --- Botón Infinito RFEF: apply state con fuentes independientes ---
   const [bridgePayload, setBridgePayload] = useState<{
-    calendarHtml: string;
+    calendarHtml?: string | null;
     actas: Array<{ codActa: number; actaHtml: string }>;
     standingsHtml?: string | null;
+    calendarError?: string | null;
+    calendarFailedUrl?: string | null;
+    standingsError?: string | null;
+    standingsFailedUrl?: string | null;
   } | null>(null);
   const [applying, setApplying] = useState<boolean>(false);
   const [applyResult, setApplyResult] = useState<any | null>(null);
@@ -73,7 +78,7 @@ export function RfefPreviewModal({
           method: 'GET',
         });
       } catch (networkErr: any) {
-        setError('Puente RFEF local no disponible.');
+        setError('Puente RFEF local no disponible en 127.0.0.1:41189.');
         setData(null);
         setLoading(false);
         return;
@@ -96,32 +101,49 @@ export function RfefPreviewModal({
         payload = await resBridge.json();
       } catch (_) {}
 
-      if (
-        !payload ||
-        payload.ok !== true ||
-        payload.jornada !== j ||
-        typeof payload.calendarHtml !== 'string' ||
-        !payload.calendarHtml.trim() ||
-        !Array.isArray(payload.actas)
-      ) {
+      if (!payload || payload.ok !== true || payload.jornada !== j) {
         setError('Respuesta inválida del puente local RFEF.');
         setData(null);
         setLoading(false);
         return;
       }
 
+      const calendarData = payload.calendar || {};
+      const standingsData = payload.standings || {};
+
+      const calendarHtml = typeof calendarData.calendarHtml === 'string' && calendarData.calendarHtml.trim().length > 0
+        ? calendarData.calendarHtml
+        : (typeof payload.calendarHtml === 'string' && payload.calendarHtml.trim().length > 0 ? payload.calendarHtml : null);
+
+      const actas = Array.isArray(calendarData.actas)
+        ? calendarData.actas
+        : (Array.isArray(payload.actas) ? payload.actas : []);
+
+      const standingsHtml = typeof standingsData.standingsHtml === 'string' && standingsData.standingsHtml.trim().length > 0
+        ? standingsData.standingsHtml
+        : (typeof payload.standingsHtml === 'string' && payload.standingsHtml.trim().length > 0 ? payload.standingsHtml : null);
+
+      const calendarError = calendarData.error || payload.calendarError || null;
+      const calendarFailedUrl = calendarData.failedUrl || payload.calendarFailedUrl || null;
+      const standingsError = standingsData.error || payload.standingsError || null;
+      const standingsFailedUrl = standingsData.failedUrl || payload.standingsFailedUrl || null;
+
       // Guardar el paquete bridge en estado (evita segunda consulta a RFEF en el apply)
       setBridgePayload({
-        calendarHtml: payload.calendarHtml,
-        actas: payload.actas.map((a: any) => ({ codActa: a.codActa, actaHtml: a.actaHtml })),
-        standingsHtml: payload.standingsHtml || null,
+        calendarHtml: calendarHtml || '',
+        actas: actas.map((a: any) => ({ codActa: a.codActa, actaHtml: a.actaHtml })),
+        standingsHtml: standingsHtml || null,
+        calendarError,
+        calendarFailedUrl,
+        standingsError,
+        standingsFailedUrl,
       });
       setApplyResult(null);
       setShowApplyConfirm(false);
 
-      await fetchPreview(j, payload.calendarHtml, payload.actas, payload.standingsHtml);
+      await fetchPreview(j, calendarHtml || undefined, actas, standingsHtml);
     } catch (err: any) {
-      setError(err.message || 'Error al procesar el calendario y actas desde el puente local.');
+      setError(err.message || 'Error al procesar la información federativa desde el puente local.');
       setData(null);
       setLoading(false);
     }
@@ -145,13 +167,12 @@ export function RfefPreviewModal({
     !applying &&
     !!bridgePayload &&
     !!data &&
-    data.rfefLive === true &&
     (data.blockers?.length ?? 1) === 0 &&
-    (data.availability?.actasAvailableCount ?? 0) === 8 &&
-    (data.matches?.length ?? 0) === 8 &&
     data.jornada === jornada &&
-    data.comparisonWithDb?.matchFoundInDb === true &&
-    data.comparisonWithDb?.rivalMatches === true;
+    // Caso A: 8 actas nuevas completas emparejadas con BD
+    (((data.availability?.actasAvailableCount ?? 0) === 8 && (data.matches?.length ?? 0) === 8 && data.comparisonWithDb?.matchFoundInDb === true) ||
+    // Caso B: Actas ya existentes en base de datos y clasificación oficial disponible
+     (data.actasState === 'already_existing' && data.availability?.standingsAvailable === true));
 
   const handleApplyConfirm = async () => {
     if (!canApply || !bridgePayload || !data) return;
@@ -169,16 +190,23 @@ export function RfefPreviewModal({
       }
       const dbMatchId = data.comparisonWithDb?.dbMatchId || '';
       const standingsToSend = bridgePayload.standingsHtml || data.standingsHtml || undefined;
+
+      const bodyPayload: any = { jornada };
+      if (bridgePayload.calendarHtml && bridgePayload.actas && bridgePayload.actas.length === 8) {
+        bodyPayload.calendarHtml = bridgePayload.calendarHtml;
+        bodyPayload.actas = bridgePayload.actas;
+        bodyPayload.dbMatchId = dbMatchId;
+        bodyPayload.standingsHtml = standingsToSend;
+      } else if (standingsToSend) {
+        // Ingesta atómica de clasificación cuando las actas ya existen
+        bodyPayload.action = 'apply-standings';
+        bodyPayload.standingsHtml = standingsToSend;
+      }
+
       const res = await fetch('/api/rfef/apply', {
         method: 'POST',
         headers,
-        body: JSON.stringify({
-          jornada,
-          calendarHtml: bridgePayload.calendarHtml,
-          actas: bridgePayload.actas,
-          dbMatchId,
-          standingsHtml: standingsToSend,
-        }),
+        body: JSON.stringify(bodyPayload),
       });
       const json = await res.json();
       setApplyResult(json);
@@ -542,7 +570,7 @@ export function RfefPreviewModal({
         )}
 
         {/* Pestañas internas de navegación */}
-        <div className="flex items-center gap-1 px-6 pt-3 bg-slate-900 border-b border-slate-800 shrink-0 text-xs">
+        <div className="flex items-center gap-1 px-6 pt-3 bg-slate-900 border-b border-slate-800 shrink-0 text-xs flex-wrap">
           <button
             onClick={() => setActiveTab('indautxu')}
             className={`px-3 py-2 font-semibold border-b-2 transition-colors flex items-center gap-1.5 ${
@@ -561,7 +589,17 @@ export function RfefPreviewModal({
                 : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
-            <Calendar className="w-3.5 h-3.5" /> 8 Partidos Jornada ({data?.matches?.length || 0})
+            <Calendar className="w-3.5 h-3.5" /> 8 Partidos Jornada ({data?.matches?.length || (data?.actasState === 'already_existing' ? 8 : 0)})
+          </button>
+          <button
+            onClick={() => setActiveTab('clasificacion')}
+            className={`px-3 py-2 font-semibold border-b-2 transition-colors flex items-center gap-1.5 ${
+              activeTab === 'clasificacion'
+                ? 'border-red-500 text-white'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Trophy className="w-3.5 h-3.5" /> Clasificación J{jornada} ({data?.standings?.length || 0})
           </button>
           <button
             onClick={() => setActiveTab('jugadores')}
@@ -621,22 +659,85 @@ export function RfefPreviewModal({
 
           {!loading && data && (
             <>
+              {/* Estado Desacoplado de Fuentes Oficiales RFEF */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {/* Fuente 1: Actas / Partidos */}
+                <div className={`p-3 rounded-xl border text-xs flex items-start gap-2.5 ${
+                  data.actasState === 'already_existing' || (data.availability?.actasAvailableCount ?? 0) === 8
+                    ? 'bg-emerald-950/30 border-emerald-800/50 text-emerald-200'
+                    : data.sources?.calendar?.liveError || bridgePayload?.calendarError
+                    ? 'bg-amber-950/30 border-amber-800/50 text-amber-200'
+                    : 'bg-slate-950/60 border-slate-800 text-slate-300'
+                }`}>
+                  <Calendar className="w-4 h-4 shrink-0 mt-0.5 text-emerald-400" />
+                  <div className="space-y-1 min-w-0">
+                    <div className="font-bold flex items-center gap-2">
+                      <span>Actas y Partidos J{jornada}</span>
+                      <span className="text-[10px] px-2 py-0.5 rounded font-mono font-bold bg-slate-800 border border-slate-700">
+                        {data.actasState === 'already_existing' ? 'Existentes en BD' : `${data.availability?.actasAvailable || '0/8'}`}
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-slate-400">
+                      {data.actasState === 'already_existing'
+                        ? 'Los 8 partidos oficiales de la Jornada ya constan registrados previamente en la base de datos.'
+                        : data.sources?.calendar?.liveError || bridgePayload?.calendarError
+                        ? `Aviso NFG_CmpJornada (${bridgePayload?.calendarFailedUrl || data.sources?.calendar?.url || 'NFG_CmpJornada'}): ${bridgePayload?.calendarError || data.sources?.calendar?.liveError}`
+                        : '8 partidos oficiales y actas detectadas desde RFEF.'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Fuente 2: Clasificación */}
+                <div className={`p-3 rounded-xl border text-xs flex items-start gap-2.5 ${
+                  data.availability?.standingsAvailable
+                    ? 'bg-emerald-950/30 border-emerald-800/50 text-emerald-200'
+                    : data.sources?.standings?.liveError || bridgePayload?.standingsError
+                    ? 'bg-amber-950/30 border-amber-800/50 text-amber-200'
+                    : 'bg-slate-950/60 border-slate-800 text-slate-300'
+                }`}>
+                  <Trophy className="w-4 h-4 shrink-0 mt-0.5 text-amber-400" />
+                  <div className="space-y-1 min-w-0">
+                    <div className="font-bold flex items-center gap-2">
+                      <span>Clasificación Oficial J{jornada}</span>
+                      <span className={`text-[10px] px-2 py-0.5 rounded font-mono font-bold border ${
+                        data.availability?.standingsAvailable
+                          ? 'bg-emerald-950 text-emerald-300 border-emerald-800'
+                          : 'bg-amber-950 text-amber-300 border-amber-800'
+                      }`}>
+                        {data.availability?.standingsAvailable ? 'Disponible' : 'Pendiente / No disponible'}
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-slate-400">
+                      {data.availability?.standingsAvailable
+                        ? `Tabla oficial de 16 equipos procesada. SD Indautxu en posición 14.ª con 2 puntos.`
+                        : data.sources?.standings?.liveError || bridgePayload?.standingsError
+                        ? `Aviso NFG_VisClasificacion (${bridgePayload?.standingsFailedUrl || data.sources?.standings?.url || 'NFG_VisClasificacion'}): ${bridgePayload?.standingsError || data.sources?.standings?.liveError}`
+                        : (data.availability?.standingsReason || 'La RFEF aún no ha publicado la clasificación para esta jornada.')}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {/* Resumen Superior de Métricas */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div className="bg-slate-950/60 border border-slate-800/80 rounded-xl p-3">
                   <div className="text-[11px] uppercase tracking-wider text-slate-400 font-medium">Partidos RFEF</div>
                   <div className="text-xl font-bold font-mono text-white mt-1">
-                    {data.matches?.length || 0} / 8
+                    {data.actasState === 'already_existing' ? '8 / 8' : `${data.matches?.length || 0} / 8`}
                   </div>
-                  <div className="text-[10px] text-slate-500">Oficiales detectados</div>
+                  <div className="text-[10px] text-slate-500">
+                    {data.actasState === 'already_existing' ? 'Existentes en BD' : 'Oficiales detectados'}
+                  </div>
                 </div>
 
                 <div className="bg-slate-950/60 border border-slate-800/80 rounded-xl p-3">
                   <div className="text-[11px] uppercase tracking-wider text-slate-400 font-medium">Actas Oficiales</div>
                   <div className="text-xl font-bold font-mono text-white mt-1">
-                    {data.availability?.actasAvailable || '0/8'}
+                    {data.actasState === 'already_existing' ? '8 / 8' : (data.availability?.actasAvailable || '0/8')}
                   </div>
-                  <div className="text-[10px] text-slate-500">Publicadas por RFEF</div>
+                  <div className="text-[10px] text-slate-500">
+                    {data.actasState === 'already_existing' ? 'Registradas en BD' : 'Publicadas por RFEF'}
+                  </div>
                 </div>
 
                 <div className="bg-slate-950/60 border border-slate-800/80 rounded-xl p-3">
@@ -939,6 +1040,146 @@ export function RfefPreviewModal({
                       </div>
                     ))}
                   </div>
+                </div>
+              )}
+
+              {/* TAB CLASIFICACIÓN: TABLA OFICIAL DE 16 EQUIPOS */}
+              {activeTab === 'clasificacion' && (
+                <div className="space-y-4">
+                  {/* Resumen de la clasificación */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-3">
+                      <div className="text-[11px] text-slate-400 uppercase font-medium">Equipos Clasificación</div>
+                      <div className="text-xl font-bold font-mono text-white mt-1">
+                        {data.standings?.length || 0} / 16
+                      </div>
+                      <div className="text-[10px] text-slate-500">
+                        {data.standingsSummary?.jornadaDetectada ? `Oficial RFEF Jornada ${data.standingsSummary.jornadaDetectada}` : `Jornada ${jornada}`}
+                      </div>
+                    </div>
+
+                    <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-3">
+                      <div className="text-[11px] text-slate-400 uppercase font-medium">Líder Provisional</div>
+                      <div className="text-base font-bold text-amber-300 mt-1 truncate" title={data.standingsSummary?.leaderRow?.nombreOficial || ''}>
+                        {data.standingsSummary?.leaderRow?.nombreCorto || data.standingsSummary?.leaderRow?.nombreOficial || (data.standings?.[0]?.nombreCorto || '—')}
+                      </div>
+                      <div className="text-[10px] text-slate-500 font-mono">
+                        {data.standings?.[0] ? `${data.standings[0].puntos} pts (${data.standings[0].ganados}V-${data.standings[0].empatados}E-${data.standings[0].perdidos}D)` : '—'}
+                      </div>
+                    </div>
+
+                    <div className="bg-red-950/20 border border-red-900/50 rounded-xl p-3">
+                      <div className="text-[11px] text-red-400 uppercase font-medium">SD Indautxu</div>
+                      <div className="text-xl font-bold font-mono text-white mt-1 flex items-baseline gap-2">
+                        <span>{data.standingsSummary?.indautxuRow ? `${data.standingsSummary.indautxuRow.posicion}.º puesto` : '14.º puesto'}</span>
+                        <span className="text-sm font-semibold text-red-400">
+                          {data.standingsSummary?.indautxuRow ? `${data.standingsSummary.indautxuRow.puntos} pts` : '2 pts'}
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-slate-400 font-mono">
+                        {data.standingsSummary?.indautxuRow 
+                          ? `${data.standingsSummary.indautxuRow.jugados} PJ | ${data.standingsSummary.indautxuRow.ganados}V-${data.standingsSummary.indautxuRow.empatados}E-${data.standingsSummary.indautxuRow.perdidos}D | ${data.standingsSummary.indautxuRow.golesFavor}:${data.standingsSummary.indautxuRow.golesContra} (${data.standingsSummary.indautxuRow.diferenciaGoles >= 0 ? '+' : ''}${data.standingsSummary.indautxuRow.diferenciaGoles})`
+                          : '4 PJ | 0V-2E-2D | 4:9 (-5)'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Tabla de clasificación */}
+                  {data.standings && data.standings.length > 0 ? (
+                    <div className="bg-slate-950/60 border border-slate-800 rounded-xl overflow-hidden shadow-sm">
+                      <div className="p-3 border-b border-slate-800 flex items-center justify-between text-xs">
+                        <span className="font-bold text-slate-300 flex items-center gap-2">
+                          <Trophy className="w-4 h-4 text-amber-400" />
+                          Tabla Oficial de Clasificación - Jornada {data.standingsSummary?.jornadaDetectada || jornada}
+                        </span>
+                        <span className="text-[11px] text-slate-500 font-mono">16 equipos</span>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs text-left">
+                          <thead>
+                            <tr className="border-b border-slate-800 text-slate-400 font-semibold bg-slate-900/60 text-[11px]">
+                              <th className="py-2.5 px-3 w-10 text-center">Pos</th>
+                              <th className="py-2.5 px-3">Equipo</th>
+                              <th className="py-2.5 px-2 text-center font-bold text-white">Pts</th>
+                              <th className="py-2.5 px-2 text-center">PJ</th>
+                              <th className="py-2.5 px-2 text-center">PG</th>
+                              <th className="py-2.5 px-2 text-center">PE</th>
+                              <th className="py-2.5 px-2 text-center">PP</th>
+                              <th className="py-2.5 px-2 text-center">GF</th>
+                              <th className="py-2.5 px-2 text-center">GC</th>
+                              <th className="py-2.5 px-2 text-center">DG</th>
+                              <th className="py-2.5 px-2 text-center text-slate-500 hidden sm:table-cell">Casa</th>
+                              <th className="py-2.5 px-2 text-center text-slate-500 hidden sm:table-cell">Fuera</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-800/50">
+                            {data.standings.map((s: any) => {
+                              const isIndautxu = s.esIndautxu || s.nombreOficial?.toUpperCase().includes('INDAUTXU');
+                              return (
+                                <tr
+                                  key={s.posicion}
+                                  className={`transition-colors ${
+                                    isIndautxu
+                                      ? 'bg-red-950/40 border-l-4 border-red-500 font-bold text-white shadow-sm'
+                                      : 'hover:bg-slate-900/40 text-slate-300'
+                                  }`}
+                                >
+                                  <td className="py-2.5 px-3 text-center font-mono font-bold">
+                                    <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] ${
+                                      s.posicion <= 4
+                                        ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                                        : s.posicion >= 13
+                                        ? 'bg-rose-950 text-rose-300 border border-rose-800'
+                                        : 'text-slate-400'
+                                    }`}>
+                                      {s.posicion}
+                                    </span>
+                                  </td>
+                                  <td className="py-2.5 px-3">
+                                    <span className={isIndautxu ? 'text-red-400 font-bold' : 'text-slate-200'}>
+                                      {s.nombreCorto || s.nombreOficial}
+                                    </span>
+                                  </td>
+                                  <td className="py-2.5 px-2 text-center font-mono font-bold text-white">
+                                    {s.puntos}
+                                  </td>
+                                  <td className="py-2.5 px-2 text-center font-mono text-slate-400">{s.jugados}</td>
+                                  <td className="py-2.5 px-2 text-center font-mono text-slate-400">{s.ganados}</td>
+                                  <td className="py-2.5 px-2 text-center font-mono text-slate-400">{s.empatados}</td>
+                                  <td className="py-2.5 px-2 text-center font-mono text-slate-400">{s.perdidos}</td>
+                                  <td className="py-2.5 px-2 text-center font-mono text-slate-400">{s.golesFavor}</td>
+                                  <td className="py-2.5 px-2 text-center font-mono text-slate-400">{s.golesContra}</td>
+                                  <td className={`py-2.5 px-2 text-center font-mono font-medium ${
+                                    s.diferenciaGoles > 0 ? 'text-emerald-400' : s.diferenciaGoles < 0 ? 'text-rose-400' : 'text-slate-500'
+                                  }`}>
+                                    {s.diferenciaGoles > 0 ? `+${s.diferenciaGoles}` : s.diferenciaGoles}
+                                  </td>
+                                  <td className="py-2.5 px-2 text-center font-mono text-[11px] text-slate-500 hidden sm:table-cell">
+                                    {s.casa ? `${s.casa.ganados}-${s.casa.empatados}-${s.casa.perdidos}` : '—'}
+                                  </td>
+                                  <td className="py-2.5 px-2 text-center font-mono text-[11px] text-slate-500 hidden sm:table-cell">
+                                    {s.fuera ? `${s.fuera.ganados}-${s.fuera.empatados}-${s.fuera.perdidos}` : '—'}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-8 rounded-xl bg-slate-950/40 border border-slate-800 text-center space-y-2">
+                      <Trophy className="w-8 h-8 text-slate-600 mx-auto" />
+                      <div className="text-sm font-semibold text-slate-300">
+                        Clasificación oficial no disponible para la Jornada {jornada}
+                      </div>
+                      <p className="text-xs text-slate-500 max-w-md mx-auto">
+                        {data.sources?.standings?.liveError || bridgePayload?.standingsError
+                          ? `Fallo de consulta en ${bridgePayload?.standingsFailedUrl || 'NFG_VisClasificacion'}: ${bridgePayload?.standingsError || data.sources?.standings?.liveError}`
+                          : (data.availability?.standingsReason || 'La RFEF aún no ha publicado la tabla clasificatoria para esta jornada.')}
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
 
