@@ -347,6 +347,36 @@ export interface GPSPlayerMapping {
   updated_at: string;
 }
 
+export type TrafficLightColor = 'green' | 'yellow' | 'red' | 'gray';
+
+export type TrafficLightCoreMetric = 'm_min' | 'hsr_min' | 'sprint_min';
+export type TrafficLightSecondaryMetric = 'sprints_90' | 'velocidad_maxima' | 'acc_min' | 'dec_min';
+export type TrafficLightMetricKey = TrafficLightCoreMetric | TrafficLightSecondaryMetric;
+
+export interface MetricTrafficLightResult {
+  value: number | null;
+  historicalAvg: number | null;
+  ratio: number | null; // e.g. 1.08 = 108%
+  color: TrafficLightColor;
+  isCore: boolean;
+  label: string;
+  unit: string;
+}
+
+export interface PlayerTrafficLightRow {
+  playerId: string;
+  player: Player | null;
+  minutos: number;
+  esTitular?: boolean;
+  validMatchesCount: number;
+  hasEnoughHistory: boolean; // >= 3 matches of >= 45 min
+  isValidMatchParticipation: boolean; // >= 45 min in evaluated match
+  metrics: Record<TrafficLightMetricKey, MetricTrafficLightResult>;
+  globalStatus: TrafficLightColor;
+  globalReason: string;
+}
+
+
 export interface ABPPlay {
   id: string;
   tipo: ABPType;

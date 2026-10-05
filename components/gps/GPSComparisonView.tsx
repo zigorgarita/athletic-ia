@@ -4,8 +4,9 @@ import React, { useState } from 'react';
 import { Player, GPSSession, GPSData } from '@/types';
 import { GPSMatchPlayerComparison } from './GPSMatchPlayerComparison';
 import { GPSPlayerProgressComparison } from './GPSPlayerProgressComparison';
+import { GPSPerformanceTrafficLight } from './GPSPerformanceTrafficLight';
 import { Card, CardContent } from '@/components/ui/Card';
-import { Users, TrendingUp, ArrowRightLeft } from 'lucide-react';
+import { Users, TrendingUp, ArrowRightLeft, TrafficCone } from 'lucide-react';
 
 interface MatchInfo {
   id: string;
@@ -32,8 +33,8 @@ export function GPSComparisonView({
   selectedMatchId,
   onMatchChange
 }: GPSComparisonViewProps) {
-  // Mode Selection: 'modeA' = Players in 1 match, 'modeB' = Player in N matches
-  const [activeComparisonMode, setActiveComparisonMode] = useState<'modeA' | 'modeB'>('modeA');
+  // Mode Selection: 'modeA' = Players in 1 match, 'modeB' = Player in N matches, 'modeC' = Performance Traffic Light
+  const [activeComparisonMode, setActiveComparisonMode] = useState<'modeA' | 'modeB' | 'modeC'>('modeA');
 
   return (
     <div className="space-y-6">
@@ -44,7 +45,7 @@ export function GPSComparisonView({
             <ArrowRightLeft className="h-5 w-5 text-red-500" />
             <div>
               <h3 className="text-sm font-bold text-slate-200">Herramienta de Comparación GPS</h3>
-              <p className="text-xs text-slate-400">Analiza métricas entre plantilla o sigue la evolución individual</p>
+              <p className="text-xs text-slate-400">Analiza métricas entre plantilla, sigue la evolución o evalúa el semáforo de rendimiento</p>
             </div>
           </div>
 
@@ -73,12 +74,24 @@ export function GPSComparisonView({
               <TrendingUp className="h-3.5 w-3.5" />
               <span>Modo B: Evolución Jugador</span>
             </button>
+
+            <button
+              onClick={() => setActiveComparisonMode('modeC')}
+              className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                activeComparisonMode === 'modeC'
+                  ? 'bg-emerald-600 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+              }`}
+            >
+              <TrafficCone className="h-3.5 w-3.5" />
+              <span>Modo C: Semáforo Jornada</span>
+            </button>
           </div>
         </CardContent>
       </Card>
 
       {/* RENDER SELECTED MODE */}
-      {activeComparisonMode === 'modeA' ? (
+      {activeComparisonMode === 'modeA' && (
         <GPSMatchPlayerComparison
           matches={matches}
           sessions={sessions}
@@ -87,12 +100,25 @@ export function GPSComparisonView({
           selectedMatchId={selectedMatchId}
           onMatchChange={onMatchChange}
         />
-      ) : (
+      )}
+
+      {activeComparisonMode === 'modeB' && (
         <GPSPlayerProgressComparison
           matches={matches}
           sessions={sessions}
           gpsDataList={gpsDataList}
           players={players}
+        />
+      )}
+
+      {activeComparisonMode === 'modeC' && (
+        <GPSPerformanceTrafficLight
+          matches={matches}
+          sessions={sessions}
+          gpsDataList={gpsDataList}
+          players={players}
+          selectedMatchId={selectedMatchId}
+          onMatchChange={onMatchChange}
         />
       )}
     </div>
