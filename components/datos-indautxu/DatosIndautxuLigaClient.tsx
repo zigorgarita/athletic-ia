@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Users, Trophy, Calendar, ShieldCheck, Sparkles, RefreshCw } from 'lucide-react';
 import { JugadoresTab } from './tabs/JugadoresTab';
 import { ClasificacionTab } from './tabs/ClasificacionTab';
@@ -46,9 +46,15 @@ const TABS: TabItem[] = [
 export function DatosIndautxuLigaClient() {
   const [activeTab, setActiveTab] = useState<DatosLigaSubTab>('jugadores');
   const [isRfefModalOpen, setIsRfefModalOpen] = useState<boolean>(false);
+  const [dataVersion, setDataVersion] = useState<number>(0);
   const { isEditMode } = useEditMode();
-  const { nextMatch } = useIndautxuLeagueCalendar();
+  const { nextMatch, refetch: refetchCalendar } = useIndautxuLeagueCalendar();
   const targetJornada = nextMatch?.jornada ?? 4;
+
+  const handleApplySuccess = useCallback(() => {
+    refetchCalendar();
+    setDataVersion((v) => v + 1);
+  }, [refetchCalendar]);
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-20">
@@ -151,7 +157,7 @@ export function DatosIndautxuLigaClient() {
       </div>
 
       {/* 3. Contenedor de la Subpestaña Activa */}
-      <div className="transition-all duration-300">
+      <div className="transition-all duration-300" key={dataVersion}>
         {activeTab === 'jugadores' && <JugadoresTab />}
         {activeTab === 'clasificacion' && <ClasificacionTab />}
         {activeTab === 'calendario' && <CalendarioTab />}
@@ -162,6 +168,7 @@ export function DatosIndautxuLigaClient() {
         isOpen={isRfefModalOpen}
         onClose={() => setIsRfefModalOpen(false)}
         initialJornada={targetJornada}
+        onApplySuccess={handleApplySuccess}
       />
     </div>
   );

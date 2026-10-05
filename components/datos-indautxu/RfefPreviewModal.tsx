@@ -31,12 +31,14 @@ interface RfefPreviewModalProps {
   isOpen: boolean;
   onClose: () => void;
   initialJornada?: number;
+  onApplySuccess?: () => void;
 }
 
 export function RfefPreviewModal({
   isOpen,
   onClose,
   initialJornada = 4,
+  onApplySuccess,
 }: RfefPreviewModalProps) {
   const [jornada, setJornada] = useState<number>(initialJornada);
   const [loading, setLoading] = useState<boolean>(false);
@@ -49,7 +51,11 @@ export function RfefPreviewModal({
   const [showManualPaste, setShowManualPaste] = useState<boolean>(false);
   const [manualHtml, setManualHtml] = useState<string>('');
   // --- Botón Infinito RFEF: apply state ---
-  const [bridgePayload, setBridgePayload] = useState<{ calendarHtml: string; actas: Array<{ codActa: number; actaHtml: string }> } | null>(null);
+  const [bridgePayload, setBridgePayload] = useState<{
+    calendarHtml: string;
+    actas: Array<{ codActa: number; actaHtml: string }>;
+    standingsHtml?: string | null;
+  } | null>(null);
   const [applying, setApplying] = useState<boolean>(false);
   const [applyResult, setApplyResult] = useState<any | null>(null);
   const [showApplyConfirm, setShowApplyConfirm] = useState<boolean>(false);
@@ -108,11 +114,12 @@ export function RfefPreviewModal({
       setBridgePayload({
         calendarHtml: payload.calendarHtml,
         actas: payload.actas.map((a: any) => ({ codActa: a.codActa, actaHtml: a.actaHtml })),
+        standingsHtml: payload.standingsHtml || null,
       });
       setApplyResult(null);
       setShowApplyConfirm(false);
 
-      await fetchPreview(j, payload.calendarHtml, payload.actas);
+      await fetchPreview(j, payload.calendarHtml, payload.actas, payload.standingsHtml);
     } catch (err: any) {
       setError(err.message || 'Error al procesar el calendario y actas desde el puente local.');
       setData(null);
@@ -161,6 +168,7 @@ export function RfefPreviewModal({
         headers['x-editor-pass'] = currentUser.pass;
       }
       const dbMatchId = data.comparisonWithDb?.dbMatchId || '';
+      const standingsToSend = bridgePayload.standingsHtml || data.standingsHtml || undefined;
       const res = await fetch('/api/rfef/apply', {
         method: 'POST',
         headers,
@@ -169,11 +177,14 @@ export function RfefPreviewModal({
           calendarHtml: bridgePayload.calendarHtml,
           actas: bridgePayload.actas,
           dbMatchId,
-          standingsHtml: data.standingsHtml || undefined,
+          standingsHtml: standingsToSend,
         }),
       });
       const json = await res.json();
       setApplyResult(json);
+      if (json.ok) {
+        onApplySuccess?.();
+      }
     } catch (err: any) {
       setApplyResult({ ok: false, error: err?.message || 'Error de red al ejecutar el apply.' });
     } finally {
@@ -194,7 +205,8 @@ export function RfefPreviewModal({
   const fetchPreview = async (
     j: number,
     customCalendarHtml?: string,
-    customActas?: Array<{ codActa: number; actaHtml: string; bytes?: number }>
+    customActas?: Array<{ codActa: number; actaHtml: string; bytes?: number }>,
+    customStandingsHtml?: string | null
   ) => {
     setLoading(true);
     setError(null);
@@ -218,6 +230,9 @@ export function RfefPreviewModal({
       }
       if (customActas && Array.isArray(customActas)) {
         bodyPayload.actas = customActas;
+      }
+      if (customStandingsHtml) {
+        bodyPayload.standingsHtml = customStandingsHtml;
       }
 
       const res = await fetch('/api/rfef/preview', {
@@ -1370,7 +1385,12 @@ export function RfefPreviewModal({
 
           <div className="flex items-center gap-2">
             <button
-              onClick={onClose}
+              onClick={() => {
+                if (applyResult?.ok) {
+                  onApplySuccess?.();
+                }
+                onClose();
+              }}
               className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold transition-colors"
             >
               Cerrar

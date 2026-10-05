@@ -77,13 +77,14 @@ export async function POST(req: NextRequest) {
     const blockers: string[] = [];
     const warnings: string[] = [];
 
-    // 2.1 Soporte opcional de ingesta de HTML oficial y actas (P1 / P4.2)
+    // 2.1 Soporte opcional de ingesta de HTML oficial, actas y clasificación (P1 / P4.2)
     const rawCalendarHtml = typeof body.calendarHtml === 'string' ? body.calendarHtml : null;
     const rawActas = Array.isArray(body.actas) ? body.actas : null;
+    const rawStandingsHtml = typeof body.standingsHtml === 'string' && body.standingsHtml.trim().length > 500 ? body.standingsHtml.trim() : null;
     let calResult: any;
     let isManualCalendarIngest = false;
 
-    if (rawCalendarHtml !== null || rawActas !== null) {
+    if (rawCalendarHtml !== null || rawActas !== null || rawStandingsHtml !== null) {
       // REQUISITO CRÍTICO P3 / P4.2: La ingesta de datos oficiales exige EXCLUSIVAMENTE Modo Edición legítimo
       const isEditorCookie = (await isEditorSessionAuthorized()) || isEditorSessionAuthorizedFromRequest(req);
       let isEditorCredentials = false;
@@ -493,7 +494,18 @@ export async function POST(req: NextRequest) {
     let standingsAvailable = false;
     let standingsRows: any[] = [];
     let standingsReason: string | undefined;
-    const clasifResult = fetchRFEFStandingsPageDetailed(jornadaNum);
+    let clasifResult: any;
+
+    if (rawStandingsHtml) {
+      clasifResult = {
+        html: rawStandingsHtml,
+        source: 'live' as RFEFDataSource,
+        bytes: Buffer.byteLength(rawStandingsHtml, 'utf8'),
+        url: 'manual_ingest://standingsHtml',
+      };
+    } else {
+      clasifResult = fetchRFEFStandingsPageDetailed(jornadaNum);
+    }
 
     try {
       if (clasifResult.html && clasifResult.html.length > 500) {
@@ -501,6 +513,15 @@ export async function POST(req: NextRequest) {
         standingsAvailable = parsedClasif.standingsAvailable;
         standingsRows = parsedClasif.rows;
         standingsReason = parsedClasif.reasonIfNotAvailable;
+
+        // VALIDACIÓN ESTRICTA: si la clasificación devuelta no corresponde a la jornada solicitada
+        if (parsedClasif.jornada !== null && parsedClasif.jornada !== jornadaNum) {
+          standingsAvailable = false;
+          standingsReason = `DISCREPANCIA: La clasificación devuelta corresponde a la jornada ${parsedClasif.jornada}, no a la solicitada J${jornadaNum}.`;
+          blockers.push(
+            `DISCREPANCIA DE JORNADA EN CLASIFICACIÓN: RFEF devolvió clasificación de J${parsedClasif.jornada} para solicitud de J${jornadaNum}.`
+          );
+        }
       } else {
         standingsAvailable = false;
         standingsReason = clasifResult.liveError || 'Página HTML de clasificación no disponible o vacía';
@@ -661,7 +682,7 @@ export async function POST(req: NextRequest) {
         discardedSilhouettesCount,
       },
       standings: standingsRows,
-      standingsHtml: clasifResult.html || null,
+      standingsHtml: standingsAvailable && clasifResult?.html ? clasifResult.html : null,
       blockers,
       warnings,
       readOnlyAudit: {

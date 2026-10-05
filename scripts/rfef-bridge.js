@@ -357,6 +357,110 @@ function fetchRfefActa(codActa, mainSessionCookiePath, globalStartTime, cancelTo
   });
 }
 
+/**
+ * Adquisición de la clasificación oficial RFEF con gestión de sesión y retry.
+ */
+function fetchRfefStandings(jornada, sessionCookiePath, globalStartTime, cancelToken) {
+  return new Promise((resolve, reject) => {
+    const startTime = globalStartTime || Date.now();
+    const ownsCookie = !sessionCookiePath;
+    let cookieFile = sessionCookiePath || path.join(os.tmpdir(), `rfef_clasif_cookie_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.txt`);
+
+    if (ownsCookie) {
+      try { fs.writeFileSync(cookieFile, ''); } catch (e) {}
+    }
+
+    const delays = [0, 1500, 2500, 3500];
+    let currentChild = null;
+    let activeTimer = null;
+
+    if (cancelToken) {
+      cancelToken.onCancel(() => {
+        if (activeTimer) clearTimeout(activeTimer);
+        if (currentChild) {
+          try { currentChild.kill(); } catch (e) {}
+        }
+      });
+    }
+
+    const cleanup = () => {
+      if (ownsCookie) {
+        try {
+          if (fs.existsSync(cookieFile)) fs.unlinkSync(cookieFile);
+        } catch (cleanupErr) {}
+      }
+    };
+
+    const runAttempt = (attempt) => {
+      if (cancelToken && cancelToken.isCancelled) {
+        cleanup();
+        return reject({ type: 'ABORTED', message: 'Petición cancelada por el cliente.' });
+      }
+
+      const remainingMs = calculateRemainingMs(startTime);
+      if (remainingMs < 500) {
+        cleanup();
+        return reject({
+          type: 'RFEF_TEMPORARILY_UNAVAILABLE',
+          message: 'Tiempo de espera agotado al consultar clasificación RFEF.',
+          retriesExhausted: attempt - 1,
+          elapsedMs: Date.now() - startTime
+        });
+      }
+
+      const curlTimeoutSec = calculateCurlTimeoutSec(remainingMs);
+      const url = `https://resultados.rfef.es/pnfg/NPcd/NFG_VisClasificacion?cod_primaria=1000120&codcompeticion=33836116&codgrupo=33836118&codjornada=${jornada}`;
+
+      const args = [
+        '-s',
+        '--http1.1',
+        '-L',
+        '--max-time', String(curlTimeoutSec),
+        '--cookie-jar', cookieFile,
+        '--cookie', cookieFile,
+        url
+      ];
+
+      currentChild = execFile(CURL_PATH, args, { maxBuffer: 10 * 1024 * 1024, encoding: 'latin1' }, (error, stdout) => {
+        currentChild = null;
+        const html = stdout || '';
+
+        if (html.length < 1000 && attempt < 4) {
+          const nextDelay = delays[attempt];
+          const newRemainingMs = calculateRemainingMs(startTime);
+          if (newRemainingMs > nextDelay + 500) {
+            activeTimer = setTimeout(() => {
+              activeTimer = null;
+              runAttempt(attempt + 1);
+            }, nextDelay);
+            return;
+          }
+        }
+
+        cleanup();
+
+        if (html.length < 1000) {
+          return reject({
+            type: 'RFEF_TEMPORARILY_UNAVAILABLE',
+            message: `Clasificación no disponible tras ${attempt} intentos.`,
+            retriesExhausted: attempt,
+            elapsedMs: Date.now() - startTime
+          });
+        }
+
+        if (error) {
+          return reject({ type: 'CURL_ERROR', message: 'Error de conexión curl para clasificación RFEF.' });
+        }
+
+        resolve({ html, elapsedMs: Date.now() - startTime });
+      });
+    };
+
+    runAttempt(1);
+  });
+}
+
+
 function extractCodActas(calendarHtml) {
   if (!calendarHtml || typeof calendarHtml !== 'string') return [];
   const codActas = new Set();
@@ -428,7 +532,7 @@ const server = http.createServer(async (req, res) => {
 
   // Manejo de Preflight OPTIONS (CORS / PNA)
   if (req.method === 'OPTIONS') {
-    if (pathname !== '/rfef' && pathname !== '/acta' && pathname !== '/jornada-completa' && pathname !== '/health') {
+    if (pathname !== '/rfef' && pathname !== '/acta' && pathname !== '/jornada-completa' && pathname !== '/health' && pathname !== '/clasificacion') {
       sendJsonResponse(res, 404, { ok: false, error: 'Ruta no encontrada' }, origin);
       return;
     }
@@ -642,6 +746,18 @@ const server = http.createServer(async (req, res) => {
         }
       }
 
+      // 3. Adquirir clasificación oficial de la jornada compartiendo la sesión base protegida
+      let standingsHtml = null;
+      let standingsError = null;
+      if (calculateRemainingMs(startTime) > 500) {
+        try {
+          const stRes = await fetchRfefStandings(jornada, sessionCookiePath, startTime, cancelToken);
+          standingsHtml = stRes.html;
+        } catch (stErr) {
+          standingsError = (stErr && stErr.message) ? stErr.message : 'Clasificación no disponible aún.';
+        }
+      }
+
       sendJsonResponse(res, 200, {
         ok: true,
         jornada,
@@ -652,6 +768,8 @@ const server = http.createServer(async (req, res) => {
         actas,
         actasNoDisponibles,
         codActasPendientes,
+        standingsHtml,
+        standingsError,
         elapsedMs: Date.now() - startTime
       }, origin);
     } catch (err) {
@@ -690,6 +808,38 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // Endpoint oficial /clasificacion
+  if (pathname === '/clasificacion') {
+    const jornadaParam = url.searchParams.get('jornada');
+    if (!jornadaParam || !/^[0-9]+$/.test(jornadaParam)) {
+      sendJsonResponse(res, 400, { ok: false, error: "Parámetro 'jornada' inválido. Debe ser un número entero." }, origin);
+      return;
+    }
+    const jornada = parseInt(jornadaParam, 10);
+    if (jornada < 1 || jornada > 30) {
+      sendJsonResponse(res, 400, { ok: false, error: `Jornada inválida: ${jornada}. Solo se admiten jornadas de 1 a 30.` }, origin);
+      return;
+    }
+    const startTime = Date.now();
+    try {
+      const { html, elapsedMs } = await fetchRfefStandings(jornada, null, startTime, cancelToken);
+      sendJsonResponse(res, 200, {
+        ok: true,
+        jornada,
+        bytes: Buffer.byteLength(html, 'utf8'),
+        standingsHtml: html,
+        elapsedMs
+      }, origin);
+    } catch (err) {
+      sendJsonResponse(res, 422, {
+        ok: false,
+        error: (err && err.message) ? err.message : 'Error al obtener clasificación RFEF.',
+        elapsedMs: Date.now() - startTime
+      }, origin);
+    }
+    return;
+  }
+
   // Cualquier otra ruta no autorizada
   sendJsonResponse(res, 404, { ok: false, error: 'Ruta no encontrada' }, origin);
 });
@@ -700,6 +850,7 @@ server.listen(PORT, HOST, () => {
   console.log(`       GET http://${HOST}:${PORT}/rfef?jornada=3`);
   console.log(`       GET http://${HOST}:${PORT}/acta?codActa=70692435`);
   console.log(`       GET http://${HOST}:${PORT}/jornada-completa?jornada=3`);
+  console.log(`       GET http://${HOST}:${PORT}/clasificacion?jornada=3`);
   console.log(`       GET http://${HOST}:${PORT}/health`);
   console.log(`[INFO] Presiona Ctrl+C para detener el servicio.`);
 });
