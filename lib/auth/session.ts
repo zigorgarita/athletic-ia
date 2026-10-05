@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import { cookies } from 'next/headers';
 
-const SESSION_COOKIE_NAME = 'staff_session';
+export const SESSION_COOKIE_NAME = 'staff_session';
 const SESSION_DURATION_MS = 30 * 60 * 1000; // 30 minutos
 
 export interface StaffSessionPayload {
@@ -117,4 +117,4 @@ export function isEditorSessionAuthorizedFromRequest(req: Request): boolean {
   return Boolean(session && (session.role === 'editor' || session.role === 'admin'));
 }
 
-export { SESSION_COOKIE_NAME, SESSION_DURATION_MS };
+export { SESSION_DURATION_MS };
