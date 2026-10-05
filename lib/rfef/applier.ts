@@ -115,6 +115,60 @@ export async function applyJornadaRFEF(params: {
     );
   }
 
+  // PROTECCIÓN ESTRICTA 1: Validar que el HTML del calendario corresponda exactamente a la jornada solicitada
+  if (parsedCal.jornada !== null && parsedCal.jornada !== jornada) {
+    return abortResult(
+      jornada,
+      `DISCREPANCIA DE JORNADA: El calendario oficial RFEF corresponde a la Jornada ${parsedCal.jornada}, pero se solicitó aplicar la Jornada ${jornada}. ABORTADO.`
+    );
+  }
+
+  // PROTECCIÓN ESTRICTA 2: Comprobar que el partido de SD Indautxu devuelto por RFEF coincide con la jornada y rival previstos en BD
+  const rfefIndautxuMatch = parsedCal.indautxuMatch;
+  if (!rfefIndautxuMatch) {
+    return abortResult(
+      jornada,
+      `No se encontró el partido de la SD Indautxu en el calendario RFEF de la Jornada ${jornada}. ABORTADO.`
+    );
+  }
+
+  const { data: dbMatchRow, error: dbMatchErr } = await supabase
+    .from('matches')
+    .select('id, jornada, rival, es_local')
+    .eq('tipo_partido', 'LIGA')
+    .eq('jornada', jornada)
+    .maybeSingle();
+
+  if (dbMatchErr || !dbMatchRow) {
+    return abortResult(
+      jornada,
+      `No existe partido en BD para la Jornada ${jornada} de Liga: ${dbMatchErr?.message || 'No encontrado'}. ABORTADO.`
+    );
+  }
+
+  const normDbRival = normalizeClubName(dbMatchRow.rival);
+  const normRfefRival = normalizeClubName(rfefIndautxuMatch.rivalName || '');
+  const rivalMatches =
+    normDbRival === normRfefRival ||
+    normDbRival.includes(normRfefRival) ||
+    normRfefRival.includes(normDbRival);
+
+  if (!rivalMatches) {
+    return abortResult(
+      jornada,
+      `DISCREPANCIA DE RIVAL: El partido previsto en BD para J${jornada} es contra "${dbMatchRow.rival}", pero RFEF reporta contra "${rfefIndautxuMatch.rivalName}". ABORTADO.`
+    );
+  }
+
+  const dbEsLocal = Boolean(dbMatchRow.es_local);
+  const rfefEsLocal = Boolean(rfefIndautxuMatch.indautxuEsLocal);
+  if (dbEsLocal !== rfefEsLocal) {
+    return abortResult(
+      jornada,
+      `DISCREPANCIA DE LOCALÍA: BD tiene es_local=${dbEsLocal} para J${jornada}, pero RFEF marca ${rfefEsLocal ? 'LOCAL' : 'VISITANTE'}. ABORTADO.`
+    );
+  }
+
   // PASO 3: Parsear las 8 actas
   const parsedActasMap = new Map<number, ParsedActa>();
   for (const input of actas) {

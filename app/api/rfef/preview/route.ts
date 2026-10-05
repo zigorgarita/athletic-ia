@@ -166,11 +166,11 @@ export async function POST(req: NextRequest) {
 
     const parsedCal = parseCalendarPage(calResult.html);
 
-    // Validación estricta de coherencia de jornada si el HTML fue proporcionado manualmente
-    if (isManualCalendarIngest && parsedCal.jornada !== null && parsedCal.jornada !== jornadaNum) {
+    // Validación estricta de coherencia de jornada (aplica a todas las fuentes: bridge, manual, live o snapshot)
+    if (parsedCal.jornada !== null && parsedCal.jornada !== jornadaNum) {
       return NextResponse.json(
         {
-          error: `DISCREPANCIA DE JORNADA: El HTML proporcionado corresponde oficialmente a la Jornada ${parsedCal.jornada}, pero se solicitó previsualizar la Jornada ${jornadaNum}.`,
+          error: `DISCREPANCIA DE JORNADA: El HTML oficial de la RFEF corresponde a la Jornada ${parsedCal.jornada}, pero se solicitó previsualizar la Jornada ${jornadaNum}.`,
         },
         { status: 400 }
       );

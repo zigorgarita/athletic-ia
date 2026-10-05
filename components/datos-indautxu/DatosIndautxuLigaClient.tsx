@@ -5,6 +5,7 @@ import { Users, Trophy, Calendar, ShieldCheck, Sparkles, RefreshCw } from 'lucid
 import { JugadoresTab } from './tabs/JugadoresTab';
 import { ClasificacionTab } from './tabs/ClasificacionTab';
 import { CalendarioTab } from './tabs/CalendarioTab';
+import { useIndautxuLeagueCalendar } from '@/hooks/useIndautxuLeagueCalendar';
 import { RfefPreviewModal } from './RfefPreviewModal';
 import { useEditMode } from '@/context/EditModeContext';
 
@@ -46,6 +47,8 @@ export function DatosIndautxuLigaClient() {
   const [activeTab, setActiveTab] = useState<DatosLigaSubTab>('jugadores');
   const [isRfefModalOpen, setIsRfefModalOpen] = useState<boolean>(false);
   const { isEditMode } = useEditMode();
+  const { nextMatch } = useIndautxuLeagueCalendar();
+  const targetJornada = nextMatch?.jornada ?? 4;
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-20">
@@ -158,7 +161,7 @@ export function DatosIndautxuLigaClient() {
       <RfefPreviewModal
         isOpen={isRfefModalOpen}
         onClose={() => setIsRfefModalOpen(false)}
-        initialJornada={3}
+        initialJornada={targetJornada}
       />
     </div>
   );

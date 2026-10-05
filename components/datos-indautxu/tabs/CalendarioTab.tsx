@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useIndautxuLeagueCalendar } from '@/hooks/useIndautxuLeagueCalendar';
 import { useEditMode } from '@/context/EditModeContext';
 import { RfefPreviewModal } from '../RfefPreviewModal';
@@ -39,7 +39,13 @@ export function CalendarioTab() {
   const [filterEstado, setFilterEstado] = useState<FilterEstado>('todos');
   const [filterSede, setFilterSede] = useState<FilterSede>('todos');
   const [isRfefModalOpen, setIsRfefModalOpen] = useState<boolean>(false);
-  const [rfefModalJornada, setRfefModalJornada] = useState<number>(3);
+  const [rfefModalJornada, setRfefModalJornada] = useState<number>(nextMatch?.jornada || 4);
+
+  useEffect(() => {
+    if (nextMatch?.jornada) {
+      setRfefModalJornada(nextMatch.jornada);
+    }
+  }, [nextMatch?.jornada]);
 
   // Filtrado de partidos
   const filteredMatches = useMemo(() => {
@@ -104,7 +110,7 @@ export function CalendarioTab() {
               </button>
               <button
                 onClick={() => {
-                  setRfefModalJornada(3);
+                  setRfefModalJornada(nextMatch?.jornada || 4);
                   setIsRfefModalOpen(true);
                 }}
                 className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all border shrink-0 cursor-pointer ${
@@ -300,7 +306,7 @@ export function CalendarioTab() {
 
           <button
             onClick={() => {
-              setRfefModalJornada(nextMatch?.jornada || 3);
+              setRfefModalJornada(nextMatch?.jornada || 4);
               setIsRfefModalOpen(true);
             }}
             className={`px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2 transition-all shrink-0 cursor-pointer ${

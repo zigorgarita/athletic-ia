@@ -36,7 +36,7 @@ interface RfefPreviewModalProps {
 export function RfefPreviewModal({
   isOpen,
   onClose,
-  initialJornada = 3,
+  initialJornada = 4,
 }: RfefPreviewModalProps) {
   const [jornada, setJornada] = useState<number>(initialJornada);
   const [loading, setLoading] = useState<boolean>(false);
@@ -141,7 +141,10 @@ export function RfefPreviewModal({
     data.rfefLive === true &&
     (data.blockers?.length ?? 1) === 0 &&
     (data.availability?.actasAvailableCount ?? 0) === 8 &&
-    (data.matches?.length ?? 0) === 8;
+    (data.matches?.length ?? 0) === 8 &&
+    data.jornada === jornada &&
+    data.comparisonWithDb?.matchFoundInDb === true &&
+    data.comparisonWithDb?.rivalMatches === true;
 
   const handleApplyConfirm = async () => {
     if (!canApply || !bridgePayload || !data) return;
