@@ -165,17 +165,16 @@ export function RfefPreviewModal({
     isEditMode &&
     !loading &&
     !applying &&
-    !!bridgePayload &&
     !!data &&
     (data.blockers?.length ?? 1) === 0 &&
     data.jornada === jornada &&
     // Caso A: 8 actas nuevas completas emparejadas con BD
-    (((data.availability?.actasAvailableCount ?? 0) === 8 && (data.matches?.length ?? 0) === 8 && data.comparisonWithDb?.matchFoundInDb === true) ||
-    // Caso B: Actas ya existentes en base de datos y clasificación oficial disponible
-     (data.actasState === 'already_existing' && data.availability?.standingsAvailable === true));
+    (Boolean(bridgePayload && (data.availability?.actasAvailableCount ?? 0) === 8 && (data.matches?.length ?? 0) === 8 && data.comparisonWithDb?.matchFoundInDb === true) ||
+    // Caso B: Actas ya existentes en base de datos y clasificación oficial disponible (desde data.standingsHtml o bridgePayload)
+     Boolean(data.actasState === 'already_existing' && data.availability?.standingsAvailable === true && (data.standingsHtml || bridgePayload?.standingsHtml)));
 
   const handleApplyConfirm = async () => {
-    if (!canApply || !bridgePayload || !data) return;
+    if (!canApply || !data) return;
     setShowApplyConfirm(false);
     setApplying(true);
     setApplyResult(null);
@@ -189,10 +188,10 @@ export function RfefPreviewModal({
         headers['x-editor-pass'] = currentUser.pass;
       }
       const dbMatchId = data.comparisonWithDb?.dbMatchId || '';
-      const standingsToSend = bridgePayload.standingsHtml || data.standingsHtml || undefined;
+      const standingsToSend = bridgePayload?.standingsHtml || data.standingsHtml || undefined;
 
       const bodyPayload: any = { jornada };
-      if (bridgePayload.calendarHtml && bridgePayload.actas && bridgePayload.actas.length === 8) {
+      if (bridgePayload?.calendarHtml && bridgePayload?.actas && bridgePayload.actas.length === 8) {
         bodyPayload.calendarHtml = bridgePayload.calendarHtml;
         bodyPayload.actas = bridgePayload.actas;
         bodyPayload.dbMatchId = dbMatchId;
@@ -1613,8 +1612,14 @@ export function RfefPreviewModal({
               Confirmar aplicación de Jornada {jornada}
             </div>
             <div className="text-xs text-amber-200/80 space-y-1">
-              <div>Se escribirán en Supabase: <strong className="text-white">8 official_matches</strong> (70692442 = YA EXISTENTE),</div>
-              <div>stats de jugadores rivales y estadísticas de SD Indautxu.</div>
+              {data?.actasState === 'already_existing' ? (
+                <div>Se aplicará únicamente la <strong className="text-white">clasificación oficial de la Jornada {jornada}</strong> (16 equipos) en official_standings. Las actas no se modificarán.</div>
+              ) : (
+                <>
+                  <div>Se escribirán en Supabase: <strong className="text-white">8 official_matches</strong> (70692442 = YA EXISTENTE),</div>
+                  <div>stats de jugadores rivales y estadísticas de SD Indautxu.</div>
+                </>
+              )}
               <div className="text-amber-400 font-medium">Esta operación es idempotente: ejecutarla dos veces no crea duplicados.</div>
             </div>
             <div className="flex items-center gap-2">
@@ -1637,7 +1642,7 @@ export function RfefPreviewModal({
         <div className="px-6 py-3.5 border-t border-slate-800/80 bg-slate-950/80 flex items-center justify-between flex-wrap gap-3 shrink-0">
           <div className="text-[11px] text-slate-500 flex items-center gap-1.5">
             <Info className="w-3.5 h-3.5 text-slate-400" />
-            {canApply ? 'Paquete 8/8 listo. Puedes aplicar la jornada.' : 'Panel de previsualización sin modificaciones en la base de datos.'}
+            {canApply ? (data?.actasState === 'already_existing' ? 'Clasificación oficial lista para aplicar.' : 'Paquete 8/8 listo. Puedes aplicar la jornada.') : 'Panel de previsualización sin modificaciones en la base de datos.'}
           </div>
 
           <div className="flex items-center gap-2">
@@ -1668,7 +1673,7 @@ export function RfefPreviewModal({
                 className="px-4 py-2 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg text-xs font-bold transition-all shadow-lg shadow-emerald-950/50 flex items-center gap-1.5 disabled:opacity-50 animate-in fade-in duration-300"
               >
                 <Activity className={`w-3.5 h-3.5 ${applying ? 'animate-pulse' : ''}`} />
-                {applying ? 'Aplicando...' : `Aplicar J${jornada}`}
+                {applying ? 'Aplicando...' : (data?.actasState === 'already_existing' ? `Aplicar clasificación J${jornada}` : `Aplicar J${jornada}`)}
               </button>
             )}
             {applying && (
