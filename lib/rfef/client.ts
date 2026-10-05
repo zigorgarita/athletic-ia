@@ -325,7 +325,7 @@ export function fetchRFEFActaPage(codActa: string | number): string {
  * Consulta la clasificación oficial de una jornada específica detallando el origen (live vs snapshot).
  */
 export function fetchRFEFStandingsPageDetailed(jornada: number, sessionCookiePath?: string): RFEFFetchResult {
-  const url = `${RFEF_CONSTANTS.BASE_URL}/NFG_VisClasificacion?cod_primaria=${RFEF_CONSTANTS.COD_PRIMARIA}&codjornada=${jornada}&codcompeticion=${RFEF_CONSTANTS.COD_COMPETICION}&codgrupo=${RFEF_CONSTANTS.COD_GRUPO}&codjornada=${jornada}`;
+  const url = `${RFEF_CONSTANTS.BASE_URL}/NFG_VisClasificacion?cod_primaria=${RFEF_CONSTANTS.COD_PRIMARIA}&codtemporada=${RFEF_CONSTANTS.COD_TEMPORADA}&codcompeticion=${RFEF_CONSTANTS.COD_COMPETICION}&codgrupo=${RFEF_CONSTANTS.COD_GRUPO}&codjornada=${jornada}`;
   let liveHtml = '';
   let liveError: string | undefined;
 
@@ -344,11 +344,13 @@ export function fetchRFEFStandingsPageDetailed(jornada: number, sessionCookiePat
     };
   }
 
-  // Fallback a snapshot/fixture local si existe
+  // Fallback a snapshot/fixture local si existe (tracked en el repositorio para Vercel Preview y local)
   const candidatePaths = [
+    path.join(process.cwd(), 'data', 'rfef-snapshots', `rfef_clasificacion_j${jornada}.html`),
+    path.join(process.cwd(), `scratch/rfef_clasificacion_j${jornada}_live.html`),
+    path.join(process.cwd(), `scratch/rfef_clasificacion_j${jornada}.html`),
     path.join(process.cwd(), `scratch/live_clasificacion_j${jornada}_raw.html`),
     path.join(process.cwd(), `scratch/live_clasificacion_j${jornada}_audit.html`),
-    path.join(process.cwd(), `scratch/rfef_clasificacion_j${jornada}.html`),
     path.join(process.cwd(), `scratch/rfef_clasif_j${jornada}_test.html`),
   ];
 

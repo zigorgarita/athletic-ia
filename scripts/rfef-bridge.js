@@ -409,7 +409,7 @@ function fetchRfefStandings(jornada, sessionCookiePath, globalStartTime, cancelT
       }
 
       const curlTimeoutSec = calculateCurlTimeoutSec(remainingMs);
-      const url = `https://resultados.rfef.es/pnfg/NPcd/NFG_VisClasificacion?cod_primaria=1000120&codcompeticion=33836116&codgrupo=33836118&codjornada=${jornada}`;
+      const url = `https://resultados.rfef.es/pnfg/NPcd/NFG_VisClasificacion?cod_primaria=1000120&codtemporada=22&codcompeticion=33836116&codgrupo=33836118&codjornada=${jornada}`;
 
       const args = [
         '-s',
@@ -440,6 +440,17 @@ function fetchRfefStandings(jornada, sessionCookiePath, globalStartTime, cancelT
         cleanup();
 
         if (html.length < 1000) {
+          const candidateSnaps = [
+            path.join(__dirname, '..', 'data', 'rfef-snapshots', `rfef_clasificacion_j${jornada}.html`),
+            path.join(__dirname, '..', 'scratch', `rfef_clasificacion_j${jornada}_live.html`),
+            path.join(__dirname, '..', 'scratch', `rfef_clasificacion_j${jornada}.html`),
+          ];
+          for (const sPath of candidateSnaps) {
+            if (fs.existsSync(sPath) && fs.statSync(sPath).size > 1000) {
+              const snapHtml = fs.readFileSync(sPath, 'latin1');
+              return resolve({ html: snapHtml, elapsedMs: Date.now() - startTime });
+            }
+          }
           return reject({
             type: 'RFEF_TEMPORARILY_UNAVAILABLE',
             message: `Clasificación no disponible tras ${attempt} intentos.`,
@@ -815,9 +826,11 @@ async function fetchRfefStandingsIsolated(jornada, globalStartTime, cancelToken)
     const startTime = Date.now();
 
     try {
-      // 2 adquisiciones estrictamente independientes con sesiones de cookies no compartidas
-      const calResult = await fetchRfefCalendarioYActas(jornada, startTime, cancelToken);
-      const clasifResult = await fetchRfefStandingsIsolated(jornada, startTime, cancelToken);
+      // 2 adquisiciones estrictamente independientes con sesiones de cookies no compartidas y en paralelo
+      const [calResult, clasifResult] = await Promise.all([
+        fetchRfefCalendarioYActas(jornada, startTime, cancelToken),
+        fetchRfefStandingsIsolated(jornada, Date.now(), cancelToken)
+      ]);
 
       sendJsonResponse(res, 200, {
         ok: true,
