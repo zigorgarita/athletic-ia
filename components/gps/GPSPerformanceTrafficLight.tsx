@@ -149,6 +149,16 @@ export function GPSPerformanceTrafficLight({
     return Math.round(value).toString();
   };
 
+  // Formato visual de desviación respecto a la media personal: ratio% - 100
+  // Ej: 135% -> +35% | 93% -> -7% | 100% -> 0%
+  const formatDeviationPct = (ratio: number | null): string => {
+    if (ratio === null || isNaN(ratio)) return '—';
+    const deviation = Math.round(ratio * 100) - 100;
+    if (deviation > 0) return `+${deviation}%`;
+    if (deviation === 0) return '0%';
+    return `${deviation}%`; // includes negative sign
+  };
+
   return (
     <div className="space-y-6">
       {/* 1. CABECERA Y SELECTOR DE PARTIDO */}
@@ -300,7 +310,7 @@ export function GPSPerformanceTrafficLight({
                       const res = row.metrics[key];
                       const isFirstCore = idx === 0;
                       const isFirstSecondary = idx === 3;
-                      const ratioPct = res.ratio !== null ? Math.round(res.ratio * 100) : null;
+                      const devPct = formatDeviationPct(res.ratio);
 
                       return (
                         <td
@@ -310,7 +320,7 @@ export function GPSPerformanceTrafficLight({
                           } ${isFirstSecondary ? 'border-l border-slate-800/60' : ''}`}
                           title={
                             res.historicalAvg !== null
-                              ? `Valor: ${formatMetricDisplay(key, res.value)} ${res.unit}\nMedia personal: ${formatMetricDisplay(key, res.historicalAvg)} ${res.unit}\nRatio: ${ratioPct}% de su media`
+                              ? `Valor: ${formatMetricDisplay(key, res.value)} ${res.unit}\nMedia personal: ${formatMetricDisplay(key, res.historicalAvg)} ${res.unit}\nDesviación: ${devPct} de su media`
                               : `Valor: ${formatMetricDisplay(key, res.value)} ${res.unit}\nSin histórico suficiente (requiere ≥3 partidos de ≥45m)`
                           }
                         >
@@ -320,7 +330,7 @@ export function GPSPerformanceTrafficLight({
                             </span>
                             {res.ratio !== null && (
                               <span className="text-[9px] opacity-75 font-normal">
-                                {ratioPct}%
+                                {devPct}
                               </span>
                             )}
                           </div>
@@ -384,7 +394,7 @@ export function GPSPerformanceTrafficLight({
           <div className="space-y-2">
             <h4 className="font-bold text-slate-100 text-sm">3. Tabla Oficial de Umbrales</h4>
             <p className="text-[11px] text-slate-400">
-              Ratio calculado como: <code className="bg-slate-900 px-1 py-0.5 rounded text-slate-200">ratio = valor partido / media personal histórica</code>
+              Ratio calculado como: <code className="bg-slate-900 px-1 py-0.5 rounded text-slate-200">ratio = valor partido / media personal histórica</code>. En la tabla se muestra la <strong className="text-slate-200">desviación porcentual</strong> (<code className="bg-slate-900 px-1 py-0.5 rounded text-slate-200">ratio % − 100</code>): un <span className="text-emerald-400 font-bold">+30%</span> indica que el jugador rindió un 30% por encima de su media, y <span className="text-red-400 font-bold">−15%</span> indica un 15% por debajo.
             </p>
             <div className="border border-slate-800 rounded-lg overflow-hidden">
               <table className="w-full text-left text-[11px]">
@@ -527,14 +537,14 @@ export function GPSPerformanceTrafficLight({
                       <th className="p-2">Métrica</th>
                       <th className="p-2 text-center">Valor Jornada</th>
                       <th className="p-2 text-center">Media Personal (≥45m)</th>
-                      <th className="p-2 text-center">% s/ Media</th>
+                      <th className="p-2 text-center">Desviación s/ Media</th>
                       <th className="p-2 text-center">Estado</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/60 text-slate-300">
                     {ALL_METRIC_KEYS.map((key) => {
                       const res = selectedPlayerDetail.metrics[key];
-                      const ratioPct = res.ratio !== null ? Math.round(res.ratio * 100) : null;
+                      const devPct = formatDeviationPct(res.ratio);
                       return (
                         <tr key={key} className="hover:bg-slate-800/30">
                           <td className="p-2 font-medium flex items-center gap-1.5">
@@ -552,7 +562,7 @@ export function GPSPerformanceTrafficLight({
                             {res.historicalAvg !== null ? `${formatMetricDisplay(key, res.historicalAvg)} ${res.unit}` : '—'}
                           </td>
                           <td className="p-2 text-center font-mono font-bold">
-                            {ratioPct !== null ? `${ratioPct}%` : '—'}
+                            {devPct}
                           </td>
                           <td className="p-2 text-center">
                             {getTrafficColorBadge(res.color)}
