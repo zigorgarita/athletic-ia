@@ -1057,31 +1057,35 @@ export function RfefPreviewModal({
                         {data.standingsSummary?.jornadaDetectada ? `Oficial RFEF Jornada ${data.standingsSummary.jornadaDetectada}` : `Jornada ${jornada}`}
                       </div>
                     </div>
-
                     <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-3">
                       <div className="text-[11px] text-slate-400 uppercase font-medium">Líder Provisional</div>
-                      <div className="text-base font-bold text-amber-300 mt-1 truncate" title={data.standingsSummary?.leaderRow?.nombreOficial || ''}>
-                        {data.standingsSummary?.leaderRow?.nombreCorto || data.standingsSummary?.leaderRow?.nombreOficial || (data.standings?.[0]?.nombreCorto || '—')}
+                      <div className="text-base font-bold text-amber-300 mt-1 truncate" title={data.standingsSummary?.leaderRow?.nombreOficial || data.standingsSummary?.leaderRow?.nombre || ''}>
+                        {data.standingsSummary?.leaderRow?.nombreCorto || data.standingsSummary?.leaderRow?.nombreOficial || data.standingsSummary?.leaderRow?.nombre || (data.standings?.[0]?.nombreCorto || data.standings?.[0]?.nombreOficial || data.standings?.[0]?.nombre || '—')}
                       </div>
                       <div className="text-[10px] text-slate-500 font-mono">
-                        {data.standings?.[0] ? `${data.standings[0].puntos} pts (${data.standings[0].ganados}V-${data.standings[0].empatados}E-${data.standings[0].perdidos}D)` : '—'}
+                        {data.standings?.[0] ? `${data.standings[0].puntos ?? data.standings[0].pts} pts (${data.standings[0].ganados ?? data.standings[0].pg}V-${data.standings[0].empatados ?? data.standings[0].pe}E-${data.standings[0].perdidos ?? data.standings[0].pp}D)` : '—'}
                       </div>
                     </div>
 
-                    <div className="bg-red-950/20 border border-red-900/50 rounded-xl p-3">
-                      <div className="text-[11px] text-red-400 uppercase font-medium">SD Indautxu</div>
-                      <div className="text-xl font-bold font-mono text-white mt-1 flex items-baseline gap-2">
-                        <span>{data.standingsSummary?.indautxuRow ? `${data.standingsSummary.indautxuRow.posicion}.º puesto` : '14.º puesto'}</span>
-                        <span className="text-sm font-semibold text-red-400">
-                          {data.standingsSummary?.indautxuRow ? `${data.standingsSummary.indautxuRow.puntos} pts` : '2 pts'}
-                        </span>
-                      </div>
-                      <div className="text-[10px] text-slate-400 font-mono">
-                        {data.standingsSummary?.indautxuRow 
-                          ? `${data.standingsSummary.indautxuRow.jugados} PJ | ${data.standingsSummary.indautxuRow.ganados}V-${data.standingsSummary.indautxuRow.empatados}E-${data.standingsSummary.indautxuRow.perdidos}D | ${data.standingsSummary.indautxuRow.golesFavor}:${data.standingsSummary.indautxuRow.golesContra} (${data.standingsSummary.indautxuRow.diferenciaGoles >= 0 ? '+' : ''}${data.standingsSummary.indautxuRow.diferenciaGoles})`
-                          : '4 PJ | 0V-2E-2D | 4:9 (-5)'}
-                      </div>
-                    </div>
+                    {(() => {
+                      const indautxu = data.standingsSummary?.indautxuRow || data.standings?.find((s: any) => (s.nombre || s.nombreOficial || '').toUpperCase().includes('INDAUTXU'));
+                      return (
+                        <div className="bg-red-950/20 border border-red-900/50 rounded-xl p-3">
+                          <div className="text-[11px] text-red-400 uppercase font-medium">SD Indautxu</div>
+                          <div className="text-xl font-bold font-mono text-white mt-1 flex items-baseline gap-2">
+                            <span>{indautxu ? `${indautxu.posicion ?? indautxu.pos}.º puesto` : '14.º puesto'}</span>
+                            <span className="text-sm font-semibold text-red-400">
+                              {indautxu ? `${indautxu.puntos ?? indautxu.pts} pts` : '2 pts'}
+                            </span>
+                          </div>
+                          <div className="text-[10px] text-slate-400 font-mono">
+                            {indautxu 
+                              ? `${indautxu.jugados ?? indautxu.pj} PJ | ${indautxu.ganados ?? indautxu.pg}V-${indautxu.empatados ?? indautxu.pe}E-${indautxu.perdidos ?? indautxu.pp}D | ${indautxu.golesFavor ?? indautxu.gf}:${indautxu.golesContra ?? indautxu.gc} (${(indautxu.diferenciaGoles ?? indautxu.dg) >= 0 ? '+' : ''}${indautxu.diferenciaGoles ?? indautxu.dg})`
+                              : '4 PJ | 0V-2E-2D | 4:9 (-5)'}
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   {/* Tabla de clasificación */}
@@ -1113,11 +1117,23 @@ export function RfefPreviewModal({
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-800/50">
-                            {data.standings.map((s: any) => {
-                              const isIndautxu = s.esIndautxu || s.nombreOficial?.toUpperCase().includes('INDAUTXU');
+                            {data.standings.map((s: any, idx: number) => {
+                              const pos = s.posicion ?? s.pos ?? (idx + 1);
+                              const nombre = s.nombreCorto || s.nombreOficial || s.nombre || '';
+                              const isIndautxu = s.esIndautxu || nombre.toUpperCase().includes('INDAUTXU');
+                              const pts = s.puntos ?? s.pts ?? 0;
+                              const pj = s.jugados ?? s.pj ?? 0;
+                              const pg = s.ganados ?? s.pg ?? 0;
+                              const pe = s.empatados ?? s.pe ?? 0;
+                              const pp = s.perdidos ?? s.pp ?? 0;
+                              const gf = s.golesFavor ?? s.gf ?? 0;
+                              const gc = s.golesContra ?? s.gc ?? 0;
+                              const dg = s.diferenciaGoles ?? s.dg ?? (gf - gc);
+                              const casa = typeof s.casa === 'object' && s.casa ? `${s.casa.ganados}-${s.casa.empatados}-${s.casa.perdidos}` : (s.casa || '—');
+                              const fuera = typeof s.fuera === 'object' && s.fuera ? `${s.fuera.ganados}-${s.fuera.empatados}-${s.fuera.perdidos}` : (s.fuera || '—');
                               return (
                                 <tr
-                                  key={s.posicion}
+                                  key={pos}
                                   className={`transition-colors ${
                                     isIndautxu
                                       ? 'bg-red-950/40 border-l-4 border-red-500 font-bold text-white shadow-sm'
@@ -1126,39 +1142,39 @@ export function RfefPreviewModal({
                                 >
                                   <td className="py-2.5 px-3 text-center font-mono font-bold">
                                     <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] ${
-                                      s.posicion <= 4
+                                      pos <= 4
                                         ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
-                                        : s.posicion >= 13
+                                        : pos >= 13
                                         ? 'bg-rose-950 text-rose-300 border border-rose-800'
                                         : 'text-slate-400'
                                     }`}>
-                                      {s.posicion}
+                                      {pos}
                                     </span>
                                   </td>
                                   <td className="py-2.5 px-3">
                                     <span className={isIndautxu ? 'text-red-400 font-bold' : 'text-slate-200'}>
-                                      {s.nombreCorto || s.nombreOficial}
+                                      {nombre}
                                     </span>
                                   </td>
                                   <td className="py-2.5 px-2 text-center font-mono font-bold text-white">
-                                    {s.puntos}
+                                    {pts}
                                   </td>
-                                  <td className="py-2.5 px-2 text-center font-mono text-slate-400">{s.jugados}</td>
-                                  <td className="py-2.5 px-2 text-center font-mono text-slate-400">{s.ganados}</td>
-                                  <td className="py-2.5 px-2 text-center font-mono text-slate-400">{s.empatados}</td>
-                                  <td className="py-2.5 px-2 text-center font-mono text-slate-400">{s.perdidos}</td>
-                                  <td className="py-2.5 px-2 text-center font-mono text-slate-400">{s.golesFavor}</td>
-                                  <td className="py-2.5 px-2 text-center font-mono text-slate-400">{s.golesContra}</td>
+                                  <td className="py-2.5 px-2 text-center font-mono text-slate-400">{pj}</td>
+                                  <td className="py-2.5 px-2 text-center font-mono text-slate-400">{pg}</td>
+                                  <td className="py-2.5 px-2 text-center font-mono text-slate-400">{pe}</td>
+                                  <td className="py-2.5 px-2 text-center font-mono text-slate-400">{pp}</td>
+                                  <td className="py-2.5 px-2 text-center font-mono text-slate-400">{gf}</td>
+                                  <td className="py-2.5 px-2 text-center font-mono text-slate-400">{gc}</td>
                                   <td className={`py-2.5 px-2 text-center font-mono font-medium ${
-                                    s.diferenciaGoles > 0 ? 'text-emerald-400' : s.diferenciaGoles < 0 ? 'text-rose-400' : 'text-slate-500'
+                                    dg > 0 ? 'text-emerald-400' : dg < 0 ? 'text-rose-400' : 'text-slate-500'
                                   }`}>
-                                    {s.diferenciaGoles > 0 ? `+${s.diferenciaGoles}` : s.diferenciaGoles}
+                                    {dg > 0 ? `+${dg}` : dg}
                                   </td>
                                   <td className="py-2.5 px-2 text-center font-mono text-[11px] text-slate-500 hidden sm:table-cell">
-                                    {s.casa ? `${s.casa.ganados}-${s.casa.empatados}-${s.casa.perdidos}` : '—'}
+                                    {casa}
                                   </td>
                                   <td className="py-2.5 px-2 text-center font-mono text-[11px] text-slate-500 hidden sm:table-cell">
-                                    {s.fuera ? `${s.fuera.ganados}-${s.fuera.empatados}-${s.fuera.perdidos}` : '—'}
+                                    {fuera}
                                   </td>
                                 </tr>
                               );

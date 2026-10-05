@@ -729,6 +729,12 @@ export async function POST(req: NextRequest) {
         discardedSilhouettesCount,
       },
       standings: standingsRows,
+      standingsSummary: {
+        totalEquipos: standingsRows.length,
+        jornadaDetectada: jornadaNum,
+        indautxuRow: standingsRows.find((s: any) => (s.nombre || s.nombreOficial || '').toUpperCase().includes('INDAUTXU')) || null,
+        leaderRow: standingsRows.length > 0 ? standingsRows[0] : null,
+      },
       standingsHtml: standingsAvailable && clasifResult?.html ? clasifResult.html : null,
       actasState: dbHasAllOfficialMatches ? 'already_existing' : (parsedCal.totalMatches === 8 ? 'available' : 'unavailable'),
       blockers,
