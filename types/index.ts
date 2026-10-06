@@ -770,6 +770,7 @@ export interface PlanningTask {
   // Planificación V2
   responsable_staff?: string | null;
   responsable_staff_otro?: string | null;
+  library_task_id?: string | null;
 }
 
 export interface PlanningTaskLibrary {

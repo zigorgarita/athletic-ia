@@ -140,6 +140,9 @@ function sanitizeTasks(tasks: unknown[]): Record<string, unknown>[] {
         orden: t.orden !== undefined && t.orden !== null ? Number(t.orden) : idx,
         responsable_staff: typeof t.responsable_staff === 'string' && t.responsable_staff.trim()
           ? t.responsable_staff.trim()
+          : null,
+        library_task_id: typeof t.library_task_id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(t.library_task_id.trim())
+          ? t.library_task_id.trim()
           : null
       };
 

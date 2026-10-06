@@ -75,6 +75,7 @@ interface MockTask {
   descripcion: string;
   observaciones?: string;
   responsable_staff: string;
+  library_task_id?: string | null;
 }
 
 interface MockPlayer {
@@ -283,6 +284,7 @@ export function PlanificacionClient() {
         descripcion?: string | null;
         observaciones?: string | null;
         responsable_staff?: string | null;
+        library_task_id?: string | null;
       }[] = [];
       let dbConcepts: {
         id: string;
@@ -327,7 +329,8 @@ export function PlanificacionClient() {
           objetivo: task.objetivo || '',
           descripcion: task.descripcion || '',
           observaciones: task.observaciones || '',
-          responsable_staff: task.responsable_staff || 'Primer Entrenador'
+          responsable_staff: task.responsable_staff || 'Primer Entrenador',
+          library_task_id: task.library_task_id || null
         });
       });
 
@@ -608,6 +611,7 @@ export function PlanificacionClient() {
           descripcion?: string | null;
           observaciones?: string | null;
           orden: number;
+          library_task_id?: string | null;
         } = {
           nombre_tarea: t.nombre_tarea,
           tipo_tarea: t.tipo_tarea,
@@ -617,7 +621,8 @@ export function PlanificacionClient() {
           objetivo: t.objetivo || null,
           descripcion: t.descripcion || null,
           observaciones: t.observaciones || null,
-          orden: idx
+          orden: idx,
+          library_task_id: t.library_task_id || null
         };
         if (t.id && !t.id.startsWith('t') && !t.id.startsWith('temp-')) {
           payload.id = t.id;
@@ -692,7 +697,8 @@ export function PlanificacionClient() {
       espacio: libraryTask.espacio_defecto || '',
       objetivo: libraryTask.objetivo || '',
       descripcion: libraryTask.descripcion || '',
-      responsable_staff: 'Primer Entrenador'
+      responsable_staff: 'Primer Entrenador',
+      library_task_id: libraryTask.id
     };
     setSessionTasks([...sessionTasks, newTask]);
     setIsLibraryModalOpen(false);
@@ -814,6 +820,7 @@ export function PlanificacionClient() {
           descripcion?: string | null;
           observaciones?: string | null;
           orden: number;
+          library_task_id?: string | null;
         } = {
           nombre_tarea: t.nombre_tarea,
           tipo_tarea: t.tipo_tarea,
@@ -823,7 +830,8 @@ export function PlanificacionClient() {
           objetivo: t.objetivo || null,
           descripcion: t.descripcion || null,
           observaciones: t.observaciones || null,
-          orden: idx
+          orden: idx,
+          library_task_id: t.library_task_id || null
         };
         if (t.id && !t.id.startsWith('t') && !t.id.startsWith('temp-')) {
           payload.id = t.id;
