@@ -56,7 +56,7 @@ export function GPSPerformanceTrafficLight({
   // Sesión GPS del partido seleccionado
   const currentSession = useMemo(() => {
     if (!selectedMatchId) return sessions[0] || null;
-    return sessions.find(s => s.match_id === selectedMatchId) || null;
+    return sessions.find(s => s.match_id === selectedMatchId || s.id === selectedMatchId) || null;
   }, [sessions, selectedMatchId]);
 
   // Datos GPS de la jornada seleccionada
@@ -65,10 +65,50 @@ export function GPSPerformanceTrafficLight({
     return gpsDataList.filter(d => d.session_id === currentSession.id);
   }, [gpsDataList, currentSession]);
 
-  // Calcular filas procesadas con el motor de semáforos
+  // Mapa de sesión -> fecha cronológica para filtrar el histórico
+  const sessionDateMap = useMemo(() => {
+    const map = new Map<string, string>();
+    sessions.forEach(s => {
+      const match = matches.find(m => m.id === s.match_id);
+      const fecha = s.fecha || match?.fecha || '';
+      if (s.id && fecha) {
+        map.set(s.id, fecha);
+      }
+    });
+    return map;
+  }, [sessions, matches]);
+
+  // Fecha del partido/sesión evaluado
+  const currentMatchDate = useMemo(() => {
+    if (!currentSession) return null;
+    const match = matches.find(m => m.id === currentSession.match_id);
+    return currentSession.fecha || match?.fecha || null;
+  }, [currentSession, matches]);
+
+  // Filtrar exclusivamente los registros GPS de partidos disputados cronológicamente ANTES del partido evaluado
+  // Reglas:
+  // - Excluir siempre el propio partido evaluado (session_id === currentSession.id)
+  // - Excluir partidos de fecha igual o posterior (sessionDate >= currentMatchDate)
+  const priorHistoricalGpsData = useMemo(() => {
+    if (!currentSession || !currentMatchDate) return [];
+
+    return gpsDataList.filter(d => {
+      // 1. Excluir siempre el propio partido evaluado
+      if (d.session_id === currentSession.id) return false;
+
+      // 2. Obtener fecha de la sesión del registro histórico
+      const sessionDate = sessionDateMap.get(d.session_id);
+      if (!sessionDate) return false;
+
+      // 3. Excluir partidos posteriores o de la misma fecha
+      return sessionDate < currentMatchDate;
+    });
+  }, [currentSession, currentMatchDate, gpsDataList, sessionDateMap]);
+
+  // Calcular filas procesadas con el motor de semáforos pasando únicamente el histórico previo
   const processedRows = useMemo(() => {
-    return buildMatchTrafficLightRows(currentMatchGpsData, gpsDataList, players);
-  }, [currentMatchGpsData, gpsDataList, players]);
+    return buildMatchTrafficLightRows(currentMatchGpsData, priorHistoricalGpsData, players, currentSession?.id);
+  }, [currentMatchGpsData, priorHistoricalGpsData, players, currentSession]);
 
   // Opciones del selector de partido
   const matchOptions = useMemo(() => {
@@ -385,9 +425,9 @@ export function GPSPerformanceTrafficLight({
           <div className="space-y-2">
             <h4 className="font-bold text-slate-100 text-sm">2. Referencia Personal Fiable</h4>
             <ul className="list-disc pl-4 space-y-1 text-slate-400">
-              <li>Solo computan para la referencia histórica partidos donde el jugador haya disputado <strong className="text-slate-200">≥45 minutos</strong>.</li>
-              <li>Se exige un mínimo de <strong className="text-slate-200">3 partidos válidos</strong> para considerar su perfil consolidado.</li>
-              <li>Si el partido evaluado tiene <strong className="text-slate-200">&lt;45 minutos</strong>, o el jugador tiene menos de 3 partidos válidos, se muestran sus datos numéricos reales pero el semáforo y estado global se marcan en <strong className="text-slate-200">⚪ Gris (Muestra corta)</strong> para no inducir a falsos diagnósticos.</li>
+              <li>Solo computan para la referencia histórica partidos donde el jugador haya disputado <strong className="text-slate-200">≥45 minutos</strong> cronológicamente anteriores al evaluado (el propio partido y posteriores quedan excluidos).</li>
+              <li>Se exige un mínimo de <strong className="text-slate-200">3 partidos previos válidos</strong> para considerar su perfil consolidado.</li>
+              <li>Si el partido evaluado tiene <strong className="text-slate-200">&lt;45 minutos</strong>, o el jugador tiene menos de 3 partidos previos válidos, se muestran sus datos numéricos reales pero el semáforo y estado global se marcan en <strong className="text-slate-200">⚪ Gris (Muestra corta)</strong> para no inducir a falsos diagnósticos.</li>
             </ul>
           </div>
 

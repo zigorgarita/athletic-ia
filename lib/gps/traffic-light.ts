@@ -223,17 +223,21 @@ export function computeGlobalStatus(
 
 /**
  * Calcula la fila de Semáforo de Rendimiento para todos los jugadores con GPS en un partido seleccionado.
+ * La referencia personal de cada jugador se calcula a partir de los partidos válidos de >=45 min
+ * disputados cronológicamente con anterioridad al partido evaluado (excluyendo el propio partido y posteriores).
  */
 export function buildMatchTrafficLightRows(
   currentMatchGpsData: (GPSData & { player?: Player })[],
   allHistoricalGpsData: (GPSData & { player?: Player })[],
-  players: Player[]
+  players: Player[],
+  currentSessionId?: string
 ): PlayerTrafficLightRow[] {
-  // 1. Filtrar registros históricos válidos para cada jugador (SOLO partidos de >= 45 min)
+  // 1. Filtrar registros históricos válidos para cada jugador (SOLO partidos de >= 45 min y excluyendo el propio partido)
   const validHistoryByPlayer = new Map<string, NormalizedMetrics[]>();
 
   allHistoricalGpsData.forEach((row) => {
     if (!row.player_id) return;
+    if (currentSessionId && row.session_id === currentSessionId) return;
     if (row.minutos && row.minutos >= MIN_MINUTES_VALID) {
       const normalized = extractNormalizedMetrics(row);
       const existing = validHistoryByPlayer.get(row.player_id) || [];
