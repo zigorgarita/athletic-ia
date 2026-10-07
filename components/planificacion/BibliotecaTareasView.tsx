@@ -6,8 +6,9 @@ import {
   CheckCircle2, ArrowRight, Shuffle, FileText,
   AlertCircle, RotateCcw, Eye, Calendar,
   SlidersHorizontal, ChevronDown, Layers, HelpCircle,
-  Edit3, Lock
+  Edit3, Lock, BarChart3
 } from 'lucide-react';
+import { BibliotecaAnalisisTab } from './BibliotecaAnalisisTab';
 import { supabase } from '@/lib/supabase';
 import { PlanningTaskLibrary } from '@/types';
 import { Button } from '@/components/ui/Button';
@@ -116,6 +117,9 @@ export function BibliotecaTareasView({
   onSelectTask
 }: BibliotecaTareasViewProps) {
   const { currentUser } = useEditMode();
+
+  // Tab state: Catálogo vs Análisis
+  const [currentTab, setCurrentTab] = useState<'catalogo' | 'analisis'>('catalogo');
 
   // Tasks states
   const [tasks, setTasks] = useState<PlanningTaskLibrary[]>([]);
@@ -613,10 +617,40 @@ export function BibliotecaTareasView({
                 {tasks.filter(t => t.aprobada === true).length}
               </span>
             </div>
+
+            {/* Pestañas Catálogo vs Análisis */}
+            <div className="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 ml-1">
+              <button
+                type="button"
+                onClick={() => setCurrentTab('catalogo')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 ${
+                  currentTab === 'catalogo'
+                    ? 'bg-[#CC0E21] text-white shadow-sm'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <BookOpen className="w-3.5 h-3.5" />
+                Catálogo
+              </button>
+              <button
+                type="button"
+                onClick={() => setCurrentTab('analisis')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 ${
+                  currentTab === 'analisis'
+                    ? 'bg-[#CC0E21] text-white shadow-sm'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <BarChart3 className="w-3.5 h-3.5" />
+                Análisis
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* ── BANNER FEEDBACK ── */}
+        {currentTab === 'catalogo' && (
+          <>
+            {/* ── BANNER FEEDBACK ── */}
         {feedbackMsg && (
           <div
             className={`mt-3 px-4 py-2 text-xs font-bold rounded-xl flex items-center justify-between border ${
@@ -877,10 +911,20 @@ export function BibliotecaTareasView({
             </div>
           )}
         </div>
+          </>
+        )}
       </div>
 
-      {/* ── CUERPO PRINCIPAL: RESULTADOS + FICHA ── */}
-      <div className="flex-1 flex flex-col lg:flex-row gap-4 overflow-hidden min-h-[500px]">
+      {currentTab === 'analisis' ? (
+        <BibliotecaAnalisisTab
+          onSelectTaskByName={(taskName) => {
+            setCurrentTab('catalogo');
+            setSearchTerm(taskName);
+          }}
+        />
+      ) : (
+        /* ── CUERPO PRINCIPAL: RESULTADOS + FICHA ── */
+        <div className="flex-1 flex flex-col lg:flex-row gap-4 overflow-hidden min-h-[500px]">
         {/* ── LISTA DE TAREAS (COLUMNA IZQUIERDA / PRINCIPAL) ── */}
         <div
           className={`flex-1 overflow-y-auto space-y-2.5 pr-1 ${
@@ -1640,6 +1684,7 @@ export function BibliotecaTareasView({
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }
