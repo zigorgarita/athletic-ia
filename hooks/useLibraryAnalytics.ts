@@ -96,11 +96,29 @@ export function useLibraryAnalytics() {
         if (tasksErr) throw tasksErr;
 
         // 2. Fetch library concepts (168 tuples)
-        const { data: conceptsData, error: conceptsErr } = await supabase
-          .from('planning_task_library_concepts')
-          .select('id, library_id, categoria, concepto, aprobado_por, aprobado_at, created_at');
+        // Usamos la API route de servidor para garantizar acceso seguro evitando el bloqueo RLS de cliente anon
+        let fetchedConcepts: PlanningTaskLibraryConcept[] = [];
+        try {
+          const resp = await fetch('/api/planificacion/library-concepts');
+          if (resp.ok) {
+            const json = await resp.json();
+            if (Array.isArray(json.data) && json.data.length > 0) {
+              fetchedConcepts = json.data;
+            }
+          }
+        } catch (fetchErr) {
+          console.warn('[useLibraryAnalytics] Fallback a supabase directo para conceptos:', fetchErr);
+        }
 
-        if (conceptsErr) throw conceptsErr;
+        // Fallback directo a supabase si la API route no estuviera disponible
+        if (fetchedConcepts.length === 0) {
+          const { data: directConceptsData } = await supabase
+            .from('planning_task_library_concepts')
+            .select('id, library_id, categoria, concepto, aprobado_por, aprobado_at, created_at');
+          if (directConceptsData && directConceptsData.length > 0) {
+            fetchedConcepts = directConceptsData as PlanningTaskLibraryConcept[];
+          }
+        }
 
         // 3. Fetch linked usages from planning_tasks joined with planning_sessions
         const { data: usagesData, error: usagesErr } = await supabase
@@ -113,7 +131,7 @@ export function useLibraryAnalytics() {
         if (!isMounted) return;
 
         setLibraryTasks((tasksData as unknown as PlanningTaskLibrary[]) || []);
-        setLibraryConcepts((conceptsData as PlanningTaskLibraryConcept[]) || []);
+        setLibraryConcepts(fetchedConcepts);
 
         // Flatten usages
         interface RawUsageItem {
@@ -191,7 +209,7 @@ export function useLibraryAnalytics() {
       if (!map.has(c.library_id)) {
         map.set(c.library_id, []);
       }
-      map.get(c.library_id)!.push(c.concepto);
+      map.get(c.library_id)!.push(c.concepto.trim());
     }
     return map;
   }, [libraryConcepts]);
@@ -205,10 +223,11 @@ export function useLibraryAnalytics() {
     for (const c of libraryConcepts) {
       const task = approvedMap.get(c.library_id);
       if (task) {
-        if (!map.has(c.concepto)) {
-          map.set(c.concepto, []);
+        const cleanName = c.concepto.trim();
+        if (!map.has(cleanName)) {
+          map.set(cleanName, []);
         }
-        map.get(c.concepto)!.push(task);
+        map.get(cleanName)!.push(task);
       }
     }
     return map;
@@ -234,7 +253,7 @@ export function useLibraryAnalytics() {
     const workedConcepts = new Set<string>();
     usedTaskIds.forEach(tId => {
       const concepts = taskConceptsMap.get(tId) || [];
-      concepts.forEach(c => workedConcepts.add(c));
+      concepts.forEach(c => workedConcepts.add(c.trim()));
     });
 
     const totalAprobadas = approvedTasks.length || 51;
@@ -243,7 +262,7 @@ export function useLibraryAnalytics() {
 
     const allOfficialConcepts = TACTICAL_FAMILIES.flatMap(f => f.concepts);
     const totalConceptosOficiales = allOfficialConcepts.length; // 63
-    const conceptosConTareasAprobadas = allOfficialConcepts.filter(c => (conceptApprovedTasksMap.get(c)?.length || 0) > 0).length; // 61
+    const conceptosConTareasAprobadas = allOfficialConcepts.filter(c => (conceptApprovedTasksMap.get(c.trim())?.length || 0) > 0).length; // 61
     const conceptosSinTareasAprobadas = totalConceptosOficiales - conceptosConTareasAprobadas; // 2
 
     return {
@@ -291,15 +310,16 @@ export function useLibraryAnalytics() {
     }
 
     return allCanonicalConcepts.map(concepto => {
-      const famObj = getFamilyForConcept(concepto);
+      const cleanConcepto = concepto.trim();
+      const famObj = getFamilyForConcept(cleanConcepto);
       const familiaId = famObj?.id || 'ofensivo';
       const familiaLabel = famObj?.label || 'General';
       const badgeColor = famObj?.badgeColor || 'bg-slate-800 text-slate-300 border-slate-700';
 
-      const sampleConcept = libraryConcepts.find(c => c.concepto === concepto);
+      const sampleConcept = libraryConcepts.find(c => c.concepto.trim() === cleanConcepto);
       const categoriaDb = sampleConcept?.categoria || famObj?.category || 'GENERAL';
 
-      const tasksForConcept = conceptApprovedTasksMap.get(concepto) || [];
+      const tasksForConcept = conceptApprovedTasksMap.get(cleanConcepto) || [];
       const tareasAprobadasDisponibles = tasksForConcept.length;
 
       let usosTotales = 0;
