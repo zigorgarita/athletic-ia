@@ -25,7 +25,7 @@ interface BibliotecaAnalisisTabProps {
   onSelectTaskByName?: (taskName: string) => void;
 }
 
-export function BibliotecaAnalisisTab({ onSelectTaskByName }: BibliotecaAnalisisTabProps) {
+export function BibliotecaAnalisisTab({}: BibliotecaAnalisisTabProps) {
   const {
     loading,
     errorMsg,
@@ -454,13 +454,12 @@ export function BibliotecaAnalisisTab({ onSelectTaskByName }: BibliotecaAnalisis
                   <th className="py-3 px-4 text-center">Minutos</th>
                   <th className="py-3 px-4 text-center">Última sesión</th>
                   <th className="py-3 px-4 text-center">Días sin estímulo</th>
-                  <th className="py-3 px-4">Alternativas aprobadas (Rotación)</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60 font-medium">
                 {taskMetrics.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-8 text-center text-slate-500">
+                    <td colSpan={7} className="py-8 text-center text-slate-500">
                       No se encontraron tareas con los filtros aplicados.
                     </td>
                   </tr>
@@ -527,30 +526,6 @@ export function BibliotecaAnalisisTab({ onSelectTaskByName }: BibliotecaAnalisis
                       {/* Días sin estímulo */}
                       <td className="py-3 px-4 text-center">
                         {renderStimulusBadge(task.diasSinEstimulo)}
-                      </td>
-
-                      {/* Alternativas aprobadas */}
-                      <td className="py-3 px-4">
-                        {task.alternativasAprobadas.length > 0 ? (
-                          <div className="flex flex-wrap gap-1.5">
-                            {task.alternativasAprobadas.map(alt => (
-                              <button
-                                key={alt.id}
-                                type="button"
-                                onClick={() => onSelectTaskByName && onSelectTaskByName(alt.nombre)}
-                                className="inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-semibold bg-slate-950 hover:bg-slate-800 text-slate-300 border border-slate-800 hover:border-slate-700 transition-colors text-left"
-                                title={`Alternativa sugerida (usada ${alt.usos} veces)`}
-                              >
-                                <span className="truncate max-w-[140px]">{alt.nombre}</span>
-                                <span className="text-[9px] text-slate-500">({alt.usos})</span>
-                              </button>
-                            ))}
-                          </div>
-                        ) : (
-                          <span className="text-[11px] text-slate-600 italic">
-                            Sin alternativa directa
-                          </span>
-                        )}
                       </td>
                     </tr>
                   ))
