@@ -12,8 +12,7 @@ import {
   TrendingUp,
   Activity,
   Info,
-  BookOpen,
-  Flame
+  BookOpen
 } from 'lucide-react';
 import {
   useLibraryAnalytics,
@@ -92,38 +91,42 @@ export function BibliotecaAnalisisTab({ onSelectTaskByName }: BibliotecaAnalisis
     );
   };
 
-  // Helper for diagnostico badge
-  const renderDiagnosticoBadge = (diag: ConceptMetricRow['diagnostico']) => {
-    switch (diag) {
-      case 'Sin tareas en Biblioteca':
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-extrabold bg-red-950/40 text-red-400 border border-red-800/40">
-            <AlertTriangle className="w-3 h-3 text-red-400" />
-            Sin tareas en Biblioteca
-          </span>
-        );
-      case 'Biblioteca escasa':
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-extrabold bg-amber-950/40 text-amber-300 border border-amber-800/40">
-            <Info className="w-3 h-3 text-amber-400" />
-            Biblioteca escasa
-          </span>
-        );
-      case 'Tenemos tareas, no lo entrenamos':
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-extrabold bg-orange-950/40 text-orange-300 border border-orange-800/40">
-            <Flame className="w-3 h-3 text-orange-400" />
-            Tenemos tareas, no lo entrenamos
-          </span>
-        );
-      case 'Trabajado recientemente':
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-extrabold bg-emerald-950/40 text-emerald-300 border border-emerald-800/40">
-            <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-            Trabajado recientemente
-          </span>
-        );
+  // Helper for estado simplificado badge
+  // - Sin tareas → 0 tareas disponibles
+  // - Pocas tareas → 1 tarea disponible
+  // - Disponible → 2 o más tareas, pero sin uso trazado
+  // - Trabajado → existe al menos un uso trazado desde 07/10/2026
+  const renderEstadoBadge = (row: ConceptMetricRow) => {
+    if (row.diasDistintos > 0 || row.usosTotales > 0) {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-extrabold bg-emerald-950/40 text-emerald-300 border border-emerald-800/40">
+          <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+          Trabajado
+        </span>
+      );
     }
+    if (row.tareasAprobadasDisponibles === 0) {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-extrabold bg-red-950/40 text-red-400 border border-red-800/40">
+          <AlertTriangle className="w-3 h-3 text-red-400" />
+          Sin tareas
+        </span>
+      );
+    }
+    if (row.tareasAprobadasDisponibles === 1) {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-extrabold bg-amber-950/40 text-amber-300 border border-amber-800/40">
+          <Info className="w-3 h-3 text-amber-400" />
+          Pocas tareas
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-extrabold bg-slate-800/70 text-slate-300 border border-slate-700/70">
+        <BookOpen className="w-3 h-3 text-slate-400" />
+        Disponible
+      </span>
+    );
   };
 
   if (loading) {
@@ -371,18 +374,16 @@ export function BibliotecaAnalisisTab({ onSelectTaskByName }: BibliotecaAnalisis
                   <th className="py-3 px-4">Concepto</th>
                   <th className="py-3 px-4">Familia</th>
                   <th className="py-3 px-4 text-center">Días distintos</th>
-                  <th className="py-3 px-4 text-center">Tareas usadas</th>
                   <th className="py-3 px-4 text-center">Minutos</th>
                   <th className="py-3 px-4 text-center">Última vez</th>
-                  <th className="py-3 px-4 text-center">Días sin estímulo</th>
-                  <th className="py-3 px-4 text-center">Disp. Biblioteca</th>
-                  <th className="py-3 px-4 text-center">Diagnóstico</th>
+                  <th className="py-3 px-4 text-center">Tareas disponibles</th>
+                  <th className="py-3 px-4 text-center">Estado</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60 font-medium">
                 {conceptMetrics.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="py-8 text-center text-slate-500">
+                    <td colSpan={7} className="py-8 text-center text-slate-500">
                       No se encontraron conceptos con los filtros aplicados.
                     </td>
                   </tr>
@@ -409,11 +410,6 @@ export function BibliotecaAnalisisTab({ onSelectTaskByName }: BibliotecaAnalisis
                         {row.diasDistintos > 0 ? row.diasDistintos : '—'}
                       </td>
 
-                      {/* Nº de tareas usadas */}
-                      <td className="py-3 px-4 text-center font-bold text-slate-300">
-                        {row.tareasUsadas > 0 ? row.tareasUsadas : '—'}
-                      </td>
-
                       {/* Minutos */}
                       <td className="py-3 px-4 text-center font-mono font-bold text-amber-300">
                         {row.minutos > 0 ? `${row.minutos}′` : '—'}
@@ -424,21 +420,16 @@ export function BibliotecaAnalisisTab({ onSelectTaskByName }: BibliotecaAnalisis
                         {formatDate(row.ultimaVez)}
                       </td>
 
-                      {/* Días sin estímulo */}
-                      <td className="py-3 px-4 text-center">
-                        {renderStimulusBadge(row.diasSinEstimulo)}
-                      </td>
-
-                      {/* Tareas disponibles en biblioteca */}
+                      {/* Tareas disponibles */}
                       <td className="py-3 px-4 text-center">
                         <span className="font-bold px-2 py-0.5 rounded bg-slate-950 border border-slate-800 text-slate-200">
                           {row.tareasAprobadasDisponibles}
                         </span>
                       </td>
 
-                      {/* Diagnóstico */}
+                      {/* Estado */}
                       <td className="py-3 px-4 text-center">
-                        {renderDiagnosticoBadge(row.diagnostico)}
+                        {renderEstadoBadge(row)}
                       </td>
                     </tr>
                   ))
