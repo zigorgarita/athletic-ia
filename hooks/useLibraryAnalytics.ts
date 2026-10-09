@@ -5,6 +5,12 @@ import {
   TACTICAL_FAMILIES,
   getFamilyForConcept
 } from '@/lib/planificacion/tacticalDictionary';
+import {
+  filterOfficialLeagueMatches,
+  resolveMatchForTrainingEvent,
+  OfficialLeagueMatch,
+  MDTag
+} from '@/lib/planificacion/matchWeekResolver';
 
 /** Fecha de referencia en que comenzó el registro operativo de tareas en el planificador */
 export const FECHA_INICIO_TRAZABILIDAD_OPERATIVA = '2026-10-07';
@@ -23,6 +29,19 @@ export interface TaskEvent {
   metodo_minutos?: string | null;
   session_id?: string;
   nombre_tarea?: string;
+  // Campos de contexto V1 de semana y rival de Liga
+  matchId?: string | null;
+  jornada?: number | null;
+  rival?: string | null;
+  esLocal?: boolean | null;
+  fechaPartido?: string | null;
+  mdTag?: MDTag | null;
+}
+
+export interface JornadaOption {
+  value: number | 'todas' | 'sin_jornada';
+  label: string;
+  hasEvents: boolean;
 }
 
 export interface ConceptMetricRow {
@@ -95,6 +114,7 @@ export function useLibraryAnalytics() {
   const [libraryConcepts, setLibraryConcepts] = useState<PlanningTaskLibraryConcept[]>([]);
   const [historicalEvents, setHistoricalEvents] = useState<TaskEvent[]>([]);
   const [reuseEvents, setReuseEvents] = useState<TaskEvent[]>([]);
+  const [officialLeagueMatches, setOfficialLeagueMatches] = useState<OfficialLeagueMatch[]>([]);
 
   // Filter states
   const [periodo, setPeriodo] = useState<PeriodoAnalisis>('temporada');
@@ -102,6 +122,8 @@ export function useLibraryAnalytics() {
   const [selectedFamily, setSelectedFamily] = useState<string>('todas');
   const [selectedConcept, setSelectedConcept] = useState<string>('todos');
   const [searchTerm, setSearchTerm] = useState<string>('');
+  const [filtroJornada, setFiltroJornada] = useState<number | 'todas' | 'sin_jornada'>('todas');
+  const [filtroMD, setFiltroMD] = useState<string>('todos');
 
   // Fetch all necessary data
   useEffect(() => {
@@ -111,6 +133,18 @@ export function useLibraryAnalytics() {
       try {
         setLoading(true);
         setErrorMsg(null);
+
+        // 0. Fetch partidos de Liga oficiales (J1 a J30)
+        const { data: rawMatches, error: matchesErr } = await supabase
+          .from('matches')
+          .select('id, jornada, rival, fecha, es_local, competicion, tipo_partido')
+          .order('fecha', { ascending: true });
+
+        if (matchesErr) {
+          console.warn('[useLibraryAnalytics] Aviso al cargar matches:', matchesErr);
+        }
+
+        const filteredMatches = filterOfficialLeagueMatches((rawMatches as Array<Record<string, unknown>>) || []);
 
         // 1. Fetch library tasks (catálogo de tareas)
         const { data: tasksData, error: tasksErr } = await supabase
@@ -163,10 +197,11 @@ export function useLibraryAnalytics() {
 
         if (!isMounted) return;
 
+        setOfficialLeagueMatches(filteredMatches);
         setLibraryTasks((tasksData as unknown as PlanningTaskLibrary[]) || []);
         setLibraryConcepts(fetchedConcepts);
 
-        // Mapeo de eventos históricos documentados
+        // Mapeo de eventos históricos documentados enriquecidos con contexto de Liga
         interface RawHistItem {
           id: string;
           session_id?: string;
@@ -182,6 +217,7 @@ export function useLibraryAnalytics() {
         const parsedHistoricalEvents: TaskEvent[] = ((histData as unknown as RawHistItem[]) || [])
           .map(h => {
             const esMinutoExacto = h.metodo_minutos === 'EXACTO_PDF' && h.minutos !== null && !isNaN(Number(h.minutos));
+            const matchCtx = resolveMatchForTrainingEvent(h.fecha, filteredMatches);
             return {
               id: h.id,
               library_task_id: h.library_task_id,
@@ -191,12 +227,18 @@ export function useLibraryAnalytics() {
               minutosRaw: h.minutos !== null && h.minutos !== undefined ? Number(h.minutos) : null,
               metodo_minutos: h.metodo_minutos || null,
               session_id: h.session_id,
-              nombre_tarea: h.metadata?.nombre_tarea
+              nombre_tarea: h.metadata?.nombre_tarea,
+              matchId: matchCtx?.matchId || null,
+              jornada: matchCtx?.jornada || null,
+              rival: matchCtx?.rival || null,
+              esLocal: matchCtx ? matchCtx.esLocal : null,
+              fechaPartido: matchCtx?.fechaPartido || null,
+              mdTag: matchCtx?.mdTag || null
             };
           })
           .filter(ev => Boolean(ev.library_task_id && ev.fecha));
 
-        // Mapeo de eventos de reutilización en calendario
+        // Mapeo de eventos de reutilización en calendario enriquecidos con contexto de Liga
         interface RawUsageItem {
           id: string;
           library_task_id: string;
@@ -206,17 +248,27 @@ export function useLibraryAnalytics() {
         }
 
         const parsedReuseEvents: TaskEvent[] = ((reuseData as unknown as RawUsageItem[]) || [])
-          .map(item => ({
-            id: item.id,
-            library_task_id: item.library_task_id,
-            fecha: item.planning_sessions?.fecha || '',
-            source: 'reuse' as const,
-            minutosValidados: Number(item.minutos) || 0,
-            minutosRaw: Number(item.minutos) || 0,
-            metodo_minutos: 'PLANIFICACION_SESION',
-            session_id: item.planning_sessions?.id || '',
-            nombre_tarea: item.nombre_tarea || undefined
-          }))
+          .map(item => {
+            const evFecha = item.planning_sessions?.fecha || '';
+            const matchCtx = resolveMatchForTrainingEvent(evFecha, filteredMatches);
+            return {
+              id: item.id,
+              library_task_id: item.library_task_id,
+              fecha: evFecha,
+              source: 'reuse' as const,
+              minutosValidados: Number(item.minutos) || 0,
+              minutosRaw: Number(item.minutos) || 0,
+              metodo_minutos: 'PLANIFICACION_SESION',
+              session_id: item.planning_sessions?.id || '',
+              nombre_tarea: item.nombre_tarea || undefined,
+              matchId: matchCtx?.matchId || null,
+              jornada: matchCtx?.jornada || null,
+              rival: matchCtx?.rival || null,
+              esLocal: matchCtx ? matchCtx.esLocal : null,
+              fechaPartido: matchCtx?.fechaPartido || null,
+              mdTag: matchCtx?.mdTag || null
+            };
+          })
           .filter(ev => Boolean(ev.library_task_id && ev.fecha && ev.fecha >= FECHA_INICIO_TRAZABILIDAD_OPERATIVA));
 
         setHistoricalEvents(parsedHistoricalEvents);
@@ -270,16 +322,109 @@ export function useLibraryAnalytics() {
     return [...historicalEvents, ...reuseEvents];
   }, [historicalEvents, reuseEvents]);
 
-  // Eventos filtrados por fuente activa y por periodo
+  // Eventos filtrados por fuente activa, periodo, jornada y MD
   const filteredEvents = useMemo(() => {
     return allEvents.filter(ev => {
       if (fuenteAnalisis === 'historico' && ev.source !== 'historical') return false;
       if (fuenteAnalisis === 'reutilizacion' && ev.source !== 'reuse') return false;
       // Regla estricta: reuse solo es computable a partir de trazabilidad fiable (>= 2026-10-07)
       if (ev.source === 'reuse' && ev.fecha < FECHA_INICIO_TRAZABILIDAD_OPERATIVA) return false;
-      return ev.fecha >= cutoffDateStr && ev.fecha <= todayStr;
+      if (ev.fecha < cutoffDateStr || ev.fecha > todayStr) return false;
+
+      // Filtro por Jornada / Rival
+      if (filtroJornada === 'sin_jornada') {
+        if (ev.jornada !== null && ev.jornada !== undefined) return false;
+      } else if (typeof filtroJornada === 'number') {
+        if (ev.jornada !== filtroJornada) return false;
+      }
+
+      // Filtro por MD
+      if (filtroMD !== 'todos') {
+        if (ev.mdTag !== filtroMD) return false;
+      }
+
+      return true;
     });
-  }, [allEvents, fuenteAnalisis, cutoffDateStr, todayStr]);
+  }, [allEvents, fuenteAnalisis, cutoffDateStr, todayStr, filtroJornada, filtroMD]);
+
+  // Lista de opciones para el selector principal de Jornada / Rival
+  const jornadaOptions = useMemo<JornadaOption[]>(() => {
+    const activeJornadasSet = new Set<number>();
+    let hasSinJornada = false;
+
+    for (const ev of allEvents) {
+      if (typeof ev.jornada === 'number') {
+        activeJornadasSet.add(ev.jornada);
+      } else {
+        hasSinJornada = true;
+      }
+    }
+
+    const options: JornadaOption[] = [
+      {
+        value: 'todas',
+        label: 'Todas las jornadas de Liga',
+        hasEvents: allEvents.length > 0
+      }
+    ];
+
+    for (const m of officialLeagueMatches) {
+      const parts = m.fecha.split('-');
+      const fechaCorta = parts.length === 3 ? `${parts[2]}/${parts[1]}` : m.fecha;
+      const condicion = m.es_local ? 'Casa' : 'Fuera';
+      options.push({
+        value: m.jornada,
+        label: `J${m.jornada} · ${m.rival} · ${condicion} · ${fechaCorta}`,
+        hasEvents: activeJornadasSet.has(m.jornada)
+      });
+    }
+
+    options.push({
+      value: 'sin_jornada',
+      label: 'Sin Jornada de Liga',
+      hasEvents: hasSinJornada
+    });
+
+    return options;
+  }, [allEvents, officialLeagueMatches]);
+
+  // Opciones disponibles para el selector secundario de MD según la jornada seleccionada
+  const availableMDTags = useMemo<string[]>(() => {
+    if (filtroJornada === 'sin_jornada') return [];
+
+    const presentTags = new Set<string>();
+    for (const ev of allEvents) {
+      if (filtroJornada === 'todas' || ev.jornada === filtroJornada) {
+        if (ev.mdTag) presentTags.add(ev.mdTag);
+      }
+    }
+
+    const result: string[] = ['todos'];
+    // Orden canónico preferente: MD-4, MD-3, MD-2, MD-1, y dinámicos MD-5, MD-6, MD
+    const canonicalOrder = ['MD-4', 'MD-3', 'MD-2', 'MD-1', 'MD-5', 'MD-6', 'MD'];
+    for (const tag of canonicalOrder) {
+      if (presentTags.has(tag)) {
+        result.push(tag);
+      }
+    }
+
+    return result;
+  }, [allEvents, filtroJornada]);
+
+  // Sincronización: Si se cambia de jornada y el MD activo ya no está disponible, volver a 'todos'
+  useEffect(() => {
+    if (filtroJornada === 'sin_jornada') {
+      if (filtroMD !== 'todos') setFiltroMD('todos');
+    } else if (filtroMD !== 'todos' && !availableMDTags.includes(filtroMD)) {
+      setFiltroMD('todos');
+    }
+  }, [filtroJornada, availableMDTags, filtroMD]);
+
+  // Información del partido oficial seleccionado si aplica
+  const selectedJornadaInfo = useMemo(() => {
+    if (typeof filtroJornada !== 'number') return null;
+    return officialLeagueMatches.find(m => m.jornada === filtroJornada) || null;
+  }, [filtroJornada, officialLeagueMatches]);
 
   // Eventos acumulados hasta hoy según fuente activa (para semáforos y última sesión)
   const allTimeEventsForActiveSource = useMemo(() => {
@@ -657,6 +802,13 @@ export function useLibraryAnalytics() {
     setSelectedConcept,
     searchTerm,
     setSearchTerm,
+    filtroJornada,
+    setFiltroJornada,
+    filtroMD,
+    setFiltroMD,
+    jornadaOptions,
+    availableMDTags,
+    selectedJornadaInfo,
     kpis,
     conceptMetrics: filteredConceptMetrics,
     taskMetrics: filteredTaskMetrics,

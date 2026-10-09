@@ -61,6 +61,12 @@ export function BibliotecaAnalisisTab({}: BibliotecaAnalisisTabProps) {
     setSelectedConcept,
     searchTerm,
     setSearchTerm,
+    filtroJornada,
+    setFiltroJornada,
+    filtroMD,
+    setFiltroMD,
+    jornadaOptions,
+    availableMDTags,
     kpis,
     conceptMetrics,
     taskMetrics
@@ -551,6 +557,60 @@ export function BibliotecaAnalisisTab({}: BibliotecaAnalisisTabProps) {
                 );
               })}
             </div>
+          </div>
+        </div>
+
+        {/* Selector Canónico V1: Jornada / Rival y Microciclo MD */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2.5 pb-1 border-t border-slate-800/60">
+          {/* Selector Principal: Jornada / Rival */}
+          <div className="flex-1 flex items-center gap-2 min-w-0">
+            <span className="text-[10px] font-black uppercase text-slate-400 whitespace-nowrap px-1 flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-[#CC0E21]"></span>
+              Jornada / Rival:
+            </span>
+            <select
+              value={filtroJornada === 'sin_jornada' ? 'sin_jornada' : typeof filtroJornada === 'number' ? filtroJornada : 'todas'}
+              onChange={e => {
+                const val = e.target.value;
+                if (val === 'todas') setFiltroJornada('todas');
+                else if (val === 'sin_jornada') setFiltroJornada('sin_jornada');
+                else setFiltroJornada(Number(val));
+              }}
+              className="flex-1 max-w-md bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-[#CC0E21] rounded-xl px-3 py-1.5 text-xs font-bold text-slate-100 focus:outline-none cursor-pointer truncate transition-colors"
+            >
+              {jornadaOptions.map(opt => (
+                <option key={String(opt.value)} value={String(opt.value)}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Selector Secundario: Día de Partido (MD) */}
+          <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs shrink-0 overflow-x-auto">
+            <span className="text-[10px] font-black text-slate-500 uppercase px-2">Microciclo:</span>
+            {filtroJornada === 'sin_jornada' ? (
+              <span className="text-slate-500 italic text-[11px] px-2 py-0.5">Sin etiqueta MD</span>
+            ) : (
+              availableMDTags.map(tag => {
+                const isActive = filtroMD === tag;
+                const label = tag === 'todos' ? 'Todos' : tag;
+                return (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => setFiltroMD(tag)}
+                    className={`px-2.5 py-1 rounded-lg font-bold text-xs transition-all ${
+                      isActive
+                        ? 'bg-[#CC0E21] text-white shadow-sm'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })
+            )}
           </div>
         </div>
 
