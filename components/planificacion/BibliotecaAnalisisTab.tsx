@@ -442,6 +442,7 @@ export function BibliotecaAnalisisTab({}: BibliotecaAnalisisTabProps) {
             <span className="text-xs font-bold text-slate-500">/ {kpis.totalConceptosOficiales}</span>
           </div>
           <p className="text-[10px] text-slate-400 mt-1">
+            <span className="text-slate-500 font-medium">Disponibilidad en Biblioteca: </span>
             <span className="text-emerald-400 font-bold">{kpis.conceptosConTareasAprobadas}</span> con tareas · <span className="text-red-400 font-bold">{kpis.conceptosSinTareasAprobadas}</span> sin tareas
           </p>
         </div>
@@ -480,7 +481,8 @@ export function BibliotecaAnalisisTab({}: BibliotecaAnalisisTabProps) {
             </div>
 
             {activeSubTab === 'conceptos' && (
-              <div className="hidden md:flex items-center gap-2 text-[11px] text-slate-400 bg-slate-950/70 px-3 py-1 rounded-xl border border-slate-800/80">
+              <div className="hidden md:flex items-center gap-2 text-[11px] text-slate-400 bg-slate-950/70 px-3 py-1 rounded-xl border border-slate-800/80" title="Disponibilidad del catálogo en Biblioteca">
+                <span className="text-slate-500 font-medium">Catálogo:</span>
                 <span className="font-bold text-slate-200">63 oficiales</span>
                 <span className="text-slate-600">•</span>
                 <span className="text-emerald-400 font-semibold">61 con tareas</span>

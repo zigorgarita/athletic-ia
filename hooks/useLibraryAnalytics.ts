@@ -439,14 +439,10 @@ export function useLibraryAnalytics() {
             fechasDistintas.add(ev.fecha);
             if (ev.source === 'historical') hasHistorical = true;
             if (ev.source === 'reuse') hasReuse = true;
+            if (!ultimaFechaConcepto || ev.fecha > ultimaFechaConcepto) {
+              ultimaFechaConcepto = ev.fecha;
+            }
           });
-        }
-
-        const histDate = taskAllTimeMaxDate.get(t.id);
-        if (histDate) {
-          if (!ultimaFechaConcepto || histDate > ultimaFechaConcepto) {
-            ultimaFechaConcepto = histDate;
-          }
         }
       }
 
@@ -455,7 +451,7 @@ export function useLibraryAnalytics() {
       else if (hasHistorical) origenPresencia = 'historico';
       else if (hasReuse) origenPresencia = 'reutilizacion';
 
-      // Cálculo de días sin estímulo
+      // Cálculo de días sin estímulo (solo si hay fecha en el periodo)
       let diasSinEstimulo: number | null = null;
       if (ultimaFechaConcepto) {
         const d1 = new Date(ultimaFechaConcepto);
@@ -464,13 +460,13 @@ export function useLibraryAnalytics() {
         diasSinEstimulo = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
       }
 
-      // Diagnóstico contextualizado
+      // Diagnóstico contextualizado al periodo
       let diagnostico: ConceptMetricRow['diagnostico'];
       if (tareasAprobadasDisponibles === 0) {
         diagnostico = 'Sin tareas en Biblioteca';
       } else if (tareasAprobadasDisponibles === 1) {
         diagnostico = 'Biblioteca escasa';
-      } else if (tareasAprobadasDisponibles > 1 && usosTotales === 0) {
+      } else if (usosTotales === 0) {
         diagnostico = 'Tenemos tareas, no lo entrenamos';
       } else if (origenPresencia === 'ambos') {
         diagnostico = 'Histórico y reutilizado';
@@ -497,7 +493,7 @@ export function useLibraryAnalytics() {
         diagnostico
       };
     });
-  }, [conceptApprovedTasksMap, taskPeriodEventsMap, taskAllTimeMaxDate, todayStr, libraryConcepts]);
+  }, [conceptApprovedTasksMap, taskPeriodEventsMap, todayStr, libraryConcepts]);
 
   // ── TABLA: POR TAREA ──
   const taskMetrics: TaskMetricRow[] = useMemo(() => {
@@ -511,11 +507,20 @@ export function useLibraryAnalytics() {
     return approvedTasks.map(task => {
       const events = taskPeriodEventsMap.get(task.id) || [];
       const conceptos = taskConceptsMap.get(task.id) || [];
-      const ultimaSesion = taskAllTimeMaxDate.get(task.id) || null;
 
+      // Última sesión dentro del periodo seleccionado
+      let ultimaSesionPeriodo: string | null = null;
+      for (const ev of events) {
+        if (!ultimaSesionPeriodo || ev.fecha > ultimaSesionPeriodo) {
+          ultimaSesionPeriodo = ev.fecha;
+        }
+      }
+
+      // Última sesión histórica all-time para calcular semáforo de días sin estímulo
+      const ultimaSesionAllTime = taskAllTimeMaxDate.get(task.id) || null;
       let diasSinEstimulo: number | null = null;
-      if (ultimaSesion) {
-        const d1 = new Date(ultimaSesion);
+      if (ultimaSesionAllTime) {
+        const d1 = new Date(ultimaSesionAllTime);
         const d2 = new Date(todayStr);
         const diffMs = d2.getTime() - d1.getTime();
         diasSinEstimulo = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
@@ -590,7 +595,7 @@ export function useLibraryAnalytics() {
         diasDistintos: taskDates.size,
         minutos: totalMinutes,
         minutosDetalle,
-        ultimaSesion,
+        ultimaSesion: ultimaSesionPeriodo,
         diasSinEstimulo,
         alternativasAprobadas: alternativasAprobadas.slice(0, 3)
       };
