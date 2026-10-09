@@ -6,16 +6,23 @@ import {
   getFamilyForConcept
 } from '@/lib/planificacion/tacticalDictionary';
 
-export const FECHA_INICIO_TRAZABILIDAD = '2026-10-07';
+/** Fecha de referencia en que comenzó el registro operativo de tareas en el planificador */
+export const FECHA_INICIO_TRAZABILIDAD_OPERATIVA = '2026-10-07';
 
 export type PeriodoAnalisis = 'semana' | '15d' | '30d' | 'temporada';
+export type AnalyticsSource = 'total' | 'historico' | 'reutilizacion';
+export type OrigenPresencia = 'historico' | 'reutilizacion' | 'ambos' | 'ninguno';
 
-export interface LinkedTaskUsage {
+export interface TaskEvent {
   id: string;
   library_task_id: string;
-  minutos: number;
   fecha: string;
-  session_id: string;
+  source: 'historical' | 'reuse';
+  minutosValidados: number; // Suma solo si EXACTO_PDF o planning_tasks
+  minutosRaw: number | null;
+  metodo_minutos?: string | null;
+  session_id?: string;
+  nombre_tarea?: string;
 }
 
 export interface ConceptMetricRow {
@@ -31,7 +38,14 @@ export interface ConceptMetricRow {
   ultimaVez: string | null;
   diasSinEstimulo: number | null;
   tareasAprobadasDisponibles: number;
-  diagnostico: 'Sin tareas en Biblioteca' | 'Biblioteca escasa' | 'Tenemos tareas, no lo entrenamos' | 'Trabajado recientemente';
+  origenPresencia: OrigenPresencia;
+  diagnostico:
+    | 'Sin tareas en Biblioteca'
+    | 'Biblioteca escasa'
+    | 'Tenemos tareas, no lo entrenamos'
+    | 'Trabajado recientemente'
+    | 'Documentado en histórico'
+    | 'Histórico y reutilizado';
 }
 
 export interface TaskMetricRow {
@@ -39,9 +53,13 @@ export interface TaskMetricRow {
   nombre: string;
   tipo_tarea: string;
   conceptos: string[];
-  usos: number;
+  usosTotales: number;
+  usosHistoricos: number;
+  usosReutilizacion: number;
+  origenPresencia: OrigenPresencia;
   diasDistintos: number;
   minutos: number;
+  minutosDetalle: string;
   ultimaSesion: string | null;
   diasSinEstimulo: number | null;
   alternativasAprobadas: Array<{
@@ -52,11 +70,16 @@ export interface TaskMetricRow {
 }
 
 export interface LibraryAnalyticsKPIs {
+  fuenteActiva: AnalyticsSource;
   tareasAprobadasUtilizadas: number;
   totalTareasAprobadas: number;
   porcentajeExplotacion: number;
   minutosAcumulados: number;
+  minutosExactosHistoricos: number;
+  minutosReutilizacion: number;
   diasDistintosEntrenamiento: number;
+  diasHistoricos: number;
+  diasReutilizacion: number;
   conceptosTrabajados: number;
   totalConceptosOficiales: number;
   conceptosConTareasAprobadas: number;
@@ -70,10 +93,12 @@ export function useLibraryAnalytics() {
   // Raw data from Supabase
   const [libraryTasks, setLibraryTasks] = useState<PlanningTaskLibrary[]>([]);
   const [libraryConcepts, setLibraryConcepts] = useState<PlanningTaskLibraryConcept[]>([]);
-  const [usages, setUsages] = useState<LinkedTaskUsage[]>([]);
+  const [historicalEvents, setHistoricalEvents] = useState<TaskEvent[]>([]);
+  const [reuseEvents, setReuseEvents] = useState<TaskEvent[]>([]);
 
   // Filter states
   const [periodo, setPeriodo] = useState<PeriodoAnalisis>('temporada');
+  const [fuenteAnalisis, setFuenteAnalisis] = useState<AnalyticsSource>('total');
   const [selectedFamily, setSelectedFamily] = useState<string>('todas');
   const [selectedConcept, setSelectedConcept] = useState<string>('todos');
   const [searchTerm, setSearchTerm] = useState<string>('');
@@ -87,7 +112,7 @@ export function useLibraryAnalytics() {
         setLoading(true);
         setErrorMsg(null);
 
-        // 1. Fetch library tasks
+        // 1. Fetch library tasks (catálogo de tareas)
         const { data: tasksData, error: tasksErr } = await supabase
           .from('planning_task_library')
           .select('id, nombre, tipo_tarea, minutos_defecto, jugadores_defecto, espacio_defecto, objetivo, descripcion, observaciones, creado_por, created_at, sesion_origen_id, numero_tarea_pdf, aprobada')
@@ -95,8 +120,7 @@ export function useLibraryAnalytics() {
 
         if (tasksErr) throw tasksErr;
 
-        // 2. Fetch library concepts (168 tuples)
-        // Usamos la API route de servidor para garantizar acceso seguro evitando el bloqueo RLS de cliente anon
+        // 2. Fetch library concepts (168 tuplas canónicas auditadas)
         let fetchedConcepts: PlanningTaskLibraryConcept[] = [];
         try {
           const resp = await fetch('/api/planificacion/library-concepts');
@@ -110,7 +134,7 @@ export function useLibraryAnalytics() {
           console.warn('[useLibraryAnalytics] Fallback a supabase directo para conceptos:', fetchErr);
         }
 
-        // Fallback directo a supabase si la API route no estuviera disponible
+        // Fallback directo a supabase si la API route no respondiese
         if (fetchedConcepts.length === 0) {
           const { data: directConceptsData } = await supabase
             .from('planning_task_library_concepts')
@@ -120,38 +144,83 @@ export function useLibraryAnalytics() {
           }
         }
 
-        // 3. Fetch linked usages from planning_tasks joined with planning_sessions
-        const { data: usagesData, error: usagesErr } = await supabase
+        // 3. Fetch historical training view (51 filas homologadas en v_planning_training_history_current)
+        const { data: histData, error: histErr } = await supabase
+          .from('v_planning_training_history_current')
+          .select('id, session_id, library_task_id, fecha, numero_tarea_pdf, estado_documental, minutos, metodo_minutos, metadata');
+
+        if (histErr) {
+          console.warn('[useLibraryAnalytics] Aviso al cargar v_planning_training_history_current:', histErr);
+        }
+
+        // 4. Fetch linked reuse tasks from planning_tasks joined with planning_sessions
+        const { data: reuseData, error: reuseErr } = await supabase
           .from('planning_tasks')
-          .select('id, library_task_id, minutos, planning_sessions!inner(id, fecha)')
+          .select('id, library_task_id, minutos, nombre_tarea, planning_sessions!inner(id, fecha)')
           .not('library_task_id', 'is', null);
 
-        if (usagesErr) throw usagesErr;
+        if (reuseErr) throw reuseErr;
 
         if (!isMounted) return;
 
         setLibraryTasks((tasksData as unknown as PlanningTaskLibrary[]) || []);
         setLibraryConcepts(fetchedConcepts);
 
-        // Flatten usages
+        // Mapeo de eventos históricos documentados
+        interface RawHistItem {
+          id: string;
+          session_id?: string;
+          library_task_id: string;
+          fecha: string;
+          numero_tarea_pdf?: number;
+          estado_documental?: string;
+          minutos?: number | string | null;
+          metodo_minutos?: string | null;
+          metadata?: { nombre_tarea?: string; duracion_texto?: string | null } | null;
+        }
+
+        const parsedHistoricalEvents: TaskEvent[] = ((histData as unknown as RawHistItem[]) || [])
+          .map(h => {
+            const esMinutoExacto = h.metodo_minutos === 'EXACTO_PDF' && h.minutos !== null && !isNaN(Number(h.minutos));
+            return {
+              id: h.id,
+              library_task_id: h.library_task_id,
+              fecha: h.fecha,
+              source: 'historical' as const,
+              minutosValidados: esMinutoExacto ? Number(h.minutos) : 0,
+              minutosRaw: h.minutos !== null && h.minutos !== undefined ? Number(h.minutos) : null,
+              metodo_minutos: h.metodo_minutos || null,
+              session_id: h.session_id,
+              nombre_tarea: h.metadata?.nombre_tarea
+            };
+          })
+          .filter(ev => Boolean(ev.library_task_id && ev.fecha));
+
+        // Mapeo de eventos de reutilización en calendario
         interface RawUsageItem {
           id: string;
           library_task_id: string;
           minutos: number | string | null;
+          nombre_tarea?: string | null;
           planning_sessions?: { id?: string; fecha?: string } | null;
         }
 
-        const flattenedUsages: LinkedTaskUsage[] = ((usagesData as unknown as RawUsageItem[]) || [])
-          .map((item) => ({
+        const parsedReuseEvents: TaskEvent[] = ((reuseData as unknown as RawUsageItem[]) || [])
+          .map(item => ({
             id: item.id,
             library_task_id: item.library_task_id,
-            minutos: Number(item.minutos) || 0,
             fecha: item.planning_sessions?.fecha || '',
-            session_id: item.planning_sessions?.id || ''
+            source: 'reuse' as const,
+            minutosValidados: Number(item.minutos) || 0,
+            minutosRaw: Number(item.minutos) || 0,
+            metodo_minutos: 'PLANIFICACION_SESION',
+            session_id: item.planning_sessions?.id || '',
+            nombre_tarea: item.nombre_tarea || undefined
           }))
-          .filter((u: LinkedTaskUsage) => Boolean(u.library_task_id && u.fecha));
+          .filter(ev => Boolean(ev.library_task_id && ev.fecha && ev.fecha >= FECHA_INICIO_TRAZABILIDAD_OPERATIVA));
 
-        setUsages(flattenedUsages);
+        setHistoricalEvents(parsedHistoricalEvents);
+        setReuseEvents(parsedReuseEvents);
       } catch (err: unknown) {
         console.error('Error al cargar datos de analítica de biblioteca:', err);
         if (isMounted) {
@@ -196,11 +265,31 @@ export function useLibraryAnalytics() {
     return '2026-07-01';
   }, [periodo]);
 
-  // Filtered usages in selected period and with session date >= FECHA_INICIO_TRAZABILIDAD and <= today
-  const filteredUsages = useMemo(() => {
-    const effectiveMinDate = cutoffDateStr < FECHA_INICIO_TRAZABILIDAD ? FECHA_INICIO_TRAZABILIDAD : cutoffDateStr;
-    return usages.filter(u => u.fecha >= effectiveMinDate && u.fecha <= todayStr);
-  }, [usages, cutoffDateStr, todayStr]);
+  // Unificación de todos los eventos
+  const allEvents = useMemo(() => {
+    return [...historicalEvents, ...reuseEvents];
+  }, [historicalEvents, reuseEvents]);
+
+  // Eventos filtrados por fuente activa y por periodo
+  const filteredEvents = useMemo(() => {
+    return allEvents.filter(ev => {
+      if (fuenteAnalisis === 'historico' && ev.source !== 'historical') return false;
+      if (fuenteAnalisis === 'reutilizacion' && ev.source !== 'reuse') return false;
+      // Regla estricta: reuse solo es computable a partir de trazabilidad fiable (>= 2026-10-07)
+      if (ev.source === 'reuse' && ev.fecha < FECHA_INICIO_TRAZABILIDAD_OPERATIVA) return false;
+      return ev.fecha >= cutoffDateStr && ev.fecha <= todayStr;
+    });
+  }, [allEvents, fuenteAnalisis, cutoffDateStr, todayStr]);
+
+  // Eventos acumulados hasta hoy según fuente activa (para semáforos y última sesión)
+  const allTimeEventsForActiveSource = useMemo(() => {
+    return allEvents.filter(ev => {
+      if (fuenteAnalisis === 'historico' && ev.source !== 'historical') return false;
+      if (fuenteAnalisis === 'reutilizacion' && ev.source !== 'reuse') return false;
+      if (ev.source === 'reuse' && ev.fecha < FECHA_INICIO_TRAZABILIDAD_OPERATIVA) return false;
+      return ev.fecha <= todayStr;
+    });
+  }, [allEvents, fuenteAnalisis, todayStr]);
 
   // Map of concepts per approved task: taskId -> string[]
   const taskConceptsMap = useMemo(() => {
@@ -214,10 +303,14 @@ export function useLibraryAnalytics() {
     return map;
   }, [libraryConcepts]);
 
+  // Approved tasks only
+  const approvedTasks = useMemo(() => {
+    return libraryTasks.filter(t => t.aprobada === true);
+  }, [libraryTasks]);
+
   // Map of approved tasks per concept: concepto -> PlanningTaskLibrary[]
   const conceptApprovedTasksMap = useMemo(() => {
     const map = new Map<string, PlanningTaskLibrary[]>();
-    const approvedTasks = libraryTasks.filter(t => t.aprobada === true);
     const approvedMap = new Map(approvedTasks.map(t => [t.id, t]));
 
     for (const c of libraryConcepts) {
@@ -231,25 +324,53 @@ export function useLibraryAnalytics() {
       }
     }
     return map;
-  }, [libraryTasks, libraryConcepts]);
+  }, [approvedTasks, libraryConcepts]);
 
-  // Approved tasks only
-  const approvedTasks = useMemo(() => {
-    return libraryTasks.filter(t => t.aprobada === true);
-  }, [libraryTasks]);
+  // Index de eventos en el periodo por task id: taskId -> TaskEvent[]
+  const taskPeriodEventsMap = useMemo(() => {
+    const map = new Map<string, TaskEvent[]>();
+    for (const ev of filteredEvents) {
+      if (!map.has(ev.library_task_id)) {
+        map.set(ev.library_task_id, []);
+      }
+      map.get(ev.library_task_id)!.push(ev);
+    }
+    return map;
+  }, [filteredEvents]);
 
-  // ── KPIs SUPERIORES ──
+  // Fecha máxima histórica de cada tarea (para semáforos)
+  const taskAllTimeMaxDate = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const ev of allTimeEventsForActiveSource) {
+      const prev = map.get(ev.library_task_id);
+      if (!prev || ev.fecha > prev) {
+        map.set(ev.library_task_id, ev.fecha);
+      }
+    }
+    return map;
+  }, [allTimeEventsForActiveSource]);
+
+  // ── KPIS SUPERIORES ──
   const kpis: LibraryAnalyticsKPIs = useMemo(() => {
     const approvedTaskIds = new Set(approvedTasks.map(t => t.id));
+    const relevantEvents = filteredEvents.filter(e => approvedTaskIds.has(e.library_task_id));
 
-    // Usages that correspond to approved tasks within the period
-    const relevantUsages = filteredUsages.filter(u => approvedTaskIds.has(u.library_task_id));
+    const usedTaskIds = new Set(relevantEvents.map(e => e.library_task_id));
+    const distinctDates = new Set(relevantEvents.map(e => e.fecha));
+    const totalMinutes = relevantEvents.reduce((sum, e) => sum + e.minutosValidados, 0);
 
-    const usedTaskIds = new Set(relevantUsages.map(u => u.library_task_id));
-    const distinctDates = new Set(relevantUsages.map(u => u.fecha));
-    const totalMinutes = relevantUsages.reduce((sum, u) => sum + u.minutos, 0);
+    const histMinutes = relevantEvents
+      .filter(e => e.source === 'historical')
+      .reduce((sum, e) => sum + e.minutosValidados, 0);
 
-    // Distinct canonical concepts worked via used approved tasks
+    const reuseMinutes = relevantEvents
+      .filter(e => e.source === 'reuse')
+      .reduce((sum, e) => sum + e.minutosValidados, 0);
+
+    const histDates = new Set(relevantEvents.filter(e => e.source === 'historical').map(e => e.fecha));
+    const reuseDates = new Set(relevantEvents.filter(e => e.source === 'reuse').map(e => e.fecha));
+
+    // Conceptos canónicos distintos estimulados
     const workedConcepts = new Set<string>();
     usedTaskIds.forEach(tId => {
       const concepts = taskConceptsMap.get(tId) || [];
@@ -266,48 +387,26 @@ export function useLibraryAnalytics() {
     const conceptosSinTareasAprobadas = totalConceptosOficiales - conceptosConTareasAprobadas; // 2
 
     return {
+      fuenteActiva: fuenteAnalisis,
       tareasAprobadasUtilizadas: tareasUsadasCount,
       totalTareasAprobadas: totalAprobadas,
       porcentajeExplotacion: Number(explotacion.toFixed(1)),
       minutosAcumulados: totalMinutes,
+      minutosExactosHistoricos: histMinutes,
+      minutosReutilizacion: reuseMinutes,
       diasDistintosEntrenamiento: distinctDates.size,
+      diasHistoricos: histDates.size,
+      diasReutilizacion: reuseDates.size,
       conceptosTrabajados: workedConcepts.size,
       totalConceptosOficiales,
       conceptosConTareasAprobadas,
       conceptosSinTareasAprobadas
     };
-  }, [approvedTasks, filteredUsages, taskConceptsMap, conceptApprovedTasksMap]);
+  }, [approvedTasks, filteredEvents, taskConceptsMap, conceptApprovedTasksMap, fuenteAnalisis]);
 
   // ── TABLA: POR CONCEPTO ──
   const conceptMetrics: ConceptMetricRow[] = useMemo(() => {
-    // Universo completo de 63 conceptos canónicos oficiales del Diccionario V2
     const allCanonicalConcepts = TACTICAL_FAMILIES.flatMap(f => f.concepts);
-
-    // Usage index per library task: taskId -> { usages: number, dates: Set<string>, minutes: number, maxDate: string }
-    const taskUsageStats = new Map<string, { usages: number; dates: Set<string>; minutes: number; maxDate: string }>();
-    for (const u of filteredUsages) {
-      if (!taskUsageStats.has(u.library_task_id)) {
-        taskUsageStats.set(u.library_task_id, { usages: 0, dates: new Set(), minutes: 0, maxDate: '' });
-      }
-      const st = taskUsageStats.get(u.library_task_id)!;
-      st.usages += 1;
-      st.dates.add(u.fecha);
-      st.minutes += u.minutos;
-      if (!st.maxDate || u.fecha > st.maxDate) {
-        st.maxDate = u.fecha;
-      }
-    }
-
-    // Historical max date per task (for diasSinEstimulo, respetando >= FECHA_INICIO_TRAZABILIDAD)
-    const taskAllTimeMaxDate = new Map<string, string>();
-    for (const u of usages) {
-      if (u.fecha >= FECHA_INICIO_TRAZABILIDAD && u.fecha <= todayStr) {
-        const prev = taskAllTimeMaxDate.get(u.library_task_id);
-        if (!prev || u.fecha > prev) {
-          taskAllTimeMaxDate.set(u.library_task_id, u.fecha);
-        }
-      }
-    }
 
     return allCanonicalConcepts.map(concepto => {
       const cleanConcepto = concepto.trim();
@@ -326,15 +425,21 @@ export function useLibraryAnalytics() {
       let minutos = 0;
       const fechasDistintas = new Set<string>();
       let tareasUsadasCount = 0;
+      let hasHistorical = false;
+      let hasReuse = false;
       let ultimaFechaConcepto: string | null = null;
 
       for (const t of tasksForConcept) {
-        const st = taskUsageStats.get(t.id);
-        if (st && st.usages > 0) {
+        const events = taskPeriodEventsMap.get(t.id) || [];
+        if (events.length > 0) {
           tareasUsadasCount += 1;
-          usosTotales += st.usages;
-          minutos += st.minutes;
-          st.dates.forEach(d => fechasDistintas.add(d));
+          usosTotales += events.length;
+          events.forEach(ev => {
+            minutos += ev.minutosValidados;
+            fechasDistintas.add(ev.fecha);
+            if (ev.source === 'historical') hasHistorical = true;
+            if (ev.source === 'reuse') hasReuse = true;
+          });
         }
 
         const histDate = taskAllTimeMaxDate.get(t.id);
@@ -345,7 +450,12 @@ export function useLibraryAnalytics() {
         }
       }
 
-      // Calculate days without stimulus
+      let origenPresencia: OrigenPresencia = 'ninguno';
+      if (hasHistorical && hasReuse) origenPresencia = 'ambos';
+      else if (hasHistorical) origenPresencia = 'historico';
+      else if (hasReuse) origenPresencia = 'reutilizacion';
+
+      // Cálculo de días sin estímulo
       let diasSinEstimulo: number | null = null;
       if (ultimaFechaConcepto) {
         const d1 = new Date(ultimaFechaConcepto);
@@ -354,7 +464,7 @@ export function useLibraryAnalytics() {
         diasSinEstimulo = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
       }
 
-      // Diagnóstico según reglas acordadas
+      // Diagnóstico contextualizado
       let diagnostico: ConceptMetricRow['diagnostico'];
       if (tareasAprobadasDisponibles === 0) {
         diagnostico = 'Sin tareas en Biblioteca';
@@ -362,8 +472,12 @@ export function useLibraryAnalytics() {
         diagnostico = 'Biblioteca escasa';
       } else if (tareasAprobadasDisponibles > 1 && usosTotales === 0) {
         diagnostico = 'Tenemos tareas, no lo entrenamos';
-      } else {
+      } else if (origenPresencia === 'ambos') {
+        diagnostico = 'Histórico y reutilizado';
+      } else if (origenPresencia === 'reutilizacion') {
         diagnostico = 'Trabajado recientemente';
+      } else {
+        diagnostico = 'Documentado en histórico';
       }
 
       return {
@@ -379,47 +493,25 @@ export function useLibraryAnalytics() {
         ultimaVez: ultimaFechaConcepto,
         diasSinEstimulo,
         tareasAprobadasDisponibles,
+        origenPresencia,
         diagnostico
       };
     });
-  }, [conceptApprovedTasksMap, filteredUsages, usages, todayStr, libraryConcepts]);
+  }, [conceptApprovedTasksMap, taskPeriodEventsMap, taskAllTimeMaxDate, todayStr, libraryConcepts]);
 
   // ── TABLA: POR TAREA ──
   const taskMetrics: TaskMetricRow[] = useMemo(() => {
-    // Stats in current period
-    const taskPeriodStats = new Map<string, { usos: number; dates: Set<string>; minutes: number }>();
-    for (const u of filteredUsages) {
-      if (!taskPeriodStats.has(u.library_task_id)) {
-        taskPeriodStats.set(u.library_task_id, { usos: 0, dates: new Set(), minutes: 0 });
-      }
-      const st = taskPeriodStats.get(u.library_task_id)!;
-      st.usos += 1;
-      st.dates.add(u.fecha);
-      st.minutes += u.minutos;
-    }
-
-    // Historical max date (respetando >= FECHA_INICIO_TRAZABILIDAD)
-    const taskAllTimeMax = new Map<string, string>();
-    for (const u of usages) {
-      if (u.fecha >= FECHA_INICIO_TRAZABILIDAD && u.fecha <= todayStr) {
-        const prev = taskAllTimeMax.get(u.library_task_id);
-        if (!prev || u.fecha > prev) {
-          taskAllTimeMax.set(u.library_task_id, u.fecha);
-        }
-      }
-    }
-
-    // Pre-calculate usages for each task for alternatives comparison
+    // Usos de cada tarea en el periodo para alternativas
     const allTaskUsagesMap = new Map<string, number>();
     approvedTasks.forEach(t => {
-      const st = taskPeriodStats.get(t.id);
-      allTaskUsagesMap.set(t.id, st?.usos || 0);
+      const evs = taskPeriodEventsMap.get(t.id) || [];
+      allTaskUsagesMap.set(t.id, evs.length);
     });
 
     return approvedTasks.map(task => {
-      const st = taskPeriodStats.get(task.id);
+      const events = taskPeriodEventsMap.get(task.id) || [];
       const conceptos = taskConceptsMap.get(task.id) || [];
-      const ultimaSesion = taskAllTimeMax.get(task.id) || null;
+      const ultimaSesion = taskAllTimeMaxDate.get(task.id) || null;
 
       let diasSinEstimulo: number | null = null;
       if (ultimaSesion) {
@@ -429,13 +521,36 @@ export function useLibraryAnalytics() {
         diasSinEstimulo = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
       }
 
-      const taskUsos = st?.usos || 0;
+      const usosTotales = events.length;
+      const usosHistoricos = events.filter(e => e.source === 'historical').length;
+      const usosReutilizacion = events.filter(e => e.source === 'reuse').length;
 
-      // Find approved alternatives
-      // If task has concepts: other approved tasks sharing at least 1 concept with <= uses
-      // If task has NO concepts (e.g. 2026-09-03_T2): other approved tasks sharing tipo_tarea with <= uses
+      let origenPresencia: OrigenPresencia = 'ninguno';
+      if (usosHistoricos > 0 && usosReutilizacion > 0) origenPresencia = 'ambos';
+      else if (usosHistoricos > 0) origenPresencia = 'historico';
+      else if (usosReutilizacion > 0) origenPresencia = 'reutilizacion';
+
+      const taskDates = new Set(events.map(e => e.fecha));
+      const totalMinutes = events.reduce((sum, e) => sum + e.minutosValidados, 0);
+      const histMin = events.filter(e => e.source === 'historical').reduce((sum, e) => sum + e.minutosValidados, 0);
+      const reuseMin = events.filter(e => e.source === 'reuse').reduce((sum, e) => sum + e.minutosValidados, 0);
+
+      let minutosDetalle = '—';
+      if (totalMinutes > 0) {
+        if (usosHistoricos > 0 && usosReutilizacion > 0) {
+          minutosDetalle = `${totalMinutes}′ (${histMin}′ hist + ${reuseMin}′ reut)`;
+        } else if (usosHistoricos > 0) {
+          minutosDetalle = `${histMin}′ (PDF exacto)`;
+        } else {
+          minutosDetalle = `${reuseMin}′ (reutilización)`;
+        }
+      } else if (usosTotales > 0) {
+        const hasRango = events.some(e => e.metodo_minutos === 'RANGO_PDF');
+        minutosDetalle = hasRango ? 'Rango en PDF' : 'Sin minutaje en ficha';
+      }
+
+      // Encontrar alternativas aprobadas
       const alternativasAprobadas: Array<{ id: string; nombre: string; usos: number }> = [];
-
       if (conceptos.length > 0) {
         const conceptSet = new Set(conceptos);
         approvedTasks.forEach(other => {
@@ -444,25 +559,23 @@ export function useLibraryAnalytics() {
           const sharesConcept = otherConcepts.some(c => conceptSet.has(c));
           if (sharesConcept) {
             const otherUsos = allTaskUsagesMap.get(other.id) || 0;
-            if (otherUsos <= taskUsos) {
+            if (otherUsos <= usosTotales) {
               alternativasAprobadas.push({ id: other.id, nombre: other.nombre, usos: otherUsos });
             }
           }
         });
       } else {
-        // Fallback for 2026-09-03_T2
         approvedTasks.forEach(other => {
           if (other.id === task.id) return;
           if (other.tipo_tarea === task.tipo_tarea) {
             const otherUsos = allTaskUsagesMap.get(other.id) || 0;
-            if (otherUsos <= taskUsos) {
+            if (otherUsos <= usosTotales) {
               alternativasAprobadas.push({ id: other.id, nombre: other.nombre, usos: otherUsos });
             }
           }
         });
       }
 
-      // Sort alternatives by least used first
       alternativasAprobadas.sort((a, b) => a.usos - b.usos);
 
       return {
@@ -470,28 +583,29 @@ export function useLibraryAnalytics() {
         nombre: task.nombre,
         tipo_tarea: task.tipo_tarea,
         conceptos,
-        usos: taskUsos,
-        diasDistintos: st?.dates.size || 0,
-        minutos: st?.minutes || 0,
+        usosTotales,
+        usosHistoricos,
+        usosReutilizacion,
+        origenPresencia,
+        diasDistintos: taskDates.size,
+        minutos: totalMinutes,
+        minutosDetalle,
         ultimaSesion,
         diasSinEstimulo,
         alternativasAprobadas: alternativasAprobadas.slice(0, 3)
       };
     });
-  }, [approvedTasks, filteredUsages, usages, taskConceptsMap, todayStr]);
+  }, [approvedTasks, taskPeriodEventsMap, taskConceptsMap, taskAllTimeMaxDate, todayStr]);
 
-  // Filtered views according to dropdowns & search
+  // Filtrado final por desplegables y término de búsqueda
   const filteredConceptMetrics = useMemo(() => {
     return conceptMetrics.filter(row => {
-      // Family filter
       if (selectedFamily !== 'todas' && row.familiaId !== selectedFamily) {
         return false;
       }
-      // Concept filter
       if (selectedConcept !== 'todos' && row.concepto !== selectedConcept) {
         return false;
       }
-      // Text search
       if (searchTerm.trim()) {
         const q = searchTerm.toLowerCase();
         const matchConcept = row.concepto.toLowerCase().includes(q);
@@ -504,7 +618,6 @@ export function useLibraryAnalytics() {
 
   const filteredTaskMetrics = useMemo(() => {
     return taskMetrics.filter(row => {
-      // Family filter (task must have at least one concept in this family)
       if (selectedFamily !== 'todas') {
         const hasFamilyConcept = row.conceptos.some(c => {
           const f = getFamilyForConcept(c);
@@ -512,11 +625,9 @@ export function useLibraryAnalytics() {
         });
         if (!hasFamilyConcept) return false;
       }
-      // Concept filter
       if (selectedConcept !== 'todos' && !row.conceptos.includes(selectedConcept)) {
         return false;
       }
-      // Text search
       if (searchTerm.trim()) {
         const q = searchTerm.toLowerCase();
         const matchName = row.nombre.toLowerCase().includes(q);
@@ -533,6 +644,8 @@ export function useLibraryAnalytics() {
     errorMsg,
     periodo,
     setPeriodo,
+    fuenteAnalisis,
+    setFuenteAnalisis,
     selectedFamily,
     setSelectedFamily,
     selectedConcept,
