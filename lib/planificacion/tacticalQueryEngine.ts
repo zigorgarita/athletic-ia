@@ -189,6 +189,266 @@ function findPeriodInQuery(queryNorm: string): '15d' | '30d' | 'temporada' | 'se
   return null;
 }
 
+/** Encuentra todos los conceptos canónicos presentes en el texto ordenados por aparición */
+function findAllCanonicalConceptsInQuery(queryNorm: string): string[] {
+  const found: Array<{ concept: string; index: number; length: number }> = [];
+
+  // 1. Alias
+  for (const [alias, canonical] of Object.entries(CANONICAL_ALIASES)) {
+    const aliasNorm = normalizeText(alias);
+    const regex = new RegExp(`(^|\\b|\\s)${aliasNorm}(\\b|\\s|$)`, 'gi');
+    let match;
+    while ((match = regex.exec(queryNorm)) !== null) {
+      if (!found.some(f => f.concept === canonical)) {
+        found.push({ concept: canonical, index: match.index, length: aliasNorm.length });
+      }
+    }
+  }
+
+  // 2. Nombres canónicos exactos
+  for (const concept of ALL_CANONICAL_CONCEPTS) {
+    const conceptNorm = normalizeText(concept);
+    const regex = new RegExp(`(^|\\b|\\s)${conceptNorm}(\\b|\\s|$)`, 'gi');
+    let match;
+    while ((match = regex.exec(queryNorm)) !== null) {
+      if (!found.some(f => f.concept === concept)) {
+        found.push({ concept, index: match.index, length: conceptNorm.length });
+      }
+    }
+  }
+
+  // 3. Parte canónica sin paréntesis
+  for (const concept of ALL_CANONICAL_CONCEPTS) {
+    const clean = concept.replace(/\s*\(.*?\)\s*/g, '').trim();
+    if (clean.length > 4) {
+      const cleanNorm = normalizeText(clean);
+      const regex = new RegExp(`(^|\\b|\\s)${cleanNorm}(\\b|\\s|$)`, 'gi');
+      let match;
+      while ((match = regex.exec(queryNorm)) !== null) {
+        if (!found.some(f => f.concept === concept)) {
+          found.push({ concept, index: match.index, length: cleanNorm.length });
+        }
+      }
+    }
+  }
+
+  found.sort((a, b) => a.index - b.index);
+  return found.map(f => f.concept);
+}
+
+/** Extrae dos candidatos a concepto en preguntas de comparación determinista */
+function extractTwoConceptCandidates(query: string): [string, string] | null {
+  const clean = query.replace(/^[¿?\s]+/, '');
+
+  // 1. Cuanto X y cuanto Y
+  const m1 = clean.match(/cu[aá]nto(?:s)?(?:\s+(?:hemos\s+entrenado|se\s+ha\s+trabajado|hemos\s+trabajado|se\s+ha\s+entrenado|tenemos|hay))?\s+(?:de\s+)?(.+?)\s+y\s+cu[aá]nto(?:s)?(?:\s+(?:hemos\s+entrenado|se\s+ha\s+trabajado|hemos\s+trabajado|se\s+ha\s+entrenado|tenemos|hay))?\s+(?:de\s+)?(.+?)(?:\s+esta\s+temporada|\s+en\s+los|\s+en\s+la|\s+en\s+el|\s+en\s+septiembre|\s+en|\s+ultimos|\?|\.|$)/i);
+  if (m1) {
+    return [m1[1].trim(), m1[2].trim()];
+  }
+
+  // 2. Que hemos entrenado mas, X o Y
+  const m2 = clean.match(/qu[eé]\s+(?:hemos\s+entrenado|se\s+ha\s+trabajado|se\s+ha\s+entrenado)\s+m[aá]s,?\s*(?:de\s+)?(.+?)\s+o\s+(?:de\s+)?(.+?)(?:\s+esta\s+temporada|\s+en\s+los|\s+en\s+la|\s+en\s+el|\s+en|\s+ultimos|\?|\.|$)/i);
+  if (m2) {
+    return [m2[1].trim(), m2[2].trim()];
+  }
+
+  // 3. Compara / comparativa / diferencia entre X y/con/vs Y
+  const m3 = clean.match(/(?:compara|comparar|comparativa|diferencia\s+entre)\s+(?:de\s+|el\s+|la\s+)?(.+?)\s+(?:y|con|frente\s+a|vs\.?)\s+(?:de\s+|el\s+|la\s+)?(.+?)(?:\s+esta\s+temporada|\s+en\s+los|\s+en\s+la|\s+en\s+el|\s+en\s+septiembre|\s+en|\s+ultimos|\?|\.|$)/i);
+  if (m3) {
+    return [m3[1].trim(), m3[2].trim()];
+  }
+
+  // 4. X vs Y
+  const m4 = clean.match(/^(.+?)\s+vs\.?\s+(.+?)(?:\s+esta\s+temporada|\s+en\s+los|\s+en\s+la|\s+en\s+el|\s+en|\s+ultimos|\?|\.|$)/i);
+  if (m4) {
+    return [m4[1].trim(), m4[2].trim()];
+  }
+
+  return null;
+}
+
+/** Extrae un término candidato a concepto cuando el usuario pregunta por él directamente */
+function extractSingleConceptCandidate(query: string): string | null {
+  const clean = query.replace(/^[¿?\s]+/, '').trim();
+  const m = clean.match(/cu[aá]nto(?:s)?(?:\s+(?:hemos\s+entrenado|se\s+ha\s+trabajado|hemos\s+trabajado|se\s+ha\s+entrenado|tenemos|hay))?\s+(?:de\s+)?(.+?)(?:\s+esta\s+temporada|\s+en\s+los|\s+en\s+la|\s+en\s+el|\s+en\s+septiembre|\s+en|\s+ultimos|\?|\.|$)/i);
+  if (m) {
+    const cand = m[1].trim();
+    if (cand.length > 2 && !/^(conceptos|tiempo|sesiones|tareas|este|esta)/i.test(cand)) {
+      return cand;
+    }
+  }
+  return null;
+}
+
+/**
+ * Manejador determinista para comparación de dos conceptos tácticos en un mismo periodo.
+ * Soporta:
+ * - Sesiones distintas con registro (X / total).
+ * - Porcentaje sobre el total de sesiones de registro del periodo.
+ * - Número de tareas asociadas.
+ * - Última fecha registrada (DD/MM/AAAA).
+ * - Origen: doc. PDF / reutilización / ambos.
+ * - Si uno o ambos términos no son canónicos, no asume equivalencias:
+ *   lo indica explícitamente y solicita aclaración.
+ */
+function handleTwoConceptsComparison(
+  query: string,
+  raw1: string,
+  raw2: string,
+  context: QueryEngineContext,
+  detectedPeriod: '15d' | '30d' | 'temporada' | 'septiembre' | null
+): QueryResult {
+  const cleanRaw1 = raw1.replace(/^["'«“\s]+|["'»”\s]+$/g, '').trim();
+  const cleanRaw2 = raw2.replace(/^["'«“\s]+|["'»”\s]+$/g, '').trim();
+
+  const canonical1 = findCanonicalConceptInQuery(normalizeText(cleanRaw1));
+  const canonical2 = findCanonicalConceptInQuery(normalizeText(cleanRaw2));
+
+  let periodEvents = context.events;
+  let labelPeriodo = 'la temporada completa';
+
+  if (detectedPeriod === '15d') {
+    const d = new Date();
+    d.setDate(d.getDate() - 15);
+    const minDate = d.toISOString().slice(0, 10);
+    periodEvents = periodEvents.filter(e => e.fecha >= minDate);
+    labelPeriodo = 'los últimos 15 días';
+  } else if (detectedPeriod === '30d') {
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    const minDate = d.toISOString().slice(0, 10);
+    periodEvents = periodEvents.filter(e => e.fecha >= minDate);
+    labelPeriodo = 'los últimos 30 días';
+  } else if (detectedPeriod === 'septiembre') {
+    periodEvents = periodEvents.filter(e => e.fecha >= '2026-09-01' && e.fecha <= '2026-09-30');
+    labelPeriodo = 'septiembre';
+  }
+
+  const uniqueDates = Array.from(new Set(periodEvents.map(e => e.fecha))).sort();
+  const totalSesiones = uniqueDates.length;
+
+  if (totalSesiones === 0) {
+    return {
+      tipo: 'no_data',
+      preguntaOriginal: query,
+      intencionDetectada: `Comparativa de conceptos en ${labelPeriodo}`,
+      respuesta: `No hay registros documentados ni reutilizaciones en ${labelPeriodo} en Athletic IA.`
+    };
+  }
+
+  function evaluateConcept(raw: string, canonical: string | null) {
+    if (!canonical) {
+      return {
+        raw,
+        canonical: null,
+        sesionesCount: 0,
+        pctFormatted: '0,0 %',
+        tareasCount: 0,
+        docCount: 0,
+        reuseCount: 0,
+        ultimaFechaFormateada: 'sin registro',
+        origenTexto: 'no canónico',
+        isCanonical: false,
+        linea: `• "${raw}" — No figura como concepto canónico en el catálogo oficial de 63 conceptos de Athletic IA. Para mantener el rigor metodológico no se asumen equivalencias automáticas sin confirmación; por favor, especifica un concepto canónico oficial (ej. Ataque Posicional, Estructura de Juego, etc.).`
+      };
+    }
+
+    const approvedTasks = context.conceptApprovedTasksMap.get(canonical.trim()) || [];
+    const taskIds = new Set(approvedTasks.map(t => t.id));
+    const matchingEvents = periodEvents.filter(e => taskIds.has(e.library_task_id));
+    const sesionesSet = new Set(matchingEvents.map(e => e.fecha));
+    const sesionesCount = sesionesSet.size;
+    const tareasCount = matchingEvents.length;
+    const pct = totalSesiones > 0 ? (sesionesCount / totalSesiones) * 100 : 0;
+    const pctFormatted = pct.toFixed(1).replace('.', ',') + ' %';
+
+    const docCount = matchingEvents.filter(e => e.source === 'historical').length;
+    const reuseCount = matchingEvents.filter(e => e.source === 'reuse').length;
+
+    let origenTexto = 'sin registros en el periodo';
+    if (docCount > 0 && reuseCount > 0) {
+      origenTexto = 'ambos (doc. PDF + reutilización)';
+    } else if (docCount > 0) {
+      origenTexto = 'doc. PDF';
+    } else if (reuseCount > 0) {
+      origenTexto = 'reutilización';
+    }
+
+    const fechasOrdenadas = Array.from(sesionesSet).sort();
+    const ultimaFecha = fechasOrdenadas.length > 0 ? fechasOrdenadas[fechasOrdenadas.length - 1] : null;
+    let ultimaFechaFormateada = 'sin registro en el periodo';
+    if (ultimaFecha) {
+      const parts = ultimaFecha.split('-');
+      if (parts.length === 3) {
+        ultimaFechaFormateada = `${parts[2]}/${parts[1]}/${parts[0]}`;
+      }
+    }
+
+    let linea: string;
+    if (sesionesCount === 0) {
+      linea = `• ${canonical} — 0/${totalSesiones} sesiones · 0,0 % · 0 tareas · Sin registros en el periodo`;
+    } else {
+      linea = `• ${canonical} — ${sesionesCount}/${totalSesiones} sesiones · ${pctFormatted} · ${tareasCount} ${tareasCount === 1 ? 'tarea' : 'tareas'} · último reg. ${ultimaFechaFormateada} · origen: ${origenTexto}`;
+    }
+
+    return {
+      raw,
+      canonical,
+      sesionesCount,
+      pctFormatted,
+      tareasCount,
+      docCount,
+      reuseCount,
+      ultimaFechaFormateada,
+      origenTexto,
+      isCanonical: true,
+      linea
+    };
+  }
+
+  const eval1 = evaluateConcept(cleanRaw1, canonical1);
+  const eval2 = evaluateConcept(cleanRaw2, canonical2);
+
+  const hasNonCanonical = !eval1.isCanonical || !eval2.isCanonical;
+  const allNonCanonical = !eval1.isCanonical && !eval2.isCanonical;
+
+  const lineas: string[] = [];
+  lineas.push(`En ${labelPeriodo} constan ${totalSesiones} sesiones con registro en Athletic IA.\n`);
+  lineas.push(`Comparativa de conceptos solicitada:`);
+  lineas.push(eval1.linea);
+  lineas.push(eval2.linea);
+
+  return {
+    tipo: hasNonCanonical ? 'clarification' : 'success',
+    preguntaOriginal: query,
+    intencionDetectada: allNonCanonical
+      ? 'Consulta de conceptos no canónicos'
+      : hasNonCanonical
+      ? `Comparativa y aclaración metodológica (${labelPeriodo})`
+      : `Comparativa: ${eval1.canonical} vs ${eval2.canonical} (${labelPeriodo})`,
+    respuesta: lineas.join('\n'),
+    trazabilidad: {
+      sesionesCount: totalSesiones,
+      tareasCount: eval1.tareasCount + eval2.tareasCount,
+      docPdfCount: eval1.docCount + eval2.docCount,
+      reuseCount: eval1.reuseCount + eval2.reuseCount,
+      detalle: `Comparativa: ${cleanRaw1} vs ${cleanRaw2} · ${labelPeriodo}`
+    },
+    detalles: [
+      { etiqueta: 'Periodo', valor: labelPeriodo },
+      { etiqueta: 'Total sesiones', valor: totalSesiones },
+      {
+        etiqueta: eval1.canonical || cleanRaw1,
+        valor: eval1.isCanonical ? `${eval1.sesionesCount}/${totalSesiones} (${eval1.pctFormatted})` : 'No canónico'
+      },
+      {
+        etiqueta: eval2.canonical || cleanRaw2,
+        valor: eval2.isCanonical ? `${eval2.sesionesCount}/${totalSesiones} (${eval2.pctFormatted})` : 'No canónico'
+      }
+    ]
+  };
+}
+
 /**
  * Manejador determinista para rankings y porcentajes de presencia por sesión.
  * Regla metodológica estricta:
@@ -401,6 +661,51 @@ export function executeTacticalQuery(
   const detectedRivalMatch = findRivalInQuery(qNorm, context.officialLeagueMatches);
   const detectedMdTag = findMdTagInQuery(qNorm);
   const detectedPeriod = findPeriodInQuery(qNorm);
+
+  const twoConceptCandidates = extractTwoConceptCandidates(query);
+  const allCanonicalInQuery = findAllCanonicalConceptsInQuery(qNorm);
+
+  // ─────────────────────────────────────────────────────────────
+  // CASO COMPARATIVO: COMPARACIÓN DETERMINISTA DE DOS CONCEPTOS
+  // ─────────────────────────────────────────────────────────────
+  if (twoConceptCandidates) {
+    return handleTwoConceptsComparison(
+      query,
+      twoConceptCandidates[0],
+      twoConceptCandidates[1],
+      context,
+      detectedPeriod
+    );
+  }
+
+  if (allCanonicalInQuery.length >= 2 && !detectedRivalMatch && detectedJornada === null) {
+    return handleTwoConceptsComparison(
+      query,
+      allCanonicalInQuery[0],
+      allCanonicalInQuery[1],
+      context,
+      detectedPeriod
+    );
+  }
+
+  // Guardrail para consulta sobre término no reconocido en catálogo
+  const singleCandidate = extractSingleConceptCandidate(query);
+  if (singleCandidate && !detectedConcept && !detectedRivalMatch && detectedJornada === null && !detectedMdTag) {
+    const isKnownNonCanonical = findCanonicalConceptInQuery(normalizeText(singleCandidate)) === null;
+    if (isKnownNonCanonical) {
+      return {
+        tipo: 'clarification',
+        preguntaOriginal: query,
+        intencionDetectada: `Concepto no reconocido ("${singleCandidate}")`,
+        respuesta: `El término "${singleCandidate}" no figura como concepto canónico en el catálogo oficial de 63 conceptos de Athletic IA. Para preservar el rigor metodológico no se asumen equivalencias automáticas sin confirmación; por favor, formula la consulta indicando un concepto canónico oficial (ej. Ataque Posicional, Estructura de Juego, Salida de Balón, etc.).`,
+        detalles: [
+          { etiqueta: 'Término consultado', valor: singleCandidate },
+          { etiqueta: 'Catálogo oficial', valor: '63 conceptos canónicos' },
+          { etiqueta: 'Estado', valor: 'No canónico (sin equivalencia asumida)' }
+        ]
+      };
+    }
+  }
 
   // ─────────────────────────────────────────────────────────────
   // CASO A: CONSULTA POR RIVAL O JORNADA DE LIGA

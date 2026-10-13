@@ -25,8 +25,9 @@ interface ConsultaTacticoModalProps {
 }
 
 const PREGUNTAS_SUGERIDAS = [
-  '¿Qué hemos entrenado los últimos 15 días?',
+  '¿Cuánto hemos entrenado Modelo de Juego y cuánto Salida de Balón esta temporada?',
   '¿Qué conceptos hemos entrenado más y menos en los últimos 30 días en porcentaje?',
+  '¿Qué hemos entrenado los últimos 15 días?',
   '¿Qué conceptos no aparecen en los últimos 30 días?',
   '¿Qué trabajamos antes de J2 Santutxu?',
   '¿Cuándo se registró por última vez Presión Tras Pérdida?',
