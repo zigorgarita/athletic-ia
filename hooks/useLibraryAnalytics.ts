@@ -768,6 +768,11 @@ export function useLibraryAnalytics() {
 
   const filteredTaskMetrics = useMemo(() => {
     return taskMetrics.filter(row => {
+      // Si hay una jornada concreta seleccionada (filtroJornada !== 'todas'),
+      // Por Tarea muestra únicamente tareas con usosTotales > 0 dentro del filtro activo
+      if (filtroJornada !== 'todas' && row.usosTotales === 0) {
+        return false;
+      }
       if (selectedFamily !== 'todas') {
         const hasFamilyConcept = row.conceptos.some(c => {
           const f = getFamilyForConcept(c);
@@ -787,7 +792,7 @@ export function useLibraryAnalytics() {
       }
       return true;
     });
-  }, [taskMetrics, selectedFamily, selectedConcept, searchTerm]);
+  }, [taskMetrics, filtroJornada, selectedFamily, selectedConcept, searchTerm]);
 
   return {
     loading,
