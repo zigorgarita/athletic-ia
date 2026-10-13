@@ -189,6 +189,161 @@ function findPeriodInQuery(queryNorm: string): '15d' | '30d' | 'temporada' | 'se
   return null;
 }
 
+/**
+ * Manejador determinista para rankings y porcentajes de presencia por sesión.
+ * Regla metodológica estricta:
+ * porcentaje = sesiones_distintas_en_que_aparece_el_concepto / total_sesiones_con_registro_del_periodo × 100
+ * Un concepto cuenta como máximo 1 vez por sesión, aunque aparezca en varias tareas.
+ */
+function handleRankingAndPercentages(
+  query: string,
+  qNorm: string,
+  context: QueryEngineContext,
+  detectedPeriod: '15d' | '30d' | 'temporada' | 'septiembre' | null,
+  isAskingMoreAndLess: boolean
+): QueryResult {
+  let periodEvents = context.events;
+  let labelPeriodo = 'la temporada completa';
+
+  if (detectedPeriod === '15d' || qNorm.includes('15 dias') || qNorm.includes('ultimos 15')) {
+    const d = new Date();
+    d.setDate(d.getDate() - 15);
+    const minDate = d.toISOString().slice(0, 10);
+    periodEvents = periodEvents.filter(e => e.fecha >= minDate);
+    labelPeriodo = 'los últimos 15 días';
+  } else if (detectedPeriod === '30d' || qNorm.includes('30 dias') || qNorm.includes('ultimos 30') || qNorm.includes('mes')) {
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    const minDate = d.toISOString().slice(0, 10);
+    periodEvents = periodEvents.filter(e => e.fecha >= minDate);
+    labelPeriodo = 'los últimos 30 días';
+  } else if (detectedPeriod === 'septiembre' || qNorm.includes('septiembre')) {
+    periodEvents = periodEvents.filter(e => e.fecha >= '2026-09-01' && e.fecha <= '2026-09-30');
+    labelPeriodo = 'septiembre';
+  }
+
+  const uniqueDates = Array.from(new Set(periodEvents.map(e => e.fecha))).sort();
+  const totalSesiones = uniqueDates.length;
+  const docCount = periodEvents.filter(e => e.source === 'historical').length;
+  const reuseCount = periodEvents.filter(e => e.source === 'reuse').length;
+
+  if (totalSesiones === 0) {
+    return {
+      tipo: 'no_data',
+      preguntaOriginal: query,
+      intencionDetectada: `Distribución táctica en ${labelPeriodo}`,
+      respuesta: `No hay registros documentados ni reutilizaciones en ${labelPeriodo} en Athletic IA.`
+    };
+  }
+
+  interface ConceptStat {
+    concepto: string;
+    sesionesCount: number;
+    tareasCount: number;
+    pct: number;
+    pctFormatted: string;
+  }
+
+  const stats: ConceptStat[] = ALL_CANONICAL_CONCEPTS.map(concepto => {
+    const approvedTasks = context.conceptApprovedTasksMap.get(concepto.trim()) || [];
+    const taskIds = new Set(approvedTasks.map(t => t.id));
+    const matchingEvents = periodEvents.filter(e => taskIds.has(e.library_task_id));
+    const sesionesSet = new Set(matchingEvents.map(e => e.fecha));
+    const sesionesCount = sesionesSet.size;
+    const tareasCount = matchingEvents.length;
+    const pct = totalSesiones > 0 ? (sesionesCount / totalSesiones) * 100 : 0;
+    const pctFormatted = pct.toFixed(1).replace('.', ',') + ' %';
+
+    return {
+      concepto,
+      sesionesCount,
+      tareasCount,
+      pct,
+      pctFormatted
+    };
+  });
+
+  const conRegistro = stats.filter(s => s.sesionesCount > 0);
+  const sinRegistro = stats.filter(s => s.sesionesCount === 0);
+
+  // Ordenar estrictamente de mayor a menor porcentaje, luego por tareas
+  conRegistro.sort((a, b) => b.sesionesCount - a.sesionesCount || b.tareasCount - a.tareasCount || a.concepto.localeCompare(b.concepto));
+
+  const isOnlyAskingLess = !isAskingMoreAndLess && /(?:menos|menor|menor\s+presencia|menos\s+entrenados)/i.test(qNorm);
+
+  const lineas: string[] = [];
+  lineas.push(`En ${labelPeriodo} constan ${totalSesiones} sesiones distintas con registro y ${periodEvents.length} tareas registradas sobre los 63 conceptos canónicos:`);
+
+  if (isAskingMoreAndLess) {
+    // 1. Mayor porcentaje
+    const topCount = Math.min(5, conRegistro.length);
+    const topItems = conRegistro.slice(0, topCount);
+    lineas.push(`\n• Mayor porcentaje de presencia por sesión (ordenado de mayor a menor):`);
+    topItems.forEach((c, idx) => {
+      lineas.push(`${idx + 1}. ${c.concepto} — ${c.sesionesCount}/${totalSesiones} sesiones · ${c.pctFormatted} (${c.tareasCount} ${c.tareasCount === 1 ? 'tarea' : 'tareas'})`);
+    });
+
+    // 2. Menor porcentaje (> 0)
+    if (conRegistro.length > topCount) {
+      const bottomCount = Math.min(4, Math.max(1, conRegistro.length - topCount));
+      const bottomItems = [...conRegistro].reverse().slice(0, bottomCount);
+      lineas.push(`\n• Menor presencia registrada (> 0 %):`);
+      bottomItems.forEach(c => {
+        lineas.push(`- ${c.concepto} — ${c.sesionesCount}/${totalSesiones} sesiones · ${c.pctFormatted} (${c.tareasCount} ${c.tareasCount === 1 ? 'tarea' : 'tareas'})`);
+      });
+    }
+
+    // 3. Sin registros en el periodo (0 %)
+    lineas.push(`\n• Sin registros en el periodo (0 %):`);
+    const muestraSin = sinRegistro.slice(0, 5).map(c => c.concepto).join(', ');
+    lineas.push(`${sinRegistro.length} conceptos de los 63 canónicos cuentan con 0 % de presencia en el periodo (ej. ${muestraSin}${sinRegistro.length > 5 ? '...' : ''}).`);
+  } else if (isOnlyAskingLess) {
+    const bottomItems = [...conRegistro].reverse().slice(0, 5);
+    lineas.push(`\n• Menor presencia registrada (> 0 %):`);
+    bottomItems.forEach((c, idx) => {
+      lineas.push(`${idx + 1}. ${c.concepto} — ${c.sesionesCount}/${totalSesiones} sesiones · ${c.pctFormatted} (${c.tareasCount} ${c.tareasCount === 1 ? 'tarea' : 'tareas'})`);
+    });
+
+    lineas.push(`\n• Sin registros en el periodo (0 %):`);
+    const muestraSin = sinRegistro.slice(0, 5).map(c => c.concepto).join(', ');
+    lineas.push(`${sinRegistro.length} conceptos de los 63 canónicos cuentan con 0 % de presencia en el periodo (ej. ${muestraSin}${sinRegistro.length > 5 ? '...' : ''}).`);
+  } else {
+    // Mayor presencia / ranking general con porcentaje
+    const topCount = Math.min(6, conRegistro.length);
+    const topItems = conRegistro.slice(0, topCount);
+    lineas.push(`\n• Distribución de mayor a menor porcentaje de presencia:`);
+    topItems.forEach((c, idx) => {
+      lineas.push(`${idx + 1}. ${c.concepto} — ${c.sesionesCount}/${totalSesiones} sesiones · ${c.pctFormatted} (${c.tareasCount} ${c.tareasCount === 1 ? 'tarea' : 'tareas'})`);
+    });
+
+    lineas.push(`\n• Sin registros en el periodo (0 %):`);
+    const muestraSin = sinRegistro.slice(0, 5).map(c => c.concepto).join(', ');
+    lineas.push(`${sinRegistro.length} conceptos cuentan con 0 % de presencia en el periodo (ej. ${muestraSin}${sinRegistro.length > 5 ? '...' : ''}).`);
+  }
+
+  return {
+    tipo: 'success',
+    preguntaOriginal: query,
+    intencionDetectada: isAskingMoreAndLess
+      ? `Conceptos con mayor y menor presencia en porcentaje (${labelPeriodo})`
+      : `Ranking de conceptos en porcentaje sobre sesiones (${labelPeriodo})`,
+    respuesta: lineas.join('\n'),
+    trazabilidad: {
+      sesionesCount: totalSesiones,
+      tareasCount: periodEvents.length,
+      docPdfCount: docCount,
+      reuseCount: reuseCount,
+      detalle: `Porcentaje sobre ${totalSesiones} sesiones con registro · 63 conceptos auditados`
+    },
+    detalles: [
+      { etiqueta: 'Periodo', valor: labelPeriodo },
+      { etiqueta: 'Total sesiones', valor: totalSesiones },
+      { etiqueta: 'Conceptos con presencia', valor: `${conRegistro.length} / 63` },
+      { etiqueta: 'Sin registros', valor: `${sinRegistro.length} / 63` }
+    ]
+  };
+}
+
 // ── MOTOR PRINCIPAL DE EJECUCIÓN DE CONSULTA ──
 
 export function executeTacticalQuery(
@@ -567,7 +722,19 @@ export function executeTacticalQuery(
   }
 
   // ─────────────────────────────────────────────────────────────
-  // CASO F: QUÉ HEMOS ENTRENADO EN UN PERIODO TEMPORAL (15D, 30D, TEMPORADA)
+  // CASO F: RANKINGS Y PORCENTAJES DE PRESENCIA POR SESIÓN (MÁS Y MENOS / PORCENTAJES)
+  // ─────────────────────────────────────────────────────────────
+  const isAskingMoreAndLess = /(?:m[aá]s\s+y\s+menos|mayor\s+y\s+menor|m[aá]s\s+o\s+menos|extremos)/i.test(qNorm) ||
+    (/(?:m[aá]s|mayor)/i.test(qNorm) && /(?:menos|menor)/i.test(qNorm));
+  const isAskingPercentage = /(?:porcentaje|porcentajes|%)/i.test(qNorm);
+  const isAskingRanking = /(?:ordenad[oa]|de\s+mayor\s+a\s+menor|ranking)/i.test(qNorm);
+
+  if (isAskingMoreAndLess || isAskingPercentage || (isAskingRanking && (detectedPeriod !== null || qNorm.includes('conceptos')))) {
+    return handleRankingAndPercentages(query, qNorm, context, detectedPeriod, isAskingMoreAndLess);
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // CASO G: QUÉ HEMOS ENTRENADO EN UN PERIODO TEMPORAL (15D, 30D, TEMPORADA)
   // ─────────────────────────────────────────────────────────────
   if (detectedPeriod !== null || qNorm.includes('que hemos entrenado') || qNorm.includes('que se ha entrenado') || qNorm.includes('que llevamos')) {
     let periodEvents = context.events;

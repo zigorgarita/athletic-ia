@@ -26,6 +26,7 @@ interface ConsultaTacticoModalProps {
 
 const PREGUNTAS_SUGERIDAS = [
   '¿Qué hemos entrenado los últimos 15 días?',
+  '¿Qué conceptos hemos entrenado más y menos en los últimos 30 días en porcentaje?',
   '¿Qué conceptos no aparecen en los últimos 30 días?',
   '¿Qué trabajamos antes de J2 Santutxu?',
   '¿Cuándo se registró por última vez Presión Tras Pérdida?',
@@ -165,10 +166,10 @@ export function ConsultaTacticoModal({
                   </span>
                 </div>
 
-                {/* Texto de Respuesta */}
-                <p className="text-xs text-slate-200 leading-relaxed font-medium">
+                {/* Texto de Respuesta con soporte multilínea y listas */}
+                <div className="text-xs text-slate-200 leading-relaxed font-medium whitespace-pre-line space-y-1 text-left">
                   {result.respuesta}
-                </p>
+                </div>
 
                 {/* Métricas destacadas (si las hay) */}
                 {result.detalles && result.detalles.length > 0 && (
