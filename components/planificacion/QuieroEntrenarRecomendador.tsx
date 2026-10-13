@@ -329,7 +329,7 @@ export function QuieroEntrenarRecomendador({
             ¿Qué objetivo táctico necesitas trabajar hoy?
           </h4>
           <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
-            Elige un concepto en el selector superior para obtener las 3 tareas oficiales más idóneas según el tiempo transcurrido desde su último estímulo.
+            Elige un concepto en el selector superior para obtener las 3 tareas oficiales más idóneas, priorizando la rotación según los registros documentados y reutilizaciones disponibles.
           </p>
         </div>
       )}
