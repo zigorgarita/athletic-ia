@@ -86,6 +86,7 @@ export interface TaskMetricRow {
     nombre: string;
     usos: number;
   }>;
+  rawTask?: PlanningTaskLibrary;
 }
 
 export interface LibraryAnalyticsKPIs {
@@ -742,7 +743,8 @@ export function useLibraryAnalytics() {
         minutosDetalle,
         ultimaSesion: ultimaSesionPeriodo,
         diasSinEstimulo,
-        alternativasAprobadas: alternativasAprobadas.slice(0, 3)
+        alternativasAprobadas: alternativasAprobadas.slice(0, 3),
+        rawTask: task
       };
     });
   }, [approvedTasks, taskPeriodEventsMap, taskConceptsMap, taskAllTimeMaxDate, todayStr]);

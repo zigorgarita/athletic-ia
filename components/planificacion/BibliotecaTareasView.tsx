@@ -6,9 +6,10 @@ import {
   CheckCircle2, ArrowRight, Shuffle, FileText,
   AlertCircle, RotateCcw, Eye, Calendar,
   SlidersHorizontal, ChevronDown, Layers, HelpCircle,
-  Edit3, Lock, BarChart3
+  Edit3, Lock, BarChart3, Sparkles
 } from 'lucide-react';
 import { BibliotecaAnalisisTab } from './BibliotecaAnalisisTab';
+import { QuieroEntrenarRecomendador } from './QuieroEntrenarRecomendador';
 import { supabase } from '@/lib/supabase';
 import { PlanningTaskLibrary } from '@/types';
 import { Button } from '@/components/ui/Button';
@@ -118,8 +119,8 @@ export function BibliotecaTareasView({
 }: BibliotecaTareasViewProps) {
   const { currentUser } = useEditMode();
 
-  // Tab state: Catálogo vs Análisis
-  const [currentTab, setCurrentTab] = useState<'catalogo' | 'analisis'>('catalogo');
+  // Tab state: Catálogo vs Recomendador vs Análisis
+  const [currentTab, setCurrentTab] = useState<'catalogo' | 'analisis' | 'recomendador'>('catalogo');
 
   // Tasks states
   const [tasks, setTasks] = useState<PlanningTaskLibrary[]>([]);
@@ -618,7 +619,7 @@ export function BibliotecaTareasView({
               </span>
             </div>
 
-            {/* Pestañas Catálogo vs Análisis */}
+            {/* Pestañas Catálogo vs Quiero Entrenar vs Análisis */}
             <div className="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 ml-1">
               <button
                 type="button"
@@ -631,6 +632,18 @@ export function BibliotecaTareasView({
               >
                 <BookOpen className="w-3.5 h-3.5" />
                 Catálogo
+              </button>
+              <button
+                type="button"
+                onClick={() => setCurrentTab('recomendador')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 ${
+                  currentTab === 'recomendador'
+                    ? 'bg-[#CC0E21] text-white shadow-sm'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                Quiero Entrenar…
               </button>
               <button
                 type="button"
@@ -676,6 +689,21 @@ export function BibliotecaTareasView({
             </button>
           </div>
         )}
+
+        {/* ── ACCESO RÁPIDO A QUIERO ENTRENAR ── */}
+        <div className="mt-3.5 p-2.5 rounded-xl bg-gradient-to-r from-red-950/25 via-slate-950/70 to-slate-950/50 border border-[#CC0E21]/20 flex items-center justify-between">
+          <div className="flex items-center gap-2 text-xs text-slate-300">
+            <Sparkles className="w-3.5 h-3.5 text-[#CC0E21] shrink-0" />
+            <span className="text-[11px] font-bold">¿Tienes un concepto concreto en mente para hoy?</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setCurrentTab('recomendador')}
+            className="text-[11px] font-black text-red-400 hover:text-red-300 flex items-center gap-1 transition-colors"
+          >
+            Abrir Quiero Entrenar… →
+          </button>
+        </div>
 
         {/* ── MOTOR DE BÚSQUEDA GUIADA: FAMILIA → CONCEPTO ── */}
         <div className="mt-4 pt-4 border-t border-slate-800/80 space-y-3">
@@ -925,13 +953,20 @@ export function BibliotecaTareasView({
       ) : (
         /* ── CUERPO PRINCIPAL: RESULTADOS + FICHA ── */
         <div className="flex-1 flex flex-col lg:flex-row gap-4 overflow-hidden min-h-[500px]">
-        {/* ── LISTA DE TAREAS (COLUMNA IZQUIERDA / PRINCIPAL) ── */}
+        {/* ── LISTA DE TAREAS / RECOMENDADOR (COLUMNA IZQUIERDA / PRINCIPAL) ── */}
         <div
           className={`flex-1 overflow-y-auto space-y-2.5 pr-1 ${
             selectedTask ? 'lg:w-7/12' : 'w-full'
           }`}
         >
-          {loading ? (
+          {currentTab === 'recomendador' ? (
+            <QuieroEntrenarRecomendador
+              onSelectTask={task => setSelectedTask(task)}
+              existingTasks={tasks}
+            />
+          ) : (
+            <>
+              {loading ? (
             <div className="flex flex-col items-center justify-center p-12 text-slate-500 space-y-3">
               <div className="h-8 w-8 rounded-full border-2 border-slate-700 border-t-[#CC0E21] animate-spin" />
               <p className="text-xs font-bold uppercase tracking-wider">Cargando biblioteca táctica...</p>
@@ -1090,6 +1125,8 @@ export function BibliotecaTareasView({
                 </div>
               );
             })
+          )}
+            </>
           )}
         </div>
 
