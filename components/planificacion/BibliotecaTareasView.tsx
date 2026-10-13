@@ -6,10 +6,12 @@ import {
   CheckCircle2, ArrowRight, Shuffle, FileText,
   AlertCircle, RotateCcw, Eye, Calendar,
   SlidersHorizontal, ChevronDown, Layers, HelpCircle,
-  Edit3, Lock, BarChart3, Sparkles
+  Edit3, Lock, BarChart3, Sparkles, MessageSquare
 } from 'lucide-react';
 import { BibliotecaAnalisisTab } from './BibliotecaAnalisisTab';
 import { QuieroEntrenarRecomendador } from './QuieroEntrenarRecomendador';
+import { ConsultaTacticoModal } from './ConsultaTacticoModal';
+import { useLibraryAnalytics } from '@/hooks/useLibraryAnalytics';
 import { supabase } from '@/lib/supabase';
 import { PlanningTaskLibrary } from '@/types';
 import { Button } from '@/components/ui/Button';
@@ -121,6 +123,8 @@ export function BibliotecaTareasView({
 
   // Tab state: Catálogo vs Recomendador vs Análisis
   const [currentTab, setCurrentTab] = useState<'catalogo' | 'analisis' | 'recomendador'>('catalogo');
+  const [isConsultaModalOpen, setIsConsultaModalOpen] = useState(false);
+  const analytics = useLibraryAnalytics();
 
   // Tasks states
   const [tasks, setTasks] = useState<PlanningTaskLibrary[]>([]);
@@ -618,6 +622,17 @@ export function BibliotecaTareasView({
                 {tasks.filter(t => t.aprobada === true).length}
               </span>
             </div>
+
+            {/* Botón de acceso a Consulta Conversacional Táctica V1 */}
+            <button
+              type="button"
+              onClick={() => setIsConsultaModalOpen(true)}
+              className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-850 border border-slate-750 hover:border-slate-700 text-xs font-bold text-slate-200 hover:text-white transition-all flex items-center gap-1.5 shadow-sm"
+              title="Hacer preguntas sobre lo entrenado a partir de datos reales"
+            >
+              <MessageSquare className="w-3.5 h-3.5 text-[#CC0E21]" />
+              <span>💬 Consultar lo entrenado</span>
+            </button>
 
             {/* Pestañas Catálogo vs Quiero Entrenar vs Análisis */}
             <div className="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 ml-1">
@@ -1722,6 +1737,13 @@ export function BibliotecaTareasView({
         )}
       </div>
       )}
+
+      {/* Modal conversacional táctico V1 */}
+      <ConsultaTacticoModal
+        isOpen={isConsultaModalOpen}
+        onClose={() => setIsConsultaModalOpen(false)}
+        context={analytics.queryEngineContext}
+      />
     </div>
   );
 }

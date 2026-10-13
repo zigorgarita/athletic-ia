@@ -11,6 +11,7 @@ import {
   OfficialLeagueMatch,
   MDTag
 } from '@/lib/planificacion/matchWeekResolver';
+import { QueryEngineContext } from '@/lib/planificacion/tacticalQueryEngine';
 
 /** Fecha de referencia en que comenzó el registro operativo de tareas en el planificador */
 export const FECHA_INICIO_TRAZABILIDAD_OPERATIVA = '2026-10-07';
@@ -820,6 +821,15 @@ export function useLibraryAnalytics() {
     conceptMetrics: filteredConceptMetrics,
     taskMetrics: filteredTaskMetrics,
     totalConceptsAvailable: conceptMetrics.length,
-    totalTasksAvailable: taskMetrics.length
+    totalTasksAvailable: taskMetrics.length,
+    queryEngineContext: {
+      events: allEvents,
+      conceptMetrics,
+      libraryTasks: approvedTasks,
+      conceptApprovedTasksMap,
+      taskConceptsMap,
+      officialLeagueMatches,
+      todayStr
+    }
   };
 }
