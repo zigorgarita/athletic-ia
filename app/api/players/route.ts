@@ -24,6 +24,7 @@ function sanitizePlayerPayload(data: Record<string, unknown>): Record<string, un
   if (data.equipo !== undefined) payload.equipo = typeof data.equipo === 'string' && data.equipo.trim() ? data.equipo.trim() : 'Juvenil A';
   if (data.oliver_player_id !== undefined) payload.oliver_player_id = typeof data.oliver_player_id === 'string' && data.oliver_player_id.trim() ? data.oliver_player_id.trim() : null;
   if (data.rfef_player_id !== undefined) payload.rfef_player_id = data.rfef_player_id !== null && data.rfef_player_id !== '' ? Number(data.rfef_player_id) : null;
+  if (data.activo !== undefined) payload.activo = Boolean(data.activo);
 
   return payload;
 }
@@ -126,17 +127,22 @@ export async function DELETE(req: Request) {
     }
 
     const supabaseServer = getSupabaseServerClient();
+    // Baja lógica obligatoria: NUNCA BORRAR FÍSICAMENTE
     const { error } = await supabaseServer
       .from('players')
-      .delete()
+      .update({
+        activo: false,
+        estado: 'Baja temporal',
+        updated_at: new Date().toISOString()
+      })
       .eq('id', playerId.trim());
 
     if (error) {
-      console.error('[API /api/players DELETE] Error Supabase:', error);
+      console.error('[API /api/players DELETE (Baja lógica)] Error Supabase:', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true, id: playerId.trim() }, { status: 200 });
+    return NextResponse.json({ success: true, id: playerId.trim(), soft_deleted: true }, { status: 200 });
   } catch (err: unknown) {
     console.error('[API /api/players DELETE] Excepción:', err);
     return NextResponse.json({ error: (err instanceof Error ? err.message : String(err)) || 'Error interno del servidor.' }, { status: 500 });

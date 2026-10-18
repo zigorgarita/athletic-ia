@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Match, MatchPlayerStats } from '@/types';
 import { usePlayers } from '@/hooks/usePlayers';
 import { Avatar } from '@/components/ui/Avatar';
@@ -15,7 +15,13 @@ interface ConvocatoriaModalProps {
 }
 
 export function ConvocatoriaModal({ match, onClose, onSave, initialStats }: ConvocatoriaModalProps) {
-  const { players, loading: loadingPlayers } = usePlayers();
+  const { players: allPlayers, loading: loadingPlayers } = usePlayers({ includeInactive: true });
+
+  // Convocatoria: futbolistas activos O jugadores que ya constaban convocados en este partido histórico
+  const players = useMemo(() => {
+    const historicalPlayerIds = new Set(initialStats.map(s => s.player_id));
+    return allPlayers.filter(p => p.activo !== false || historicalPlayerIds.has(p.id));
+  }, [allPlayers, initialStats]);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const { isEditMode } = useEditMode();

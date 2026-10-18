@@ -16,7 +16,7 @@ import { BibliotecaTareasView } from './BibliotecaTareasView';
 import { PdfSessionAnalyzer } from './PdfSessionAnalyzer';
 import { useClubLogos } from '@/hooks/useClubLogos';
 import { MatchBadge } from './MatchBadge';
-import { PlanningTaskLibrary, Match, TrainingAttendance, TrainingEvaluation } from '@/types';
+import { PlanningTaskLibrary, Match, TrainingAttendance, TrainingEvaluation, Player } from '@/types';
 import { useTrainingAttendance } from '@/hooks/useTrainingAttendance';
 import { getEffectiveGlobalRating } from '@/components/asistencia/AsistenciaClient';
 import { getStaffPasskey } from '@/lib/passkey';
@@ -424,7 +424,9 @@ export function PlanificacionClient() {
           .select('*')
           .order('dorsal', { ascending: true });
         if (error) throw error;
-        setPlayers(data || []);
+        // Solo jugadores activos en planificaciones operativas
+        const activeList = (data || []).filter((p: Player) => p.activo !== false);
+        setPlayers(activeList);
       } catch (err) {
         console.error('Error loading players:', err);
       }

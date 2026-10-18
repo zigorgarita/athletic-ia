@@ -1,9 +1,9 @@
 'use client';
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Plus, Users, Search, SlidersHorizontal, Eye, Star, Edit2, Trash2, Heart } from 'lucide-react';
+import { Plus, Users, Search, SlidersHorizontal, Eye, Star, Edit2, Trash2, Heart, Archive } from 'lucide-react';
 import { usePlayers } from '@/hooks/usePlayers';
 import { useCreatePlayer } from '@/hooks/useCreatePlayer';
 import { useUpdatePlayer } from '@/hooks/useUpdatePlayer';
@@ -29,13 +29,22 @@ function parseTab(value: string | null): PlayerTab | undefined {
 }
 
 export function PlantillaClient() {
-  const { players, loading, error, refetch } = usePlayers();
+  const { players: allPlayers, loading, error, refetch } = usePlayers({ includeInactive: true });
   const { createPlayer, loading: creating, error: createError } = useCreatePlayer();
   const { updatePlayer, loading: updating, error: updateError } = useUpdatePlayer();
   const { deletePlayer, error: deleteError } = useDeletePlayer();
   const { isEditMode } = useEditMode();
   const searchParams = useSearchParams();
   const router = useRouter();
+
+  // Pestaña operativa: Plantilla Activa vs Histórico / Bajas
+  const [subTab, setSubTab] = useState<'activa' | 'historico'>('activa');
+
+  // Separación nítida: Plantilla Activa (activo = true) vs Histórico / Bajas (activo = false)
+  const activePlayers = useMemo(() => allPlayers.filter(p => p.activo !== false), [allPlayers]);
+  const inactivePlayers = useMemo(() => allPlayers.filter(p => p.activo === false), [allPlayers]);
+
+  const currentDataset = subTab === 'activa' ? activePlayers : inactivePlayers;
 
   // Navigation state (list vs details)
   const [activePlayerForDetail, setActivePlayerForDetail] = useState<Player | null>(null);
@@ -123,24 +132,24 @@ export function PlantillaClient() {
         console.error('Error loading general caches:', e);
       }
     }
-    if (players.length > 0) {
+    if (allPlayers.length > 0) {
       loadValuationsAndInjuries();
     }
-  }, [players]);
+  }, [allPlayers]);
 
   // Deep-link: open player+tab from URL params (?player=ID&tab=fisico)
   useEffect(() => {
-    if (deepLinkHandled.current || players.length === 0) return;
+    if (deepLinkHandled.current || allPlayers.length === 0) return;
     const playerId = searchParams.get('player');
     const tabParam = parseTab(searchParams.get('tab'));
     if (!playerId) return;
-    const target = players.find((p) => p.id === playerId);
+    const target = allPlayers.find((p) => p.id === playerId);
     if (target) {
       deepLinkHandled.current = true;
       setInitialTabForDetail(tabParam);
       setActivePlayerForDetail(target);
     }
-  }, [players, searchParams]);
+  }, [allPlayers, searchParams]);
 
   const handleOpenAddModal = () => {
     setSelectedPlayer(null);
@@ -193,14 +202,14 @@ export function PlantillaClient() {
     }
   };
 
-  const handleDelete = async (e: React.MouseEvent, id: string) => {
+  const handleDelete = async (e: React.MouseEvent, id: string, playerName?: string) => {
     e.stopPropagation();
-    if (confirm('¿Estás seguro de que deseas eliminar este jugador de la plantilla?')) {
+    if (confirm(`¿Dar de baja a ${playerName || 'este futbolista'} de la plantilla activa?\n\nEl jugador pasará a "Histórico / Bajas" y se conservará TODO su historial intacto (partidos, evaluaciones, estadísticas y actas). NUNCA se borran datos.`)) {
       const success = await deletePlayer(id);
       if (success) {
         refetch();
       } else {
-        alert(deleteError || 'Error al eliminar el jugador de la base de datos.');
+        alert(deleteError || 'Error al tramitar la baja del jugador.');
       }
     }
   };
@@ -217,8 +226,8 @@ export function PlantillaClient() {
     return age;
   };
 
-  // Filter logic
-  const filteredPlayers = players.filter((player) => {
+  // Filter logic (aplica al conjunto actual: Activos o Histórico/Bajas)
+  const filteredPlayers = currentDataset.filter((player) => {
     const matchSearch = 
       player.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
       player.apellidos.toLowerCase().includes(searchTerm.toLowerCase());
@@ -294,16 +303,75 @@ export function PlantillaClient() {
             Plantilla
           </h1>
           <p className="text-slate-400 text-sm">
-            Fichas completas y gestión de futbolistas ({players.length})
+            {subTab === 'activa'
+              ? `Fichas completas y gestión de futbolistas activos (${activePlayers.length})`
+              : `Archivo histórico y futbolistas dados de baja (${inactivePlayers.length})`}
           </p>
         </div>
-        {isEditMode && (
+        {isEditMode && subTab === 'activa' && (
           <Button onClick={handleOpenAddModal} className="flex items-center gap-1.5 self-start sm:self-auto">
             <Plus className="h-4 w-4" />
             Añadir Jugador
           </Button>
         )}
       </div>
+
+      {/* Selector de Pestañas: Plantilla Activa vs Histórico / Bajas */}
+      <div className="flex items-center gap-2 border-b border-slate-800/80 pb-2">
+        <button
+          onClick={() => {
+            setSubTab('activa');
+            setSearchTerm('');
+          }}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
+            subTab === 'activa'
+              ? 'bg-[#CC0E21] text-white shadow-lg shadow-[#CC0E21]/20'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60 border border-slate-800/60'
+          }`}
+        >
+          <Users className="h-4 w-4" />
+          <span>Plantilla Activa</span>
+          <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+            subTab === 'activa' ? 'bg-white/20 text-white' : 'bg-slate-800 text-slate-400'
+          }`}>
+            {activePlayers.length}
+          </span>
+        </button>
+
+        <button
+          onClick={() => {
+            setSubTab('historico');
+            setSearchTerm('');
+          }}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
+            subTab === 'historico'
+              ? 'bg-amber-600 text-white shadow-lg shadow-amber-600/20'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60 border border-slate-800/60'
+          }`}
+        >
+          <Archive className="h-4 w-4" />
+          <span>Histórico / Bajas</span>
+          <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+            subTab === 'historico' ? 'bg-white/20 text-white' : 'bg-slate-800 text-slate-400'
+          }`}>
+            {inactivePlayers.length}
+          </span>
+        </button>
+      </div>
+
+      {/* Banner Informativo al consultar Histórico / Bajas */}
+      {subTab === 'historico' && (
+        <div className="p-4 rounded-2xl bg-amber-950/20 border border-amber-900/40 text-amber-200 text-xs flex items-start gap-3">
+          <Archive className="h-5 w-5 text-amber-400 shrink-0 mt-0.5" />
+          <div>
+            <h4 className="font-bold text-amber-300">Archivo Histórico y Bajas</h4>
+            <p className="text-amber-200/80 mt-0.5 leading-relaxed">
+              Futbolistas que no forman parte de la plantilla activa actual (bajas temporales, reasignaciones al Juvenil B o fin de etapa).
+              Sus registros de partidos, minutos, actas, métricas GPS y evaluaciones históricas se conservan íntegros y conectados. Haz clic en cualquier jugador para consultar su ficha histórica.
+            </p>
+          </div>
+        </div>
+      )}
 
       {error && (
         <div className="p-4 rounded-xl bg-red-950/20 border border-red-900/30 text-red-400 text-sm">
@@ -567,13 +635,15 @@ export function PlantillaClient() {
                                           <Edit2 className="h-3.5 w-3.5 text-[#CC0E21]" />
                                           <span>Editar</span>
                                         </button>
-                                        <button 
-                                          onClick={(e) => handleDelete(e, player.id)} 
-                                          className="h-7 w-7 flex items-center justify-center rounded-lg text-red-500 hover:text-red-400 hover:bg-red-950/20 border border-transparent hover:border-red-900/30 transition-colors duration-150"
-                                          title="Eliminar"
-                                        >
-                                          <Trash2 className="h-3.5 w-3.5" />
-                                        </button>
+                                        {subTab === 'activa' && (
+                                          <button 
+                                            onClick={(e) => handleDelete(e, player.id, `${player.nombre} ${player.apellidos}`)} 
+                                            className="h-7 w-7 flex items-center justify-center rounded-lg text-amber-500/80 hover:text-amber-400 hover:bg-amber-950/20 border border-transparent hover:border-amber-900/30 transition-colors duration-150"
+                                            title="Dar de baja de la plantilla activa"
+                                          >
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                          </button>
+                                        )}
                                       </>
                                     )}
                                   </div>
@@ -688,13 +758,15 @@ export function PlantillaClient() {
                                           <Edit2 className="h-3.5 w-3.5 text-[#CC0E21]" />
                                           <span>Editar</span>
                                         </button>
-                                        <button 
-                                          onClick={(e) => handleDelete(e, player.id)} 
-                                          className="h-7 w-7 flex items-center justify-center rounded-lg text-red-500 hover:text-red-400 hover:bg-red-950/20 border border-transparent hover:border-red-900/30 transition-colors duration-150"
-                                          title="Eliminar"
-                                        >
-                                          <Trash2 className="h-3.5 w-3.5" />
-                                        </button>
+                                        {subTab === 'activa' && (
+                                          <button 
+                                            onClick={(e) => handleDelete(e, player.id, `${player.nombre} ${player.apellidos}`)} 
+                                            className="h-7 w-7 flex items-center justify-center rounded-lg text-amber-500/80 hover:text-amber-400 hover:bg-amber-950/20 border border-transparent hover:border-amber-900/30 transition-colors duration-150"
+                                            title="Dar de baja de la plantilla activa"
+                                          >
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                          </button>
+                                        )}
                                       </>
                                     )}
                                   </div>
@@ -727,7 +799,7 @@ export function PlantillaClient() {
           )}
           <PlayerForm
             player={selectedPlayer}
-            allPlayers={players}
+            allPlayers={allPlayers}
             onSubmit={handleFormSubmit}
             onCancel={() => setIsModalOpen(false)}
             onDelete={() => {

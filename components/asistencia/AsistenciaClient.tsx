@@ -137,13 +137,14 @@ export function AsistenciaClient() {
     async function loadInitialData() {
       try {
         setLoadingData(true);
-        // Load players
+        // Load players (solo activos para registro operativo diario de asistencia)
         const { data: playersData, error: pErr } = await supabase
           .from('players')
           .select('*')
           .order('dorsal', { ascending: true });
         if (pErr) throw pErr;
-        setPlayers(playersData || []);
+        const activeOnly = (playersData || []).filter((p: Player) => p.activo !== false);
+        setPlayers(activeOnly);
 
         // Load planning sessions
         const { data: sessionsData, error: sErr } = await supabase
