@@ -305,6 +305,11 @@ export interface GPSSession {
   tournament_match_id?: string | null; // Sub-partido de torneo (Opción C)
   fecha: string;
   descripcion: string | null;
+  // Campos aditivos de archivado Google Drive V1
+  drive_file_id?: string | null;
+  drive_file_url?: string | null;
+  file_name?: string | null;
+  file_hash?: string | null;
   created_at: string;
 }
 
