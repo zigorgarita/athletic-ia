@@ -40,6 +40,7 @@ export interface Player {
   oliver_player_id?: string | null;
   rfef_player_id?: number | null;
   metadata_personal?: Record<string, any>;
+  activo?: boolean;
   created_at: string;
   updated_at: string;
 }
