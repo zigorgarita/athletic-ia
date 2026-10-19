@@ -48,8 +48,8 @@ export function GPSAttachFileModal({
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       const lower = file.name.toLowerCase();
-      if (!lower.endsWith('.xlsx') && !lower.endsWith('.csv')) {
-        setErrorMsg('Formato no válido. Únicamente se admiten archivos brutos .xlsx y .csv del preparador físico.');
+      if (!lower.endsWith('.xlsx') && !lower.endsWith('.csv') && !lower.endsWith('.xls')) {
+        setErrorMsg('Formato no válido. Únicamente se admiten archivos brutos .xlsx, .xls y .csv del preparador físico.');
         setSelectedFile(null);
         return;
       }
@@ -63,8 +63,8 @@ export function GPSAttachFileModal({
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       const file = e.dataTransfer.files[0];
       const lower = file.name.toLowerCase();
-      if (!lower.endsWith('.xlsx') && !lower.endsWith('.csv')) {
-        setErrorMsg('Formato no válido. Únicamente se admiten archivos brutos .xlsx y .csv del preparador físico.');
+      if (!lower.endsWith('.xlsx') && !lower.endsWith('.csv') && !lower.endsWith('.xls')) {
+        setErrorMsg('Formato no válido. Únicamente se admiten archivos brutos .xlsx, .xls y .csv del preparador físico.');
         setSelectedFile(null);
         return;
       }
@@ -74,7 +74,7 @@ export function GPSAttachFileModal({
 
   const handleUpload = async () => {
     if (!selectedFile) {
-      setErrorMsg('Selecciona un archivo .xlsx o .csv antes de continuar.');
+      setErrorMsg('Selecciona un archivo .xlsx, .xls o .csv antes de continuar.');
       return;
     }
 
@@ -191,7 +191,7 @@ export function GPSAttachFileModal({
               <span>Garantía de inmutabilidad analítica</span>
             </div>
             <p className="text-indigo-300/80 leading-relaxed text-[11px]">
-              Este proceso sube el archivo original (<code className="text-indigo-200 font-mono">.xlsx</code> / <code className="text-indigo-200 font-mono">.csv</code>) a Google Drive bajo <span className="font-semibold text-slate-200">01_PARTIDOS/&lt;Partido&gt;/GPS</span> y registra su enlace en la sesión. <strong className="text-white">NO se recalculan métricas, medias, gráficos ni datos de jugadores</strong>.
+              Este proceso sube el archivo original (<code className="text-indigo-200 font-mono">.xlsx</code> / <code className="text-indigo-200 font-mono">.xls</code> / <code className="text-indigo-200 font-mono">.csv</code>) a Google Drive bajo <span className="font-semibold text-slate-200">01_PARTIDOS/&lt;Partido&gt;/GPS</span> y registra su enlace en la sesión. <strong className="text-white">NO se recalculan métricas, medias, gráficos ni datos de jugadores</strong>.
             </p>
           </div>
 
@@ -232,7 +232,7 @@ export function GPSAttachFileModal({
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".xlsx,.csv"
+                  accept=".xlsx,.xls,.csv"
                   className="hidden"
                   onChange={handleFileChange}
                 />
@@ -255,7 +255,7 @@ export function GPSAttachFileModal({
                         Arrastra o haz clic para seleccionar el archivo bruto
                       </p>
                       <p className="text-xs text-slate-500 mt-0.5">
-                        Formatos soportados: Excel (.xlsx) o CSV (.csv)
+                        Formatos soportados: Excel (.xlsx, .xls) o CSV (.csv)
                       </p>
                     </div>
                   </div>

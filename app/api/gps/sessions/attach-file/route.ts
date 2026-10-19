@@ -57,18 +57,21 @@ export async function POST(req: Request) {
 
     const fileName = fileEntry.name || 'archivo_gps.xlsx';
     const lowerName = fileName.toLowerCase();
-    if (!lowerName.endsWith('.xlsx') && !lowerName.endsWith('.csv')) {
+    if (!lowerName.endsWith('.xlsx') && !lowerName.endsWith('.csv') && !lowerName.endsWith('.xls')) {
       return NextResponse.json(
-        { error: 'Formato de archivo no admitido. Únicamente se aceptan ficheros brutos .xlsx y .csv.' },
+        { error: 'Formato de archivo no admitido. Únicamente se aceptan ficheros brutos .xlsx, .xls y .csv.' },
         { status: 400 }
       );
     }
 
-    const mimeType =
-      fileEntry.type ||
-      (lowerName.endsWith('.csv')
-        ? 'text/csv'
-        : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    let defaultMime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    if (lowerName.endsWith('.csv')) {
+      defaultMime = 'text/csv';
+    } else if (lowerName.endsWith('.xls')) {
+      defaultMime = 'application/vnd.ms-excel';
+    }
+
+    const mimeType = fileEntry.type || defaultMime;
 
     const supabaseServer = getSupabaseServerClient();
 
