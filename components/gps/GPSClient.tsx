@@ -13,10 +13,11 @@ import { Select } from '@/components/ui/Select';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Avatar } from '@/components/ui/Avatar';
 import { GPSComparisonView } from './GPSComparisonView';
+import { GPSAttachFileModal } from './GPSAttachFileModal';
 import { 
   Activity, Upload, Calendar, ChevronRight, 
   Trash2, AlertCircle, ArrowUpDown, Award, Lock, CheckCircle2,
-  Zap, Gauge, AlertTriangle, HelpCircle, ArrowRightLeft, Trophy, ExternalLink
+  Zap, Gauge, AlertTriangle, HelpCircle, ArrowRightLeft, Trophy, ExternalLink, Paperclip
 } from 'lucide-react';
 
 interface Match {
@@ -95,6 +96,7 @@ export function GPSClient() {
   const [loadingSession, setLoadingSession] = useState(false);
   
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isAttachModalOpen, setIsAttachModalOpen] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [dateMismatchWarning, setDateMismatchWarning] = useState<string | null>(null);
 
@@ -125,6 +127,40 @@ export function GPSClient() {
   // Tournament sub-match states (Opción C)
   const [tournamentMatches, setTournamentMatches] = useState<TournamentMatch[]>([]);
   const [selectedTournamentMatchId, setSelectedTournamentMatchId] = useState<string>('');
+
+  const handleAttachSuccess = (updated: {
+    sessionId: string;
+    drive_file_id: string;
+    drive_file_url: string;
+    file_name: string;
+    file_hash: string;
+  }) => {
+    setCurrentSession((prev) =>
+      prev && prev.id === updated.sessionId
+        ? {
+            ...prev,
+            drive_file_id: updated.drive_file_id,
+            drive_file_url: updated.drive_file_url,
+            file_name: updated.file_name,
+            file_hash: updated.file_hash,
+          }
+        : prev
+    );
+
+    setAllSessions((prev) =>
+      prev.map((s) =>
+        s.id === updated.sessionId
+          ? {
+              ...s,
+              drive_file_id: updated.drive_file_id,
+              drive_file_url: updated.drive_file_url,
+              file_name: updated.file_name,
+              file_hash: updated.file_hash,
+            }
+          : s
+      )
+    );
+  };
 
   // Load list of matches from `matches` table
   const loadMatches = useCallback(async () => {
@@ -930,7 +966,7 @@ export function GPSClient() {
               {selectedMatch.tipo_partido || selectedMatch.competicion || 'PARTIDO'}
             </span>
 
-            {currentSession?.drive_file_url && (
+            {currentSession?.drive_file_url ? (
               <a
                 href={currentSession.drive_file_url}
                 target="_blank"
@@ -941,7 +977,23 @@ export function GPSClient() {
                 <ExternalLink className="h-3 w-3 text-blue-400" />
                 <span>Archivo Drive</span>
               </a>
-            )}
+            ) : currentSession ? (
+              <button
+                onClick={() => {
+                  try {
+                    verifyWritePermission();
+                    setIsAttachModalOpen(true);
+                  } catch {
+                    // Modo lectura o sin permisos de edicion
+                  }
+                }}
+                className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded text-[10px] font-bold bg-indigo-950/60 text-indigo-300 hover:bg-indigo-900/80 hover:text-white border border-indigo-700/50 transition-colors"
+                title="Adjuntar el archivo original (.xlsx / .csv) de esta sesión histórica a Google Drive"
+              >
+                <Paperclip className="h-3 w-3 text-indigo-400" />
+                <span>Adjuntar archivo original a Drive</span>
+              </button>
+            ) : null}
 
             {currentSession && isEditMode && (
               <button
@@ -1355,6 +1407,17 @@ export function GPSClient() {
           </div>
         )}
       </Modal>
+
+      {/* MODAL PARA ADJUNTAR ARCHIVO ORIGINAL A SESIONES HISTÓRICAS */}
+      <GPSAttachFileModal
+        isOpen={isAttachModalOpen}
+        onClose={() => setIsAttachModalOpen(false)}
+        session={currentSession}
+        matchTitle={selectedMatch ? getMatchTitle(selectedMatch) : ''}
+        matchDate={selectedMatch?.fecha}
+        matchType={selectedMatch?.tipo_partido || selectedMatch?.competicion || 'PARTIDO'}
+        onSuccess={handleAttachSuccess}
+      />
     </div>
   );
 }
