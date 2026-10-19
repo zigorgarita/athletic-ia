@@ -196,6 +196,7 @@ export function VideosTab({ club, season }: VideosTabProps) {
               uploadContext={{
                 module: 'RIVALES',
                 entityName: club.nombre || club.nombre_corto || 'Rival',
+                subCategory: 'Videos',
               }}
               onVideoSelected={({ url, driveFileId, fileType, fileName, tamanoBytes }) => {
                 setSaveError(null);
