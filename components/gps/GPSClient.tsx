@@ -16,7 +16,7 @@ import { GPSComparisonView } from './GPSComparisonView';
 import { 
   Activity, Upload, Calendar, ChevronRight, 
   Trash2, AlertCircle, ArrowUpDown, Award, Lock, CheckCircle2,
-  Zap, Gauge, AlertTriangle, HelpCircle, ArrowRightLeft, Trophy
+  Zap, Gauge, AlertTriangle, HelpCircle, ArrowRightLeft, Trophy, ExternalLink
 } from 'lucide-react';
 
 interface Match {
@@ -100,6 +100,7 @@ export function GPSClient() {
 
   // Import wizard states
   const [importStep, setImportStep] = useState<1 | 2 | 3>(1);
+  const [rawFile, setRawFile] = useState<File | null>(null);
   const [parsedFile, setParsedFile] = useState<ParsedFile | null>(null);
   const [columnMapping, setColumnMapping] = useState<ColumnMapping>({
     player_name: '',
@@ -348,6 +349,7 @@ export function GPSClient() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    setRawFile(file);
     setErrorMsg(null);
     setDateMismatchWarning(null);
 
@@ -664,29 +666,54 @@ export function GPSClient() {
           player_id: playerMappings[rawName]
         }));
 
-      // Llamada atómica transaccional server-side
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json'
-      };
+      // Llamada atómica transaccional server-side con archivo bruto a Google Drive
+      let response: Response;
       const staffPasskey = getStaffPasskey();
-      if (staffPasskey) {
-        headers['x-staff-passkey'] = staffPasskey;
-      }
 
-      const response = await fetch('/api/gps/sessions', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          session: sessionPayload,
-          rows: validPayloads,
-          mappings: mappingsPayload
-        })
-      });
+      if (rawFile) {
+        const formData = new FormData();
+        formData.append('file', rawFile);
+        formData.append('session', JSON.stringify(sessionPayload));
+        formData.append('rows', JSON.stringify(validPayloads));
+        formData.append('mappings', JSON.stringify(mappingsPayload));
+
+        const headers: Record<string, string> = {};
+        if (staffPasskey) {
+          headers['x-staff-passkey'] = staffPasskey;
+        }
+
+        response = await fetch('/api/gps/sessions', {
+          method: 'POST',
+          headers,
+          body: formData
+        });
+      } else {
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json'
+        };
+        if (staffPasskey) {
+          headers['x-staff-passkey'] = staffPasskey;
+        }
+
+        response = await fetch('/api/gps/sessions', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            session: sessionPayload,
+            rows: validPayloads,
+            mappings: mappingsPayload
+          })
+        });
+      }
 
       const resJson = await response.json().catch(() => null);
 
       if (!response.ok) {
         throw new Error(resJson?.error || `Error ${response.status} al guardar los datos del GPS`);
+      }
+
+      if (resJson?.warning) {
+        alert(`⚠️ Aviso: ${resJson.warning}`);
       }
 
       // 5. Complete & reload
@@ -710,6 +737,7 @@ export function GPSClient() {
 
   function resetImportWizard() {
     setImportStep(1);
+    setRawFile(null);
     setParsedFile(null);
     setErrorMsg(null);
     setDateMismatchWarning(null);
@@ -901,6 +929,19 @@ export function GPSClient() {
             <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-[#CC0E21]/20 text-[#CC0E21]">
               {selectedMatch.tipo_partido || selectedMatch.competicion || 'PARTIDO'}
             </span>
+
+            {currentSession?.drive_file_url && (
+              <a
+                href={currentSession.drive_file_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 border border-slate-700 transition-colors"
+                title={currentSession.file_name ? `Archivo original: ${currentSession.file_name}` : 'Ver archivo original en Google Drive'}
+              >
+                <ExternalLink className="h-3 w-3 text-blue-400" />
+                <span>Archivo Drive</span>
+              </a>
+            )}
 
             {currentSession && isEditMode && (
               <button
