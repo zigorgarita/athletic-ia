@@ -65,10 +65,45 @@ function normalizeClubName(str: string | null | undefined): string {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/[.,]/g, '')
-    .replace(/\b(de|del|el|la|los|las|cf|fc|cd|sd|ud|sad|ke)\b/gi, '')
+    .replace(/\b(de|del|el|la|los|las|cf|fc|cd|sd|ud|sad|cyd|ke)\b/gi, '')
     .replace(/\s+/g, ' ')
     .trim();
 }
+
+/**
+ * Mapeo canónico RFEF: Nombre / patrón específico -> rfef_club_id (DHJ Grupo 2)
+ * Denominaciones específicas por club para evitar coincidencias erróneas.
+ */
+export const RFEF_CLUB_ID_PATTERNS: Array<{ regex: RegExp; rfefClubId: number }> = [
+  { regex: /indautxu/i, rfefClubId: 33836524 },
+  { regex: /leioa/i, rfefClubId: 23289700 },
+  { regex: /cultural\s*(y\s*deportiva\s*)?leonesa|cyd\s*leonesa/i, rfefClubId: 33836521 },
+  { regex: /alav[eé]s/i, rfefClubId: 205484 },
+  { regex: /arratia/i, rfefClubId: 33836523 },
+  { regex: /santutxu/i, rfefClubId: 205567 },
+  { regex: /danok/i, rfefClubId: 900361152 },
+  { regex: /mareo/i, rfefClubId: 33836522 },
+  { regex: /valladolid/i, rfefClubId: 205459 },
+  { regex: /beto[nñ]o/i, rfefClubId: 23289793 },
+  { regex: /eibar/i, rfefClubId: 205540 },
+  { regex: /unionistas/i, rfefClubId: 207449 },
+  { regex: /antiguoko/i, rfefClubId: 205603 },
+  { regex: /sociedad/i, rfefClubId: 205597 },
+  { regex: /athletic/i, rfefClubId: 205514 },
+  { regex: /logro[nñ][eé]s/i, rfefClubId: 205744 },
+];
+
+/**
+ * Resuelve el identificador federativo oficial (rfef_club_id) de un club a partir de su denominación.
+ */
+export function resolveRfefClubId(teamName: string | null | undefined): number | null {
+  if (!teamName) return null;
+  for (const pat of RFEF_CLUB_ID_PATTERNS) {
+    if (pat.regex.test(teamName)) return pat.rfefClubId;
+  }
+  return null;
+}
+
 
 function abortResult(jornada: number, reason: string): ApplyJornadaResult {
   return {
@@ -148,10 +183,22 @@ export async function applyJornadaRFEF(params: {
 
   const normDbRival = normalizeClubName(dbMatchRow.rival);
   const normRfefRival = normalizeClubName(rfefIndautxuMatch.rivalName || '');
-  const rivalMatches =
-    normDbRival === normRfefRival ||
-    normDbRival.includes(normRfefRival) ||
-    normRfefRival.includes(normDbRival);
+
+  const dbClubId = resolveRfefClubId(dbMatchRow.rival);
+  const rfefClubId = resolveRfefClubId(rfefIndautxuMatch.rivalName);
+
+  let rivalMatches = false;
+  if (dbClubId !== null && rfefClubId !== null) {
+    // 1. Ambos identificadores federativos oficiales están disponibles:
+    // Ley estricta: Coincidencia exacta obligatoria. Si son diferentes, NUNCA se anula con includes()
+    rivalMatches = dbClubId === rfefClubId;
+  } else {
+    // 2. Fallback textual solo si alguno de los dos lados no tiene rfef_club_id identificado:
+    rivalMatches =
+      normDbRival === normRfefRival ||
+      normDbRival.includes(normRfefRival) ||
+      normRfefRival.includes(normDbRival);
+  }
 
   if (!rivalMatches) {
     return abortResult(
@@ -222,26 +269,6 @@ export async function applyJornadaRFEF(params: {
     return abortResult(jornada, `Error cargando clubs: ${clubsErr?.message || 'Sin datos'}. ABORTADO.`);
   }
 
-  // Mapeo canónico RFEF: Nombre / patrón -> rfef_club_id (DHJ Grupo 2)
-  const RFEF_CLUB_ID_PATTERNS: Array<{ regex: RegExp; rfefClubId: number }> = [
-    { regex: /indautxu/i, rfefClubId: 33836524 },
-    { regex: /leioa/i, rfefClubId: 23289700 },
-    { regex: /cultural|leonesa/i, rfefClubId: 33836521 },
-    { regex: /alav[eé]s/i, rfefClubId: 205484 },
-    { regex: /arratia/i, rfefClubId: 33836523 },
-    { regex: /santutxu/i, rfefClubId: 205567 },
-    { regex: /danok/i, rfefClubId: 900361152 },
-    { regex: /mareo/i, rfefClubId: 33836522 },
-    { regex: /valladolid/i, rfefClubId: 205459 },
-    { regex: /beto[nñ]o/i, rfefClubId: 23289793 },
-    { regex: /eibar/i, rfefClubId: 205540 },
-    { regex: /unionistas/i, rfefClubId: 207449 },
-    { regex: /antiguoko/i, rfefClubId: 205603 },
-    { regex: /sociedad/i, rfefClubId: 205597 },
-    { regex: /athletic/i, rfefClubId: 205514 },
-    { regex: /logro[nñ][eé]s/i, rfefClubId: 205744 },
-  ];
-
   const clubByRfefClubId = new Map<number, { id: string; nombre: string; rfef_club_id: number }>();
   const clubByNormName = new Map<string, { id: string; nombre: string; rfef_club_id: number | null }>();
 
@@ -254,11 +281,9 @@ export async function applyJornadaRFEF(params: {
 
   function resolveClub(nombre: string): { id: string; nombre: string; rfef_club_id?: number | null } | null {
     // 1. Intentar resolver directamente por rfef_club_id mediante patrón canónico
-    for (const pat of RFEF_CLUB_ID_PATTERNS) {
-      if (pat.regex.test(nombre)) {
-        const found = clubByRfefClubId.get(pat.rfefClubId);
-        if (found) return found;
-      }
+    const rfefId = resolveRfefClubId(nombre);
+    if (rfefId && clubByRfefClubId.has(rfefId)) {
+      return clubByRfefClubId.get(rfefId)!;
     }
 
     // 2. Fallback: normalización de nombre

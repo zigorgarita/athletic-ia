@@ -16,6 +16,7 @@ import {
   ParsedActa,
   ParsedActaPlayer,
 } from '@/lib/rfef/parser';
+import { resolveRfefClubId } from '@/lib/rfef/applier';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,7 +26,7 @@ function normalizeString(str: string | null | undefined): string {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/[.,]/g, '')
-    .replace(/\b(de|del|el|la|los|las|cf|fc|cd|sd|ud|sad|c\.f\.|f\.c\.|c\.d\.|s\.d\.|u\.d\.|ke)\b/gi, '')
+    .replace(/\b(de|del|el|la|los|las|cf|fc|cd|sd|ud|sad|cyd|c\.f\.|f\.c\.|c\.d\.|s\.d\.|u\.d\.|ke)\b/gi, '')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -246,10 +247,22 @@ export async function POST(req: NextRequest) {
 
       const normDbRival = normalizeString(dbMatch.rival);
       const normRfefRival = normalizeString(rfefIndautxuMatch.rivalName);
-      const rivalMatches =
-        normDbRival === normRfefRival ||
-        normDbRival.includes(normRfefRival) ||
-        normRfefRival.includes(normDbRival);
+
+      const dbClubId = resolveRfefClubId(dbMatch.rival);
+      const rfefClubId = resolveRfefClubId(rfefIndautxuMatch.rivalName);
+
+      let rivalMatches = false;
+      if (dbClubId !== null && rfefClubId !== null) {
+        // 1. Ambos identificadores federativos oficiales están disponibles:
+        // Ley estricta: Coincidencia exacta obligatoria. Si son diferentes, NUNCA se anula con includes()
+        rivalMatches = dbClubId === rfefClubId;
+      } else {
+        // 2. Fallback textual solo si alguno de los dos lados no tiene rfef_club_id identificado:
+        rivalMatches =
+          normDbRival === normRfefRival ||
+          normDbRival.includes(normRfefRival) ||
+          normRfefRival.includes(normDbRival);
+      }
 
       if (!rivalMatches) {
         blockers.push(
