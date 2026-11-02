@@ -403,31 +403,74 @@ export function parseActaPage(html: string, codActa: string): ParsedActa {
   const posTit2 = html.indexOf('Titulares', posSup1 + 1);
   const posSup2 = html.indexOf('Suplentes', posTit2 + 1);
 
-  // Secciones de sustituciones
+  // Secciones de sustituciones y tarjetas
   const posSubs1 = html.indexOf('Sustituciones');
   const posTarj1 = html.indexOf('Tarjetas');
-  const posSubs2 = html.indexOf('Sustituciones', posSubs1 + 1);
-  const posTarj2 = html.indexOf('Tarjetas', posTarj1 + 1);
+  const posSubs2 = posSubs1 !== -1 ? html.indexOf('Sustituciones', posSubs1 + 1) : -1;
+  const posTarj2 = posTarj1 !== -1 ? html.indexOf('Tarjetas', posTarj1 + 1) : -1;
 
   function parseSubsFromBlock(subsHtml: string, isLocal: boolean): ParsedActaSubstitution[] {
     const subs: ParsedActaSubstitution[] = [];
-    const tblRegex = /<table class="table table-striped table-hover">([\s\S]*?)<\/table>/gi;
+    if (!subsHtml) return subs;
+
+    // Acepta cualquier tabla en el bloque de sustituciones (con o sin table-striped)
+    const tblRegex = /<table[^>]*class=["'][^"']*table[^"']*["'][^>]*>([\s\S]*?)<\/table>/gi;
     let tm;
     while ((tm = tblRegex.exec(subsHtml)) !== null) {
       const tableHtml = tm[1];
-      const entraMatch = tableHtml.match(
-        /<td[^>]*class=font_responsive>(\d+)<\/td>\s*<td[^>]*class=font_responsive>([^<]+)<\/td>\s*<td[^>]*><i class="fa fa-arrow-left/i
+
+      // 1. Minuto
+      // Formato actual: en celda rowspan=2 con <strong>XX'</strong>
+      // Formato anterior: en <span class=font-blue>(XX')</span>
+      const minMatchNew =
+        tableHtml.match(/<td[^>]*rowspan=2[^>]*><strong>\s*(\d+)'?\s*<\/strong>/i) ||
+        tableHtml.match(/<strong>\s*(\d+)'\s*<\/strong>/i);
+      const minMatchOld = tableHtml.match(
+        /<span class=["']?font-blue["']?>\((\d+)(?:'\+?(\d+)?)?'?\)\s*<\/span>/i
       );
-      const saleMatch = tableHtml.match(
-        /<td[^>]*class=font_responsive>(\d+)<\/td>\s*<td[^>]*class=font_responsive><p[^>]*><span class=font-blue>\((\d+)(?:'\+?(\d+)?)?'?\)\s*<\/span>\s*([^<]+)<\/p><\/td>\s*<td[^>]*><i class="fa fa-arrow-right/i
+      const minuto = minMatchNew
+        ? parseInt(minMatchNew[1], 10)
+        : minMatchOld
+        ? parseInt(minMatchOld[1], 10)
+        : null;
+
+      // 2. Entra (Jugador que entra)
+      // Formato actual: dorsal opcionalmente en <strong>, flecha fa-solid fa-arrow-up-long o fa-arrow-left
+      // Formato anterior: dorsal directo, flecha fa fa-arrow-left
+      const entraMatch =
+        tableHtml.match(
+          /<td[^>]*class=font_responsive[^>]*>(?:<strong>)?(\d+)(?:<\/strong>)?<\/td>\s*<td[^>]*class=font_responsive>([^<]+)<\/td>\s*<td[^>]*><i class="[^"]*(?:arrow-up|fa-arrow-left)/i
+        ) ||
+        tableHtml.match(
+          /<td[^>]*class=font_responsive>(\d+)<\/td>\s*<td[^>]*class=font_responsive>([^<]+)<\/td>\s*<td[^>]*><i class="fa fa-arrow-left/i
+        );
+
+      // 3. Sale (Jugador que sale)
+      let saleDorsal: number | null = null;
+      let saleNombre = '';
+      const saleMatchNew = tableHtml.match(
+        /<td[^>]*class=font_responsive[^>]*>(?:<strong>)?(\d+)(?:<\/strong>)?<\/td>\s*<td[^>]*class=font_responsive><p[^>]*>(?:<span[^>]*>[^<]*<\/span>)?\s*([^<]+)<\/p><\/td>\s*<td[^>]*><i class="[^"]*(?:arrow-down|fa-arrow-right)/i
       );
-      if (entraMatch && saleMatch) {
+      if (saleMatchNew) {
+        saleDorsal = parseInt(saleMatchNew[1], 10);
+        saleNombre = stripHtml(saleMatchNew[2]);
+      } else {
+        const saleMatchOld = tableHtml.match(
+          /<td[^>]*class=font_responsive>(\d+)<\/td>\s*<td[^>]*class=font_responsive><p[^>]*><span class=font-blue>\((\d+)(?:'\+?(\d+)?)?'?\)\s*<\/span>\s*([^<]+)<\/p><\/td>\s*<td[^>]*><i class="fa fa-arrow-right/i
+        );
+        if (saleMatchOld) {
+          saleDorsal = parseInt(saleMatchOld[1], 10);
+          saleNombre = stripHtml(saleMatchOld[4]);
+        }
+      }
+
+      if (minuto !== null && entraMatch && saleDorsal !== null) {
         subs.push({
-          minuto: parseInt(saleMatch[2], 10),
+          minuto,
           entraDorsal: parseInt(entraMatch[1], 10),
           entraNombre: stripHtml(entraMatch[2]),
-          saleDorsal: parseInt(saleMatch[1], 10),
-          saleNombre: stripHtml(saleMatch[4]),
+          saleDorsal,
+          saleNombre,
           esLocal: isLocal,
         });
       }
@@ -435,14 +478,27 @@ export function parseActaPage(html: string, codActa: string): ParsedActa {
     return subs;
   }
 
-  const localSubs =
-    posSubs1 !== -1 && posTarj1 !== -1
-      ? parseSubsFromBlock(html.substring(posSubs1, posTarj1), true)
-      : [];
-  const visitSubs =
-    posSubs2 !== -1 && posTarj2 !== -1
-      ? parseSubsFromBlock(html.substring(posSubs2, posTarj2), false)
-      : [];
+  // Detección polimórfica del delimitador de bloques (formato actual en 2 columnas vs formato anterior secuencial)
+  let localSubsHtml = '';
+  let visitSubsHtml = '';
+
+  if (posSubs1 !== -1 && posSubs2 !== -1) {
+    if (posTarj1 !== -1 && posSubs2 < posTarj1) {
+      // Formato actual RFEF (columnas paralelas: Local Subs -> Visitor Subs -> Local Tarjetas -> Visitor Tarjetas)
+      localSubsHtml = html.substring(posSubs1, posSubs2);
+      visitSubsHtml = html.substring(posSubs2, posTarj1);
+    } else {
+      // Formato anterior RFEF (secuencial: Local Subs -> Local Tarjetas -> Visitor Subs -> Visitor Tarjetas)
+      localSubsHtml = posTarj1 !== -1 ? html.substring(posSubs1, posTarj1) : '';
+      visitSubsHtml = posTarj2 !== -1 ? html.substring(posSubs2, posTarj2) : html.substring(posSubs2, posSubs2 + 8000);
+    }
+  } else if (posSubs1 !== -1) {
+    const endPos = posTarj1 !== -1 && posTarj1 > posSubs1 ? posTarj1 : posSubs1 + 8000;
+    localSubsHtml = html.substring(posSubs1, endPos);
+  }
+
+  const localSubs = parseSubsFromBlock(localSubsHtml, true);
+  const visitSubs = parseSubsFromBlock(visitSubsHtml, false);
   const substitutions = [...localSubs, ...visitSubs];
 
   // Parsear jugadores de ambos equipos
@@ -564,13 +620,22 @@ export function parseActaPage(html: string, codActa: string): ParsedActa {
     return cards;
   }
 
+  // Detección polimórfica del delimitador de tarjetas locales (formato actual en 2 columnas vs formato anterior secuencial)
+  let localTarjHtml = '';
+  if (posTarj1 !== -1) {
+    if (posSubs2 !== -1 && posSubs2 > posTarj1) {
+      // Formato anterior RFEF (secuencial: posSubs1 < posTarj1 < posSubs2 < posTarj2)
+      localTarjHtml = html.substring(posTarj1, posSubs2);
+    } else if (posTarj2 !== -1 && posTarj2 > posTarj1) {
+      // Formato actual RFEF (en 2 columnas: posSubs1 < posSubs2 < posTarj1 < posTarj2)
+      localTarjHtml = html.substring(posTarj1, posTarj2);
+    } else {
+      localTarjHtml = html.substring(posTarj1, posTarj1 + 3500);
+    }
+  }
+
   const cardsLocal =
-    posTarj1 !== -1
-      ? parseCardsFromSection(
-          html.substring(posTarj1, posSubs2 !== -1 ? posSubs2 : posTarj1 + 3500),
-          true
-        )
-      : [];
+    posTarj1 !== -1 ? parseCardsFromSection(localTarjHtml, true) : [];
   const cardsVisit =
     posTarj2 !== -1
       ? parseCardsFromSection(html.substring(posTarj2, posTarj2 + 4000), false)
