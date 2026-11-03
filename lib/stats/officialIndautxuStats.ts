@@ -32,6 +32,8 @@ export interface OfficialPlayerLeagueStats {
   dorsal: number;
   demarcacion: string;
   isPortero: boolean;
+  activo: boolean;
+  estado: string;
   convocatorias: number;
   partidosJugados: number; // PJ: oficial con minutos > 0
   titularidades: number;
@@ -91,6 +93,8 @@ export function createEmptyOfficialPlayerStats(
     apellidos: string;
     dorsal?: number;
     demarcacion?: string;
+    activo?: boolean;
+    estado?: string;
   },
   matchesPlayedByTeam: number
 ): OfficialPlayerLeagueStats {
@@ -105,6 +109,8 @@ export function createEmptyOfficialPlayerStats(
     dorsal: player.dorsal || 0,
     demarcacion: player.demarcacion || 'Desconocida',
     isPortero,
+    activo: player.activo !== false,
+    estado: player.estado || 'Disponible',
     convocatorias: 0,
     partidosJugados: 0,
     titularidades: 0,
@@ -132,6 +138,8 @@ export function calculateOfficialPlayerStats(
     apellidos: string;
     dorsal?: number;
     demarcacion?: string;
+    activo?: boolean;
+    estado?: string;
   },
   playerStats: MatchPlayerStats[],
   matchesPlayedByTeam: number
@@ -173,6 +181,8 @@ export function calculateOfficialPlayerStats(
     dorsal: player.dorsal || 0,
     demarcacion: player.demarcacion || 'Desconocida',
     isPortero,
+    activo: player.activo !== false,
+    estado: player.estado || 'Disponible',
     convocatorias,
     partidosJugados,
     titularidades,
