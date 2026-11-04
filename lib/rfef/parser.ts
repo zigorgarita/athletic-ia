@@ -347,6 +347,89 @@ export function parseCalendarPage(html: string): ParsedRFEFCalendar {
  * 2. PARSER DEL ACTA FEDERATIVA (NFG_CmpPartido)
  * ----------------------------------------------------------------------------
  */
+/**
+ * Normaliza una cadena de texto para comparación unívoca libre de acentos,
+ * mayúsculas, signos de puntuación y espacios redundantes.
+ */
+export function normalizeName(str: string): string {
+  if (!str) return '';
+  return str
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export interface PlayerMatchResult<T = ParsedActaPlayer> {
+  player: T | null;
+  isAmbiguous: boolean;
+  isStaff: boolean;
+  ambiguousCandidates?: T[];
+}
+
+/**
+ * Empareja un objetivo (nombre en tarjeta o autor de gol) con la plantilla
+ * utilizando identidad completa normalizada.
+ * Nunca empareja por un único apellido común aislado.
+ * Si es cuerpo técnico o no pertenece a la plantilla, no lo asigna a futbolistas.
+ * Si hay ambigüedad (> 1 candidatos), no asigna datos y señala la ambigüedad.
+ */
+export function matchPlayerByName<T extends { nombre?: string | null; dorsal?: number | null }>(
+  rawTarget: string,
+  candidates: T[]
+): PlayerMatchResult<T> {
+  if (!rawTarget || !candidates || candidates.length === 0) {
+    return { player: null, isAmbiguous: false, isStaff: false };
+  }
+
+  // Detectar cuerpo técnico explícito por sufijos federativos habituales
+  const isStaff = /\b(e\.t\.|e\.a\.|e\.p\.|del|med|p\.f\.|entrenador|delegado|fisioterapeuta|medico|preparador)\b/i.test(rawTarget);
+  if (isStaff) {
+    return { player: null, isAmbiguous: false, isStaff: true };
+  }
+
+  const cleanTarget = rawTarget.replace(/\([^)]*\)/g, '').trim();
+  const targetNorm = normalizeName(cleanTarget);
+  if (!targetNorm) {
+    return { player: null, isAmbiguous: false, isStaff: false };
+  }
+
+  // 1. Coincidencia exacta completa normalizada
+  const exact = candidates.filter((p) => normalizeName(p.nombre || '') === targetNorm);
+  if (exact.length === 1) {
+    return { player: exact[0], isAmbiguous: false, isStaff: false };
+  }
+  if (exact.length > 1) {
+    return { player: null, isAmbiguous: true, isStaff: false, ambiguousCandidates: exact };
+  }
+
+  // 2. Coincidencia por tokens (debe contener al menos 2 tokens significativos)
+  const targetTokens = targetNorm.split(' ').filter((t) => t.length > 1);
+  if (targetTokens.length < 2) {
+    // Si solo hay un único token (ej: primer apellido suelto), NUNCA emparejar para evitar falsos positivos
+    return { player: null, isAmbiguous: false, isStaff: false };
+  }
+
+  const tokenMatches = candidates.filter((p) => {
+    const pTokens = normalizeName(p.nombre || '').split(' ').filter((t) => t.length > 1);
+    if (pTokens.length < 2) return false;
+    const targetInP = targetTokens.every((t) => pTokens.includes(t));
+    const pInTarget = pTokens.every((t) => targetTokens.includes(t));
+    return targetInP || pInTarget;
+  });
+
+  if (tokenMatches.length === 1) {
+    return { player: tokenMatches[0], isAmbiguous: false, isStaff: false };
+  }
+  if (tokenMatches.length > 1) {
+    return { player: null, isAmbiguous: true, isStaff: false, ambiguousCandidates: tokenMatches };
+  }
+
+  return { player: null, isAmbiguous: false, isStaff: false };
+}
+
 export function parseActaPage(html: string, codActa: string): ParsedActa {
   if (!html || html.length < 500) {
     throw new Error(`Acta vacía o inválida para CodActa ${codActa}`);
@@ -439,24 +522,24 @@ export function parseActaPage(html: string, codActa: string): ParsedActa {
       // Formato anterior: dorsal directo, flecha fa fa-arrow-left
       const entraMatch =
         tableHtml.match(
-          /<td[^>]*class=font_responsive[^>]*>(?:<strong>)?(\d+)(?:<\/strong>)?<\/td>\s*<td[^>]*class=font_responsive>([^<]+)<\/td>\s*<td[^>]*><i class="[^"]*(?:arrow-up|fa-arrow-left)/i
+          /<td[^>]*class=["']?font_responsive["']?[^>]*>(?:<strong>)?(\d+)(?:<\/strong>)?<\/td>\s*<td[^>]*class=["']?font_responsive["']?[^>]*>([^<]+)<\/td>\s*<td[^>]*><i class="[^"]*(?:arrow-up|fa-arrow-left)/i
         ) ||
         tableHtml.match(
-          /<td[^>]*class=font_responsive>(\d+)<\/td>\s*<td[^>]*class=font_responsive>([^<]+)<\/td>\s*<td[^>]*><i class="fa fa-arrow-left/i
+          /<td[^>]*class=["']?font_responsive["']?[^>]*>(\d+)<\/td>\s*<td[^>]*class=["']?font_responsive["']?[^>]*>([^<]+)<\/td>\s*<td[^>]*><i class="fa fa-arrow-left/i
         );
 
       // 3. Sale (Jugador que sale)
       let saleDorsal: number | null = null;
       let saleNombre = '';
       const saleMatchNew = tableHtml.match(
-        /<td[^>]*class=font_responsive[^>]*>(?:<strong>)?(\d+)(?:<\/strong>)?<\/td>\s*<td[^>]*class=font_responsive><p[^>]*>(?:<span[^>]*>[^<]*<\/span>)?\s*([^<]+)<\/p><\/td>\s*<td[^>]*><i class="[^"]*(?:arrow-down|fa-arrow-right)/i
+        /<td[^>]*class=["']?font_responsive["']?[^>]*>(?:<strong>)?(\d+)(?:<\/strong>)?<\/td>\s*<td[^>]*class=["']?font_responsive["']?[^>]*><p[^>]*>(?:<span[^>]*>[^<]*<\/span>)?\s*([^<]+)<\/p><\/td>\s*<td[^>]*><i class="[^"]*(?:arrow-down|fa-arrow-right)/i
       );
       if (saleMatchNew) {
         saleDorsal = parseInt(saleMatchNew[1], 10);
         saleNombre = stripHtml(saleMatchNew[2]);
       } else {
         const saleMatchOld = tableHtml.match(
-          /<td[^>]*class=font_responsive>(\d+)<\/td>\s*<td[^>]*class=font_responsive><p[^>]*><span class=font-blue>\((\d+)(?:'\+?(\d+)?)?'?\)\s*<\/span>\s*([^<]+)<\/p><\/td>\s*<td[^>]*><i class="fa fa-arrow-right/i
+          /<td[^>]*class=["']?font_responsive["']?[^>]*>(\d+)<\/td>\s*<td[^>]*class=["']?font_responsive["']?[^>]*><p[^>]*><span class=["']?font-blue["']?>\((\d+)(?:'\+?(\d+)?)?'?\)\s*<\/span>\s*([^<]+)<\/p><\/td>\s*<td[^>]*><i class="fa fa-arrow-right/i
         );
         if (saleMatchOld) {
           saleDorsal = parseInt(saleMatchOld[1], 10);
@@ -620,27 +703,47 @@ export function parseActaPage(html: string, codActa: string): ParsedActa {
     return cards;
   }
 
-  // Detección polimórfica del delimitador de tarjetas locales (formato actual en 2 columnas vs formato anterior secuencial)
+  // Detección polimórfica del delimitador de tarjetas locales y visitantes
   let localTarjHtml = '';
+  let visitTarjHtml = '';
+
   if (posTarj1 !== -1) {
-    if (posSubs2 !== -1 && posSubs2 > posTarj1) {
-      // Formato anterior RFEF (secuencial: posSubs1 < posTarj1 < posSubs2 < posTarj2)
-      localTarjHtml = html.substring(posTarj1, posSubs2);
-    } else if (posTarj2 !== -1 && posTarj2 > posTarj1) {
-      // Formato actual RFEF (en 2 columnas: posSubs1 < posSubs2 < posTarj1 < posTarj2)
-      localTarjHtml = html.substring(posTarj1, posTarj2);
+    if (posTarj2 !== -1) {
+      if (posSubs2 !== -1 && posSubs2 > posTarj1) {
+        // Formato anterior RFEF (secuencial: posSubs1 < posTarj1 < posSubs2 < posTarj2)
+        localTarjHtml = html.substring(posTarj1, posSubs2);
+      } else {
+        // Formato actual RFEF (en 2 columnas: posSubs1 < posSubs2 < posTarj1 < posTarj2)
+        localTarjHtml = html.substring(posTarj1, posTarj2);
+      }
+      visitTarjHtml = html.substring(posTarj2, posTarj2 + 4000);
     } else {
-      localTarjHtml = html.substring(posTarj1, posTarj1 + 3500);
+      // Solo 1 bloque de Tarjetas en toda el acta (un equipo tuvo 0 tarjetas)
+      if (posSubs2 !== -1 && posTarj1 > posSubs2) {
+        // El bloque está tras los cambios visitantes -> Corresponde al VISITANTE
+        visitTarjHtml = html.substring(posTarj1, posTarj1 + 4000);
+      } else {
+        localTarjHtml = html.substring(posTarj1, posTarj1 + 4000);
+      }
     }
   }
 
-  const cardsLocal =
-    posTarj1 !== -1 ? parseCardsFromSection(localTarjHtml, true) : [];
-  const cardsVisit =
-    posTarj2 !== -1
-      ? parseCardsFromSection(html.substring(posTarj2, posTarj2 + 4000), false)
-      : [];
+  const cardsLocal = localTarjHtml ? parseCardsFromSection(localTarjHtml, true) : [];
+  const cardsVisit = visitTarjHtml ? parseCardsFromSection(visitTarjHtml, false) : [];
   const cards = [...cardsLocal, ...cardsVisit];
+
+  // Re-validación estricta de pertenencia de equipo para evitar inversiones de columna
+  const allLocalP = localTitularesRaw.concat(localSuplentesRaw);
+  const allVisitP = visitTitularesRaw.concat(visitSuplentesRaw);
+  for (const c of cards) {
+    const inLocal = matchPlayerByName(c.nombre, allLocalP).player !== null;
+    const inVisit = matchPlayerByName(c.nombre, allVisitP).player !== null;
+    if (inLocal && !inVisit) {
+      c.esLocal = true;
+    } else if (inVisit && !inLocal) {
+      c.esLocal = false;
+    }
+  }
 
   // Expulsiones desde el bloque textual del acta
   function parseExpulsionsFromHtml(
@@ -743,14 +846,16 @@ export function parseActaPage(html: string, codActa: string): ParsedActa {
       }
 
       // Comprobar si el futbolista sufrió expulsión (por texto de incidencias o por tarjetas)
-      const firstName = (p.nombre || '').split(' ')[0];
-      const expFromText = teamExpulsions.find(
-        (e) => (p.dorsal && e.dorsal === p.dorsal) || (firstName && e.nombre.includes(firstName))
-      );
+      const expFromText = teamExpulsions.find((e) => {
+        if (p.dorsal && e.dorsal === p.dorsal) return true;
+        const matchRes = matchPlayerByName(e.nombre, [p]);
+        return matchRes.player !== null;
+      });
 
-      const pCards = teamCards.filter(
-        (c) => firstName && c.nombre.includes(firstName)
-      );
+      const pCards = teamCards.filter((c) => {
+        const matchRes = matchPlayerByName(c.nombre, [p]);
+        return matchRes.player !== null;
+      });
       const hasDirectRed = pCards.some((c) => c.tipo === 'Roja Directa');
       const yellowCount = pCards.filter((c) => c.tipo === 'Amarilla').length;
       const hasDoubleYellow = yellowCount >= 2 || pCards.some((c) => c.tipo === 'Doble Amarilla');
@@ -766,17 +871,19 @@ export function parseActaPage(html: string, codActa: string): ParsedActa {
       } else if (hasDirectRed) {
         expulsado = true;
         const redCard = pCards.find((c) => c.tipo === 'Roja Directa');
-        minutoExpulsion = redCard ? redCard.minuto : 90;
+        minutoExpulsion = redCard ? redCard.minuto : null;
         tipoExpulsion = 'roja_directa';
       } else if (hasDoubleYellow) {
         expulsado = true;
         const yellows = pCards.filter((c) => c.tipo === 'Amarilla' || c.tipo === 'Doble Amarilla');
-        minutoExpulsion = yellows[yellows.length - 1]?.minuto ?? 90;
+        minutoExpulsion = yellows[yellows.length - 1]?.minuto ?? null;
         tipoExpulsion = 'doble_amarilla';
       }
 
-      // Corte de minutos estricto por expulsión (nunca más de 90', nunca negativo)
-      if (expulsado && minutoExpulsion !== null) {
+      // Corte de minutos estricto por expulsión durante el tiempo de juego (<= 90')
+      // Si la incidencia ocurrió con el partido finalizado (minuto 999 o > 90), NO altera los minutos
+      // reglamentarios jugados por el futbolista ni trunca minuto_salida a 90 ni 999.
+      if (expulsado && minutoExpulsion !== null && minutoExpulsion <= 90) {
         if (rol === 'Titular') {
           minutoSalida = Math.min(minutoSalida ?? 90, minutoExpulsion);
           minutos = minutoSalida;
@@ -861,8 +968,7 @@ export function parseActaPage(html: string, codActa: string): ParsedActa {
     html.match(/<div class=number[^>]*>Goles<\/div>[\s\S]*?<table class=table>([\s\S]*?)<\/table>/i) ||
     html.match(/<div class=["']?number["']?[^>]*>Goles<\/div>[\s\S]*?<table class=["']?table["']?>([\s\S]*?)<\/table>/i);
 
-  const localNames = new Set(localTitulares.concat(localSuplentes).map((p) => p.nombre));
-  const visitNames = new Set(visitTitulares.concat(visitSuplentes).map((p) => p.nombre));
+  // Las plantillas completas se usan directamente en matchPlayerByName
 
   const goals: ParsedActaGoal[] = [];
   let golesLocal = 0;
@@ -884,12 +990,14 @@ export function parseActaPage(html: string, codActa: string): ParsedActa {
         const min = parseInt(match[1], 10);
         const autor = stripHtml(match[3]);
 
-        // Determinar si es local o visitante
-        let esLocalAuthor = localNames.has(autor);
-        if (!esLocalAuthor && !visitNames.has(autor)) {
-          // Búsqueda por subcadena
-          const lSub = Array.from(localNames).some((n) => n.includes(autor) || autor.includes(n));
-          if (lSub) esLocalAuthor = true;
+        // Determinar si es local o visitante utilizando coincidencia exacta/normalizada con las plantillas
+        let esLocalAuthor = false;
+        const matchLocal = matchPlayerByName(autor, localTitulares.concat(localSuplentes));
+        const matchVisit = matchPlayerByName(autor, visitTitulares.concat(visitSuplentes));
+        if (matchLocal.player) {
+          esLocalAuthor = true;
+        } else if (matchVisit.player) {
+          esLocalAuthor = false;
         }
 
         // Si es propia puerta, el gol suma al equipo contrario

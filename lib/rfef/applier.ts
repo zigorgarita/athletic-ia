@@ -15,7 +15,7 @@
  */
 
 import { SupabaseClient } from '@supabase/supabase-js';
-import { parseCalendarPage, parseActaPage, parseStandingsPage, ParsedActa, ParsedStandingRow } from './parser';
+import { parseCalendarPage, parseActaPage, parseStandingsPage, ParsedActa, ParsedStandingRow, matchPlayerByName } from './parser';
 
 // ---------------------------------------------------------------------------
 // Tipos públicos
@@ -502,16 +502,26 @@ export async function applyJornadaRFEF(params: {
           const subIn = teamSubs.find((s) => s.entraDorsal === p.dorsal);
           if (subIn) minutoEntrada = subIn.minuto;
         }
-        const firstName = (p.nombre || '').split(' ')[0];
-        const playerCards = parsedActa.cards.filter(
-          (c) => c.esLocal === team.isLocal && firstName && c.nombre?.includes(firstName)
-        );
+        const teamCards = parsedActa.cards.filter((c) => c.esLocal === team.isLocal);
+        const playerCards = teamCards.filter((c) => {
+          const matchRes = matchPlayerByName(c.nombre, [p]);
+          return matchRes.player !== null;
+        });
         const amarillas = Math.min(playerCards.filter((c) => c.tipo === 'Amarilla' || c.tipo === 'Doble Amarilla').length, 2);
         const dobleAmarilla = p.tipoExpulsion === 'doble_amarilla' || playerCards.some((c) => c.tipo === 'Doble Amarilla');
         const roja = p.tipoExpulsion === 'roja_directa' || (!dobleAmarilla && playerCards.some((c) => c.tipo === 'Roja Directa'));
-        const playerGoals = parsedActa.goals.filter(
-          (g) => g.esLocal === team.isLocal && !g.isPropia && firstName && g.autor?.includes(firstName)
-        ).length;
+
+        const teamGoals = parsedActa.goals.filter((g) => g.esLocal === team.isLocal && !g.isPropia);
+        const playerGoals = teamGoals.filter((g) => {
+          const matchRes = matchPlayerByName(g.autor, [p]);
+          return matchRes.player !== null;
+        }).length;
+
+        // Tratar incidencias post-partido (minuto 999) conservando constancia federativa
+        const motivoSancion =
+          p.expulsado && p.minutoExpulsion != null && p.minutoExpulsion >= 999
+            ? 'Incidencia post-partido (minuto 999)'
+            : null;
 
         statsToInsert.push({
           official_match_id: officialMatchId,
@@ -527,7 +537,7 @@ export async function applyJornadaRFEF(params: {
           amarillas,
           doble_amarilla: dobleAmarilla,
           roja,
-          motivo_sancion: null,
+          motivo_sancion: motivoSancion,
           source: 'rfef',
           last_synced_at: new Date().toISOString(),
         });
@@ -656,10 +666,11 @@ export async function applyJornadaRFEF(params: {
             }
           }
 
-          const firstName = (p.nombre || '').split(' ')[0];
-          const playerCards = indautxuActa.cards.filter(
-            (c) => c.esLocal === indIsLocal && firstName && c.nombre?.includes(firstName)
-          );
+          const indCards = indautxuActa.cards.filter((c) => c.esLocal === indIsLocal);
+          const playerCards = indCards.filter((c) => {
+            const matchRes = matchPlayerByName(c.nombre, [p]);
+            return matchRes.player !== null;
+          });
 
           const esDobleAmarilla =
             p.tipoExpulsion === 'doble_amarilla' || playerCards.some((c) => c.tipo === 'Doble Amarilla');
@@ -673,9 +684,11 @@ export async function applyJornadaRFEF(params: {
             esDobleAmarilla || playerCards.some((c) => c.tipo === 'Amarilla' || c.tipo === 'Doble Amarilla');
           const tarjetaRoja = esRojaDirecta;
 
-          const playerGoals = indautxuActa.goals.filter(
-            (g) => g.esLocal === indIsLocal && !g.isPropia && firstName && g.autor?.includes(firstName)
-          ).length;
+          const indGoals = indautxuActa.goals.filter((g) => g.esLocal === indIsLocal && !g.isPropia);
+          const playerGoals = indGoals.filter((g) => {
+            const matchRes = matchPlayerByName(g.autor, [p]);
+            return matchRes.player !== null;
+          }).length;
 
           const indSubs = indautxuActa.substitutions.filter((s) => s.esLocal === indIsLocal);
           const subIn = indSubs.find((s) => s.entraDorsal === p.dorsal);
